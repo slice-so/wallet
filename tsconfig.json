@@ -1,0 +1,9 @@
+{
+  "extends": "@slice/typescript-config/base.json",
+  "compilerOptions": {
+    "lib": ["ES2025", "DOM"],
+    "outDir": "./dist/esm",
+    "rootDir": "./src"
+  },
+  "include": ["src/**/*"]
+}

@@ -1,0 +1,118 @@
+{
+  "name": "@slicekit/wallet",
+  "version": "0.1.0-beta.0",
+  "description": "Portable Slice smart wallet SDK",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/esm/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "development": {
+        "types": "./src/index.ts",
+        "import": "./src/index.ts",
+        "default": "./src/index.ts"
+      },
+      "types": "./dist/esm/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "default": "./dist/esm/index.js"
+    },
+    "./frame": {
+      "development": {
+        "types": "./src/frame.ts",
+        "import": "./src/frame.ts",
+        "default": "./src/frame.ts"
+      },
+      "types": "./dist/esm/frame.d.ts",
+      "import": "./dist/esm/frame.js",
+      "default": "./dist/esm/frame.js"
+    },
+    "./policy": {
+      "development": {
+        "types": "./src/policy.ts",
+        "import": "./src/policy.ts",
+        "default": "./src/policy.ts"
+      },
+      "types": "./dist/esm/policy.d.ts",
+      "import": "./dist/esm/policy.js",
+      "default": "./dist/esm/policy.js"
+    },
+    "./recovery": {
+      "development": {
+        "types": "./src/recovery.ts",
+        "import": "./src/recovery.ts",
+        "default": "./src/recovery.ts"
+      },
+      "types": "./dist/esm/recovery.d.ts",
+      "import": "./dist/esm/recovery.js",
+      "default": "./dist/esm/recovery.js"
+    },
+    "./provider": {
+      "development": {
+        "types": "./src/provider.ts",
+        "import": "./src/provider.ts",
+        "default": "./src/provider.ts"
+      },
+      "types": "./dist/esm/provider.d.ts",
+      "import": "./dist/esm/provider.js",
+      "default": "./dist/esm/provider.js"
+    },
+    "./server": {
+      "development": {
+        "types": "./src/server.ts",
+        "import": "./src/server.ts",
+        "default": "./src/server.ts"
+      },
+      "types": "./dist/esm/server.d.ts",
+      "import": "./dist/esm/server.js",
+      "default": "./dist/esm/server.js"
+    },
+    "./wagmi": {
+      "development": {
+        "types": "./src/wagmi.ts",
+        "import": "./src/wagmi.ts",
+        "default": "./src/wagmi.ts"
+      },
+      "types": "./dist/esm/wagmi.d.ts",
+      "import": "./dist/esm/wagmi.js",
+      "default": "./dist/esm/wagmi.js"
+    }
+  },
+  "files": [
+    "./dist"
+  ],
+  "scripts": {
+    "build": "bun run build.ts",
+    "check": "biome check --write --unsafe",
+    "format": "biome format --write",
+    "lint": "biome lint --write",
+    "test": "bun test",
+    "type-check": "tsc -p tsconfig.json --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@zerodev/permissions": "5.6.3",
+    "@zerodev/sdk": "5.5.10",
+    "permissionless": "catalog:",
+    "viem": "catalog:"
+  },
+  "peerDependencies": {
+    "@wagmi/core": "catalog:"
+  },
+  "peerDependenciesMeta": {
+    "@wagmi/core": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@slice/typescript-config": "workspace:*",
+    "@wagmi/core": "catalog:"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/slice-so/slicekit"
+  }
+}

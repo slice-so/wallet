@@ -1,0 +1,112 @@
+import type { Address, Hex } from "viem"
+import type {
+  CreateSliceWalletRegisteredKernelAccountParameters,
+  SliceWalletRootSignatureRequest
+} from "./account"
+import type {
+  SliceWalletFrameSession,
+  SliceWalletPermissionAuthorization,
+  SliceWalletSignerFrameClient
+} from "./frame"
+import type { SliceWalletRegistryCredential } from "./registry"
+
+export type SliceWalletCeremonyReadyMessage = {
+  type: "slice-wallet:ceremony-ready"
+  version: 1
+}
+
+export type SliceWalletCeremonyConnectMessage = {
+  nonce: Hex
+  type: "slice-wallet:ceremony-connect"
+  version: 1
+}
+
+export type SliceWalletCeremonyAuthorizationMessage = {
+  authorization: SliceWalletPermissionAuthorization
+  nonce: Hex
+  type: "slice-wallet:ceremony-authorization"
+  version: 1
+}
+
+export type SliceWalletCeremonyErrorMessage = {
+  code: "authorization_failed" | "bridge_unavailable" | "invalid_request"
+  message: string
+  nonce: Hex
+  type: "slice-wallet:ceremony-error"
+  version: 1
+}
+
+export type SliceWalletCeremonyResponse =
+  | SliceWalletCeremonyAuthorizationMessage
+  | SliceWalletCeremonyErrorMessage
+
+export type SliceWalletCeremonyAccountMessage = {
+  account: Address
+  credentialIdHash: Hex
+  nonce: Hex
+  recovery?: {
+    permissionId: Hex
+    signerAddress: Address
+  }
+  type: "slice-wallet:ceremony-account"
+  version: 1
+}
+
+export type SliceWalletConnectedAccount = SliceWalletRegistryCredential & {
+  recovery?: {
+    permissionId: Hex
+    signerAddress: Address
+  }
+}
+
+export type SliceWalletCeremonyRootSignRequest = {
+  account: Address
+  chainId: number
+  nonce: Hex
+  request: SliceWalletRootSignatureRequest
+  type: "slice-wallet:root-sign-request"
+  version: 1
+}
+
+export type SliceWalletCeremonyRootSignatureMessage = {
+  hash: Hex
+  nonce: Hex
+  signature: Hex
+  type: "slice-wallet:root-signature"
+  version: 1
+}
+
+export type SliceWalletCeremonyRootResponse =
+  | SliceWalletCeremonyRootSignatureMessage
+  | SliceWalletCeremonyErrorMessage
+
+export type AuthorizeSliceWalletSessionParameters = {
+  frameClient: SliceWalletSignerFrameClient
+  idOrigin: string
+  session: SliceWalletFrameSession
+  timeoutMs?: number
+  window: Window
+}
+
+export type ConnectSliceWalletAccountParameters = {
+  fetch?: typeof fetch
+  idOrigin: string
+  timeoutMs?: number
+  window: Window
+}
+
+export type CreateSliceWalletCeremonyRootSignerParameters = {
+  account: Address
+  chainId: number
+  idOrigin: string
+  timeoutMs?: number
+  window: Window
+}
+
+export type CreateSliceWalletCeremonyKernelAccountParameters = Omit<
+  CreateSliceWalletRegisteredKernelAccountParameters,
+  "rootSigner"
+> & {
+  idOrigin: string
+  window: Window
+}
