@@ -112,13 +112,23 @@ export const createSliceWalletRegistryClient = ({
 
 export const getSliceWalletRegistryProofChallenge = ({
   challenge,
+  credentialIdHash,
+  publicKey,
   registrationKind
 }: {
   challenge: Hex
+  credentialIdHash: Hex
+  publicKey: Hex
   registrationKind: SliceWalletCredentialRegistrationKind
 }) =>
   keccak256(
     stringToHex(
-      `Slice Wallet Credential Registration v1\n${registrationKind}\n${challenge}`
+      [
+        "Slice Wallet Credential Registration v1",
+        registrationKind,
+        challenge,
+        credentialIdHash,
+        keccak256(publicKey)
+      ].join("\n")
     )
   )

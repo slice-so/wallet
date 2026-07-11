@@ -13,7 +13,7 @@ export const sliceWalletKernelAddresses = {
   metaFactory: "0xd703aaE79538628d27099B8c4f621bE4CCd142d5",
   webAuthnRootValidator: "0x7ab16Ff354AcB328452F1D445b3Ddee9a91e9e69",
   webAuthnSignerV004: "0x65DEeC8fEe717dc044D0CFD63cCf55F02cCaC2b3",
-  weightedP256Signer: "0xF0fD613A395753CDB4c91BE4f1d953d3F9F03D8e"
+  weightedP256Signer: "0xAD6e9430244f179101207D614F3c810f987d0786"
 } as const satisfies Record<string, Address>
 
 export const sliceWalletDefaultRpId = "id.slice.so"
