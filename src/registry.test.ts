@@ -9,7 +9,7 @@ const base = {
   registrationKind: "initial" as const
 }
 
-describe("registry proof challenge binding", () => {
+describe("registry proof challenge commitment", () => {
   test("is deterministic for identical inputs", () => {
     expect(getSliceWalletRegistryProofChallenge(base)).toBe(
       getSliceWalletRegistryProofChallenge(base)

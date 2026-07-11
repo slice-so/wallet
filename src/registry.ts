@@ -121,6 +121,10 @@ export const getSliceWalletRegistryProofChallenge = ({
   publicKey: Hex
   registrationKind: SliceWalletCredentialRegistrationKind
 }) =>
+  // This commits the assertion to the submitted credential tuple. WebAuthn
+  // assertions do not attest that an authenticator assigned an id to a key;
+  // immutable first-registration remains protected by the trusted ceremony
+  // registering the high-entropy id before disclosing it.
   keccak256(
     stringToHex(
       [
