@@ -40,7 +40,7 @@ type SliceWalletPermissionAccountCommonParameters = {
   client: KernelSmartAccountImplementation["client"]
   credential: SliceWalletRegisteredRootCredential
   enableSignature?: Hex
-  frameClient: SliceWalletSignerFrameClient
+  frameClient: Pick<SliceWalletSignerFrameClient, "request">
   getFactoryArgs?: () => Promise<{
     factory?: Address
     factoryData?: Hex

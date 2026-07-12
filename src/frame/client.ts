@@ -88,6 +88,7 @@ export const connectSliceWalletSignerFrame = async ({
     throw new Error("Slice wallet frame is unavailable.")
 
   const channel = new MessageChannel()
+  let destroyed = false
   const pending = new Map<
     string,
     {
@@ -122,8 +123,14 @@ export const connectSliceWalletSignerFrame = async ({
     message:
       | SliceWalletFrameRequest
       | { id: string; method: "connect"; version: 1 }
-  ) =>
-    new Promise<
+  ) => {
+    if (destroyed) {
+      return Promise.reject(
+        new Error("Slice wallet frame client was destroyed.")
+      )
+    }
+
+    return new Promise<
       Extract<
         SliceWalletFrameResponse,
         { result: object | string | null }
@@ -142,11 +149,14 @@ export const connectSliceWalletSignerFrame = async ({
         channel.port1.postMessage(message)
       }
     })
+  }
 
   await send({ id: window.crypto.randomUUID(), method: "connect", version: 1 })
 
   return {
     destroy: () => {
+      if (destroyed) return
+      destroyed = true
       for (const request of pending.values()) {
         clearTimeout(request.timeout)
         request.reject(new Error("Slice wallet frame client was destroyed."))
