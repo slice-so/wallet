@@ -1,8 +1,23 @@
 import type {
   SliceWalletFrameRequest,
   SliceWalletFrameResponse,
+  SliceWalletProtocolValue,
   SliceWalletSignerFrameClient
 } from "../types"
+
+const isFrameReadyMessage = (value: SliceWalletProtocolValue) => {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false
+  }
+  const input = value as {
+    readonly [key: string]: SliceWalletProtocolValue
+  }
+  return (
+    Object.keys(input).length === 2 &&
+    input.type === "slice-wallet:frame-ready" &&
+    input.version === 1
+  )
+}
 
 export const connectSliceWalletSignerFrame = async ({
   document,
@@ -27,7 +42,6 @@ export const connectSliceWalletSignerFrame = async ({
   iframe.style.pointerEvents = "none"
   iframe.style.width = "1px"
   iframe.style.zIndex = "2147483647"
-  document.body.appendChild(iframe)
 
   const setContinuationVisible = (visible: boolean) => {
     iframe.style.height = visible ? "72px" : "1px"
@@ -35,16 +49,41 @@ export const connectSliceWalletSignerFrame = async ({
     iframe.style.width = visible ? "320px" : "1px"
   }
 
-  await new Promise<void>((resolve, reject) => {
-    iframe.addEventListener("load", () => resolve(), { once: true })
-    iframe.addEventListener(
-      "error",
-      () => reject(new Error("Slice wallet frame failed to load.")),
-      {
-        once: true
+  const ready = new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      cleanup()
+      reject(new Error("Slice wallet frame failed to become ready."))
+    }, timeoutMs)
+    const cleanup = () => {
+      clearTimeout(timeout)
+      iframe.removeEventListener("error", onError)
+      window.removeEventListener("message", onReady)
+    }
+    const onError = () => {
+      cleanup()
+      reject(new Error("Slice wallet frame failed to load."))
+    }
+    const onReady = (event: MessageEvent<SliceWalletProtocolValue>) => {
+      if (
+        event.source !== iframe.contentWindow ||
+        event.origin !== url.origin ||
+        !isFrameReadyMessage(event.data)
+      ) {
+        return
       }
-    )
+      cleanup()
+      resolve()
+    }
+    iframe.addEventListener("error", onError, { once: true })
+    window.addEventListener("message", onReady)
   })
+  document.body.appendChild(iframe)
+  try {
+    await ready
+  } catch (error) {
+    iframe.remove()
+    throw error
+  }
   if (iframe.contentWindow === null)
     throw new Error("Slice wallet frame is unavailable.")
 
@@ -92,7 +131,9 @@ export const connectSliceWalletSignerFrame = async ({
     >((resolve, reject) => {
       const timeout = setTimeout(() => {
         pending.delete(message.id)
-        reject(new Error("Slice wallet frame request timed out."))
+        reject(
+          new Error(`Slice wallet frame ${message.method} request timed out.`)
+        )
       }, timeoutMs)
       pending.set(message.id, { reject, resolve, timeout })
       if (message.method === "connect") {
