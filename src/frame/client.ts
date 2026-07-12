@@ -5,6 +5,11 @@ import type {
   SliceWalletSignerFrameClient
 } from "../types"
 
+const logFrameClient = (
+  stage: string,
+  details: Record<string, boolean | number | string> = {}
+) => console.info(`[slice-wallet-frame-client] ${stage}`, details)
+
 const isFrameReadyMessage = (value: SliceWalletProtocolValue) => {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return false
@@ -50,8 +55,13 @@ export const connectSliceWalletSignerFrame = async ({
   }
 
   const ready = new Promise<void>((resolve, reject) => {
+    const startedAt = Date.now()
+    logFrameClient("ready.wait.start", { origin: url.origin })
     const timeout = setTimeout(() => {
       cleanup()
+      logFrameClient("ready.wait.timeout", {
+        durationMs: Date.now() - startedAt
+      })
       reject(new Error("Slice wallet frame failed to become ready."))
     }, timeoutMs)
     const cleanup = () => {
@@ -61,6 +71,9 @@ export const connectSliceWalletSignerFrame = async ({
     }
     const onError = () => {
       cleanup()
+      logFrameClient("ready.wait.error", {
+        durationMs: Date.now() - startedAt
+      })
       reject(new Error("Slice wallet frame failed to load."))
     }
     const onReady = (event: MessageEvent<SliceWalletProtocolValue>) => {
@@ -72,6 +85,9 @@ export const connectSliceWalletSignerFrame = async ({
         return
       }
       cleanup()
+      logFrameClient("ready.wait.done", {
+        durationMs: Date.now() - startedAt
+      })
       resolve()
     }
     iframe.addEventListener("error", onError, { once: true })
@@ -88,7 +104,6 @@ export const connectSliceWalletSignerFrame = async ({
     throw new Error("Slice wallet frame is unavailable.")
 
   const channel = new MessageChannel()
-  let destroyed = false
   const pending = new Map<
     string,
     {
@@ -99,6 +114,8 @@ export const connectSliceWalletSignerFrame = async ({
           { result: object | string | null }
         >["result"]
       ) => void
+      method: string
+      startedAt: number
       timeout: ReturnType<typeof setTimeout>
     }
   >()
@@ -107,9 +124,18 @@ export const connectSliceWalletSignerFrame = async ({
     (event: MessageEvent<SliceWalletFrameResponse>) => {
       const response = event.data
       const request = pending.get(response.id)
-      if (request === undefined) return
+      if (request === undefined) {
+        logFrameClient("response.unmatched", { id: response.id })
+        return
+      }
       clearTimeout(request.timeout)
       pending.delete(response.id)
+      logFrameClient("response.received", {
+        durationMs: Date.now() - request.startedAt,
+        id: response.id,
+        method: request.method,
+        status: "error" in response ? "error" : "success"
+      })
       if ("error" in response) {
         request.reject(new Error(response.error.message))
       } else {
@@ -123,40 +149,49 @@ export const connectSliceWalletSignerFrame = async ({
     message:
       | SliceWalletFrameRequest
       | { id: string; method: "connect"; version: 1 }
-  ) => {
-    if (destroyed) {
-      return Promise.reject(
-        new Error("Slice wallet frame client was destroyed.")
-      )
-    }
-
-    return new Promise<
+  ) =>
+    new Promise<
       Extract<
         SliceWalletFrameResponse,
         { result: object | string | null }
       >["result"]
     >((resolve, reject) => {
+      const startedAt = Date.now()
+      logFrameClient("request.send", {
+        id: message.id,
+        method: message.method,
+        transport: message.method === "connect" ? "window" : "message-port"
+      })
       const timeout = setTimeout(() => {
         pending.delete(message.id)
+        logFrameClient("request.timeout", {
+          durationMs: Date.now() - startedAt,
+          id: message.id,
+          method: message.method
+        })
         reject(
           new Error(`Slice wallet frame ${message.method} request timed out.`)
         )
       }, timeoutMs)
-      pending.set(message.id, { reject, resolve, timeout })
+      pending.set(message.id, {
+        method: message.method,
+        reject,
+        resolve,
+        startedAt,
+        timeout
+      })
       if (message.method === "connect") {
         iframe.contentWindow?.postMessage(message, url.origin, [channel.port2])
       } else {
         channel.port1.postMessage(message)
       }
     })
-  }
 
   await send({ id: window.crypto.randomUUID(), method: "connect", version: 1 })
 
   return {
     destroy: () => {
-      if (destroyed) return
-      destroyed = true
+      logFrameClient("client.destroy", { pendingRequests: pending.size })
       for (const request of pending.values()) {
         clearTimeout(request.timeout)
         request.reject(new Error("Slice wallet frame client was destroyed."))

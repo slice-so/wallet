@@ -8,6 +8,11 @@ const databaseName = "slice-wallet-signer"
 const objectStoreName = "sessions"
 const databaseVersion = 1
 
+const logSessionStore = (
+  stage: string,
+  details: Record<string, boolean | number | string> = {}
+) => console.info(`[slice-wallet-frame-storage] ${stage}`, details)
+
 const normalizeOrigin = (origin: string) => new URL(origin).origin
 
 const getRecordKey = (appOrigin: string, key: SliceWalletFrameSessionKey) =>
@@ -110,12 +115,27 @@ export const createSliceWalletIndexedDbSessionStore = (
     database.close()
   },
   get: async (appOrigin, key) => {
+    const startedAt = Date.now()
+    logSessionStore("get.open.start", { grantKind: key.grantKind })
     const database = await openDatabase(indexedDb)
+    logSessionStore("get.open.done", {
+      durationMs: Date.now() - startedAt,
+      grantKind: key.grantKind
+    })
     const transaction = database.transaction(objectStoreName, "readonly")
     const record = await requestResult(
       transaction.objectStore(objectStoreName).get(getRecordKey(appOrigin, key))
     )
+    logSessionStore("get.request.done", {
+      durationMs: Date.now() - startedAt,
+      found: record !== undefined,
+      grantKind: key.grantKind
+    })
     await transactionComplete(transaction)
+    logSessionStore("get.transaction.done", {
+      durationMs: Date.now() - startedAt,
+      grantKind: key.grantKind
+    })
     database.close()
     return (record as PersistedSession | undefined) ?? null
   },

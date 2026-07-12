@@ -36,6 +36,11 @@ import {
 } from "./messages"
 import { parseSliceWalletFrameRequest } from "./protocol"
 
+const logSignerFrame = (
+  stage: string,
+  details: Record<string, boolean | number | string> = {}
+) => console.info(`[slice-wallet-frame] ${stage}`, details)
+
 const isConnectRequest = (
   value: SliceWalletProtocolValue
 ): value is SliceWalletFrameConnectRequest => {
@@ -156,7 +161,14 @@ export const attachSliceWalletSignerFrame = ({
     key: SliceWalletFrameSessionKey
   ): Promise<SliceWalletStoredSession> => {
     if (parentOrigin === null) throw new Error("Wallet frame is not connected.")
+    const startedAt = Date.now()
+    logSignerFrame("session.read.start", { grantKind: key.grantKind })
     const stored = await sessionStore.get(parentOrigin, key)
+    logSignerFrame("session.read.done", {
+      durationMs: Date.now() - startedAt,
+      found: stored !== null,
+      grantKind: key.grantKind
+    })
     if (stored === null) throw new Error("Wallet session is unavailable.")
     if (stored.session.expiresAt <= now())
       throw new Error("Wallet session has expired.")
@@ -243,16 +255,17 @@ export const attachSliceWalletSignerFrame = ({
     }
     const stored = await getStoredSession(request.params.session)
     if (request.method === "signCheckoutProposal") {
+      logSignerFrame("checkout.validate.start")
       if (stored.session.grantKind !== "checkout") {
         throw new Error("Only checkout sessions may sign checkout proposals.")
       }
       if (!isAddressEqual(request.params.sender, stored.session.account)) {
         throw new Error("Checkout sender does not match the wallet session.")
       }
-      validateCheckoutCalls(
-        decodeScopedCalls(request.params.callData),
-        stored.session
-      )
+      const calls = decodeScopedCalls(request.params.callData)
+      logSignerFrame("checkout.decode.done", { calls: calls.length })
+      validateCheckoutCalls(calls, stored.session)
+      logSignerFrame("checkout.validate.done")
       const proposalHash = hashSliceWalletWeightedP256Proposal({
         account: stored.session.account,
         callData: request.params.callData,
@@ -260,10 +273,15 @@ export const attachSliceWalletSignerFrame = ({
         nonce: request.params.nonce,
         permissionId: stored.session.permissionId
       })
+      const signingStartedAt = Date.now()
+      logSignerFrame("checkout.sign.start")
       const signature = await signSliceWalletP256({
         cryptoImpl,
         key: stored.privateKey,
         message: hexToBytes(proposalHash)
+      })
+      logSignerFrame("checkout.sign.done", {
+        durationMs: Date.now() - signingStartedAt
       })
       return { proposalHash, signature }
     }
@@ -391,10 +409,20 @@ export const attachSliceWalletSignerFrame = ({
     try {
       const request = parseSliceWalletFrameRequest(event.data)
       id = request.id
-      parentPort?.postMessage(successResponse(id, await handleRequest(request)))
+      const startedAt = Date.now()
+      logSignerFrame("request.received", { id, method: request.method })
+      const result = await handleRequest(request)
+      logSignerFrame("request.handled", {
+        durationMs: Date.now() - startedAt,
+        id,
+        method: request.method
+      })
+      parentPort?.postMessage(successResponse(id, result))
+      logSignerFrame("response.sent", { id, method: request.method })
     } catch (error) {
       const message =
         error instanceof Error ? error : new Error("Wallet request failed.")
+      logSignerFrame("request.failed", { id, message: message.message })
       parentPort?.postMessage(errorResponse(id, message))
     }
   }
@@ -407,10 +435,12 @@ export const attachSliceWalletSignerFrame = ({
       event.ports.length === 1
     ) {
       parentOrigin = new URL(event.origin).origin
+      logSignerFrame("connection.received", { parentOrigin })
       parentPort = event.ports[0]
       parentPort.addEventListener("message", onPortMessage)
       parentPort.start()
       parentPort.postMessage(successResponse(event.data.id, null))
+      logSignerFrame("connection.ready", { parentOrigin })
       return
     }
 
