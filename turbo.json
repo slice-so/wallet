@@ -1,0 +1,11 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "envMode": "loose",
+      "inputs": ["src/**/*.ts", "build.ts"],
+      "outputs": ["dist/**"]
+    }
+  }
+}

@@ -21,7 +21,7 @@ Portable Kernel wallet primitives for Slice and third-party applications. The pa
 - `@slicekit/wallet/recovery`: encrypted recovery bundles and Timelock recovery operations.
 - `@slicekit/wallet/server`: server-only P-256 verification and proposal helpers.
 
-Slice commerce policies, checkout decoding, allowance clients, and ProductsModule integration live in `@slicekit/core/wallet`; they are intentionally absent from this package.
+Slice commerce policies, checkout decoding, allowance clients, and ProductsModule integration remain internal to Slice applications in `@slicekit/common`; they are intentionally absent from this package.
 
 ## Provider
 

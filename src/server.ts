@@ -1,7 +1,6 @@
 export * from "./account"
 export * from "./calls"
 export * from "./constants"
-export * from "./factory"
 export * from "./frame/messages"
 export {
   getSliceWalletP256SignerId,
