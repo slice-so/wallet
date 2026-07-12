@@ -73,4 +73,32 @@ describe("signer-frame protocol parser", () => {
       })
     ).toThrow("unknown field")
   })
+
+  it("accepts only the session key in signing requests", () => {
+    const signingRequest = {
+      id: "request-2",
+      method: "signCheckoutProposal",
+      params: {
+        callData: "0x",
+        nonce: 0n,
+        sender: account,
+        session: { account, chainId: 8453, grantKind: "checkout" }
+      },
+      version: 1
+    } as const satisfies SliceWalletProtocolValue
+
+    expect(parseSliceWalletFrameRequest(signingRequest)).toMatchObject({
+      id: "request-2",
+      method: "signCheckoutProposal"
+    })
+    expect(() =>
+      parseSliceWalletFrameRequest({
+        ...signingRequest,
+        params: {
+          ...signingRequest.params,
+          session: { ...signingRequest.params.session, expiresAt: 200 }
+        }
+      })
+    ).toThrow("unknown field")
+  })
 })

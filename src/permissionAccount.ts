@@ -33,6 +33,7 @@ import type {
   BuildSliceWalletPermissionEnableTypedDataParameters,
   CreateSliceWalletPermissionAccountParameters,
   SliceWalletFrameSession,
+  SliceWalletFrameSessionKey,
   SliceWalletUnsignedUserOperation
 } from "./types"
 
@@ -269,6 +270,12 @@ export const createSliceWalletPermissionAccount = async (
     mode,
     session
   } = parameters
+  // The frame protocol deliberately rejects the rest of the session metadata.
+  const frameSessionKey = {
+    account: session.account,
+    chainId: session.chainId,
+    grantKind: session.grantKind
+  } satisfies SliceWalletFrameSessionKey
   const { account, permissionValidator } =
     await createPermissionKernelAccount(parameters)
 
@@ -304,7 +311,7 @@ export const createSliceWalletPermissionAccount = async (
           callData: userOperation.callData,
           nonce: userOperation.nonce,
           sender: userOperation.sender ?? address,
-          session
+          session: frameSessionKey
         }
       })
     )
@@ -329,7 +336,7 @@ export const createSliceWalletPermissionAccount = async (
       const result = getFrameSignatureResult(
         await frameClient.request({
           method: "signScopedUserOperation",
-          params: { session, userOperation: unsigned }
+          params: { session: frameSessionKey, userOperation: unsigned }
         })
       )
       return wrapEnableSignature(concat(["0xff", result.signature]))
@@ -344,7 +351,7 @@ export const createSliceWalletPermissionAccount = async (
         params: {
           ...challenge,
           delegationId: parameters.delegationId,
-          session,
+          session: frameSessionKey,
           userOperation: unsigned
         }
       })
