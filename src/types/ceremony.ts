@@ -89,6 +89,7 @@ export type AuthorizeSliceWalletSessionParameters = {
 }
 
 export type ConnectSliceWalletAccountParameters = {
+  chainId: number
   fetch?: typeof fetch
   idOrigin: string
   timeoutMs?: number

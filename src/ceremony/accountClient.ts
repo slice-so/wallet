@@ -12,6 +12,7 @@ import {
 import { parseSliceWalletCeremonyAccountMessage } from "./protocol"
 
 export const connectSliceWalletAccount = async ({
+  chainId,
   fetch,
   idOrigin,
   timeoutMs = 5 * 60_000,
@@ -21,7 +22,7 @@ export const connectSliceWalletAccount = async ({
   const { popup, port } = await openSliceWalletCeremonyChannel({
     idOrigin,
     nonce,
-    path: "/ceremony/connect",
+    path: `/ceremony/connect?chainId=${chainId}`,
     window
   })
   const account = await waitForSliceWalletCeremonyMessage({

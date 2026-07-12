@@ -223,12 +223,31 @@ export const authorizeSliceWalletSession = async ({
 }: AuthorizeSliceWalletSessionParameters) => {
   const normalizedIdOrigin = new URL(idOrigin).origin
   const nonce = randomNonce(window)
-  const popup = window.open(
-    getCeremonyUrl({ idOrigin: normalizedIdOrigin, nonce, session }),
-    "slice-wallet-ceremony",
-    "popup,width=560,height=720"
-  )
-  if (popup === null) throw new Error("Slice Wallet popup was blocked.")
+  const continueFromFrame = async () => {
+    frameClient.setContinuationVisible(true)
+    try {
+      return await waitForFrameAuthorization({
+        appOrigin: window.location.origin,
+        frameClient,
+        session,
+        timeoutMs
+      })
+    } finally {
+      frameClient.setContinuationVisible(false)
+    }
+  }
+
+  // Opening after asynchronous session preparation is blocked by browsers once
+  // the initiating click's transient activation has expired.
+  const popup =
+    window.navigator.userActivation?.isActive === false
+      ? null
+      : window.open(
+          getCeremonyUrl({ idOrigin: normalizedIdOrigin, nonce, session }),
+          "slice-wallet-ceremony",
+          "popup,width=560,height=720"
+        )
+  if (popup === null) return continueFromFrame()
 
   try {
     const authorization = await requestPopupAuthorization({
@@ -244,16 +263,6 @@ export const authorizeSliceWalletSession = async ({
   } catch (error) {
     popup.close()
     if (!(error instanceof SliceWalletBridgeUnavailableError)) throw error
-    frameClient.setContinuationVisible(true)
-    try {
-      return await waitForFrameAuthorization({
-        appOrigin: window.location.origin,
-        frameClient,
-        session,
-        timeoutMs
-      })
-    } finally {
-      frameClient.setContinuationVisible(false)
-    }
+    return continueFromFrame()
   }
 }
