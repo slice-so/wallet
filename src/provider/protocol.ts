@@ -11,7 +11,8 @@ import {
   createErc20ApproveCallRule,
   createErc20TransferCallRule,
   createErc20TransferFromCallRule,
-  createNativeTransferCallRule
+  createNativeTransferCallRule,
+  getWalletPermissionValidAfter
 } from "../policy"
 import type {
   SliceWalletGenericPermission,
@@ -488,7 +489,7 @@ export const parseSliceWalletGrantPermissions = ({
       chainId,
       grantKind: "generic" as const,
       ...(rateLimit === undefined ? {} : { rateLimit }),
-      validAfter: now,
+      validAfter: getWalletPermissionValidAfter(now * 1_000),
       validUntil: expiresAt,
       version: 1 as const
     }

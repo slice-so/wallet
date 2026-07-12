@@ -49,6 +49,14 @@ type WalletPolicyJsonRecord = {
 type SerializedWalletPolicyParameterRule =
   SerializedWalletPolicyDescriptor["calls"][number]["parameterRules"][number]
 
+const walletPermissionActivationSkewSeconds = 300
+
+export const getWalletPermissionValidAfter = (nowMs = Date.now()) =>
+  Math.max(
+    0,
+    Math.floor(nowMs / 1_000) - walletPermissionActivationSkewSeconds
+  )
+
 const isWalletPolicyJsonRecord = (
   value: WalletPolicyJsonValue | undefined
 ): value is WalletPolicyJsonRecord =>

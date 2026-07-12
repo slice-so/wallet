@@ -7,6 +7,7 @@ import {
   createErc20TransferFromCallRule,
   createNativeTransferCallRule,
   encodeWalletPolicyDescriptor,
+  getWalletPermissionValidAfter,
   getWalletPermissionId,
   toWalletPermissionPolicies
 } from "./policy"
@@ -32,6 +33,11 @@ const descriptor = (
 })
 
 describe("normalized wallet policies", () => {
+  it("allows for block timestamp lag when activating a permission", () => {
+    expect(getWalletPermissionValidAfter(1_000_000)).toBe(700)
+    expect(getWalletPermissionValidAfter(100_000)).toBe(0)
+  })
+
   it("encodes deterministically and maps to ZeroDev policies", () => {
     const transfer = createErc20TransferCallRule({
       maximumAmount: 100n,
