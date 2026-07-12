@@ -4,6 +4,7 @@ import { getSliceWalletP256SignerId } from "../p256Server"
 import { createErc20ApproveCallRule, getWalletPermissionId } from "../policy"
 import type {
   SliceWalletPermissionAuthorization,
+  SliceWalletProtocolValue,
   SliceWalletSignerFrameClient
 } from "../types"
 import { authorizeSliceWalletSession } from "./client"
@@ -55,7 +56,7 @@ const createWindow = ({
   open
 }: {
   isActive: boolean
-  open: Window["open"]
+  open: (...args: Parameters<Window["open"]>) => object | null
 }) =>
   Object.assign(Object.create(null) as Window, {
     crypto: globalThis.crypto,
@@ -107,5 +108,82 @@ describe("authorizeSliceWalletSession", () => {
     expect(result).toEqual(authorization)
     expect(open).toHaveBeenCalledTimes(1)
     expect(visibility).toEqual([true, false])
+  })
+
+  it("keeps the user consent timeout separate from popup readiness", async () => {
+    const close = mock(() => undefined)
+    const popup = Object.assign(new MessageChannel().port1, {
+      close,
+      postMessage: ((
+        message: SliceWalletProtocolValue,
+        _targetOrigin: string,
+        transfer?: readonly Transferable[]
+      ) => {
+        if (
+          typeof message !== "object" ||
+          message === null ||
+          Array.isArray(message)
+        ) {
+          throw new Error("Ceremony connect message is invalid.")
+        }
+        const input = message as {
+          readonly [key: string]: SliceWalletProtocolValue
+        }
+        const port = transfer?.[0]
+        if (typeof input.nonce !== "string" || !(port instanceof MessagePort)) {
+          throw new Error("Ceremony connect channel is invalid.")
+        }
+        setTimeout(
+          () =>
+            port.postMessage({
+              authorization,
+              nonce: input.nonce,
+              type: "slice-wallet:ceremony-authorization",
+              version: 1
+            }),
+          20
+        )
+      }) as Window["postMessage"]
+    })
+    const open = mock(() => popup)
+    let onMessage:
+      | ((event: MessageEvent<SliceWalletProtocolValue>) => void)
+      | null = null
+    const browserWindow = Object.assign(
+      createWindow({ isActive: true, open }),
+      {
+        addEventListener: ((_type: "message", listener: typeof onMessage) => {
+          onMessage = listener
+        }) as Window["addEventListener"],
+        removeEventListener: ((
+          _type: "message",
+          listener: typeof onMessage
+        ) => {
+          if (onMessage === listener) onMessage = null
+        }) as Window["removeEventListener"]
+      }
+    )
+    const { client } = createFrameClient()
+
+    const resultPromise = authorizeSliceWalletSession({
+      frameClient: client,
+      idOrigin: "https://id.slice.so",
+      popupReadyTimeoutMs: 5,
+      session,
+      timeoutMs: 100,
+      window: browserWindow
+    })
+    queueMicrotask(() => {
+      onMessage?.(
+        new MessageEvent("message", {
+          data: { type: "slice-wallet:ceremony-ready", version: 1 },
+          origin: "https://id.slice.so",
+          source: popup
+        })
+      )
+    })
+
+    await expect(resultPromise).resolves.toEqual(authorization)
+    expect(close).toHaveBeenCalledTimes(1)
   })
 })

@@ -83,6 +83,7 @@ export type SliceWalletCeremonyRootResponse =
 export type AuthorizeSliceWalletSessionParameters = {
   frameClient: SliceWalletSignerFrameClient
   idOrigin: string
+  popupReadyTimeoutMs?: number
   session: SliceWalletFrameSession
   timeoutMs?: number
   window: Window

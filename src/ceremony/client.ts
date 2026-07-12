@@ -81,32 +81,29 @@ const isMatchingAuthorization = (
 }
 
 const requestPopupAuthorization = ({
+  authorizationTimeoutMs,
   expectedOrigin,
   nonce,
   popup,
+  readyTimeoutMs,
   session,
-  timeoutMs,
   window
 }: {
+  authorizationTimeoutMs: number
   expectedOrigin: string
   nonce: Hex
   popup: WindowProxy
+  readyTimeoutMs: number
   session: SliceWalletFrameSession
-  timeoutMs: number
   window: Window
 }) =>
   new Promise<SliceWalletPermissionAuthorization>((resolve, reject) => {
-    const readyTimeout = setTimeout(
-      () => {
-        window.removeEventListener("message", onReady)
-        reject(
-          new SliceWalletBridgeUnavailableError(
-            "Wallet popup bridge timed out."
-          )
-        )
-      },
-      Math.min(timeoutMs, 10_000)
-    )
+    const readyTimeout = setTimeout(() => {
+      window.removeEventListener("message", onReady)
+      reject(
+        new SliceWalletBridgeUnavailableError("Wallet popup bridge timed out.")
+      )
+    }, readyTimeoutMs)
     const onReady = (event: MessageEvent<SliceWalletProtocolValue>) => {
       if (event.source !== popup || event.origin !== expectedOrigin) {
         return
@@ -122,7 +119,7 @@ const requestPopupAuthorization = ({
       const authorizationTimeout = setTimeout(() => {
         channel.port1.close()
         reject(new Error("Wallet authorization timed out."))
-      }, timeoutMs)
+      }, authorizationTimeoutMs)
       channel.port1.addEventListener(
         "message",
         (responseEvent: MessageEvent<SliceWalletProtocolValue>) => {
@@ -217,6 +214,7 @@ const waitForFrameAuthorization = async ({
 export const authorizeSliceWalletSession = async ({
   frameClient,
   idOrigin,
+  popupReadyTimeoutMs = 10_000,
   session,
   timeoutMs = 5 * 60_000,
   window
@@ -251,11 +249,12 @@ export const authorizeSliceWalletSession = async ({
 
   try {
     const authorization = await requestPopupAuthorization({
+      authorizationTimeoutMs: timeoutMs,
       expectedOrigin: normalizedIdOrigin,
       nonce,
       popup,
+      readyTimeoutMs: popupReadyTimeoutMs,
       session,
-      timeoutMs: Math.min(timeoutMs, 10_000),
       window
     })
     popup.close()
