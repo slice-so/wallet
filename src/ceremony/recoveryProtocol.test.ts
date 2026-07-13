@@ -68,6 +68,8 @@ describe("recovery handoff protocol", () => {
         credentialIdHash,
         factoryVersion,
         publicKey,
+        recoveryPermissionId: null,
+        recoverySignerAddress: null,
         registrationKind: "existing_account"
       },
       type: "slice-wallet:recovery-credential",

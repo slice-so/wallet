@@ -2,19 +2,24 @@ import { describe, expect, it } from "bun:test"
 import { PolicyFlags } from "@zerodev/permissions"
 import {
   concat,
+  createPublicClient,
   decodeAbiParameters,
   decodeFunctionData,
   encodeAbiParameters,
   hexToBigInt,
+  http,
   numberToHex,
   size,
   slice,
   toFunctionSelector,
   zeroAddress
 } from "viem"
+import { anvil } from "viem/chains"
 import { sliceWalletKernelAddresses } from "./constants"
 import {
   buildRecoveryCancelCall,
+  assertRecoveryPermissionInitConfig,
+  buildRecoveryPermissionInitConfig,
   buildRecoveryNoOpCallData,
   buildRecoveryRotationCalls,
   createRecoveryCallPolicy,
@@ -91,6 +96,31 @@ const credential = {
 } as const
 
 describe("slice recovery timelock policy", () => {
+  it("round-trips the canonical account init config", async () => {
+    const client = createPublicClient({
+      chain: anvil,
+      transport: http("http://127.0.0.1:8545")
+    })
+    const recoverySignerAddress = "0x0000000000000000000000000000000000000001"
+    const recovery = await buildRecoveryPermissionInitConfig({
+      client,
+      recoverySignerAddress
+    })
+
+    await expect(
+      assertRecoveryPermissionInitConfig({
+        client,
+        initConfig: recovery.initConfig
+      })
+    ).resolves.toEqual({
+      permissionId: recovery.permissionId,
+      recoverySignerAddress
+    })
+    await expect(
+      assertRecoveryPermissionInitConfig({ client, initConfig: [] })
+    ).rejects.toThrow("two calls")
+  })
+
   it("encodes delay, expiration, guardian and policy info", () => {
     const policy = toSliceTimelockPolicy()
 

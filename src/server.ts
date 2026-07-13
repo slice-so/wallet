@@ -13,6 +13,11 @@ export { buildSliceWalletPermissionEnableTypedData } from "./permissionAccount"
 export * from "./policy"
 export * from "./registry"
 export * from "./rootValidator"
+export {
+  assertRecoveryPermissionInitConfig,
+  buildRecoveryPermissionInitConfig,
+  getSliceWalletRegistryRecoveryInitConfig
+} from "./recovery"
 export type {
   CreateSliceWalletKernelAccountParameters,
   SliceWalletPublicClient,

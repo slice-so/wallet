@@ -114,11 +114,13 @@ export const getSliceWalletRegistryProofChallenge = ({
   challenge,
   credentialIdHash,
   publicKey,
+  recoverySignerAddress,
   registrationKind
 }: {
   challenge: Hex
   credentialIdHash: Hex
   publicKey: Hex
+  recoverySignerAddress?: `0x${string}`
   registrationKind: SliceWalletCredentialRegistrationKind
 }) =>
   // This commits the assertion to the submitted credential tuple. WebAuthn
@@ -132,7 +134,8 @@ export const getSliceWalletRegistryProofChallenge = ({
         registrationKind,
         challenge,
         credentialIdHash,
-        keccak256(publicKey)
+        keccak256(publicKey),
+        recoverySignerAddress?.toLowerCase() ?? "none"
       ].join("\n")
     )
   )

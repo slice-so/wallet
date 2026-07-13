@@ -1,18 +1,28 @@
-import { PolicyFlags, toPermissionValidator } from "@zerodev/permissions"
+import {
+  PolicyFlags,
+  toInitConfig,
+  toPermissionValidator
+} from "@zerodev/permissions"
 import { CallPolicyVersion, toCallPolicy } from "@zerodev/permissions/policies"
 import { toECDSASigner, toEmptyECDSASigner } from "@zerodev/permissions/signers"
 import {
   createKernelAccount,
+  KernelV3_3AccountAbi,
   type KernelSmartAccountImplementation
 } from "@zerodev/sdk"
+import { toKernelPluginManager } from "@zerodev/sdk/accounts"
 import { encode7579Calls } from "permissionless/utils"
 import {
   type Address,
   concat,
+  decodeAbiParameters,
+  decodeFunctionData,
   decodeFunctionResult,
   encodeAbiParameters,
   encodeFunctionData,
+  getAddress,
   type Hex,
+  isAddressEqual,
   isHex,
   numberToHex,
   pad,
@@ -42,15 +52,16 @@ import {
   createSliceWalletRootValidator,
   encodeSliceWalletRootValidatorData
 } from "./rootValidator"
+import type { SliceWalletRegisteredRootCredential } from "./types/account"
 import type {
   CreateRecoveryPermissionAccountParameters,
   RecoveryUserOperationGas,
   SliceRecoveryProposalStatus,
   SliceTimelockPolicy,
   SliceTimelockPolicyParameters,
-  SliceWalletRecoveryCall,
-  SliceWalletRegisteredRootCredential
-} from "./types"
+  SliceWalletRecoveryCall
+} from "./types/recovery"
+import type { SliceWalletRegistryCredential } from "./types/registry"
 
 const recoveryEntryPoint = {
   address: sliceWalletEntryPoint.address,
@@ -318,6 +329,121 @@ const createRecoveryPermissionValidator = async ({
   })
 }
 
+const sliceWalletRecoveryEcdsaSignerAddress =
+  "0x6A6F069E2a08c2468e7724Ab3250CdBFBA14D4FF" satisfies Address
+
+type BuildRecoveryPermissionInitConfigParameters = {
+  client: KernelSmartAccountImplementation["client"]
+  recoverySignerAddress: Address
+  recoveryTimelock?: SliceTimelockPolicyParameters
+}
+
+export const buildRecoveryPermissionInitConfig = async ({
+  client,
+  recoverySignerAddress,
+  recoveryTimelock
+}: BuildRecoveryPermissionInitConfigParameters) => {
+  const validator = await createRecoveryPermissionValidator({
+    client,
+    delaySec: recoveryTimelock?.delaySec,
+    expirationSec: recoveryTimelock?.expirationSec,
+    guardian: recoveryTimelock?.guardian,
+    recoverySignerAddress
+  })
+
+  return {
+    initConfig: await toInitConfig(validator),
+    permissionId: validator.getIdentifier()
+  }
+}
+
+export const assertRecoveryPermissionInitConfig = async ({
+  client,
+  initConfig
+}: {
+  client: KernelSmartAccountImplementation["client"]
+  initConfig: readonly Hex[]
+}) => {
+  if (initConfig.length !== 2 || initConfig[0] === undefined) {
+    throw new Error("Wallet recovery init config must contain two calls.")
+  }
+
+  const install = decodeFunctionData({
+    abi: KernelV3_3AccountAbi,
+    data: initConfig[0]
+  })
+  if (
+    install.functionName !== "installValidations" ||
+    install.args[0].length !== 1 ||
+    install.args[1].length !== 1 ||
+    install.args[2].length !== 1 ||
+    install.args[3].length !== 1
+  ) {
+    throw new Error("Wallet recovery init config is not canonical.")
+  }
+
+  const [policyAndSignerData] = decodeAbiParameters(
+    [{ name: "policyAndSignerData", type: "bytes[]" }],
+    install.args[2][0]
+  )
+  const signerData = policyAndSignerData.at(-1)
+  if (
+    signerData === undefined ||
+    size(signerData) !== 42 ||
+    slice(signerData, 0, 2) !== PolicyFlags.NOT_FOR_VALIDATE_SIG ||
+    !isAddressEqual(
+      getAddress(slice(signerData, 2, 22)),
+      sliceWalletRecoveryEcdsaSignerAddress
+    )
+  ) {
+    throw new Error("Wallet recovery init config signer is invalid.")
+  }
+
+  const recoverySignerAddress = getAddress(slice(signerData, 22, 42))
+  const expected = await buildRecoveryPermissionInitConfig({
+    client,
+    recoverySignerAddress
+  })
+  if (
+    expected.initConfig.some(
+      (call, index) => call.toLowerCase() !== initConfig[index]?.toLowerCase()
+    )
+  ) {
+    throw new Error("Wallet recovery init config is not canonical.")
+  }
+
+  return {
+    permissionId: expected.permissionId,
+    recoverySignerAddress
+  }
+}
+
+export const getSliceWalletRegistryRecoveryInitConfig = async ({
+  client,
+  credential
+}: {
+  client: KernelSmartAccountImplementation["client"]
+  credential: SliceWalletRegistryCredential
+}) => {
+  if (
+    credential.recoveryPermissionId === null ||
+    credential.recoverySignerAddress === null
+  ) {
+    return undefined
+  }
+  const recovery = await buildRecoveryPermissionInitConfig({
+    client,
+    recoverySignerAddress: credential.recoverySignerAddress
+  })
+  if (
+    recovery.permissionId.toLowerCase() !==
+    credential.recoveryPermissionId.toLowerCase()
+  ) {
+    throw new Error("Registry recovery metadata is inconsistent.")
+  }
+  return recovery.initConfig
+}
+
 export const createRecoveryPermissionAccount = async ({
   address,
   chainId,
@@ -340,6 +466,17 @@ export const createRecoveryPermissionAccount = async ({
       recoverySignerAddress
     })
   ])
+  const plugins = await toKernelPluginManager(client, {
+    chainId,
+    entryPoint: recoveryEntryPoint,
+    ...(enableSignature === undefined
+      ? {}
+      : { pluginEnableSignature: enableSignature }),
+    isPreInstalled: true,
+    kernelVersion: recoveryKernelVersion,
+    regular: recoveryValidator,
+    sudo: rootValidator
+  })
 
   const account = await createKernelAccount(client, {
     address,
@@ -349,13 +486,7 @@ export const createRecoveryPermissionAccount = async ({
     index: 0n,
     kernelVersion: recoveryKernelVersion,
     metaFactoryAddress: sliceKernelBaseV33Addresses.metaFactory,
-    plugins: {
-      ...(enableSignature === undefined
-        ? {}
-        : { pluginEnableSignature: enableSignature }),
-      regular: recoveryValidator,
-      sudo: rootValidator
-    },
+    plugins,
     useMetaFactory: true
   })
 

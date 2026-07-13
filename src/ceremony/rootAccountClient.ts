@@ -13,6 +13,7 @@ export const createSliceWalletCeremonyKernelAccount = async ({
   credential,
   idOrigin,
   index,
+  initConfig,
   window
 }: CreateSliceWalletCeremonyKernelAccountParameters) => {
   if (address === undefined) {
@@ -40,6 +41,7 @@ export const createSliceWalletCeremonyKernelAccount = async ({
     client,
     credential,
     ...(index === undefined ? {} : { index }),
+    ...(initConfig === undefined ? {} : { initConfig }),
     rootSigner: (hash, purpose, request) => {
       const source = pendingMessage ?? pendingTypedData
       const requestWithSource =

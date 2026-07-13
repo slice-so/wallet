@@ -216,6 +216,7 @@ const parsePayload = (value: SliceWalletRecoveryJsonValue) => {
     "metaFactory",
     "recoveryPermissionId",
     "recoveryPrivateKey",
+    "recoverySignerAddress",
     "runbookVersion"
   ])
   if (input.runbookVersion !== 1) {
@@ -246,6 +247,10 @@ const parsePayload = (value: SliceWalletRecoveryJsonValue) => {
       input.recoveryPrivateKey,
       "Recovery private key",
       32
+    ),
+    recoverySignerAddress: addressField(
+      input.recoverySignerAddress,
+      "Recovery signer address"
     ),
     runbookVersion: 1
   }

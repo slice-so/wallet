@@ -27,10 +27,7 @@ import {
   getWalletPolicyHash,
   serializeWalletPolicyDescriptor
 } from "../policy"
-import {
-  buildRecoveryPermissionInstallCalls,
-  getRecoveryConfig
-} from "../recovery"
+import { getSliceWalletRegistryRecoveryInitConfig } from "../recovery"
 import { createSliceWalletRegistryClient } from "../registry"
 import type {
   SliceWalletConnectedAccount,
@@ -133,8 +130,14 @@ export const createSliceWalletProviderRuntime = (
   let hydrationPromise: Promise<ActiveWallet | null> | null = null
   let framePromise: Promise<SliceWalletSignerFrameClient> | null = null
 
-  const createRootAccount = async (credential: SliceWalletRegistryCredential) =>
-    createSliceWalletCeremonyKernelAccount({
+  const createRootAccount = async (
+    credential: SliceWalletRegistryCredential
+  ) => {
+    const initConfig = await getSliceWalletRegistryRecoveryInitConfig({
+      client: publicClient,
+      credential
+    })
+    return createSliceWalletCeremonyKernelAccount({
       address: credential.accountAddress,
       chainId: config.chain.id,
       client: publicClient,
@@ -144,8 +147,10 @@ export const createSliceWalletProviderRuntime = (
       },
       idOrigin,
       index: BigInt(credential.accountIndex),
+      ...(initConfig === undefined ? {} : { initConfig }),
       window: browserWindow
     })
+  }
 
   const toActiveWallet = async (credential: SliceWalletRegistryCredential) => {
     const rootAccount = await createRootAccount(credential)
@@ -233,34 +238,15 @@ export const createSliceWalletProviderRuntime = (
         "Complete the recovery bundle ceremony before connecting."
       )
     }
-    const { calls, permissionId } = await buildRecoveryPermissionInstallCalls({
-      account: wallet.rootAccount.address,
-      client: publicClient,
-      recoverySignerAddress: connected.recovery.signerAddress
-    })
     if (
-      permissionId.toLowerCase() !==
-      connected.recovery.permissionId.toLowerCase()
+      wallet.credential.recoveryPermissionId !== null &&
+      (wallet.credential.recoveryPermissionId.toLowerCase() !==
+        connected.recovery.permissionId.toLowerCase() ||
+        wallet.credential.recoverySignerAddress?.toLowerCase() !==
+          connected.recovery.signerAddress.toLowerCase())
     ) {
-      throw new Error("Recovery permission does not match the saved bundle.")
+      throw new Error("Recovery permission does not match the registry.")
     }
-    const code = await publicClient.getCode({
-      address: wallet.rootAccount.address
-    })
-    if (code !== undefined) {
-      const recovery = await getRecoveryConfig({
-        account: wallet.rootAccount.address,
-        client: publicClient,
-        permissionId
-      }).catch(() => null)
-      if (recovery?.initialized === true) return
-    }
-    const hash = await createAccountBundler(
-      wallet.rootAccount
-    ).sendUserOperation({
-      calls
-    })
-    await waitForSuccessfulUserOperation(hash)
   }
 
   const connect = async () => {

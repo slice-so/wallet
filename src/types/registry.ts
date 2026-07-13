@@ -19,6 +19,8 @@ export type SliceWalletRegistryCredential = {
   credentialIdHash: Hex
   factoryVersion: string
   publicKey: Hex
+  recoveryPermissionId: Hex | null
+  recoverySignerAddress: Address | null
   registrationKind: SliceWalletCredentialRegistrationKind
 }
 
@@ -36,6 +38,7 @@ export type RegisterSliceWalletCredentialInput = {
   credentialId: string
   credentialProof: SliceWalletCredentialProof
   publicKey: Hex
+  recoverySignerAddress?: Address
   registrationKind: SliceWalletCredentialRegistrationKind
   rootSignature?: Hex
 }

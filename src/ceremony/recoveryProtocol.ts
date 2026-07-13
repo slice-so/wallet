@@ -74,6 +74,8 @@ const parseRegistryCredential = (
     "credentialIdHash",
     "factoryVersion",
     "publicKey",
+    "recoveryPermissionId",
+    "recoverySignerAddress",
     "registrationKind"
   ])
   if (input.registrationKind !== "existing_account") {
@@ -97,6 +99,14 @@ const parseRegistryCredential = (
       "Credential factory version"
     ),
     publicKey: hexValue(input.publicKey, "Credential public key", 65),
+    recoveryPermissionId:
+      input.recoveryPermissionId === null
+        ? null
+        : hexValue(input.recoveryPermissionId, "Recovery permission id", 4),
+    recoverySignerAddress:
+      input.recoverySignerAddress === null
+        ? null
+        : addressValue(input.recoverySignerAddress, "Recovery signer"),
     registrationKind: "existing_account"
   }
 }

@@ -63,6 +63,7 @@ export type SliceWalletRecoveryBundlePayload = {
   metaFactory: Address
   recoveryPermissionId: Hex
   recoveryPrivateKey: Hex
+  recoverySignerAddress: Address
   runbookVersion: 1
 }
 

@@ -269,6 +269,7 @@ export const createSliceWalletRegisteredKernelAccount = async ({
   client,
   credential,
   index = 0n,
+  initConfig,
   rootSigner
 }: CreateSliceWalletRegisteredKernelAccountParameters) => {
   const rootValidator = createSliceWalletRootValidator({
@@ -282,6 +283,7 @@ export const createSliceWalletRegisteredKernelAccount = async ({
     entryPoint: sliceWalletEntryPoint,
     factoryAddress: sliceWalletKernelAddresses.factory,
     index,
+    ...(initConfig === undefined ? {} : { initConfig }),
     kernelVersion: sliceWalletKernelVersion,
     metaFactoryAddress: sliceWalletKernelAddresses.metaFactory,
     plugins: { sudo: rootValidator },

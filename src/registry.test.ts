@@ -6,6 +6,7 @@ const base = {
   challenge: `0x${"11".repeat(32)}` as Hex,
   credentialIdHash: `0x${"22".repeat(32)}` as Hex,
   publicKey: `0x04${"33".repeat(64)}` as Hex,
+  recoverySignerAddress: "0x0000000000000000000000000000000000000001" as const,
   registrationKind: "initial" as const
 }
 
@@ -39,6 +40,15 @@ describe("registry proof challenge commitment", () => {
       getSliceWalletRegistryProofChallenge({
         ...base,
         registrationKind: "existing_account"
+      })
+    ).not.toBe(getSliceWalletRegistryProofChallenge(base))
+  })
+
+  test("changes when the recovery signer changes", () => {
+    expect(
+      getSliceWalletRegistryProofChallenge({
+        ...base,
+        recoverySignerAddress: "0x0000000000000000000000000000000000000002"
       })
     ).not.toBe(getSliceWalletRegistryProofChallenge(base))
   })

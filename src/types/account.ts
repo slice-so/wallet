@@ -109,5 +109,6 @@ export type CreateSliceWalletRegisteredKernelAccountParameters = {
   client: KernelSmartAccountImplementation["client"]
   credential: SliceWalletRegisteredRootCredential
   index?: bigint
+  initConfig?: Hex[]
   rootSigner?: SliceWalletRootSigner
 }

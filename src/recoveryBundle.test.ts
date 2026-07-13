@@ -40,6 +40,7 @@ const payload = {
   metaFactory: "0xd703aaE79538628d27099B8c4f621bE4CCd142d5",
   recoveryPermissionId: "0x12345678",
   recoveryPrivateKey: `0x${"33".repeat(32)}`,
+  recoverySignerAddress: "0x3333333333333333333333333333333333333333",
   runbookVersion: 1
 } as const satisfies SliceWalletRecoveryBundlePayload
 
