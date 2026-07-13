@@ -71,21 +71,38 @@ const formatEncodedBody = (encoded: string) =>
 
 const parseEncodedBody = (code: string) => {
   const normalized = code.trim().toUpperCase()
-  const prefix = /^SLW([0-9]+)-/.exec(normalized)
-  if (prefix === null) throw new Error("Recovery code prefix is invalid.")
-  if (prefix[1] !== "1") {
+  if (!normalized.startsWith("SLW")) {
+    throw new Error("Recovery code prefix is invalid.")
+  }
+  const suffix = normalized.slice(3)
+  const delimitedVersion = /^([0-9]+)-/.exec(suffix)
+  const compactSuffix = suffix.replace(/[-\s]/g, "")
+  if (!/^[0-9]/.test(compactSuffix)) {
+    throw new Error("Recovery code prefix is invalid.")
+  }
+  const versionLength = compactSuffix.length - recoveryCodeEncodedCharacters
+  if (delimitedVersion === null && versionLength <= 0) {
+    throw new Error("Recovery code has an invalid length.")
+  }
+  const version = delimitedVersion?.[1] ?? compactSuffix.slice(0, versionLength)
+  if (version !== "1") {
     throw new Error("This recovery code requires a newer recovery tool.")
   }
-  const groups = normalized.slice(prefix[0].length).split("-")
-  if (
-    groups.length !== 16 ||
-    groups.some((group) => group.length !== 6 || !/^[A-Z0-9]+$/.test(group))
-  ) {
-    throw new Error("Recovery code has an invalid length.")
-  }
-  const encoded = groups.join("").replaceAll("O", "0").replace(/[IL]/g, "1")
+  const body =
+    delimitedVersion === null
+      ? compactSuffix.slice(versionLength)
+      : suffix.slice(delimitedVersion[0].length)
+  const encoded = body
+    .replace(/[-\s]/g, "")
+    .replaceAll("O", "0")
+    .replace(/[IL]/g, "1")
   if (encoded.length !== recoveryCodeEncodedCharacters) {
     throw new Error("Recovery code has an invalid length.")
+  }
+  if (
+    [...encoded].some((character) => !recoveryCodeAlphabet.includes(character))
+  ) {
+    throw new Error("Recovery code contains an invalid character.")
   }
   return encoded
 }

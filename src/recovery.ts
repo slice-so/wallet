@@ -452,6 +452,15 @@ const missingDeployedRoot = () => {
   )
 }
 
+const deployedRecoveryAccountMarker = Symbol("SliceWalletDeployedRecovery")
+
+const isDeployedRecoveryAccount = (account: SmartAccount) =>
+  (
+    account as SmartAccount & {
+      [deployedRecoveryAccountMarker]?: true
+    }
+  )[deployedRecoveryAccountMarker] === true
+
 const createDeployedRecoveryRootValidator =
   (): KernelValidator<"SliceWalletDeployedRecoveryRoot"> => {
     const account = toAccount({
@@ -583,6 +592,7 @@ export const createDeployedRecoveryPermissionAccount = async ({
   })
   return {
     ...account,
+    [deployedRecoveryAccountMarker]: true,
     getFactoryArgs: async () => ({
       factory: undefined,
       factoryData: undefined
@@ -867,6 +877,12 @@ export const buildRecoveryUserOperation = async ({
   gas: RecoveryUserOperationGas
 }) => {
   const { factory, factoryData } = await account.getFactoryArgs()
+  if (
+    isDeployedRecoveryAccount(account) &&
+    (factory !== undefined || factoryData !== undefined)
+  ) {
+    throw new Error("A deployed recovery account cannot include factory data.")
+  }
   const userOperationBase = {
     sender: account.address,
     nonce: await account.getNonce(),

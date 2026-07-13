@@ -3,7 +3,9 @@ import type {
   SliceWalletProtocolValue,
   SliceWalletRecoveryEnrollError,
   SliceWalletRecoveryEnrollRequest,
-  SliceWalletRecoveryEnrollResult
+  SliceWalletRecoveryEnrollResult,
+  SliceWalletRecoveryReattestRequest,
+  SliceWalletRecoveryReattestResult
 } from "../types"
 
 type ProtocolRecord = { readonly [key: string]: SliceWalletProtocolValue }
@@ -57,8 +59,21 @@ const nonce = (value: SliceWalletProtocolValue) =>
 
 export const parseSliceWalletRecoveryEnrollRequest = (
   value: SliceWalletProtocolValue
-): SliceWalletRecoveryEnrollRequest => {
+): SliceWalletRecoveryEnrollRequest | SliceWalletRecoveryReattestRequest => {
   const input = record(value)
+  if (input.type === "slice-wallet:recovery-reattest-request") {
+    exactKeys(input, ["account", "nonce", "signerAddress", "type", "version"])
+    if (input.version !== 1) {
+      throw new Error("Recovery re-attestation request is invalid.")
+    }
+    return {
+      account: addressValue(input.account, "Recovery account"),
+      nonce: nonce(input.nonce),
+      signerAddress: addressValue(input.signerAddress, "Recovery signer"),
+      type: "slice-wallet:recovery-reattest-request",
+      version: 1
+    }
+  }
   exactKeys(input, [
     "chainId",
     "credentialId",
@@ -72,7 +87,8 @@ export const parseSliceWalletRecoveryEnrollRequest = (
     input.version !== 1 ||
     typeof input.chainId !== "number" ||
     !Number.isSafeInteger(input.chainId) ||
-    input.chainId <= 0
+    input.chainId <= 0 ||
+    input.chainId > 0xffffffff
   ) {
     throw new Error("Recovery enrollment request is invalid.")
   }
@@ -92,7 +108,10 @@ export const parseSliceWalletRecoveryEnrollRequest = (
 
 export const parseSliceWalletRecoveryEnrollResponse = (
   value: SliceWalletProtocolValue
-): SliceWalletRecoveryEnrollResult | SliceWalletRecoveryEnrollError => {
+):
+  | SliceWalletRecoveryEnrollResult
+  | SliceWalletRecoveryReattestResult
+  | SliceWalletRecoveryEnrollError => {
   const input = record(value)
   if (input.type === "slice-wallet:recovery-enroll-error") {
     exactKeys(input, ["message", "nonce", "type", "version"])
@@ -102,6 +121,19 @@ export const parseSliceWalletRecoveryEnrollResponse = (
       message: stringValue(input.message, "Recovery enrollment error"),
       nonce: nonce(input.nonce),
       type: "slice-wallet:recovery-enroll-error",
+      version: 1
+    }
+  }
+  if (input.type === "slice-wallet:recovery-reattest-result") {
+    exactKeys(input, ["account", "nonce", "signerAddress", "type", "version"])
+    if (input.version !== 1) {
+      throw new Error("Recovery re-attestation result is invalid.")
+    }
+    return {
+      account: addressValue(input.account, "Recovery account"),
+      nonce: nonce(input.nonce),
+      signerAddress: addressValue(input.signerAddress, "Recovery signer"),
+      type: "slice-wallet:recovery-reattest-result",
       version: 1
     }
   }

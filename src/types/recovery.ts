@@ -74,12 +74,28 @@ export type SliceWalletRecoveryEnrollRequest = {
   version: 1
 }
 
+export type SliceWalletRecoveryReattestRequest = {
+  account: Address
+  nonce: Hex
+  signerAddress: Address
+  type: "slice-wallet:recovery-reattest-request"
+  version: 1
+}
+
 export type SliceWalletRecoveryEnrollResult = {
   account: Address
   nonce: Hex
   permissionId: Hex
   signerAddress: Address
   type: "slice-wallet:recovery-enroll-result"
+  version: 1
+}
+
+export type SliceWalletRecoveryReattestResult = {
+  account: Address
+  nonce: Hex
+  signerAddress: Address
+  type: "slice-wallet:recovery-reattest-result"
   version: 1
 }
 

@@ -8,6 +8,7 @@ await buildPackage({
 
 const secondaryBuild = await Bun.build({
   entrypoints: [
+    "./src/argon2id.ts",
     "./src/frame.ts",
     "./src/policy.ts",
     "./src/provider.ts",

@@ -26,11 +26,16 @@ const parameters = {
   recoverySignerAddress: "0x0000000000000000000000000000000000000001"
 } as const
 
+// Captured from EntryPoint 0.7 getSenderAddress on a Base fork using the
+// pinned Kernel 0.3.3 factories. The fork tier independently replays it.
+const entryPointDerivedAddress =
+  "0x2EAC7591EbE1Fe88f9C01ff4bb4AcD0DA699cDac" as const
+
 describe("Slice wallet offline account prediction", () => {
   it("matches the permanent known-address vector without RPC", async () => {
     await expect(
       predictSliceWalletKernelAccountAddress(parameters)
-    ).resolves.toBe("0x2EAC7591EbE1Fe88f9C01ff4bb4AcD0DA699cDac")
+    ).resolves.toBe(entryPointDerivedAddress)
     expect(sliceWalletKernelProxyInitCodeHash).toBe(
       "0xc452397f1e7518f8cea0566ac057e243bb1643f6298aba8eec8cdee78ee3b3dd"
     )

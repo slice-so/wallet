@@ -48,6 +48,20 @@ describe("Slice wallet recovery codes", () => {
     ).toThrow("prefix")
   })
 
+  it("accepts lowercase, dash-free, and whitespace-mangled input", () => {
+    expect(parseSliceWalletRecoveryCode(fixedCode.toLowerCase())).toEqual(
+      fixedPayload
+    )
+    expect(parseSliceWalletRecoveryCode(fixedCode.replaceAll("-", ""))).toEqual(
+      fixedPayload
+    )
+    expect(
+      parseSliceWalletRecoveryCode(
+        fixedCode.replaceAll("-", " \n\t").replace("SLW1 ", "SLW1-")
+      )
+    ).toEqual(fixedPayload)
+  })
+
   it("distinguishes unsupported versions, malformed codes, and checksum errors", () => {
     expect(() =>
       parseSliceWalletRecoveryCode(fixedCode.replace("SLW1", "SLW2"))

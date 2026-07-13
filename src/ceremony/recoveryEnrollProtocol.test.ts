@@ -22,11 +22,34 @@ const result = {
   type: "slice-wallet:recovery-enroll-result",
   version: 1
 } as const
+const reattestRequest = {
+  account: result.account,
+  nonce,
+  signerAddress: result.signerAddress,
+  type: "slice-wallet:recovery-reattest-request",
+  version: 1
+} as const
+const reattestResult = {
+  account: result.account,
+  nonce,
+  signerAddress: result.signerAddress,
+  type: "slice-wallet:recovery-reattest-result",
+  version: 1
+} as const
 
 describe("recovery enrollment protocol", () => {
   it("parses the exact public request and result", () => {
     expect(parseSliceWalletRecoveryEnrollRequest(request)).toEqual(request)
     expect(parseSliceWalletRecoveryEnrollResponse(result)).toEqual(result)
+  })
+
+  it("parses the exact re-attestation request and result", () => {
+    expect(parseSliceWalletRecoveryEnrollRequest(reattestRequest)).toEqual(
+      reattestRequest
+    )
+    expect(parseSliceWalletRecoveryEnrollResponse(reattestResult)).toEqual(
+      reattestResult
+    )
   })
 
   it("rejects secret-bearing, replay-shaping, and malformed messages", () => {
@@ -42,6 +65,35 @@ describe("recovery enrollment protocol", () => {
     expect(() =>
       parseSliceWalletRecoveryEnrollResponse({ ...result, version: 2 })
     ).toThrow("invalid")
+    expect(() =>
+      parseSliceWalletRecoveryEnrollRequest({ ...request, version: 2 })
+    ).toThrow("invalid")
+    expect(() =>
+      parseSliceWalletRecoveryEnrollRequest({
+        ...request,
+        chainId: 0x1_0000_0000
+      })
+    ).toThrow("invalid")
+    expect(() =>
+      parseSliceWalletRecoveryEnrollRequest({ ...request, type: "wrong" })
+    ).toThrow("invalid")
+    expect(() =>
+      parseSliceWalletRecoveryEnrollRequest({
+        ...request,
+        credentialPublicKey: "0x04"
+      })
+    ).toThrow("public key")
+    const { credentialId: _credentialId, ...missingCredentialId } = request
+    expect(() =>
+      parseSliceWalletRecoveryEnrollRequest(missingCredentialId)
+    ).toThrow("invalid fields")
+    expect(() => parseSliceWalletRecoveryEnrollRequest(null)).toThrow("object")
+    expect(() =>
+      parseSliceWalletRecoveryEnrollRequest({
+        ...reattestRequest,
+        recoveryPrivateKey: `0x${"44".repeat(32)}`
+      })
+    ).toThrow("invalid fields")
   })
 
   it("parses a structured error with no secret fields", () => {

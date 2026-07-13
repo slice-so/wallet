@@ -2,7 +2,10 @@ import { describe, expect, it } from "bun:test"
 import { createPublicClient, custom } from "viem"
 import { privateKeyToAccount } from "viem/accounts"
 import { base } from "viem/chains"
-import { createDeployedRecoveryPermissionAccount } from "./recovery"
+import {
+  buildRecoveryUserOperation,
+  createDeployedRecoveryPermissionAccount
+} from "./recovery"
 
 const recoveryPrivateKey = `0x${"33".repeat(32)}` as const
 
@@ -30,5 +33,26 @@ describe("deployed recovery permission account", () => {
       factoryData: undefined
     })
     expect(account.recoveryPermissionId).toMatch(/^0x[0-9a-f]{8}$/)
+
+    await expect(
+      buildRecoveryUserOperation({
+        account: {
+          ...account,
+          getFactoryArgs: async () => ({
+            factory: "0x2222222222222222222222222222222222222222" as const,
+            factoryData: "0x1234" as const
+          })
+        },
+        calls: [],
+        chainId: base.id,
+        gas: {
+          callGasLimit: 1n,
+          maxFeePerGas: 1n,
+          maxPriorityFeePerGas: 1n,
+          preVerificationGas: 1n,
+          verificationGasLimit: 1n
+        }
+      })
+    ).rejects.toThrow("cannot include factory data")
   })
 })

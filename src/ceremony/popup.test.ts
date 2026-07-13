@@ -63,6 +63,26 @@ describe("waitForSliceWalletCeremonyMessage", () => {
     expect(close).toHaveBeenCalledTimes(1)
     channel.port2.close()
   })
+
+  it("waits without a deadline when timeoutMs is omitted", async () => {
+    const channel = new MessageChannel()
+    const { surface } = createSurface()
+    const response = {
+      type: "slice-wallet:no-timeout",
+      version: 1
+    } satisfies SliceWalletProtocolValue
+    channel.port1.start()
+
+    const result = waitForSliceWalletCeremonyMessage({
+      parse: (value) => value,
+      port: channel.port1,
+      surface
+    })
+    channel.port2.postMessage(response)
+
+    await expect(result).resolves.toEqual(response)
+    channel.port2.close()
+  })
 })
 
 describe("openSliceWalletCeremonyChannel", () => {
@@ -118,6 +138,97 @@ describe("openSliceWalletCeremonyChannel", () => {
       "slice-wallet-recovery",
       "popup,width=560,height=720"
     )
+    channel.port.close()
+    channel.surface.close()
+  })
+
+  it("creates the iframe surface with the complete capability boundary", async () => {
+    const source = Object.assign(Object.create(null) as WindowProxy, {
+      postMessage: mock(() => undefined)
+    })
+    const sandboxTokens: string[] = []
+    const iframe = Object.assign(Object.create(null) as HTMLIFrameElement, {
+      allow: "",
+      contentWindow: source,
+      referrerPolicy: "",
+      sandbox: {
+        add: (...tokens: string[]) => sandboxTokens.push(...tokens)
+      },
+      src: "",
+      style: {},
+      title: ""
+    })
+    const dialog = Object.assign(Object.create(null) as HTMLDivElement, {
+      appendChild: mock(() => iframe),
+      dataset: {},
+      remove: mock(() => undefined),
+      setAttribute: mock(() => undefined),
+      style: {}
+    })
+    const appendChild = mock(() => dialog)
+    const document = Object.assign(Object.create(null) as Document, {
+      body: { appendChild },
+      createElement: ((tagName: string) =>
+        tagName === "iframe" ? iframe : dialog) as Document["createElement"]
+    })
+    let onMessage:
+      | ((event: MessageEvent<SliceWalletProtocolValue>) => void)
+      | null = null
+    const window = Object.assign(Object.create(null) as Window, {
+      addEventListener: ((type: string, listener: EventListener) => {
+        if (type === "message") {
+          onMessage = listener as (
+            event: MessageEvent<SliceWalletProtocolValue>
+          ) => void
+        }
+      }) as Window["addEventListener"],
+      isSecureContext: true,
+      navigator: { userAgent: "Mozilla/5.0 Chrome/140.0 Safari/537.36" },
+      removeEventListener: mock(() => undefined)
+    })
+    const nonce = `0x${"22".repeat(32)}` as const
+
+    const channelPromise = openSliceWalletCeremonyChannel({
+      document,
+      idOrigin: "https://id.slice.so",
+      mode: "iframe",
+      nonce,
+      path: "/ceremony/account",
+      readyTimeoutMs: 100,
+      window
+    })
+    queueMicrotask(() =>
+      onMessage?.(
+        Object.assign(
+          Object.create(null) as MessageEvent<SliceWalletProtocolValue>,
+          {
+            data: {
+              type: "slice-wallet:ceremony-ready",
+              version: 1
+            } satisfies SliceWalletProtocolValue,
+            origin: "https://id.slice.so",
+            source
+          }
+        )
+      )
+    )
+
+    const channel = await channelPromise
+
+    expect(sandboxTokens).toEqual([
+      "allow-downloads",
+      "allow-forms",
+      "allow-popups",
+      "allow-popups-to-escape-sandbox",
+      "allow-same-origin",
+      "allow-scripts"
+    ])
+    expect(iframe.referrerPolicy).toBe("no-referrer")
+    expect(iframe.allow).toBe(
+      "publickey-credentials-create https://id.slice.so; publickey-credentials-get https://id.slice.so"
+    )
+    expect(iframe.src).toContain("/dialog/account")
+    expect(appendChild).toHaveBeenCalledTimes(1)
     channel.port.close()
     channel.surface.close()
   })

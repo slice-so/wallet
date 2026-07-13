@@ -18,6 +18,16 @@
       "import": "./dist/esm/index.js",
       "default": "./dist/esm/index.js"
     },
+    "./argon2id": {
+      "development": {
+        "types": "./src/argon2id.ts",
+        "import": "./src/argon2id.ts",
+        "default": "./src/argon2id.ts"
+      },
+      "types": "./dist/esm/argon2id.d.ts",
+      "import": "./dist/esm/argon2id.js",
+      "default": "./dist/esm/argon2id.js"
+    },
     "./frame": {
       "development": {
         "types": "./src/frame.ts",
@@ -96,6 +106,7 @@
   "dependencies": {
     "@zerodev/permissions": "5.6.3",
     "@zerodev/sdk": "5.5.10",
+    "hash-wasm": "catalog:",
     "permissionless": "catalog:",
     "viem": "catalog:"
   },

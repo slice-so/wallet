@@ -1,4 +1,3 @@
-import { KernelV3_1AccountAbi } from "@zerodev/sdk"
 import {
   concatHex,
   createPublicClient,
@@ -17,6 +16,24 @@ import type { PredictSliceWalletKernelAccountAddressParameters } from "./types"
 
 export const sliceWalletKernelProxyInitCodeHash =
   "0xc452397f1e7518f8cea0566ac057e243bb1643f6298aba8eec8cdee78ee3b3dd" as const
+
+// Kernel 0.3.3 initializer paired with the pinned proxy initcode hash above.
+// Keep this local so SDK ABI changes cannot alter counterfactual addresses.
+const kernelV33InitializeAbi = [
+  {
+    inputs: [
+      { name: "_rootValidator", type: "bytes21" },
+      { name: "hook", type: "address" },
+      { name: "validatorData", type: "bytes" },
+      { name: "hookData", type: "bytes" },
+      { name: "initConfig", type: "bytes[]" }
+    ],
+    name: "initialize",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
+  }
+] as const
 
 const createOfflineClient = (chainId: number) =>
   createPublicClient({
@@ -53,7 +70,7 @@ export const deriveSliceWalletRecoveryBootstrap = async ({
     recoverySignerAddress
   })
   const initializationData = encodeFunctionData({
-    abi: KernelV3_1AccountAbi,
+    abi: kernelV33InitializeAbi,
     args: [
       concatHex(["0x01", sliceWalletKernelAddresses.webAuthnRootValidator]),
       zeroAddress,
