@@ -7,8 +7,8 @@ import {
   createErc20TransferFromCallRule,
   createNativeTransferCallRule,
   encodeWalletPolicyDescriptor,
-  getWalletPermissionValidAfter,
   getWalletPermissionId,
+  getWalletPermissionValidAfter,
   toWalletPermissionPolicies
 } from "./policy"
 import type { WalletPolicyDescriptor } from "./types"
