@@ -2,6 +2,9 @@ import { bytesToHex, type Hex } from "viem"
 import type { SliceWalletProtocolValue } from "../types"
 import { parseSliceWalletCeremonyReadyMessage } from "./protocol"
 
+const popupClosedPollIntervalMs = 100
+const userRejectedRequestMessage = "User rejected the request"
+
 export const createSliceWalletCeremonyNonce = (window: Window): Hex => {
   const bytes = new Uint8Array(32)
   window.crypto.getRandomValues(bytes)
@@ -77,27 +80,37 @@ export const waitForSliceWalletCeremonyMessage = <Result>({
   timeoutMs: number
 }) =>
   new Promise<Result>((resolve, reject) => {
+    const cleanup = () => {
+      clearTimeout(timeout)
+      clearInterval(popupClosedPoll)
+      port.removeEventListener("message", onMessage)
+    }
     const timeout = setTimeout(() => {
+      cleanup()
       port.close()
       popup.close()
       reject(new Error("Slice Wallet ceremony timed out."))
     }, timeoutMs)
-    port.addEventListener(
-      "message",
-      (event: MessageEvent<SliceWalletProtocolValue>) => {
-        clearTimeout(timeout)
-        port.close()
-        popup.close()
-        try {
-          resolve(parse(event.data))
-        } catch (error) {
-          reject(
-            error instanceof Error
-              ? error
-              : new Error("Slice Wallet ceremony response is invalid.")
-          )
-        }
-      },
-      { once: true }
-    )
+    const popupClosedPoll = setInterval(() => {
+      if (!popup.closed) return
+
+      cleanup()
+      port.close()
+      reject(new Error(userRejectedRequestMessage))
+    }, popupClosedPollIntervalMs)
+    const onMessage = (event: MessageEvent<SliceWalletProtocolValue>) => {
+      cleanup()
+      port.close()
+      popup.close()
+      try {
+        resolve(parse(event.data))
+      } catch (error) {
+        reject(
+          error instanceof Error
+            ? error
+            : new Error("Slice Wallet ceremony response is invalid.")
+        )
+      }
+    }
+    port.addEventListener("message", onMessage, { once: true })
   })
