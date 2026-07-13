@@ -44,9 +44,10 @@ export const connectSliceWalletSignerFrame = async ({
   iframe.style.zIndex = "2147483647"
 
   const setContinuationVisible = (visible: boolean) => {
-    iframe.style.height = visible ? "72px" : "1px"
+    iframe.style.height = visible ? "100dvh" : "1px"
+    iframe.style.inset = visible ? "0" : "auto 16px 16px auto"
     iframe.style.pointerEvents = visible ? "auto" : "none"
-    iframe.style.width = visible ? "320px" : "1px"
+    iframe.style.width = visible ? "100vw" : "1px"
   }
 
   const ready = new Promise<void>((resolve, reject) => {

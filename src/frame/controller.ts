@@ -198,7 +198,7 @@ export const attachSliceWalletSignerFrame = ({
         privateKey: keyPair.privateKey,
         session
       })
-      onSessionCreated?.(session)
+      onSessionCreated?.(session, parentOrigin)
       return session
     }
     if (request.method === "getSession") {

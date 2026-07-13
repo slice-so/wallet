@@ -9,32 +9,39 @@ import {
   openSliceWalletCeremonyChannel,
   waitForSliceWalletCeremonyMessage
 } from "./popup"
-import { parseSliceWalletCeremonyAccountMessage } from "./protocol"
+import { parseSliceWalletCeremonyAccountResponse } from "./protocol"
 
 export const connectSliceWalletAccount = async ({
+  ceremonyMode = "popup",
   chainId,
+  document,
   fetch,
   idOrigin,
   timeoutMs = 5 * 60_000,
   window
 }: ConnectSliceWalletAccountParameters): Promise<SliceWalletConnectedAccount> => {
   const nonce = createSliceWalletCeremonyNonce(window)
-  const { popup, port } = await openSliceWalletCeremonyChannel({
+  const { port, surface } = await openSliceWalletCeremonyChannel({
+    document,
     idOrigin,
+    mode: ceremonyMode,
     nonce,
     path: `/ceremony/connect?chainId=${chainId}`,
     window
   })
   const account = await waitForSliceWalletCeremonyMessage({
     parse: (value: SliceWalletProtocolValue) => {
-      const message = parseSliceWalletCeremonyAccountMessage(value)
+      const message = parseSliceWalletCeremonyAccountResponse(value)
       if (message.nonce !== nonce) {
         throw new Error("Slice Wallet account response nonce does not match.")
       }
+      if (message.type === "slice-wallet:ceremony-error") {
+        throw new Error(message.message)
+      }
       return message
     },
-    popup,
     port,
+    surface,
     timeoutMs
   })
   const credential = await createSliceWalletRegistryClient({

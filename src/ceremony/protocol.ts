@@ -10,6 +10,7 @@ import type {
   SliceWalletBridgeGrantProofResponse,
   SliceWalletBridgeRecord,
   SliceWalletCeremonyAccountMessage,
+  SliceWalletCeremonyAccountResponse,
   SliceWalletCeremonyConnectMessage,
   SliceWalletCeremonyReadyMessage,
   SliceWalletCeremonyResponse,
@@ -376,6 +377,20 @@ export const parseSliceWalletCeremonyAccountMessage = (
     type: "slice-wallet:ceremony-account",
     version: 1
   }
+}
+
+export const parseSliceWalletCeremonyAccountResponse = (
+  value: SliceWalletProtocolValue
+): SliceWalletCeremonyAccountResponse => {
+  const input = record(value, "Ceremony account response")
+  if (input.type === "slice-wallet:ceremony-account") {
+    return parseSliceWalletCeremonyAccountMessage(value)
+  }
+  const response = parseSliceWalletCeremonyResponse(value)
+  if (response.type !== "slice-wallet:ceremony-error") {
+    throw new Error("Ceremony account response is invalid.")
+  }
+  return response
 }
 
 export const parseSliceWalletCeremonyRootSignRequest = (

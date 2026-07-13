@@ -110,7 +110,10 @@ export type SliceWalletSignerFrameControllerOptions = {
   decodeScopedCalls: (callData: Hex) => readonly WalletCall[]
   managementOrigins?: readonly string[]
   now?: () => number
-  onSessionCreated?: (session: SliceWalletFrameSession) => void
+  onSessionCreated?: (
+    session: SliceWalletFrameSession,
+    appOrigin: string
+  ) => void
   rpId?: string
   selfOrigin: string
   sessionStore: SliceWalletSessionStore

@@ -13,7 +13,9 @@ import { parseSliceWalletCeremonyRootResponse } from "./protocol"
 export const createSliceWalletCeremonyRootSigner =
   ({
     account,
+    ceremonyMode = "popup",
     chainId,
+    document,
     idOrigin,
     timeoutMs = 5 * 60_000,
     window
@@ -25,8 +27,10 @@ export const createSliceWalletCeremonyRootSigner =
       )
     }
     const nonce = createSliceWalletCeremonyNonce(window)
-    const { popup, port } = await openSliceWalletCeremonyChannel({
+    const { port, surface } = await openSliceWalletCeremonyChannel({
+      document,
       idOrigin,
+      mode: ceremonyMode,
       nonce,
       path: `/ceremony/root?account=${encodeURIComponent(account)}&chainId=${chainId}`,
       window
@@ -42,8 +46,8 @@ export const createSliceWalletCeremonyRootSigner =
     port.postMessage(message)
     const response = await waitForSliceWalletCeremonyMessage({
       parse: parseSliceWalletCeremonyRootResponse,
-      popup,
       port,
+      surface,
       timeoutMs
     })
     if (response.nonce !== nonce) {

@@ -35,7 +35,7 @@ export const registerRecoveredSliceWalletCredential = async ({
   registry: SliceWalletRegistryCredential
 }> => {
   const nonce = createSliceWalletCeremonyNonce(window)
-  const { popup, port } = await openSliceWalletCeremonyChannel({
+  const { port, surface } = await openSliceWalletCeremonyChannel({
     idOrigin,
     nonce,
     path: `/ceremony/recovery?account=${encodeURIComponent(account)}`,
@@ -45,14 +45,14 @@ export const registerRecoveredSliceWalletCredential = async ({
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       port.close()
-      popup.close()
+      surface.close()
       reject(new Error("Recovery handoff timed out."))
     }, timeoutMs)
     let signed = false
     const finish = () => {
       clearTimeout(timeout)
       port.close()
-      popup.close()
+      surface.close()
     }
     port.addEventListener(
       "message",

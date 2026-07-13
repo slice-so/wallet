@@ -139,12 +139,14 @@ export const createSliceWalletProviderRuntime = (
     })
     return createSliceWalletCeremonyKernelAccount({
       address: credential.accountAddress,
+      ceremonyMode: config.ceremonyMode,
       chainId: config.chain.id,
       client: publicClient,
       credential: {
         credentialIdHash: credential.credentialIdHash,
         publicKey: credential.publicKey
       },
+      document: browserDocument,
       idOrigin,
       index: BigInt(credential.accountIndex),
       ...(initConfig === undefined ? {} : { initConfig }),
@@ -253,7 +255,9 @@ export const createSliceWalletProviderRuntime = (
     const hydrated = await hydrate()
     if (hydrated !== null) return hydrated
     const connected = await connectSliceWalletAccount({
+      ceremonyMode: config.ceremonyMode,
       chainId: config.chain.id,
+      document: browserDocument,
       fetch: fetchImpl,
       idOrigin,
       window: browserWindow
@@ -413,6 +417,8 @@ export const createSliceWalletProviderRuntime = (
     const session = parseSliceWalletFrameSession(result)
     try {
       const authorization = await authorizeSliceWalletSession({
+        ceremonyMode: config.ceremonyMode,
+        document: browserDocument,
         frameClient: frame,
         idOrigin,
         session,

@@ -1,4 +1,5 @@
 import type { Address, Chain, Hex } from "viem"
+import type { SliceWalletCeremonyMode } from "./ceremony"
 import type { SerializedWalletPolicyDescriptor } from "./policy"
 
 export type SliceWalletProviderValue =
@@ -47,6 +48,7 @@ export type SliceWalletProvider = {
 
 export type SliceWalletProviderConfig = {
   bundlerUrl: string
+  ceremonyMode?: SliceWalletCeremonyMode
   chain: Chain
   document?: Document
   fetch?: typeof fetch

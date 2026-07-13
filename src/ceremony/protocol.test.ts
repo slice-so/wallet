@@ -5,6 +5,7 @@ import { createErc20ApproveCallRule, getWalletPermissionId } from "../policy"
 import type { SliceWalletProtocolValue } from "../types"
 import {
   parseSliceWalletBridgeRecord,
+  parseSliceWalletCeremonyAccountResponse,
   parseSliceWalletCeremonyRootSignRequest,
   parseSliceWalletPermissionAuthorization
 } from "./protocol"
@@ -80,6 +81,21 @@ const managementAuthorization = {
 } as const satisfies SliceWalletProtocolValue
 
 describe("wallet ceremony protocol parser", () => {
+  it("accepts a terminal account cancellation response", () => {
+    expect(
+      parseSliceWalletCeremonyAccountResponse({
+        code: "authorization_failed",
+        message: "User rejected the request",
+        nonce,
+        type: "slice-wallet:ceremony-error",
+        version: 1
+      })
+    ).toMatchObject({
+      code: "authorization_failed",
+      type: "slice-wallet:ceremony-error"
+    })
+  })
+
   it("accepts a canonical checkout authorization", () => {
     expect(
       parseSliceWalletPermissionAuthorization(authorization)

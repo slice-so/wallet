@@ -7,7 +7,11 @@ import type {
   SliceWalletProtocolValue
 } from "../types"
 import {
-  parseSliceWalletCeremonyReadyMessage,
+  openSliceWalletCeremonyChannel,
+  resolveSliceWalletCeremonyMode,
+  waitForSliceWalletCeremonyMessage
+} from "./popup"
+import {
   parseSliceWalletCeremonyResponse,
   parseSliceWalletPermissionAuthorization
 } from "./protocol"
@@ -80,105 +84,6 @@ const isMatchingAuthorization = (
   )
 }
 
-const requestPopupAuthorization = ({
-  authorizationTimeoutMs,
-  expectedOrigin,
-  nonce,
-  popup,
-  readyTimeoutMs,
-  session,
-  window
-}: {
-  authorizationTimeoutMs: number
-  expectedOrigin: string
-  nonce: Hex
-  popup: WindowProxy
-  readyTimeoutMs: number
-  session: SliceWalletFrameSession
-  window: Window
-}) =>
-  new Promise<SliceWalletPermissionAuthorization>((resolve, reject) => {
-    const readyTimeout = setTimeout(() => {
-      window.removeEventListener("message", onReady)
-      reject(
-        new SliceWalletBridgeUnavailableError("Wallet popup bridge timed out.")
-      )
-    }, readyTimeoutMs)
-    const onReady = (event: MessageEvent<SliceWalletProtocolValue>) => {
-      if (event.source !== popup || event.origin !== expectedOrigin) {
-        return
-      }
-      try {
-        parseSliceWalletCeremonyReadyMessage(event.data)
-      } catch {
-        return
-      }
-      clearTimeout(readyTimeout)
-      window.removeEventListener("message", onReady)
-      const channel = new MessageChannel()
-      const authorizationTimeout = setTimeout(() => {
-        channel.port1.close()
-        reject(new Error("Wallet authorization timed out."))
-      }, authorizationTimeoutMs)
-      channel.port1.addEventListener(
-        "message",
-        (responseEvent: MessageEvent<SliceWalletProtocolValue>) => {
-          clearTimeout(authorizationTimeout)
-          channel.port1.close()
-          let response: ReturnType<typeof parseSliceWalletCeremonyResponse>
-          try {
-            response = parseSliceWalletCeremonyResponse(responseEvent.data)
-          } catch (error) {
-            reject(
-              error instanceof Error
-                ? error
-                : new Error("Wallet ceremony returned an invalid response.")
-            )
-            return
-          }
-          if (response.nonce !== nonce) {
-            reject(new Error("Wallet ceremony response nonce does not match."))
-            return
-          }
-          if (response.type === "slice-wallet:ceremony-error") {
-            reject(
-              response.code === "bridge_unavailable"
-                ? new SliceWalletBridgeUnavailableError(response.message)
-                : new Error(response.message)
-            )
-            return
-          }
-          if (
-            response.type !== "slice-wallet:ceremony-authorization" ||
-            !isMatchingAuthorization(
-              response.authorization,
-              session,
-              window.location.origin
-            )
-          ) {
-            reject(
-              new Error("Wallet ceremony returned an invalid authorization.")
-            )
-            return
-          }
-          resolve(response.authorization)
-        },
-        { once: true }
-      )
-      channel.port1.start()
-      popup.postMessage(
-        {
-          nonce,
-          type: "slice-wallet:ceremony-connect",
-          version: 1
-        },
-        expectedOrigin,
-        [channel.port2]
-      )
-    }
-    window.addEventListener("message", onReady)
-  })
-
 const waitForFrameAuthorization = async ({
   appOrigin,
   frameClient,
@@ -212,6 +117,8 @@ const waitForFrameAuthorization = async ({
 }
 
 export const authorizeSliceWalletSession = async ({
+  ceremonyMode = "popup",
+  document,
   frameClient,
   idOrigin,
   popupReadyTimeoutMs = 10_000,
@@ -235,32 +142,65 @@ export const authorizeSliceWalletSession = async ({
     }
   }
 
-  // Opening after asynchronous session preparation is blocked by browsers once
-  // the initiating click's transient activation has expired.
-  const popup =
+  const resolvedMode = resolveSliceWalletCeremonyMode({
+    document,
+    mode: ceremonyMode,
+    window
+  })
+  if (
+    resolvedMode === "popup" &&
     window.navigator.userActivation?.isActive === false
-      ? null
-      : window.open(
-          getCeremonyUrl({ idOrigin: normalizedIdOrigin, nonce, session }),
-          "slice-wallet-ceremony",
-          "popup,width=560,height=720"
-        )
-  if (popup === null) return continueFromFrame()
+  ) {
+    return continueFromFrame()
+  }
 
+  let channel: Awaited<ReturnType<typeof openSliceWalletCeremonyChannel>>
   try {
-    const authorization = await requestPopupAuthorization({
-      authorizationTimeoutMs: timeoutMs,
-      expectedOrigin: normalizedIdOrigin,
+    channel = await openSliceWalletCeremonyChannel({
+      document,
+      idOrigin: normalizedIdOrigin,
+      mode: resolvedMode,
       nonce,
-      popup,
+      path: getCeremonyUrl({
+        idOrigin: normalizedIdOrigin,
+        nonce,
+        session
+      }).href,
       readyTimeoutMs: popupReadyTimeoutMs,
-      session,
       window
     })
-    popup.close()
-    return authorization
+  } catch {
+    return continueFromFrame()
+  }
+
+  try {
+    return await waitForSliceWalletCeremonyMessage({
+      parse: (value: SliceWalletProtocolValue) => {
+        const response = parseSliceWalletCeremonyResponse(value)
+        if (response.nonce !== nonce) {
+          throw new Error("Wallet ceremony response nonce does not match.")
+        }
+        if (response.type === "slice-wallet:ceremony-error") {
+          throw response.code === "bridge_unavailable"
+            ? new SliceWalletBridgeUnavailableError(response.message)
+            : new Error(response.message)
+        }
+        if (
+          !isMatchingAuthorization(
+            response.authorization,
+            session,
+            window.location.origin
+          )
+        ) {
+          throw new Error("Wallet ceremony returned an invalid authorization.")
+        }
+        return response.authorization
+      },
+      port: channel.port,
+      surface: channel.surface,
+      timeoutMs
+    })
   } catch (error) {
-    popup.close()
     if (!(error instanceof SliceWalletBridgeUnavailableError)) throw error
     return continueFromFrame()
   }
