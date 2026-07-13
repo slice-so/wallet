@@ -55,6 +55,53 @@ export const formatSliceWalletExecutionGrantMessage = ({
 }
 
 const coSignDomain = keccak256(stringToHex("Slice Wallet Checkout Co-sign v1"))
+const sessionRequestDomain = keccak256(
+  stringToHex("Slice Wallet Execution Session Request v1")
+)
+
+export const hashSliceWalletSessionRequest = ({
+  action,
+  appOrigin,
+  challenge,
+  delegationId,
+  expiresAt,
+  session
+}: {
+  action: "revoke" | "status"
+  appOrigin: string
+  challenge: Hex
+  delegationId: string
+  expiresAt: number
+  session: SliceWalletFrameSession
+}) =>
+  keccak256(
+    encodeAbiParameters(
+      [
+        { name: "domain", type: "bytes32" },
+        { name: "action", type: "string" },
+        { name: "origin", type: "string" },
+        { name: "account", type: "address" },
+        { name: "chainId", type: "uint256" },
+        { name: "delegationId", type: "string" },
+        { name: "signerId", type: "address" },
+        { name: "permissionId", type: "bytes4" },
+        { name: "challenge", type: "bytes32" },
+        { name: "expiresAt", type: "uint48" }
+      ],
+      [
+        sessionRequestDomain,
+        action,
+        new URL(appOrigin).origin,
+        session.account,
+        BigInt(session.chainId),
+        delegationId,
+        session.signerId,
+        session.permissionId,
+        challenge,
+        expiresAt
+      ]
+    )
+  )
 
 export const hashSliceWalletCoSignRequest = ({
   accountNonce,

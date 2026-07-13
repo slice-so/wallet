@@ -32,7 +32,8 @@ import type {
 } from "../types"
 import {
   formatSliceWalletExecutionGrantMessage,
-  hashSliceWalletCoSignRequest
+  hashSliceWalletCoSignRequest,
+  hashSliceWalletSessionRequest
 } from "./messages"
 import { parseSliceWalletFrameRequest } from "./protocol"
 
@@ -335,6 +336,31 @@ export const attachSliceWalletSignerFrame = ({
         signature,
         userOperationHash
       }
+    }
+    if (request.method === "signSessionRequest") {
+      if (stored.session.grantKind !== "checkout") {
+        throw new Error("Only checkout sessions may sign session requests.")
+      }
+      if (
+        request.params.expiresAt <= now() ||
+        request.params.expiresAt > now() + 300
+      ) {
+        throw new Error("Session request expiration is invalid.")
+      }
+      return signSliceWalletP256({
+        cryptoImpl,
+        key: stored.privateKey,
+        message: hexToBytes(
+          hashSliceWalletSessionRequest({
+            action: request.params.action,
+            appOrigin: parentOrigin,
+            challenge: request.params.challenge,
+            delegationId: request.params.delegationId,
+            expiresAt: request.params.expiresAt,
+            session: stored.session
+          })
+        )
+      })
     }
     if (request.method === "signScopedUserOperation") {
       if (stored.session.grantKind === "checkout") {

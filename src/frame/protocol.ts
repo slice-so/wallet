@@ -358,6 +358,30 @@ export const parseSliceWalletFrameRequest = (
       version: 1
     }
   }
+  if (method === "signSessionRequest") {
+    assertKeys(params, [
+      "action",
+      "challenge",
+      "delegationId",
+      "expiresAt",
+      "session"
+    ])
+    if (params.action !== "revoke" && params.action !== "status") {
+      throw new Error("Unsupported wallet session request action.")
+    }
+    return {
+      id,
+      method,
+      params: {
+        action: params.action,
+        challenge: hexValue(params.challenge, "Session request challenge"),
+        delegationId: stringValue(params.delegationId, "Delegation id"),
+        expiresAt: integerValue(params.expiresAt, "Session request expiration"),
+        session: parseSessionKey(params.session)
+      },
+      version: 1
+    }
+  }
   if (method === "signScopedUserOperation") {
     assertKeys(params, ["session", "userOperation"])
     return {

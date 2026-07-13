@@ -236,4 +236,79 @@ describe("isolated signer-frame controller", () => {
     })
     detach()
   })
+
+  test("signs a structured status proof with the committed checkout key", async () => {
+    const parent = new MessageChannel()
+    const window = new MockMessageWindow(parent.port1)
+    const store = new MemorySessionStore()
+    const detach = attachSliceWalletSignerFrame({
+      decodeScopedCalls: () => [],
+      now: () => 100,
+      selfOrigin: "https://id.slice.so",
+      sessionStore: store,
+      validateCheckoutCalls: () => {},
+      window
+    })
+    const connection = new MessageChannel()
+    const connected = receive(connection.port1)
+    window.dispatch({
+      data: { id: "connect", method: "connect", version: 1 },
+      origin: "https://app.example",
+      ports: [connection.port2],
+      source: parent.port1
+    })
+    await connected
+
+    const policy = {
+      account,
+      calls: [createNativeTransferCallRule({ maximumValue: 1n, recipient })],
+      chainId: 8453,
+      grantKind: "checkout",
+      validAfter: 90,
+      validUntil: 1_000,
+      version: 1
+    } as const
+    const created = receive(connection.port1)
+    connection.port1.postMessage({
+      id: "create",
+      method: "createSession",
+      params: {
+        checkout: {
+          allowanceUsdMicros: "100000000",
+          coSignerAddress: recipient
+        },
+        policy
+      },
+      version: 1
+    } satisfies SliceWalletProtocolValue)
+    await created
+
+    const committed = receive(connection.port1)
+    connection.port1.postMessage({
+      id: "commit",
+      method: "commitSession",
+      params: { account, chainId: 8453, grantKind: "checkout" },
+      version: 1
+    } satisfies SliceWalletProtocolValue)
+    await committed
+
+    const signed = receive(connection.port1)
+    connection.port1.postMessage({
+      id: "status",
+      method: "signSessionRequest",
+      params: {
+        action: "status",
+        challenge: nonce,
+        delegationId: "delegation-1",
+        expiresAt: 200,
+        session: { account, chainId: 8453, grantKind: "checkout" }
+      },
+      version: 1
+    } satisfies SliceWalletProtocolValue)
+    expect(await signed).toMatchObject({
+      id: "status",
+      result: expect.stringMatching(/^0x[0-9a-f]{128}$/)
+    })
+    detach()
+  })
 })

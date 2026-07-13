@@ -14,6 +14,10 @@ const coSigner = "0x2000000000000000000000000000000000000002" as Address
 const token = "0x3000000000000000000000000000000000000003" as Address
 const spender = "0x4000000000000000000000000000000000000004" as Address
 const publicKey = `0x04${"11".repeat(64)}` as Hex
+const rootCredential = {
+  credentialIdHash: `0x${"44".repeat(32)}` as Hex,
+  publicKey: `0x04${"55".repeat(64)}` as Hex
+}
 const signerId = getSliceWalletP256SignerId(publicKey)
 const policy = {
   account,
@@ -44,10 +48,10 @@ const authorization = {
   executionGrant: {
     expiresAt: 200,
     nonce: `0x${"22".repeat(32)}` as Hex,
-    rootSignature: "0x02",
     scopes: ["wallet_execution"],
     signerProof: `0x${"33".repeat(64)}` as Hex
   },
+  rootCredential,
   session
 } as const satisfies SliceWalletPermissionAuthorization
 

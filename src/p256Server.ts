@@ -3,6 +3,7 @@ import {
   bytesToBigInt,
   bytesToHex,
   concat,
+  decodeAbiParameters,
   type Hex,
   hashTypedData,
   hexToBytes,
@@ -16,6 +17,34 @@ import { sliceWalletKernelAddresses } from "./constants"
 const p256Order =
   0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551n
 const p256HalfOrder = p256Order / 2n
+
+const webAuthnAssertionParameters = [
+  { name: "authenticatorData", type: "bytes" },
+  { name: "clientDataJSON", type: "string" },
+  { name: "responseTypeLocation", type: "uint256" },
+  { name: "r", type: "uint256" },
+  { name: "s", type: "uint256" },
+  { name: "usePrecompiled", type: "bool" }
+] as const
+
+export const decodeSliceWalletWebAuthnAssertion = (signature: Hex) => {
+  const [
+    authenticatorData,
+    clientDataJSON,
+    responseTypeLocation,
+    r,
+    s,
+    usePrecompiled
+  ] = decodeAbiParameters(webAuthnAssertionParameters, signature)
+  return {
+    authenticatorData,
+    clientDataJSON,
+    r,
+    responseTypeLocation,
+    s,
+    usePrecompiled
+  }
+}
 
 const normalizeP256Scalars = (r: bigint, rawS: bigint) => {
   if (r === 0n || r >= p256Order || rawS === 0n || rawS >= p256Order) {

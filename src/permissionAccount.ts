@@ -30,12 +30,14 @@ import {
 import { getWalletPermissionId, toWalletPermissionPolicies } from "./policy"
 import { createSliceWalletRootValidator } from "./rootValidator"
 import type {
-  BuildSliceWalletPermissionEnableTypedDataParameters,
-  CreateSliceWalletPermissionAccountParameters,
   SliceWalletFrameSession,
   SliceWalletFrameSessionKey,
   SliceWalletUnsignedUserOperation
-} from "./types"
+} from "./types/frame"
+import type {
+  BuildSliceWalletPermissionEnableTypedDataParameters,
+  CreateSliceWalletPermissionAccountParameters
+} from "./types/permission"
 
 const kernelExecuteSelector = toFunctionSelector({
   inputs: [

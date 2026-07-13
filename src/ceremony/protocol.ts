@@ -211,7 +211,7 @@ export const parseSliceWalletPermissionAuthorization = (
   const input = record(value, "Wallet authorization")
   assertKeys(
     input,
-    ["appOrigin", "enableSignature", "session"],
+    ["appOrigin", "enableSignature", "rootCredential", "session"],
     ["accountFactory", "accountFactoryData", "executionGrant"]
   )
   if (
@@ -223,20 +223,30 @@ export const parseSliceWalletPermissionAuthorization = (
     )
   }
   const session = parseSliceWalletFrameSession(input.session)
+  const rootCredentialInput = record(input.rootCredential, "Root credential")
+  assertKeys(rootCredentialInput, ["credentialIdHash", "publicKey"])
+  const rootCredential = {
+    credentialIdHash: hexValue(
+      rootCredentialInput.credentialIdHash,
+      "Root credential id hash",
+      32
+    ),
+    publicKey: hexValue(
+      rootCredentialInput.publicKey,
+      "Root credential public key",
+      65
+    )
+  }
+  if (!rootCredential.publicKey.toLowerCase().startsWith("0x04")) {
+    throw new Error("Root credential public key must be uncompressed P-256.")
+  }
   let executionGrant: SliceWalletPermissionAuthorization["executionGrant"]
   if (input.executionGrant !== undefined) {
     const grant = record(input.executionGrant, "Execution grant")
-    assertKeys(grant, [
-      "expiresAt",
-      "nonce",
-      "rootSignature",
-      "scopes",
-      "signerProof"
-    ])
+    assertKeys(grant, ["expiresAt", "nonce", "scopes", "signerProof"])
     executionGrant = {
       expiresAt: integerValue(grant.expiresAt, "Execution grant expiration"),
       nonce: hexValue(grant.nonce, "Execution grant nonce", 32),
-      rootSignature: hexValue(grant.rootSignature, "Root grant signature"),
       scopes: stringArray(grant.scopes, "Execution grant scopes"),
       signerProof: hexValue(grant.signerProof, "Execution signer proof", 64)
     }
@@ -260,6 +270,7 @@ export const parseSliceWalletPermissionAuthorization = (
     appOrigin: originValue(input.appOrigin, "Application origin"),
     enableSignature: hexValue(input.enableSignature, "Enable signature"),
     ...(executionGrant === undefined ? {} : { executionGrant }),
+    rootCredential,
     session
   }
 }

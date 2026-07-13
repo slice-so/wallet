@@ -45,9 +45,12 @@ export type SliceWalletPermissionAuthorization = {
   executionGrant?: {
     expiresAt: number
     nonce: Hex
-    rootSignature: Hex
     scopes: readonly string[]
     signerProof: Hex
+  }
+  rootCredential: {
+    credentialIdHash: Hex
+    publicKey: Hex
   }
   session: SliceWalletFrameSession
 }
@@ -195,6 +198,18 @@ export type SliceWalletFrameRequest =
         expiresAt: number
         nonce: Hex
         scopes: readonly string[]
+        session: SliceWalletFrameSessionKey
+      }
+      version: 1
+    }
+  | {
+      id: string
+      method: "signSessionRequest"
+      params: {
+        action: "revoke" | "status"
+        challenge: Hex
+        delegationId: string
+        expiresAt: number
         session: SliceWalletFrameSessionKey
       }
       version: 1

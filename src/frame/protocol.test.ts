@@ -101,4 +101,30 @@ describe("signer-frame protocol parser", () => {
       })
     ).toThrow("unknown field")
   })
+
+  it("accepts only structured checkout session status and revoke proofs", () => {
+    const sessionRequest = {
+      id: "request-3",
+      method: "signSessionRequest",
+      params: {
+        action: "status",
+        challenge: `0x${"44".repeat(32)}`,
+        delegationId: "delegation-1",
+        expiresAt: 220,
+        session: { account, chainId: 8453, grantKind: "checkout" }
+      },
+      version: 1
+    } as const satisfies SliceWalletProtocolValue
+
+    expect(parseSliceWalletFrameRequest(sessionRequest)).toMatchObject({
+      method: "signSessionRequest",
+      params: { action: "status", delegationId: "delegation-1" }
+    })
+    expect(() =>
+      parseSliceWalletFrameRequest({
+        ...sessionRequest,
+        params: { ...sessionRequest.params, digest: `0x${"55".repeat(32)}` }
+      })
+    ).toThrow("unknown field")
+  })
 })
