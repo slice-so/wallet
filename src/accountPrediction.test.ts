@@ -1,0 +1,98 @@
+import { describe, expect, it } from "bun:test"
+import {
+  concatHex,
+  createPublicClient,
+  custom,
+  decodeFunctionData,
+  defineChain,
+  getContractAddress,
+  keccak256
+} from "viem"
+import {
+  predictSliceWalletKernelAccountAddress,
+  sliceWalletKernelProxyInitCodeHash
+} from "./accountPrediction"
+import { buildRecoveryPermissionInitConfig } from "./recovery"
+import { createSliceWalletRegisteredKernelAccount } from "./rootValidator"
+
+const parameters = {
+  chainId: 8453,
+  credential: {
+    credentialIdHash:
+      "0x0102030400000000000000000000000000000000000000000000000000000000",
+    publicKey:
+      "0x04000000000000000000000000000000000000000000000000000000000000007b00000000000000000000000000000000000000000000000000000000000001c8"
+  },
+  recoverySignerAddress: "0x0000000000000000000000000000000000000001"
+} as const
+
+describe("Slice wallet offline account prediction", () => {
+  it("matches the permanent known-address vector without RPC", async () => {
+    await expect(
+      predictSliceWalletKernelAccountAddress(parameters)
+    ).resolves.toBe("0x2EAC7591EbE1Fe88f9C01ff4bb4AcD0DA699cDac")
+    expect(sliceWalletKernelProxyInitCodeHash).toBe(
+      "0xc452397f1e7518f8cea0566ac057e243bb1643f6298aba8eec8cdee78ee3b3dd"
+    )
+  })
+
+  it("matches the pinned Kernel account constructor", async () => {
+    const client = createPublicClient({
+      chain: defineChain({
+        id: parameters.chainId,
+        name: "Offline Base",
+        nativeCurrency: { decimals: 18, name: "Ether", symbol: "ETH" },
+        rpcUrls: { default: { http: ["http://127.0.0.1"] } }
+      }),
+      transport: custom({
+        async request({ method }) {
+          if (method === "eth_getCode") return "0x"
+          throw new Error(`Unexpected RPC request: ${method}`)
+        }
+      })
+    })
+    const recovery = await buildRecoveryPermissionInitConfig({
+      client,
+      recoverySignerAddress: parameters.recoverySignerAddress
+    })
+    const predicted = await predictSliceWalletKernelAccountAddress(parameters)
+    const account = await createSliceWalletRegisteredKernelAccount({
+      address: predicted,
+      chainId: parameters.chainId,
+      client,
+      credential: parameters.credential,
+      initConfig: recovery.initConfig
+    })
+
+    const factoryArgs = await account.getFactoryArgs()
+    if (factoryArgs.factoryData === undefined) {
+      throw new Error("Kernel account factory data is missing.")
+    }
+    const deployment = decodeFunctionData({
+      abi: [
+        {
+          inputs: [
+            { name: "factory", type: "address" },
+            { name: "createData", type: "bytes" },
+            { name: "salt", type: "bytes32" }
+          ],
+          name: "deployWithFactory",
+          outputs: [{ name: "account", type: "address" }],
+          stateMutability: "payable",
+          type: "function"
+        }
+      ] as const,
+      data: factoryArgs.factoryData
+    })
+    const [factory, initializationData, index] = deployment.args
+    const actual = getContractAddress({
+      bytecodeHash: sliceWalletKernelProxyInitCodeHash,
+      from: factory,
+      opcode: "CREATE2",
+      salt: keccak256(concatHex([initializationData, index]))
+    })
+
+    expect(account.address).toBe(predicted)
+    expect(actual).toBe(predicted)
+  })
+})

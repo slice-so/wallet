@@ -236,9 +236,7 @@ export const createSliceWalletProviderRuntime = (
     connected: SliceWalletConnectedAccount
   ) => {
     if (connected.recovery === undefined) {
-      throw new Error(
-        "Complete the recovery bundle ceremony before connecting."
-      )
+      throw new Error("Complete recovery enrollment before connecting.")
     }
     if (
       wallet.credential.recoveryPermissionId !== null &&

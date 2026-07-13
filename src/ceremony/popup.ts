@@ -63,13 +63,15 @@ const popupFeatures = (window: Window) => {
 }
 
 const createPopupSurface = ({
+  name,
   url,
   window
 }: {
+  name: string
   url: URL
   window: Window
 }): SliceWalletCeremonySurface => {
-  const popup = window.open(url, "slice-wallet-ceremony", popupFeatures(window))
+  const popup = window.open(url, name, popupFeatures(window))
   if (popup === null) throw new Error("Slice Wallet popup was blocked.")
   return {
     close: () => popup.close(),
@@ -115,6 +117,8 @@ const createIframeSurface = ({
   iframe.sandbox.add(
     "allow-downloads",
     "allow-forms",
+    "allow-popups",
+    "allow-popups-to-escape-sandbox",
     "allow-same-origin",
     "allow-scripts"
   )
@@ -163,6 +167,7 @@ export const openSliceWalletCeremonyChannel = ({
   mode = "popup",
   nonce,
   path,
+  popupName = "slice-wallet-ceremony",
   readyTimeoutMs = 10_000,
   window
 }: {
@@ -171,6 +176,7 @@ export const openSliceWalletCeremonyChannel = ({
   mode?: SliceWalletCeremonyMode
   nonce: Hex
   path: string
+  popupName?: string
   readyTimeoutMs?: number
   window: Window
 }) => {
@@ -192,7 +198,7 @@ export const openSliceWalletCeremonyChannel = ({
     }
     surface = createIframeSurface({ document, origin, url, window })
   } else {
-    surface = createPopupSurface({ url, window })
+    surface = createPopupSurface({ name: popupName, url, window })
   }
 
   return new Promise<{
@@ -248,20 +254,23 @@ export const waitForSliceWalletCeremonyMessage = <Result>({
   parse: (value: SliceWalletProtocolValue) => Result
   port: MessagePort
   surface: SliceWalletCeremonySurface
-  timeoutMs: number
+  timeoutMs?: number
 }) =>
   new Promise<Result>((resolve, reject) => {
     const cleanup = () => {
-      clearTimeout(timeout)
+      if (timeout !== undefined) clearTimeout(timeout)
       clearInterval(closedPoll)
       port.removeEventListener("message", onMessage)
     }
-    const timeout = setTimeout(() => {
-      cleanup()
-      port.close()
-      surface.close()
-      reject(new Error("Slice Wallet ceremony timed out."))
-    }, timeoutMs)
+    const timeout =
+      timeoutMs === undefined
+        ? undefined
+        : setTimeout(() => {
+            cleanup()
+            port.close()
+            surface.close()
+            reject(new Error("Slice Wallet ceremony timed out."))
+          }, timeoutMs)
     const closedPoll = setInterval(() => {
       if (!surface.closed) return
 

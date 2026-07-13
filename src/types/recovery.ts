@@ -44,6 +44,52 @@ export type CreateRecoveryPermissionAccountParameters = {
   recoveryTimelock?: SliceTimelockPolicyParameters
 }
 
+export type CreateDeployedRecoveryPermissionAccountParameters = {
+  address: Address
+  chainId: number
+  client: KernelSmartAccountImplementation["client"]
+  recoveryPrivateKey: Hex
+  recoverySignerAddress: Address
+  recoveryTimelock?: SliceTimelockPolicyParameters
+}
+
+export type PredictSliceWalletKernelAccountAddressParameters = {
+  chainId: number
+  credential: SliceWalletRegisteredRootCredential
+  recoverySignerAddress: Address
+}
+
+export type SliceWalletRecoveryCodePayload = {
+  account: Address
+  chainId: number
+  recoveryPrivateKey: Hex
+}
+
+export type SliceWalletRecoveryEnrollRequest = {
+  chainId: number
+  credentialId: string
+  credentialPublicKey: Hex
+  nonce: Hex
+  type: "slice-wallet:recovery-enroll-request"
+  version: 1
+}
+
+export type SliceWalletRecoveryEnrollResult = {
+  account: Address
+  nonce: Hex
+  permissionId: Hex
+  signerAddress: Address
+  type: "slice-wallet:recovery-enroll-result"
+  version: 1
+}
+
+export type SliceWalletRecoveryEnrollError = {
+  message: string
+  nonce: Hex
+  type: "slice-wallet:recovery-enroll-error"
+  version: 1
+}
+
 export type RecoveryUserOperationGas = {
   callGasLimit: bigint
   maxFeePerGas: bigint

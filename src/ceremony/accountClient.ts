@@ -17,7 +17,7 @@ export const connectSliceWalletAccount = async ({
   document,
   fetch,
   idOrigin,
-  timeoutMs = 5 * 60_000,
+  timeoutMs,
   window
 }: ConnectSliceWalletAccountParameters): Promise<SliceWalletConnectedAccount> => {
   const nonce = createSliceWalletCeremonyNonce(window)

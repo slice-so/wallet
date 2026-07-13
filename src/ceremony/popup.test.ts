@@ -1,6 +1,7 @@
 import { describe, expect, it, mock } from "bun:test"
 import type { SliceWalletProtocolValue } from "../types"
 import {
+  openSliceWalletCeremonyChannel,
   resolveSliceWalletCeremonyMode,
   waitForSliceWalletCeremonyMessage
 } from "./popup"
@@ -61,6 +62,64 @@ describe("waitForSliceWalletCeremonyMessage", () => {
     await expect(result).resolves.toEqual(response)
     expect(close).toHaveBeenCalledTimes(1)
     channel.port2.close()
+  })
+})
+
+describe("openSliceWalletCeremonyChannel", () => {
+  it("opens recovery enrollment in its dedicated popup window", async () => {
+    const popup = Object.assign(Object.create(null) as WindowProxy, {
+      close: mock(() => undefined),
+      closed: false,
+      postMessage: mock(() => undefined)
+    })
+    const open = mock(() => popup)
+    let onMessage:
+      | ((event: MessageEvent<SliceWalletProtocolValue>) => void)
+      | null = null
+    const window = Object.assign(Object.create(null) as Window, {
+      addEventListener: ((_type: "message", listener: typeof onMessage) => {
+        onMessage = listener
+      }) as Window["addEventListener"],
+      matchMedia: () => ({ matches: false }),
+      navigator: { userAgent: "Mozilla/5.0 Chrome/140.0 Safari/537.36" },
+      open,
+      removeEventListener: ((_type: "message", listener: typeof onMessage) => {
+        if (onMessage === listener) onMessage = null
+      }) as Window["removeEventListener"]
+    })
+
+    const channelPromise = openSliceWalletCeremonyChannel({
+      idOrigin: "https://recovery.id.slice.so",
+      nonce: `0x${"11".repeat(32)}`,
+      path: "/enroll",
+      popupName: "slice-wallet-recovery",
+      readyTimeoutMs: 100,
+      window
+    })
+    queueMicrotask(() => {
+      const readyEvent = Object.assign(
+        Object.create(null) as MessageEvent<SliceWalletProtocolValue>,
+        {
+          data: {
+            type: "slice-wallet:ceremony-ready",
+            version: 1
+          } satisfies SliceWalletProtocolValue,
+          origin: "https://recovery.id.slice.so",
+          source: popup
+        }
+      )
+      onMessage?.(readyEvent)
+    })
+
+    const channel = await channelPromise
+
+    expect(open).toHaveBeenCalledWith(
+      expect.any(URL),
+      "slice-wallet-recovery",
+      "popup,width=560,height=720"
+    )
+    channel.port.close()
+    channel.surface.close()
   })
 })
 

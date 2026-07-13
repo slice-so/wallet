@@ -18,7 +18,7 @@ Portable Kernel wallet primitives for Slice and third-party applications. The pa
 - `@slicekit/wallet/policy`: canonical generic policy descriptors and permission ids.
 - `@slicekit/wallet/provider`: portable provider and EIP-6963 discovery.
 - `@slicekit/wallet/wagmi`: wagmi connector.
-- `@slicekit/wallet/recovery`: encrypted recovery bundles and Timelock recovery operations.
+- `@slicekit/wallet/recovery`: Timelock recovery operations. The root entry point also exports the primary password-manager recovery-code format and the advanced encrypted-file alternative.
 - `@slicekit/wallet/server`: server-only P-256 verification and proposal helpers.
 
 Slice commerce policies, checkout decoding, allowance clients, and ProductsModule integration remain internal to Slice applications in `@slicekit/common`; they are intentionally absent from this package.

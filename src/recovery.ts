@@ -7,8 +7,9 @@ import { CallPolicyVersion, toCallPolicy } from "@zerodev/permissions/policies"
 import { toECDSASigner, toEmptyECDSASigner } from "@zerodev/permissions/signers"
 import {
   createKernelAccount,
+  type KernelSmartAccountImplementation,
   KernelV3_3AccountAbi,
-  type KernelSmartAccountImplementation
+  type KernelValidator
 } from "@zerodev/sdk"
 import { toKernelPluginManager } from "@zerodev/sdk/accounts"
 import { encode7579Calls } from "permissionless/utils"
@@ -40,7 +41,7 @@ import {
   toPackedUserOperation,
   type UserOperation
 } from "viem/account-abstraction"
-import { privateKeyToAccount } from "viem/accounts"
+import { privateKeyToAccount, toAccount } from "viem/accounts"
 import { readContract } from "viem/actions"
 import { getAction } from "viem/utils"
 import {
@@ -54,6 +55,7 @@ import {
 } from "./rootValidator"
 import type { SliceWalletRegisteredRootCredential } from "./types/account"
 import type {
+  CreateDeployedRecoveryPermissionAccountParameters,
   CreateRecoveryPermissionAccountParameters,
   RecoveryUserOperationGas,
   SliceRecoveryProposalStatus,
@@ -444,6 +446,80 @@ export const getSliceWalletRegistryRecoveryInitConfig = async ({
   return recovery.initConfig
 }
 
+const missingDeployedRoot = () => {
+  throw new Error(
+    "Recovery of a deployed account cannot use the root validator."
+  )
+}
+
+const createDeployedRecoveryRootValidator =
+  (): KernelValidator<"SliceWalletDeployedRecoveryRoot"> => {
+    const account = toAccount({
+      address: sliceWalletKernelAddresses.webAuthnRootValidator,
+      signMessage: missingDeployedRoot,
+      signTransaction: missingDeployedRoot,
+      signTypedData: missingDeployedRoot
+    })
+    return {
+      ...account,
+      address: sliceWalletKernelAddresses.webAuthnRootValidator,
+      // ZeroDev eagerly encodes unused factory data while constructing an
+      // account object. Empty public enable data lets that construction finish;
+      // every root signing method remains unavailable and factory args are
+      // overridden below.
+      getEnableData: async () => "0x",
+      getIdentifier: () => sliceWalletKernelAddresses.webAuthnRootValidator,
+      getNonceKey: async () => 0n,
+      getStubSignature: async () => missingDeployedRoot(),
+      isEnabled: async () => true,
+      signUserOperation: async () => missingDeployedRoot(),
+      source: "SliceWalletDeployedRecoveryRoot",
+      supportedKernelVersions: recoveryKernelVersion,
+      validatorType: "SECONDARY"
+    }
+  }
+
+const createRecoveryKernelAccount = async ({
+  address,
+  chainId,
+  client,
+  enableSignature,
+  recoveryValidator,
+  rootValidator
+}: {
+  address: Address
+  chainId: number
+  client: KernelSmartAccountImplementation["client"]
+  enableSignature?: Hex
+  recoveryValidator: Awaited<
+    ReturnType<typeof createRecoveryPermissionValidator>
+  >
+  rootValidator: KernelValidator
+}) => {
+  const plugins = await toKernelPluginManager(client, {
+    chainId,
+    entryPoint: recoveryEntryPoint,
+    ...(enableSignature === undefined
+      ? {}
+      : { pluginEnableSignature: enableSignature }),
+    isPreInstalled: true,
+    kernelVersion: recoveryKernelVersion,
+    regular: recoveryValidator,
+    sudo: rootValidator
+  })
+  return createKernelAccount(client, {
+    address,
+    accountImplementationAddress: sliceKernelBaseV33Addresses.implementation,
+    entryPoint: recoveryEntryPoint,
+    factoryAddress: sliceKernelBaseV33Addresses.factory,
+    index: 0n,
+    kernelVersion: recoveryKernelVersion,
+    metaFactoryAddress: sliceKernelBaseV33Addresses.metaFactory,
+    plugins,
+    useMetaFactory: true
+  })
+}
+
 export const createRecoveryPermissionAccount = async ({
   address,
   chainId,
@@ -466,33 +542,51 @@ export const createRecoveryPermissionAccount = async ({
       recoverySignerAddress
     })
   ])
-  const plugins = await toKernelPluginManager(client, {
-    chainId,
-    entryPoint: recoveryEntryPoint,
-    ...(enableSignature === undefined
-      ? {}
-      : { pluginEnableSignature: enableSignature }),
-    isPreInstalled: true,
-    kernelVersion: recoveryKernelVersion,
-    regular: recoveryValidator,
-    sudo: rootValidator
-  })
-
-  const account = await createKernelAccount(client, {
+  const account = await createRecoveryKernelAccount({
     address,
-    accountImplementationAddress: sliceKernelBaseV33Addresses.implementation,
-    entryPoint: recoveryEntryPoint,
-    factoryAddress: sliceKernelBaseV33Addresses.factory,
-    index: 0n,
-    kernelVersion: recoveryKernelVersion,
-    metaFactoryAddress: sliceKernelBaseV33Addresses.metaFactory,
-    plugins,
-    useMetaFactory: true
+    chainId,
+    client,
+    enableSignature,
+    recoveryValidator,
+    rootValidator
   })
 
   return {
     ...account,
     ...(getFactoryArgs === undefined ? {} : { getFactoryArgs }),
+    recoveryPermissionId: recoveryValidator.getIdentifier()
+  }
+}
+
+export const createDeployedRecoveryPermissionAccount = async ({
+  address,
+  chainId,
+  client,
+  recoveryPrivateKey,
+  recoverySignerAddress,
+  recoveryTimelock
+}: CreateDeployedRecoveryPermissionAccountParameters) => {
+  const recoveryValidator = await createRecoveryPermissionValidator({
+    client,
+    delaySec: recoveryTimelock?.delaySec,
+    expirationSec: recoveryTimelock?.expirationSec,
+    guardian: recoveryTimelock?.guardian,
+    recoveryPrivateKey,
+    recoverySignerAddress
+  })
+  const account = await createRecoveryKernelAccount({
+    address,
+    chainId,
+    client,
+    recoveryValidator,
+    rootValidator: createDeployedRecoveryRootValidator()
+  })
+  return {
+    ...account,
+    getFactoryArgs: async () => ({
+      factory: undefined,
+      factoryData: undefined
+    }),
     recoveryPermissionId: recoveryValidator.getIdentifier()
   }
 }
