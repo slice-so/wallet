@@ -80,17 +80,19 @@ const parseEncodedBody = (code: string) => {
   if (!/^[0-9]/.test(compactSuffix)) {
     throw new Error("Recovery code prefix is invalid.")
   }
-  const versionLength = compactSuffix.length - recoveryCodeEncodedCharacters
-  if (delimitedVersion === null && versionLength <= 0) {
+  if (
+    delimitedVersion === null &&
+    compactSuffix.length !== recoveryCodeEncodedCharacters + 1
+  ) {
     throw new Error("Recovery code has an invalid length.")
   }
-  const version = delimitedVersion?.[1] ?? compactSuffix.slice(0, versionLength)
+  const version = delimitedVersion?.[1] ?? compactSuffix.slice(0, 1)
   if (version !== "1") {
     throw new Error("This recovery code requires a newer recovery tool.")
   }
   const body =
     delimitedVersion === null
-      ? compactSuffix.slice(versionLength)
+      ? compactSuffix.slice(1)
       : suffix.slice(delimitedVersion[0].length)
   const encoded = body
     .replace(/[-\s]/g, "")

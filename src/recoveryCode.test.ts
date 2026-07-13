@@ -70,6 +70,9 @@ describe("Slice wallet recovery codes", () => {
       "length"
     )
     expect(() =>
+      parseSliceWalletRecoveryCode(`${fixedCode.replaceAll("-", "")}0`)
+    ).toThrow("length")
+    expect(() =>
       parseSliceWalletRecoveryCode(`${fixedCode.slice(0, -1)}Z`)
     ).toThrow("checksum")
     expect(isSliceWalletRecoveryCodeShaped(fixedCode)).toBe(true)
