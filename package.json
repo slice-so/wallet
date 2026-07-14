@@ -94,9 +94,9 @@
   ],
   "scripts": {
     "build": "bun run build.ts",
-    "check": "biome check --write --unsafe",
+    "check": "biome check --write --unsafe && bun scripts/check-import-boundaries.ts",
     "format": "biome format --write",
-    "lint": "biome lint --write",
+    "lint": "biome lint --write && bun scripts/check-import-boundaries.ts",
     "test": "bun test",
     "type-check": "tsc -p tsconfig.json --noEmit"
   },
