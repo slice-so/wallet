@@ -98,9 +98,7 @@ export type AuthorizeSliceWalletSessionParameters = {
 }
 
 export type ConnectSliceWalletAccountParameters = {
-  ceremonyMode?: SliceWalletCeremonyMode
   chainId: number
-  document?: Document
   fetch?: typeof fetch
   idOrigin: string
   timeoutMs?: number

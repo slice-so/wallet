@@ -86,7 +86,7 @@ describe("waitForSliceWalletCeremonyMessage", () => {
 })
 
 describe("openSliceWalletCeremonyChannel", () => {
-  it("opens recovery enrollment in its dedicated popup window", async () => {
+  it("opens the account ceremony in its top-level popup window", async () => {
     const popup = Object.assign(Object.create(null) as WindowProxy, {
       close: mock(() => undefined),
       closed: false,
@@ -109,10 +109,9 @@ describe("openSliceWalletCeremonyChannel", () => {
     })
 
     const channelPromise = openSliceWalletCeremonyChannel({
-      idOrigin: "https://recovery.id.slice.so",
+      idOrigin: "https://id.slice.so",
       nonce: `0x${"11".repeat(32)}`,
-      path: "/enroll",
-      popupName: "slice-wallet-recovery",
+      path: "/ceremony/connect",
       readyTimeoutMs: 100,
       window
     })
@@ -124,7 +123,7 @@ describe("openSliceWalletCeremonyChannel", () => {
             type: "slice-wallet:ceremony-ready",
             version: 1
           } satisfies SliceWalletProtocolValue,
-          origin: "https://recovery.id.slice.so",
+          origin: "https://id.slice.so",
           source: popup
         }
       )
@@ -135,7 +134,7 @@ describe("openSliceWalletCeremonyChannel", () => {
 
     expect(open).toHaveBeenCalledWith(
       expect.any(URL),
-      "slice-wallet-recovery",
+      "slice-wallet-ceremony",
       "popup,width=560,height=720"
     )
     channel.port.close()
