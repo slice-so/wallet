@@ -3,11 +3,13 @@ import {
   type Address,
   bytesToBigInt,
   encodeAbiParameters,
+  type Hex,
   hashMessage,
   hashTypedData,
   hexToBytes,
   isAddress,
   isHex,
+  type PublicClient,
   toHex
 } from "viem"
 import { getUserOperationHash } from "viem/account-abstraction"
@@ -108,6 +110,46 @@ const missingRootSigner: SliceWalletRootSigner = async () => {
   throw new Error("A visible Slice ID root ceremony is required.")
 }
 
+export const sliceWalletRootValidatorStorageAbi = [
+  {
+    inputs: [{ name: "kernel", type: "address" }],
+    name: "webAuthnValidatorStorage",
+    outputs: [
+      { name: "pubKeyX", type: "uint256" },
+      { name: "pubKeyY", type: "uint256" }
+    ],
+    stateMutability: "view",
+    type: "function"
+  }
+] as const
+
+export const parseSliceWalletUncompressedPublicKey = (publicKey: Hex) => {
+  const bytes = hexToBytes(publicKey)
+  if (bytes.length !== 65 || bytes[0] !== 4) {
+    throw new Error("Expected an uncompressed P-256 root public key.")
+  }
+  return {
+    x: bytesToBigInt(bytes.slice(1, 33)),
+    y: bytesToBigInt(bytes.slice(33, 65))
+  }
+}
+
+export const getSliceWalletRootValidatorPublicKey = async ({
+  account,
+  client
+}: {
+  account: Address
+  client: Pick<PublicClient, "readContract">
+}) => {
+  const [x, y] = await client.readContract({
+    abi: sliceWalletRootValidatorStorageAbi,
+    address: sliceWalletKernelAddresses.webAuthnRootValidator,
+    args: [account],
+    functionName: "webAuthnValidatorStorage"
+  })
+  return x === 0n && y === 0n ? null : { x, y }
+}
+
 const toUnsignedUserOperation = (
   userOperation: Parameters<KernelValidator["signUserOperation"]>[0]
 ) => ({
@@ -145,10 +187,9 @@ const toUnsignedUserOperation = (
 export const encodeSliceWalletRootValidatorData = (
   credential: SliceWalletRegisteredRootCredential
 ) => {
-  const bytes = hexToBytes(credential.publicKey)
-  if (bytes.length !== 65 || bytes[0] !== 4) {
-    throw new Error("Expected an uncompressed P-256 root public key.")
-  }
+  const coordinates = parseSliceWalletUncompressedPublicKey(
+    credential.publicKey
+  )
   if (hexToBytes(credential.credentialIdHash).length !== 32) {
     throw new Error("Root credential id hash must be 32 bytes.")
   }
@@ -166,8 +207,8 @@ export const encodeSliceWalletRootValidatorData = (
     ],
     [
       {
-        x: bytesToBigInt(bytes.slice(1, 33)),
-        y: bytesToBigInt(bytes.slice(33, 65))
+        x: coordinates.x,
+        y: coordinates.y
       },
       credential.credentialIdHash
     ]
