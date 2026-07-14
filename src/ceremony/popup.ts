@@ -103,6 +103,7 @@ const createIframeSurface = ({
   Object.assign(root.style, {
     height: "100dvh",
     inset: "0",
+    pointerEvents: "auto",
     position: "fixed",
     width: "100vw",
     zIndex: "2147483647"
@@ -127,6 +128,7 @@ const createIframeSurface = ({
   Object.assign(iframe.style, {
     border: "0",
     height: "100%",
+    pointerEvents: "auto",
     width: "100%"
   })
   root.appendChild(iframe)

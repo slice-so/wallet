@@ -227,6 +227,9 @@ describe("openSliceWalletCeremonyChannel", () => {
       "publickey-credentials-create https://id.slice.so; publickey-credentials-get https://id.slice.so"
     )
     expect(iframe.src).toContain("/dialog/account")
+    expect(dialog.style.pointerEvents).toBe("auto")
+    expect(iframe.style.pointerEvents).toBe("auto")
+    expect(dialog.style.zIndex).toBe("2147483647")
     expect(appendChild).toHaveBeenCalledTimes(1)
     channel.port.close()
     channel.surface.close()
