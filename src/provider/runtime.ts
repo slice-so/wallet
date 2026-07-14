@@ -253,9 +253,7 @@ export const createSliceWalletProviderRuntime = (
     const hydrated = await hydrate()
     if (hydrated !== null) return hydrated
     const connected = await connectSliceWalletAccount({
-      ceremonyMode: config.ceremonyMode,
       chainId: config.chain.id,
-      document: browserDocument,
       fetch: fetchImpl,
       idOrigin,
       window: browserWindow

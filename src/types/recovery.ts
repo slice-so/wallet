@@ -65,47 +65,6 @@ export type SliceWalletRecoveryCodePayload = {
   recoveryPrivateKey: Hex
 }
 
-export type SliceWalletRecoveryEnrollRequest = {
-  chainId: number
-  credentialId: string
-  credentialPublicKey: Hex
-  nonce: Hex
-  type: "slice-wallet:recovery-enroll-request"
-  version: 1
-}
-
-export type SliceWalletRecoveryReattestRequest = {
-  account: Address
-  nonce: Hex
-  signerAddress: Address
-  type: "slice-wallet:recovery-reattest-request"
-  version: 1
-}
-
-export type SliceWalletRecoveryEnrollResult = {
-  account: Address
-  nonce: Hex
-  permissionId: Hex
-  signerAddress: Address
-  type: "slice-wallet:recovery-enroll-result"
-  version: 1
-}
-
-export type SliceWalletRecoveryReattestResult = {
-  account: Address
-  nonce: Hex
-  signerAddress: Address
-  type: "slice-wallet:recovery-reattest-result"
-  version: 1
-}
-
-export type SliceWalletRecoveryEnrollError = {
-  message: string
-  nonce: Hex
-  type: "slice-wallet:recovery-enroll-error"
-  version: 1
-}
-
 export type RecoveryUserOperationGas = {
   callGasLimit: bigint
   maxFeePerGas: bigint

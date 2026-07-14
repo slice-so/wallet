@@ -12,9 +12,7 @@ import {
 import { parseSliceWalletCeremonyAccountResponse } from "./protocol"
 
 export const connectSliceWalletAccount = async ({
-  ceremonyMode = "popup",
   chainId,
-  document,
   fetch,
   idOrigin,
   timeoutMs,
@@ -22,9 +20,8 @@ export const connectSliceWalletAccount = async ({
 }: ConnectSliceWalletAccountParameters): Promise<SliceWalletConnectedAccount> => {
   const nonce = createSliceWalletCeremonyNonce(window)
   const { port, surface } = await openSliceWalletCeremonyChannel({
-    document,
     idOrigin,
-    mode: ceremonyMode,
+    mode: "popup",
     nonce,
     path: `/ceremony/connect?chainId=${chainId}`,
     window
