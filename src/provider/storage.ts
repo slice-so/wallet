@@ -18,7 +18,9 @@ import type {
 } from "../types/providerInternal"
 
 const accountStorageKey = "slice.wallet.provider.account.v1"
-const grantStorageKey = "slice.wallet.provider.generic-grant.v1"
+const legacyGrantStorageKey = "slice.wallet.provider.generic-grant.v1"
+const grantStorageKey = (chainId: number) =>
+  `${legacyGrantStorageKey}:${chainId}`
 const callStoragePrefix = "slice.wallet.provider.call.v1:"
 const callRetentionMs = 24 * 60 * 60 * 1000
 
@@ -105,9 +107,17 @@ export const clearStoredSliceWalletAccount = (storage: Storage | null) =>
 
 export const readStoredSliceWalletGrant = (
   storage: Storage | null,
+  chainId: number,
   now = Math.floor(Date.now() / 1000)
 ): StoredGenericGrant | null => {
-  const input = read(storage, grantStorageKey)
+  let input = read(storage, grantStorageKey(chainId))
+  if (input === null && chainId === 8453) {
+    input = read(storage, legacyGrantStorageKey)
+    if (input !== null && typeof input === "object" && !Array.isArray(input)) {
+      write(storage, grantStorageKey(chainId), input)
+      remove(storage, legacyGrantStorageKey)
+    }
+  }
   const value = input === null ? null : record(input)
   if (
     value === null ||
@@ -145,7 +155,7 @@ export const readStoredSliceWalletGrant = (
     value.policy === null ||
     Array.isArray(value.policy)
   ) {
-    clearStoredSliceWalletGrant(storage)
+    clearStoredSliceWalletGrant(storage, chainId)
     return null
   }
   try {
@@ -173,7 +183,7 @@ export const readStoredSliceWalletGrant = (
       version: 1
     }
   } catch {
-    clearStoredSliceWalletGrant(storage)
+    clearStoredSliceWalletGrant(storage, chainId)
     return null
   }
 }
@@ -181,10 +191,12 @@ export const readStoredSliceWalletGrant = (
 export const writeStoredSliceWalletGrant = (
   storage: Storage | null,
   grant: StoredGenericGrant
-) => write(storage, grantStorageKey, grant)
+) => write(storage, grantStorageKey(grant.chainId), grant)
 
-export const clearStoredSliceWalletGrant = (storage: Storage | null) =>
-  remove(storage, grantStorageKey)
+export const clearStoredSliceWalletGrant = (
+  storage: Storage | null,
+  chainId: number
+) => remove(storage, grantStorageKey(chainId))
 
 const callStorageKey = (id: string) =>
   `${callStoragePrefix}${keccak256(stringToHex(id))}`

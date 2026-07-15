@@ -1,7 +1,14 @@
 export * from "./account"
 export * from "./calls"
-export { getSliceWalletChainManifest } from "./chains"
+export {
+  getSliceWalletChainManifest,
+  getSliceWalletChainPolicy
+} from "./chains"
 export * from "./constants"
+export {
+  getSliceWalletDevicePermissionId,
+  isSliceWalletDevicePermissionIdAvailable
+} from "./deviceValidator"
 export * from "./frame/messages"
 export {
   decodeSliceWalletWebAuthnAssertion,

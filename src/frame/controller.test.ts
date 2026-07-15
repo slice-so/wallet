@@ -397,4 +397,81 @@ describe("isolated signer-frame controller", () => {
     })
     detach()
   })
+
+  test("refuses an over-cap scoped session before producing a signature", async () => {
+    const parent = new MessageChannel()
+    const window = new MockMessageWindow(parent.port1)
+    const store = new MemorySessionStore()
+    const detach = attachSliceWalletSignerFrame({
+      decodeScopedCalls: () => [{ to: recipient, value: 1n }],
+      now: () => 100,
+      selfOrigin: "https://id.slice.so",
+      sessionStore: store,
+      validateCheckoutCalls: () => {},
+      window
+    })
+    const connection = new MessageChannel()
+    const connected = receive(connection.port1)
+    window.dispatch({
+      data: { id: "connect", method: "connect", version: 1 },
+      origin: "https://app.example",
+      ports: [connection.port2],
+      source: parent.port1
+    })
+    await connected
+
+    const policy = {
+      account,
+      calls: [createNativeTransferCallRule({ maximumValue: 1n, recipient })],
+      chainId: 8453,
+      grantKind: "generic",
+      validAfter: 90,
+      validUntil: 1_000,
+      version: 1
+    } as const
+    const created = receive(connection.port1)
+    connection.port1.postMessage({
+      id: "create",
+      method: "createSession",
+      params: { policy },
+      version: 1
+    } satisfies SliceWalletProtocolValue)
+    await created
+    const committed = receive(connection.port1)
+    connection.port1.postMessage({
+      id: "commit",
+      method: "commitSession",
+      params: { account, chainId: 8453, grantKind: "generic" },
+      version: 1
+    } satisfies SliceWalletProtocolValue)
+    await committed
+
+    const refused = receive(connection.port1)
+    connection.port1.postMessage({
+      id: "scoped-sign",
+      method: "signScopedUserOperation",
+      params: {
+        session: { account, chainId: 8453, grantKind: "generic" },
+        userOperation: {
+          callData: "0x",
+          callGasLimit: 3_000_001n,
+          maxFeePerGas: 1n,
+          maxPriorityFeePerGas: 1n,
+          nonce: 1n,
+          preVerificationGas: 1n,
+          sender: account,
+          verificationGasLimit: 1n
+        }
+      },
+      version: 1
+    } satisfies SliceWalletProtocolValue)
+    expect(await refused).toMatchObject({
+      error: {
+        code: "invalid_request",
+        message: "Wallet operation exceeds the gas safety envelope."
+      },
+      id: "scoped-sign"
+    })
+    detach()
+  })
 })

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import type { Hex } from "viem"
 import {
+  formatSliceWalletCredentialListAuthorization,
   formatSliceWalletExistingCredentialAuthorization,
   getSliceWalletRegistryProofChallenge
 } from "./registry"
@@ -55,6 +56,12 @@ describe("registry proof challenge commitment", () => {
         registrationKind: "existing_account"
       })
     ).not.toBe(getSliceWalletRegistryProofChallenge(base))
+    expect(
+      getSliceWalletRegistryProofChallenge({
+        ...base,
+        registrationKind: "device"
+      })
+    ).not.toBe(getSliceWalletRegistryProofChallenge(base))
   })
 
   test("changes when the recovery signer changes", () => {
@@ -64,6 +71,33 @@ describe("registry proof challenge commitment", () => {
         recoverySignerAddress: "0x0000000000000000000000000000000000000002"
       })
     ).not.toBe(getSliceWalletRegistryProofChallenge(base))
+  })
+})
+
+describe("private credential-list authorization", () => {
+  test("binds account, chain, expiry, purpose, and one-shot nonce", () => {
+    const authorization = {
+      accountAddress: "0x0000000000000000000000000000000000000002",
+      challenge: base.challenge,
+      chainId: 8453,
+      expiresAt: "2026-07-15T12:00:00.000Z"
+    } as const
+    const message = formatSliceWalletCredentialListAuthorization(authorization)
+
+    expect(message).toContain("Purpose: credential-list")
+    expect(message).toContain(`Nonce: ${base.challenge}`)
+    expect(message).not.toBe(
+      formatSliceWalletCredentialListAuthorization({
+        ...authorization,
+        chainId: 10
+      })
+    )
+    expect(message).not.toBe(
+      formatSliceWalletCredentialListAuthorization({
+        ...authorization,
+        expiresAt: "2026-07-15T12:01:00.000Z"
+      })
+    )
   })
 })
 

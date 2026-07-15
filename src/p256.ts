@@ -8,6 +8,7 @@ import {
   sha256,
   stringToBytes
 } from "viem"
+import { getSliceWalletChainPolicy } from "./chains"
 import {
   getSliceWalletP256SignerId,
   normalizeSliceWalletP256Scalars,
@@ -39,6 +40,14 @@ export const generateSliceWalletP256KeyPair = async (
     publicKey: keyPair.publicKey,
     publicKeyHex,
     signerId: getSliceWalletP256SignerId(publicKeyHex)
+  }
+}
+
+export const isSliceWalletRip7212Available = (chainId: number) => {
+  try {
+    return getSliceWalletChainPolicy(chainId).rip7212Available
+  } catch {
+    return false
   }
 }
 
@@ -110,7 +119,7 @@ export const encodeSliceWalletSyntheticWebAuthnSignature = async ({
   key,
   origin,
   rpId,
-  usePrecompiled = chainId === 8453
+  usePrecompiled = isSliceWalletRip7212Available(chainId)
 }: {
   chainId: number
   challenge: Hex

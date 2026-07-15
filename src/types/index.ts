@@ -1,6 +1,7 @@
 export type * from "./account"
 export type * from "./ceremony"
 export type * from "./chains"
+export type * from "./device"
 export type * from "./frame"
 export type * from "./p256"
 export type * from "./permission"

@@ -42,6 +42,7 @@ import type {
   WalletPolicyDescriptor
 } from "../types"
 import type {
+  SliceWalletProviderChainConfig,
   SliceWalletProviderConfig,
   SliceWalletRequestPaymasterService,
   StoredGenericGrant
@@ -57,6 +58,7 @@ import {
   clearStoredSliceWalletAccount,
   clearStoredSliceWalletGrant,
   readStoredSliceWalletAccount,
+  readStoredSliceWalletCall,
   readStoredSliceWalletGrant,
   writeStoredSliceWalletAccount,
   writeStoredSliceWalletGrant
@@ -71,7 +73,15 @@ type ActiveWallet = {
   rootAccount: RootAccount
 }
 
-const getBrowserDependencies = (config: SliceWalletProviderConfig) => {
+type SliceWalletChainRuntimeConfig = Omit<
+  SliceWalletProviderConfig,
+  "chains" | "defaultChainId"
+> &
+  SliceWalletProviderChainConfig
+
+const getBrowserDependencies = (
+  config: Pick<SliceWalletProviderConfig, "document" | "storage" | "window">
+) => {
   const browserWindow = config.window ?? globalThis.window
   const browserDocument = config.document ?? globalThis.document
   if (browserWindow === undefined || browserDocument === undefined) {
@@ -110,8 +120,8 @@ const toFrameSession = (grant: StoredGenericGrant): SliceWalletFrameSession => {
   }
 }
 
-export const createSliceWalletProviderRuntime = (
-  config: SliceWalletProviderConfig
+const createSliceWalletChainRuntime = (
+  config: SliceWalletChainRuntimeConfig
 ) => {
   if (config.requireAdmittedChain === true) {
     getSliceWalletChainManifest(config.chain.id)
@@ -186,7 +196,7 @@ export const createSliceWalletProviderRuntime = (
         return activeWallet
       } catch {
         clearStoredSliceWalletAccount(storage)
-        clearStoredSliceWalletGrant(storage)
+        clearStoredSliceWalletGrant(storage, config.chain.id)
         return null
       }
     })().finally(() => {
@@ -285,7 +295,7 @@ export const createSliceWalletProviderRuntime = (
 
   const hydrateGrant = async () => {
     const wallet = await requireActiveWallet()
-    const stored = readStoredSliceWalletGrant(storage)
+    const stored = readStoredSliceWalletGrant(storage, config.chain.id)
     if (
       stored === null ||
       stored.chainId !== config.chain.id ||
@@ -303,7 +313,7 @@ export const createSliceWalletProviderRuntime = (
       }
     })
     if (result === null || typeof result !== "object") {
-      clearStoredSliceWalletGrant(storage)
+      clearStoredSliceWalletGrant(storage, config.chain.id)
       return null
     }
     const session = parseSliceWalletFrameSession(result)
@@ -315,7 +325,7 @@ export const createSliceWalletProviderRuntime = (
       getWalletPolicyHash(session.policy) !==
         getWalletPolicyHash(expected.policy)
     ) {
-      clearStoredSliceWalletGrant(storage)
+      clearStoredSliceWalletGrant(storage, config.chain.id)
       return null
     }
     return { session, stored }
@@ -391,7 +401,7 @@ export const createSliceWalletProviderRuntime = (
   }
 
   const revokeGrant = async (permissionId?: Hex) => {
-    const stored = readStoredSliceWalletGrant(storage)
+    const stored = readStoredSliceWalletGrant(storage, config.chain.id)
     if (stored === null) return
     if (
       permissionId !== undefined &&
@@ -402,7 +412,7 @@ export const createSliceWalletProviderRuntime = (
       )
     }
     await uninstallGrant(stored)
-    clearStoredSliceWalletGrant(storage)
+    clearStoredSliceWalletGrant(storage, config.chain.id)
     try {
       await (await getFrame()).request({
         method: "clearSession",
@@ -424,7 +434,7 @@ export const createSliceWalletProviderRuntime = (
     permissions: readonly SliceWalletGenericPermission[]
     policy: WalletPolicyDescriptor
   }) => {
-    const previous = readStoredSliceWalletGrant(storage)
+    const previous = readStoredSliceWalletGrant(storage, config.chain.id)
     const frame = await getFrame()
     const result = await frame.request({
       method: "createSession",
@@ -504,7 +514,7 @@ export const createSliceWalletProviderRuntime = (
   }
 
   const rotateGrant = async (permissionId: Hex) => {
-    const stored = readStoredSliceWalletGrant(storage)
+    const stored = readStoredSliceWalletGrant(storage, config.chain.id)
     if (
       stored === null ||
       stored.permissionId.toLowerCase() !== permissionId.toLowerCase()
@@ -520,12 +530,6 @@ export const createSliceWalletProviderRuntime = (
       throw new Error("Rotated wallet grant could not be restored.")
     }
     return rotated
-  }
-
-  const disconnect = async () => {
-    await revokeGrant()
-    activeWallet = null
-    clearStoredSliceWalletAccount(storage)
   }
 
   const signMessage = async (message: SignableMessage) =>
@@ -554,7 +558,6 @@ export const createSliceWalletProviderRuntime = (
       void framePromise?.then((frame) => frame.destroy())
       framePromise = null
     },
-    disconnect,
     forwardRpc: (
       method: string,
       params: SliceWalletProviderValue | undefined
@@ -578,5 +581,101 @@ export const createSliceWalletProviderRuntime = (
     signMessage,
     signTypedData,
     waitForSuccessfulUserOperation
+  }
+}
+
+type SliceWalletChainRuntime = ReturnType<typeof createSliceWalletChainRuntime>
+
+export const createSliceWalletProviderRuntime = (
+  config: SliceWalletProviderConfig
+) => {
+  const chainConfigs = new Map(
+    config.chains.map((chainConfig) => [chainConfig.chain.id, chainConfig])
+  )
+  if (
+    chainConfigs.size !== config.chains.length ||
+    !chainConfigs.has(config.defaultChainId)
+  ) {
+    throw invalidProviderRequest(
+      "Slice Wallet runtime requires unique chains and a configured default."
+    )
+  }
+
+  const runtimes = new Map<number, SliceWalletChainRuntime>()
+  let activeChainId = config.defaultChainId
+  const getChainRuntime = (chainId = activeChainId) => {
+    const chainConfig = chainConfigs.get(chainId)
+    if (chainConfig === undefined) {
+      throw new SliceWalletProviderRpcError(
+        4902,
+        `Slice Wallet chain ${chainId} is unsupported.`
+      )
+    }
+    let runtime = runtimes.get(chainId)
+    if (runtime === undefined) {
+      runtime = createSliceWalletChainRuntime({
+        ...config,
+        ...chainConfig
+      })
+      runtimes.set(chainId, runtime)
+    }
+    return runtime
+  }
+  const getCallRuntime = (id: string) => {
+    const { storage } = getBrowserDependencies(config)
+    const call = readStoredSliceWalletCall(storage, id)
+    return getChainRuntime(call?.chainId ?? activeChainId)
+  }
+
+  return {
+    get chainId() {
+      return activeChainId
+    },
+    connect: () => getChainRuntime().connect(),
+    createGrant: (
+      ...args: Parameters<SliceWalletChainRuntime["createGrant"]>
+    ) => getChainRuntime().createGrant(...args),
+    destroy: () => {
+      for (const runtime of runtimes.values()) runtime.destroy()
+      runtimes.clear()
+    },
+    disconnect: async () => {
+      for (const chainId of chainConfigs.keys()) {
+        await getChainRuntime(chainId).revokeGrant()
+      }
+      const { storage } = getBrowserDependencies(config)
+      clearStoredSliceWalletAccount(storage)
+      for (const runtime of runtimes.values()) runtime.destroy()
+      runtimes.clear()
+    },
+    forwardRpc: (...args: Parameters<SliceWalletChainRuntime["forwardRpc"]>) =>
+      getChainRuntime().forwardRpc(...args),
+    getAccounts: () => getChainRuntime().getAccounts(),
+    getCallsStatus: (id: string) => getCallRuntime(id).getCallsStatus(id),
+    getChainRuntime,
+    getGrants: () => getChainRuntime().getGrants(),
+    paymasterAvailable: (chainId = activeChainId) =>
+      getChainRuntime(chainId).paymasterAvailable,
+    revokeGrant: (
+      ...args: Parameters<SliceWalletChainRuntime["revokeGrant"]>
+    ) => getChainRuntime().revokeGrant(...args),
+    rotateGrant: (
+      ...args: Parameters<SliceWalletChainRuntime["rotateGrant"]>
+    ) => getChainRuntime().rotateGrant(...args),
+    sendCalls: (...args: Parameters<SliceWalletChainRuntime["sendCalls"]>) =>
+      getChainRuntime().sendCalls(...args),
+    signMessage: (
+      ...args: Parameters<SliceWalletChainRuntime["signMessage"]>
+    ) => getChainRuntime().signMessage(...args),
+    signTypedData: (
+      ...args: Parameters<SliceWalletChainRuntime["signTypedData"]>
+    ) => getChainRuntime().signTypedData(...args),
+    supportedChainIds: Object.freeze([...chainConfigs.keys()]),
+    switchChain: (chainId: number) => {
+      getChainRuntime(chainId)
+      activeChainId = chainId
+    },
+    waitForSuccessfulUserOperation: (hash: Hex, chainId = activeChainId) =>
+      getChainRuntime(chainId).waitForSuccessfulUserOperation(hash)
   }
 }

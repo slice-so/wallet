@@ -1,9 +1,11 @@
-import { getSliceWalletChainPolicy } from "../chains"
+import {
+  getSliceWalletChainManifest,
+  sliceWalletSupportedChainIds
+} from "../chains"
 import type { SliceWalletParameters } from "../types"
 import type { SliceWalletProviderConfig } from "../types/providerInternal"
 import { invalidProviderRequest } from "./errors"
 
-const baseChainId = 8453
 const sliceIdOrigin = "https://id.slice.so"
 
 const normalizeTransportUrl = (value: string, label: string) => {
@@ -51,19 +53,22 @@ export const resolveCanonicalSliceWalletConfig = (
     throw invalidProviderRequest("Slice Wallet announce must be boolean.")
   }
 
-  const chainIds = parameters.chainIds ?? [baseChainId]
+  const chainIds = parameters.chainIds ?? sliceWalletSupportedChainIds
   if (
     !Array.isArray(chainIds) ||
-    chainIds.length !== 1 ||
-    chainIds[0] !== baseChainId
+    chainIds.length === 0 ||
+    new Set(chainIds).size !== chainIds.length ||
+    chainIds.some((chainId) => !Number.isSafeInteger(chainId) || chainId <= 0)
   ) {
     throw invalidProviderRequest(
-      "This Slice Wallet release supports Base only."
+      "Slice Wallet requires unique supported chains."
     )
   }
-  const defaultChainId = parameters.defaultChainId ?? baseChainId
-  if (defaultChainId !== baseChainId) {
-    throw invalidProviderRequest("The default Slice Wallet chain must be Base.")
+  const defaultChainId = parameters.defaultChainId ?? chainIds[0]
+  if (defaultChainId === undefined || !chainIds.includes(defaultChainId)) {
+    throw invalidProviderRequest(
+      "The default Slice Wallet chain must be configured."
+    )
   }
 
   const transports = parameters.transports ?? {}
@@ -71,39 +76,46 @@ export const resolveCanonicalSliceWalletConfig = (
     typeof transports !== "object" ||
     transports === null ||
     Array.isArray(transports) ||
-    Object.keys(transports).some((chainId) => chainId !== String(baseChainId))
+    Object.keys(transports).some(
+      (chainId) => !chainIds.includes(Number(chainId))
+    )
   ) {
     throw invalidProviderRequest(
       "Transport overrides must target a configured Slice Wallet chain."
     )
   }
-  const overrides = transports[baseChainId] ?? {}
-  if (
-    typeof overrides !== "object" ||
-    overrides === null ||
-    Array.isArray(overrides) ||
-    Object.keys(overrides).some(
-      (key) => key !== "bundlerUrl" && key !== "rpcUrl"
-    )
-  ) {
-    throw invalidProviderRequest(
-      "Transport overrides may contain only rpcUrl and bundlerUrl."
-    )
-  }
-
-  const manifest = getSliceWalletChainPolicy(baseChainId)
+  const chains = chainIds.map((chainId) => {
+    const overrides = transports[chainId] ?? {}
+    if (
+      typeof overrides !== "object" ||
+      overrides === null ||
+      Array.isArray(overrides) ||
+      Object.keys(overrides).some(
+        (key) => key !== "bundlerUrl" && key !== "rpcUrl"
+      )
+    ) {
+      throw invalidProviderRequest(
+        "Transport overrides may contain only rpcUrl and bundlerUrl."
+      )
+    }
+    const manifest = getSliceWalletChainManifest(chainId)
+    return {
+      bundlerUrl:
+        overrides.bundlerUrl === undefined
+          ? manifest.defaultTransports.bundlerUrl
+          : normalizeTransportUrl(overrides.bundlerUrl, "Bundler URL"),
+      chain: manifest.chain,
+      rpcUrl:
+        overrides.rpcUrl === undefined
+          ? manifest.defaultTransports.rpcUrl
+          : normalizeTransportUrl(overrides.rpcUrl, "RPC URL")
+    }
+  })
   return {
     announce: parameters.announce ?? true,
-    bundlerUrl:
-      overrides.bundlerUrl === undefined
-        ? manifest.defaultTransports.bundlerUrl
-        : normalizeTransportUrl(overrides.bundlerUrl, "Bundler URL"),
-    chain: manifest.chain,
+    chains,
+    defaultChainId,
     idOrigin: sliceIdOrigin,
-    requireAdmittedChain: true,
-    rpcUrl:
-      overrides.rpcUrl === undefined
-        ? manifest.defaultTransports.rpcUrl
-        : normalizeTransportUrl(overrides.rpcUrl, "RPC URL")
+    requireAdmittedChain: true
   }
 }

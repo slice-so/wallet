@@ -1,7 +1,8 @@
-import { describe, expect, it } from "bun:test"
+import { describe, expect, it, mock } from "bun:test"
 import { createPublicClient, custom, encodeAbiParameters } from "viem"
 import { base } from "viem/chains"
 import {
+  createSliceWalletRootValidator,
   getSliceWalletRootValidatorPublicKey,
   parseSliceWalletUncompressedPublicKey
 } from "./rootValidator"
@@ -41,5 +42,30 @@ describe("Slice wallet root validator state", () => {
 
     expect(installed).toEqual({ x: 123n, y: 456n })
     expect(absent).toBeNull()
+  })
+
+  it("refuses hostile gas estimates before invoking the root signer", async () => {
+    const rootSigner = mock(async () => "0x1234" as const)
+    const validator = createSliceWalletRootValidator({
+      chainId: base.id,
+      credential: { credentialIdHash: `0x${"11".repeat(32)}`, publicKey },
+      rootSigner
+    })
+
+    await expect(
+      validator.signUserOperation({
+        callData: "0x",
+        callGasLimit: 3_000_001n,
+        chainId: base.id,
+        maxFeePerGas: 1n,
+        maxPriorityFeePerGas: 1n,
+        nonce: 0n,
+        preVerificationGas: 1n,
+        sender: account,
+        signature: "0x",
+        verificationGasLimit: 1n
+      })
+    ).rejects.toThrow("gas safety envelope")
+    expect(rootSigner).not.toHaveBeenCalled()
   })
 })

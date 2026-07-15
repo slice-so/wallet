@@ -24,6 +24,16 @@ export const sliceWalletConnector = (parameters: SliceWalletProviderConfig) => {
       }
       return value as readonly Address[]
     }
+    const parseChainId = (value: SliceWalletProviderValue | undefined) => {
+      if (typeof value !== "string" || !/^0x[0-9a-fA-F]+$/.test(value)) {
+        throw new Error("Slice Wallet returned an invalid chain id.")
+      }
+      const chainId = BigInt(value)
+      if (chainId > BigInt(Number.MAX_SAFE_INTEGER)) {
+        throw new Error("Slice Wallet returned an invalid chain id.")
+      }
+      return Number(chainId)
+    }
 
     return {
       icon: sliceWalletProviderIcon,
@@ -52,8 +62,11 @@ export const sliceWalletConnector = (parameters: SliceWalletProviderConfig) => {
         )
       },
       async connect({ chainId, withCapabilities } = {}) {
-        if (chainId !== undefined && chainId !== parameters.chain.id) {
-          throw new Error("Slice Wallet is not configured for that chain.")
+        if (chainId !== undefined) {
+          await getProvider().request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: `0x${chainId.toString(16)}` }]
+          })
         }
         const accounts = parseAccounts(
           await getProvider().request({ method: "eth_requestAccounts" })
@@ -67,7 +80,9 @@ export const sliceWalletConnector = (parameters: SliceWalletProviderConfig) => {
                 }
               }))
             : accounts) as never,
-          chainId: parameters.chain.id
+          chainId: parseChainId(
+            await getProvider().request({ method: "eth_chainId" })
+          )
         }
       },
       async disconnect() {
@@ -79,7 +94,9 @@ export const sliceWalletConnector = (parameters: SliceWalletProviderConfig) => {
         )
       },
       async getChainId() {
-        return parameters.chain.id
+        return parseChainId(
+          await getProvider().request({ method: "eth_chainId" })
+        )
       },
       async getProvider() {
         return getProvider()
@@ -91,9 +108,16 @@ export const sliceWalletConnector = (parameters: SliceWalletProviderConfig) => {
         const chain = config.chains.find(
           (candidate) => candidate.id === chainId
         )
-        if (chain === undefined || chainId !== parameters.chain.id) {
+        if (
+          chain === undefined ||
+          !parameters.chains.some((candidate) => candidate.chain.id === chainId)
+        ) {
           throw new Error("Slice Wallet is not configured for that chain.")
         }
+        await getProvider().request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: `0x${chainId.toString(16)}` }]
+        })
         return chain
       },
       onAccountsChanged(accounts) {

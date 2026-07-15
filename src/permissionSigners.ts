@@ -8,6 +8,7 @@ import {
   type Hex,
   hexToBytes,
   keccak256,
+  type LocalAccount,
   toHex
 } from "viem"
 import { sliceWalletKernelAddresses } from "./constants"
@@ -70,26 +71,54 @@ export const toSliceWalletWebAuthnSessionSigner = ({
 }: {
   publicKey: Hex
   signerId: Address
-}): ModularSigner => {
-  const { x, y } = getP256Coordinates(publicKey)
-  return {
+}): ModularSigner =>
+  toSliceWalletWebAuthnSigner({
     account: addressToEmptyAccount(signerId),
+    credentialIdHash: keccak256(publicKey),
+    publicKey
+  })
+
+export const toSliceWalletWebAuthnSigner = ({
+  account,
+  credentialIdHash,
+  publicKey
+}: {
+  account: LocalAccount
+  credentialIdHash: Hex
+  publicKey: Hex
+}): ModularSigner => {
+  return {
+    account,
     getDummySignature: () => sliceWalletWebAuthnDummySignature,
     getSignerData: () =>
-      encodeAbiParameters(
-        [
-          {
-            components: [
-              { name: "pubKeyX", type: "uint256" },
-              { name: "pubKeyY", type: "uint256" }
-            ],
-            name: "WebAuthnSignerData",
-            type: "tuple"
-          },
-          { name: "authenticatorIdHash", type: "bytes32" }
-        ],
-        [{ pubKeyX: x, pubKeyY: y }, keccak256(publicKey)]
-      ),
+      encodeSliceWalletWebAuthnSignerData({ credentialIdHash, publicKey }),
     signerContractAddress: sliceWalletKernelAddresses.webAuthnSignerV004
   }
+}
+
+export const encodeSliceWalletWebAuthnSignerData = ({
+  credentialIdHash,
+  publicKey
+}: {
+  credentialIdHash: Hex
+  publicKey: Hex
+}) => {
+  const { x, y } = getP256Coordinates(publicKey)
+  if (hexToBytes(credentialIdHash).length !== 32) {
+    throw new Error("WebAuthn credential id hash must be 32 bytes.")
+  }
+  return encodeAbiParameters(
+    [
+      {
+        components: [
+          { name: "pubKeyX", type: "uint256" },
+          { name: "pubKeyY", type: "uint256" }
+        ],
+        name: "WebAuthnSignerData",
+        type: "tuple"
+      },
+      { name: "authenticatorIdHash", type: "bytes32" }
+    ],
+    [{ pubKeyX: x, pubKeyY: y }, credentialIdHash]
+  )
 }

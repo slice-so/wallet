@@ -25,11 +25,12 @@ type ProviderEventListener = (payload: ProviderEventPayload) => void
 type FullProviderRuntime = ReturnType<typeof createSliceWalletProviderRuntime>
 type ProviderRuntime = Omit<
   FullProviderRuntime,
-  "connect" | "waitForSuccessfulUserOperation"
+  "connect" | "getChainRuntime" | "waitForSuccessfulUserOperation"
 > & {
   connect: () => Promise<{ rootAccount: { address: Address } }>
   waitForSuccessfulUserOperation: (
-    hash: Hex
+    hash: Hex,
+    chainId?: number
   ) => Promise<{ receipt: { transactionHash: Hex } }>
 }
 type ProviderDependencies = {
@@ -151,6 +152,20 @@ const parseCapabilityChainIds = (
     }
     return Number(parsedChainId)
   })
+}
+
+const parseChainId = (value: SliceWalletProviderValue | undefined) => {
+  if (
+    typeof value !== "string" ||
+    !/^0x(?:0|[1-9a-fA-F][0-9a-fA-F]*)$/.test(value)
+  ) {
+    throw invalidProviderRequest("Wallet chain id must be hex.")
+  }
+  const chainId = BigInt(value)
+  if (chainId > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw invalidProviderRequest("Wallet chain id is too large.")
+  }
+  return Number(chainId)
 }
 
 const assertAccountParam = (
@@ -276,13 +291,17 @@ export const createSliceWalletProviderInternal = (
         typeof value !== "object" ||
         value === null ||
         Array.isArray(value) ||
-        value.chainId !== numberToHex(runtime.chainId)
+        Object.keys(value).some((key) => key !== "chainId")
       ) {
-        throw new SliceWalletProviderRpcError(
-          4902,
-          "Requested chain is unsupported."
+        throw invalidProviderRequest(
+          "wallet_switchEthereumChain expects one chain id."
         )
       }
+      const chainId = parseChainId(value.chainId)
+      const previousChainId = runtime.chainId
+      runtime.switchChain(chainId)
+      if (previousChainId !== chainId)
+        emit("chainChanged", numberToHex(chainId))
       return null
     }
     if (method === "wallet_addEthereumChain") {
@@ -299,7 +318,8 @@ export const createSliceWalletProviderInternal = (
           "wallet_addEthereumChain expects one chain object."
         )
       }
-      if (value.chainId !== numberToHex(runtime.chainId)) {
+      const chainId = parseChainId(value.chainId)
+      if (!runtime.supportedChainIds.includes(chainId)) {
         throw new SliceWalletProviderRpcError(
           4902,
           "Requested chain is unsupported."
@@ -317,18 +337,18 @@ export const createSliceWalletProviderInternal = (
       }
       assertAccountParam(values[0], account)
       const requestedChainIds = parseCapabilityChainIds(values[1])
-      if (
-        requestedChainIds !== null &&
-        !requestedChainIds.includes(runtime.chainId)
-      ) {
-        return {}
-      }
-      return {
-        [numberToHex(runtime.chainId)]: {
-          atomic: { status: "supported" },
-          paymasterService: { supported: true }
-        }
-      }
+      const chainIds = (requestedChainIds ?? runtime.supportedChainIds).filter(
+        (chainId) => runtime.supportedChainIds.includes(chainId)
+      )
+      return Object.fromEntries(
+        chainIds.map((chainId) => [
+          numberToHex(chainId),
+          {
+            atomic: { status: "supported" },
+            paymasterService: { supported: true }
+          }
+        ])
+      )
     }
     if (method === "wallet_sendCalls") {
       const account = await getConnectedAccount(runtime)
@@ -336,7 +356,7 @@ export const createSliceWalletProviderInternal = (
         account,
         chainId: runtime.chainId,
         params,
-        paymasterAvailable: runtime.paymasterAvailable
+        paymasterAvailable: runtime.paymasterAvailable(runtime.chainId)
       })
       return {
         id: (
@@ -361,9 +381,11 @@ export const createSliceWalletProviderInternal = (
       const account = await getConnectedAccount(runtime)
       const transaction = parseSliceWalletTransaction(params)
       assertAccountParam(transaction.from, account)
+      const chainId = runtime.chainId
       const submitted = await runtime.sendCalls([transaction.call])
       const receipt = await runtime.waitForSuccessfulUserOperation(
-        submitted.userOperationHash
+        submitted.userOperationHash,
+        chainId
       )
       return receipt.receipt.transactionHash
     }

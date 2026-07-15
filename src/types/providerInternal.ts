@@ -6,17 +6,22 @@ import type {
   SliceWalletProviderValue
 } from "./provider"
 
+export type SliceWalletProviderChainConfig = {
+  bundlerUrl: string
+  chain: Chain
+  paymasterUrl?: string
+  rpcUrl: string
+}
+
 export type SliceWalletProviderConfig = {
   announce?: boolean
-  bundlerUrl: string
   ceremonyMode?: SliceWalletCeremonyMode
-  chain: Chain
+  chains: readonly SliceWalletProviderChainConfig[]
+  defaultChainId: number
   document?: Document
   fetch?: typeof fetch
   idOrigin: string
-  paymasterUrl?: string
   requireAdmittedChain?: boolean
-  rpcUrl: string
   storage?: Storage
   window?: Window
 }

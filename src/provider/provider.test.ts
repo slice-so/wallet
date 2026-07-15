@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from "bun:test"
 import { numberToHex } from "viem"
-import { base } from "viem/chains"
+import { base, optimism } from "viem/chains"
 import type { SliceWalletProviderValue } from "../types"
 import type { SliceWalletProviderConfig } from "../types/providerInternal"
 import { SliceWalletProviderRpcError } from "./errors"
@@ -24,10 +24,20 @@ Object.defineProperty(browserWindow, "location", {
 })
 
 const config: SliceWalletProviderConfig = {
-  bundlerUrl: "https://bundler.example",
-  chain: base,
+  chains: [
+    {
+      bundlerUrl: "https://bundler.example/base",
+      chain: base,
+      rpcUrl: "https://rpc.example/base"
+    },
+    {
+      bundlerUrl: "https://bundler.example/op",
+      chain: optimism,
+      rpcUrl: "https://rpc.example/op"
+    }
+  ],
+  defaultChainId: base.id,
   idOrigin: "https://id.slice.so",
-  rpcUrl: "https://rpc.example",
   window: browserWindow
 }
 
@@ -52,6 +62,7 @@ const publicGrant = {
 
 const createRuntime = () => {
   let connected = true
+  let chainId: number = base.id
   const connect = mock(async () => {
     connected = true
     return { rootAccount: { address: account } }
@@ -71,7 +82,9 @@ const createRuntime = () => {
   const revokeGrant = mock(async () => {})
   const rotateGrant = mock(async () => publicGrant)
   const runtime = {
-    chainId: base.id,
+    get chainId() {
+      return chainId
+    },
     connect,
     createGrant,
     destroy: mock(() => {}),
@@ -86,7 +99,7 @@ const createRuntime = () => {
       version: "2.0.0" as const
     })),
     getGrants,
-    paymasterAvailable: false,
+    paymasterAvailable: mock(() => false),
     revokeGrant,
     rotateGrant,
     sendCalls: mock(async (_calls, requestedId?: string) => ({
@@ -95,6 +108,13 @@ const createRuntime = () => {
     })),
     signMessage: mock(async () => userOperationHash),
     signTypedData: mock(async () => userOperationHash),
+    supportedChainIds: [base.id, optimism.id],
+    switchChain: mock((nextChainId: number) => {
+      if (nextChainId !== base.id && nextChainId !== optimism.id) {
+        throw new SliceWalletProviderRpcError(4902, "Unsupported chain.")
+      }
+      chainId = nextChainId
+    }),
     waitForSuccessfulUserOperation: mock(async () => ({
       receipt: { transactionHash }
     }))
@@ -176,7 +196,7 @@ describe("Slice Wallet provider dispatch", () => {
       }
     })
     expect(
-      await request(provider, "wallet_getCapabilities", [account, ["0xa"]])
+      await request(provider, "wallet_getCapabilities", [account, ["0x1"]])
     ).toEqual({})
     await expectRpcError(
       request(provider, "wallet_getCapabilities", [
@@ -223,24 +243,31 @@ describe("Slice Wallet provider dispatch", () => {
     )
   })
 
-  test("emits account and disconnect events and keeps switchChain Base-only", async () => {
+  test("switches configured chains, emits chainChanged, and disconnects", async () => {
     const { disconnect, provider } = createProvider()
     const accountEvents: string[][] = []
     const disconnectEvents: { code: number; message: string }[] = []
+    const chainEvents: string[] = []
     provider.on("accountsChanged", (accounts) => {
       accountEvents.push([...accounts])
     })
     provider.on("disconnect", (error) => disconnectEvents.push(error))
+    provider.on("chainChanged", (chainId) => chainEvents.push(chainId))
 
     expect(
       await request(provider, "wallet_switchEthereumChain", [
         { chainId: numberToHex(base.id) }
       ])
     ).toBeNull()
-    await expectRpcError(
-      request(provider, "wallet_switchEthereumChain", [{ chainId: "0xa" }]),
-      4902
+    expect(
+      await request(provider, "wallet_switchEthereumChain", [
+        { chainId: numberToHex(optimism.id) }
+      ])
+    ).toBeNull()
+    expect(await request(provider, "eth_chainId")).toBe(
+      numberToHex(optimism.id)
     )
+    expect(chainEvents).toEqual([numberToHex(optimism.id)])
 
     await request(provider, "wallet_disconnect", [])
     expect(disconnect).toHaveBeenCalledTimes(1)

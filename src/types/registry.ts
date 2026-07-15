@@ -1,6 +1,7 @@
 import type { Address, Hex } from "viem"
 
 export type SliceWalletCredentialRegistrationKind =
+  | "device"
   | "existing_account"
   | "initial"
 
@@ -43,4 +44,21 @@ export type RegisterSliceWalletCredentialInput = {
   recoverySignerAddress?: Address
   registrationKind: SliceWalletCredentialRegistrationKind
   rootSignature?: Hex
+}
+
+export type SliceWalletCredentialListChallenge = {
+  challenge: Hex
+  chainId: number
+  expiresAt: string
+  purpose: "credential-list"
+}
+
+export type SliceWalletCredentialListAuthorization = {
+  accountAddress: Address
+  accountFactory?: Address
+  accountFactoryData?: Hex
+  challenge: Hex
+  chainId: number
+  expiresAt: string
+  signature: Hex
 }

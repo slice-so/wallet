@@ -1,6 +1,8 @@
 import { type Hex, hexToBytes, isHex, keccak256, stringToHex } from "viem"
 import type {
   RegisterSliceWalletCredentialInput,
+  SliceWalletCredentialListAuthorization,
+  SliceWalletCredentialListChallenge,
   SliceWalletCredentialRegistrationKind,
   SliceWalletRegistryChallenge,
   SliceWalletRegistryCredential
@@ -33,7 +35,8 @@ export const formatSliceWalletExistingCredentialAuthorization = ({
   chainId,
   credentialIdHash,
   factoryVersion,
-  publicKey
+  publicKey,
+  registrationKind = "existing_account"
 }: {
   accountAddress: string
   accountIndex: number
@@ -42,11 +45,14 @@ export const formatSliceWalletExistingCredentialAuthorization = ({
   credentialIdHash: Hex
   factoryVersion: string
   publicKey: Hex
+  registrationKind?: "device" | "existing_account"
 }) =>
   [
     "Slice Wallet Root Credential",
     "",
-    "Authorize this credential as a root for the existing wallet.",
+    registrationKind === "device"
+      ? "Authorize this credential as a root-equivalent device for the existing wallet."
+      : "Authorize this credential as a root for the existing wallet.",
     "",
     "Version: 2",
     `Account: ${accountAddress.toLowerCase()}`,
@@ -56,6 +62,25 @@ export const formatSliceWalletExistingCredentialAuthorization = ({
     `Factory Version: ${factoryVersion}`,
     `Account Index: ${accountIndex}`,
     `Challenge: ${challenge}`
+  ].join("\n")
+
+export const formatSliceWalletCredentialListAuthorization = ({
+  accountAddress,
+  challenge,
+  chainId,
+  expiresAt
+}: Omit<SliceWalletCredentialListAuthorization, "signature">) =>
+  [
+    "Slice Wallet Credential List",
+    "",
+    "Authorize a private list of credentials registered to this wallet.",
+    "",
+    "Version: 1",
+    `Account: ${accountAddress.toLowerCase()}`,
+    `Chain ID: ${chainId}`,
+    "Purpose: credential-list",
+    `Expires At: ${expiresAt}`,
+    `Nonce: ${challenge}`
   ].join("\n")
 
 const readJson = async <T>(
@@ -75,6 +100,14 @@ export const createSliceWalletRegistryClient = ({
 }) => {
   const url = (path: string) => new URL(path, baseUrl)
   return {
+    createCredentialListChallenge: (accountAddress: string, chainId: number) =>
+      readJson<SliceWalletCredentialListChallenge>(
+        fetchImpl(url("/v1/registry/credential-list/challenges"), {
+          body: JSON.stringify({ accountAddress, chainId }),
+          headers: { "content-type": "application/json" },
+          method: "POST"
+        })
+      ),
     createChallenge: (
       registrationKind: SliceWalletCredentialRegistrationKind,
       chainId: number,
@@ -104,6 +137,16 @@ export const createSliceWalletRegistryClient = ({
       if (response.status === 404) return null
       return readJson<SliceWalletRegistryCredential>(response)
     },
+    listAuthorizedAccountCredentials: (
+      authorization: SliceWalletCredentialListAuthorization
+    ) =>
+      readJson<readonly SliceWalletRegistryCredential[]>(
+        fetchImpl(url("/v1/registry/credential-list"), {
+          body: JSON.stringify(authorization),
+          headers: { "content-type": "application/json" },
+          method: "POST"
+        })
+      ),
     registerCredential: (input: RegisterSliceWalletCredentialInput) =>
       readJson<SliceWalletRegistryCredential>(
         fetchImpl(url("/v1/registry/credentials"), {
