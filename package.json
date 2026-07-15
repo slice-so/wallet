@@ -101,6 +101,7 @@
     "generate:chains:check": "bun scripts/generate-chains.ts --check",
     "lint": "biome lint --write && bun scripts/check-import-boundaries.ts",
     "test": "bun test",
+    "test:e2e:two-chain": "bash ../../scripts/run-wallet-two-chain-e2e.sh",
     "type-check": "bun run generate:chains:check && tsc -p tsconfig.json --noEmit",
     "verify:chains": "bun scripts/verify-chain-deployments.ts"
   },

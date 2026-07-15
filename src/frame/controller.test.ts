@@ -312,7 +312,7 @@ describe("isolated signer-frame controller", () => {
     detach()
   })
 
-  test("refuses an over-cap checkout before producing a co-sign proof", async () => {
+  test("runs the malicious-transport drill before producing a co-sign proof", async () => {
     const parent = new MessageChannel()
     const window = new MockMessageWindow(parent.port1)
     const store = new MemorySessionStore()
@@ -398,7 +398,7 @@ describe("isolated signer-frame controller", () => {
     detach()
   })
 
-  test("refuses an over-cap scoped session before producing a signature", async () => {
+  test("runs the malicious-transport drill before scoped-session signing", async () => {
     const parent = new MessageChannel()
     const window = new MockMessageWindow(parent.port1)
     const store = new MemorySessionStore()

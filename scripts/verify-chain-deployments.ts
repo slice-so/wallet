@@ -13,6 +13,7 @@ import {
   zeroAddress
 } from "viem"
 import deployments from "../../contracts/core/deployments/addresses.json"
+import policy from "../config/chains.policy.json"
 
 const rpcEnvironmentVariables = {
   1: "RPC_URL_MAINNET",
@@ -92,6 +93,12 @@ const deployment = deployments.chains[chainKey]
 if (deployment === undefined || deployment.chainId !== requestedChainId) {
   throw new Error(
     `No Slice Wallet deployment facts exist for ${requestedChainId}.`
+  )
+}
+const chainPolicy = policy.chains[chainKey]
+if (chainPolicy === undefined) {
+  throw new Error(
+    `No Slice Wallet security policy exists for ${requestedChainId}.`
   )
 }
 
@@ -230,6 +237,23 @@ if (userOperationCanary !== null) {
     canaryEvent?.args.success === true,
     "The canary user operation failed."
   )
+  if (canaryEvent !== undefined) {
+    const executionSafety = chainPolicy.executionSafety
+    const maximumEnvelopeGas =
+      BigInt(executionSafety.maxCallGasLimit) +
+      BigInt(executionSafety.maxVerificationGasLimit) +
+      BigInt(executionSafety.maxPreVerificationGas) +
+      BigInt(executionSafety.maxPaymasterVerificationGasLimit) +
+      BigInt(executionSafety.maxPaymasterPostOpGasLimit)
+    assert(
+      canaryEvent.args.actualGasUsed <= maximumEnvelopeGas,
+      "The execution-safety gas envelope is below the admitted canary usage."
+    )
+    assert(
+      canaryEvent.args.actualGasCost <= BigInt(executionSafety.maxPrefundWei),
+      "The execution-safety prefund cap is below the admitted canary cost."
+    )
+  }
 
   const accountCode = await client.getCode({
     address: userOperationCanary.accountAddress

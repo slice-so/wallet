@@ -1,7 +1,5 @@
 #!/usr/bin/env bun
 
-import { Base64, Hex as OxHex, P256, PublicKey, WebAuthnP256 } from "ox"
-import type { Signature } from "ox/Signature"
 import {
   type Address,
   createPublicClient,
@@ -18,25 +16,34 @@ import {
   type UserOperation
 } from "viem/account-abstraction"
 import { privateKeyToAccount } from "viem/accounts"
-import { base } from "viem/chains"
 import { createSliceWalletKernelAccount } from "../src/account"
-import { sliceWalletEntryPoint } from "../src/constants"
-import type { CreateSliceWalletKernelAccountParameters } from "../src/types/account"
+import { getSliceWalletChainPolicy } from "../src/chains"
+import { canaryCredential, canaryGetFn, canaryRpId } from "./lib/canaryWebAuthn"
 
 const canaryRecipient =
   "0x0000000000000000000000000000000000008128" satisfies Address
-const rpId = "id.slice.so"
-const origin = "https://id.slice.so"
 const entryPointDepositTarget = 200_000_000_000_000n
-const canaryPrivateKey =
-  "0x0101010101010101010101010101010101010101010101010101010101010101" as const
-const canaryCredentialId =
-  "0xa5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5" as const
 
-const rpcUrl = process.env.RPC_URL_BASE
+const rpcEnvironmentVariables: Readonly<Record<number, string>> = {
+  1: "RPC_URL_MAINNET",
+  10: "RPC_URL_OPTIMISM",
+  8453: "RPC_URL_BASE",
+  42161: "RPC_URL_ARBITRUM"
+}
+const chainId = Number(process.argv[2] ?? 8453)
+if (!Number.isSafeInteger(chainId) || chainId <= 0) {
+  throw new Error("Pass a positive integer wallet chain id.")
+}
+const manifest = getSliceWalletChainPolicy(chainId)
+const chain = manifest.chain
+const rpcEnvironmentVariable = rpcEnvironmentVariables[chainId]
+if (rpcEnvironmentVariable === undefined) {
+  throw new Error(`No canary RPC is configured for chain ${chainId}.`)
+}
+const rpcUrl = process.env[rpcEnvironmentVariable]
 const privateKey = process.env.PRIVATE_KEY
 if (rpcUrl === undefined || rpcUrl.length === 0) {
-  throw new Error("RPC_URL_BASE is required.")
+  throw new Error(`${rpcEnvironmentVariable} is required.`)
 }
 if (privateKey === undefined || !/^0x[0-9a-fA-F]{64}$/.test(privateKey)) {
   throw new Error("PRIVATE_KEY must be a 32-byte hex private key.")
@@ -44,12 +51,12 @@ if (privateKey === undefined || !/^0x[0-9a-fA-F]{64}$/.test(privateKey)) {
 
 const broadcaster = privateKeyToAccount(privateKey as Hex)
 const publicClient = createPublicClient({
-  chain: base,
+  chain,
   transport: http(rpcUrl)
 })
 const walletClient = createWalletClient({
   account: broadcaster,
-  chain: base,
+  chain,
   transport: http(rpcUrl)
 })
 let transactionNonce = await publicClient.getTransactionCount({
@@ -62,117 +69,18 @@ const takeTransactionNonce = () => {
   return nonce
 }
 
-const toUint8Array = (source: BufferSource) => {
-  if (ArrayBuffer.isView(source)) {
-    const bytes = new Uint8Array(source.byteLength)
-    bytes.set(
-      new Uint8Array(source.buffer, source.byteOffset, source.byteLength)
-    )
-    return bytes
-  }
-
-  return new Uint8Array(source)
-}
-
-const toArrayBuffer = (bytes: Uint8Array) =>
-  bytes.buffer.slice(
-    bytes.byteOffset,
-    bytes.byteOffset + bytes.byteLength
-  ) as ArrayBuffer
-
-const encodeDerInteger = (value: bigint) => {
-  const normalizedHex =
-    value === 0n
-      ? "00"
-      : value.toString(16).length % 2 === 0
-        ? value.toString(16)
-        : `0${value.toString(16)}`
-  const valueBytes = OxHex.toBytes(`0x${normalizedHex}`)
-  const integerBytes =
-    valueBytes[0] !== undefined && valueBytes[0] >= 0x80
-      ? new Uint8Array([0, ...valueBytes])
-      : valueBytes
-
-  return new Uint8Array([0x02, integerBytes.length, ...integerBytes])
-}
-
-const encodeDerSignature = ({ r, s }: Pick<Signature, "r" | "s">) => {
-  const rBytes = encodeDerInteger(r)
-  const sBytes = encodeDerInteger(s)
-  return Uint8Array.from([
-    0x30,
-    rBytes.length + sBytes.length,
-    ...rBytes,
-    ...sBytes
-  ])
-}
-
-const publicKey = PublicKey.toHex(
-  P256.getPublicKey({ privateKey: canaryPrivateKey }),
-  { includePrefix: false }
-)
-const credentialId = Base64.fromBytes(OxHex.toBytes(canaryCredentialId), {
-  pad: false,
-  url: true
-})
-const credential = {
-  id: credentialId,
-  publicKey
-}
-
-const getFn: NonNullable<
-  CreateSliceWalletKernelAccountParameters["getFn"]
-> = async (options) => {
-  const publicKey = options?.publicKey
-  if (publicKey?.challenge === undefined) {
-    throw new Error("The WebAuthn request is missing a challenge.")
-  }
-
-  const challenge = OxHex.fromBytes(toUint8Array(publicKey.challenge))
-  const { metadata, payload } = WebAuthnP256.getSignPayload({
-    challenge,
-    origin,
-    rpId: publicKey.rpId ?? rpId,
-    userVerification: publicKey.userVerification ?? "required"
-  })
-  const signature = P256.sign({
-    hash: true,
-    payload,
-    privateKey: canaryPrivateKey
-  })
-  const rawId = Base64.toBytes(credentialId)
-
-  return {
-    authenticatorAttachment: "platform",
-    getClientExtensionResults: () => ({}),
-    id: credentialId,
-    rawId: toArrayBuffer(rawId),
-    response: {
-      authenticatorData: toArrayBuffer(
-        OxHex.toBytes(metadata.authenticatorData)
-      ),
-      clientDataJSON: toArrayBuffer(
-        new TextEncoder().encode(metadata.clientDataJSON)
-      ),
-      signature: toArrayBuffer(encodeDerSignature(signature)),
-      userHandle: null
-    },
-    type: "public-key"
-  }
-}
-
 const account = await createSliceWalletKernelAccount({
   client: publicClient,
-  credential,
-  getFn,
-  rpId
+  credential: canaryCredential,
+  getFn: canaryGetFn,
+  rpId: canaryRpId
 })
 const codeBefore = await publicClient.getCode({ address: account.address })
 if (codeBefore !== undefined && codeBefore !== "0x") {
   const latestBlock = await publicClient.getBlockNumber()
   const events = await publicClient.getContractEvents({
     abi: entryPoint07Abi,
-    address: sliceWalletEntryPoint.address,
+    address: manifest.contracts.entryPoint.address,
     args: { sender: account.address },
     eventName: "UserOperationEvent",
     fromBlock: latestBlock > 1_000n ? latestBlock - 1_000n : 0n,
@@ -214,14 +122,14 @@ if (factory === undefined || factoryData === undefined) {
 
 const existingDeposit = await publicClient.readContract({
   abi: entryPoint07Abi,
-  address: sliceWalletEntryPoint.address,
+  address: manifest.contracts.entryPoint.address,
   args: [account.address],
   functionName: "balanceOf"
 })
 if (existingDeposit < entryPointDepositTarget) {
   const depositHash = await walletClient.writeContract({
     abi: entryPoint07Abi,
-    address: sliceWalletEntryPoint.address,
+    address: manifest.contracts.entryPoint.address,
     args: [account.address],
     functionName: "depositTo",
     nonce: takeTransactionNonce(),
@@ -265,14 +173,14 @@ const userOperation = {
   ...unsignedUserOperation,
   signature: await account.signUserOperation({
     ...unsignedUserOperation,
-    chainId: base.id
+    chainId
   })
 } satisfies UserOperation<"0.7">
 
 const simulation = await publicClient.simulateContract({
   account: broadcaster,
   abi: entryPoint07Abi,
-  address: sliceWalletEntryPoint.address,
+  address: manifest.contracts.entryPoint.address,
   args: [[toPackedUserOperation(userOperation)], broadcaster.address],
   functionName: "handleOps",
   gas: 5_000_000n

@@ -44,7 +44,7 @@ describe("Slice wallet root validator state", () => {
     expect(absent).toBeNull()
   })
 
-  it("refuses hostile gas estimates before invoking the root signer", async () => {
+  it("runs the malicious-transport drill before invoking the root signer", async () => {
     const rootSigner = mock(async () => "0x1234" as const)
     const validator = createSliceWalletRootValidator({
       chainId: base.id,

@@ -61,6 +61,9 @@ describe("normalized wallet policies", () => {
     expect(
       getWalletPermissionId(first, "0x7000000000000000000000000000000000000007")
     ).not.toBe(getWalletPermissionId(first, signer))
+    expect(getWalletPermissionId({ ...first, chainId: 10 }, signer)).not.toBe(
+      getWalletPermissionId(first, signer)
+    )
 
     const policies = toWalletPermissionPolicies(first)
     expect(policies).toHaveLength(2)

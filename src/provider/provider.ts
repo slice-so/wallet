@@ -374,10 +374,7 @@ export const createSliceWalletProviderInternal = (
     if (method === "wallet_showCallsStatus") {
       throw unsupportedProviderMethod(method)
     }
-    if (
-      method === "eth_sendTransaction" ||
-      method === "wallet_sendTransaction"
-    ) {
+    if (method === "eth_sendTransaction") {
       const account = await getConnectedAccount(runtime)
       const transaction = parseSliceWalletTransaction(params)
       assertAccountParam(transaction.from, account)

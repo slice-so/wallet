@@ -27,4 +27,34 @@ describe("canonical Slice Wallet config", () => {
       } as SliceWalletParameters)
     ).toThrow("unknown field")
   })
+
+  test("applies only valid transport URL overrides", () => {
+    const config = resolveCanonicalSliceWalletConfig({
+      transports: {
+        8453: {
+          bundlerUrl: "https://bundler.example/rpc",
+          rpcUrl: "https://rpc.example"
+        }
+      }
+    })
+
+    expect(config.chains[0]).toMatchObject({
+      bundlerUrl: "https://bundler.example/rpc",
+      rpcUrl: "https://rpc.example/"
+    })
+    expect(() =>
+      resolveCanonicalSliceWalletConfig({
+        transports: {
+          8453: {
+            paymasterUrl: "https://paymaster.example"
+          }
+        }
+      } as SliceWalletParameters)
+    ).toThrow("only rpcUrl and bundlerUrl")
+    expect(() =>
+      resolveCanonicalSliceWalletConfig({
+        transports: { 8453: { rpcUrl: "javascript:alert(1)" } }
+      })
+    ).toThrow("RPC URL is not permitted")
+  })
 })

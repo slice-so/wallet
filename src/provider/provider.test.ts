@@ -233,6 +233,7 @@ describe("Slice Wallet provider dispatch", () => {
       request(provider, "wallet_getGrantedExecutionPermissions", []),
       4200
     )
+    await expectRpcError(request(provider, "wallet_sendTransaction", []), 4200)
   })
 
   test("fails explicitly when calls-status presentation is not shipped", async () => {
