@@ -1,8 +1,12 @@
-import { describe, expect, mock, test } from "bun:test"
+import { beforeEach, describe, expect, mock, test } from "bun:test"
 import { numberToHex } from "viem"
 import { base, optimism } from "viem/chains"
 import type { SliceWalletProviderConfig } from "../types/providerInternal"
 import { createSliceWalletProviderRuntime } from "./runtime"
+import {
+  readStoredSliceWalletAccount,
+  writeStoredSliceWalletAccount
+} from "./storage"
 
 type RuntimeDependencies = NonNullable<
   Parameters<typeof createSliceWalletProviderRuntime>[1]
@@ -14,6 +18,7 @@ type ChainRuntime = ReturnType<ChainRuntimeFactory>
 
 const account = "0x0000000000000000000000000000000000000001" as const
 const userOperationHash = `0x${"11".repeat(32)}` as const
+const credentialIdHash = `0x${"22".repeat(32)}` as const
 const storageValues = new Map<string, string>()
 const storage = {
   clear: () => storageValues.clear(),
@@ -49,9 +54,12 @@ const config = {
   })
 } satisfies SliceWalletProviderConfig
 
+beforeEach(() => storageValues.clear())
+
 const createRuntimeFixture = () => {
   const callsByChain = new Map<number, Set<string>>()
   const sendCallsByChain = new Map<number, ReturnType<typeof mock>>()
+  const revokeGrantByChain = new Map<number, ReturnType<typeof mock>>()
   const statusChains: number[] = []
   const createChainRuntime: ChainRuntimeFactory = (chainConfig) => {
     const calls = new Set<string>()
@@ -61,6 +69,8 @@ const createRuntimeFixture = () => {
       userOperationHash
     }))
     sendCallsByChain.set(chainConfig.chain.id, sendCalls)
+    const revokeGrant = mock(async () => undefined)
+    revokeGrantByChain.set(chainConfig.chain.id, revokeGrant)
     return {
       chainId: chainConfig.chain.id,
       connect: mock(async () => null as never),
@@ -81,7 +91,7 @@ const createRuntimeFixture = () => {
       getGrants: mock(async () => []),
       hasCall: (id: string) => calls.has(id),
       paymasterAvailable: false,
-      revokeGrant: mock(async () => undefined),
+      revokeGrant,
       rotateGrant: mock(async () => null as never),
       sendCalls,
       signMessage: mock(async () => userOperationHash),
@@ -89,7 +99,13 @@ const createRuntimeFixture = () => {
       waitForSuccessfulUserOperation: mock(async () => null as never)
     } satisfies ChainRuntime
   }
-  return { callsByChain, createChainRuntime, sendCallsByChain, statusChains }
+  return {
+    callsByChain,
+    createChainRuntime,
+    revokeGrantByChain,
+    sendCallsByChain,
+    statusChains
+  }
 }
 
 describe("multichain provider runtime routing", () => {
@@ -112,9 +128,59 @@ describe("multichain provider runtime routing", () => {
     const runtime = createSliceWalletProviderRuntime(config, fixture)
     runtime.getChainRuntime(optimism.id)
     fixture.callsByChain.get(optimism.id)?.add("op-call")
+    runtime.switchChain(optimism.id)
+    runtime.switchChain(base.id)
 
     await runtime.getCallsStatus("op-call")
 
     expect(fixture.statusChains).toEqual([optimism.id])
+  })
+
+  test("keeps the account retryable after a partial disconnect failure", async () => {
+    const fixture = createRuntimeFixture()
+    const runtime = createSliceWalletProviderRuntime(config, fixture)
+    runtime.getChainRuntime(optimism.id)
+    const failure = new Error("onchain revoke failed")
+    fixture.revokeGrantByChain
+      .get(optimism.id)
+      ?.mockImplementation(async () => {
+        throw failure
+      })
+    writeStoredSliceWalletAccount(storage, {
+      accountAddress: account,
+      credentialIdHash
+    })
+
+    try {
+      await runtime.disconnect()
+      throw new Error("Expected disconnect cleanup to fail.")
+    } catch (error) {
+      expect(error).toBeInstanceOf(AggregateError)
+      expect((error as AggregateError).errors).toEqual([failure])
+    }
+    expect(readStoredSliceWalletAccount(storage)).toEqual({
+      accountAddress: account,
+      credentialIdHash
+    })
+  })
+
+  test("clears the stored account after every chain revokes successfully", async () => {
+    const fixture = createRuntimeFixture()
+    const runtime = createSliceWalletProviderRuntime(config, fixture)
+    writeStoredSliceWalletAccount(storage, {
+      accountAddress: account,
+      credentialIdHash
+    })
+
+    await runtime.disconnect()
+
+    expect(readStoredSliceWalletAccount(storage)).toBeNull()
+    const baseRevocation = fixture.revokeGrantByChain.get(base.id)
+    const optimismRevocation = fixture.revokeGrantByChain.get(optimism.id)
+    if (baseRevocation === undefined || optimismRevocation === undefined) {
+      throw new Error("Missing chain revocation fixture.")
+    }
+    expect(baseRevocation).toHaveBeenCalledTimes(1)
+    expect(optimismRevocation).toHaveBeenCalledTimes(1)
   })
 })

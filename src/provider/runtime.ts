@@ -53,6 +53,7 @@ import {
   SliceWalletProviderRpcError,
   unauthorizedProviderRequest
 } from "./errors"
+import { revokeSliceWalletGrantState } from "./grantRevocation"
 import { forwardSliceWalletRpc } from "./rpc"
 import {
   clearStoredSliceWalletAccount,
@@ -405,30 +406,21 @@ const createSliceWalletChainRuntime = (
         "Permission id does not match this origin's grant."
       )
     }
-    let uninstallFailed = false
-    try {
-      await uninstallGrant(stored)
-    } catch {
-      uninstallFailed = true
-    }
-    clearStoredSliceWalletGrant(storage, config.chain.id)
-    try {
-      await (await getFrame()).request({
-        method: "clearSession",
-        params: {
-          account: stored.account,
-          chainId: stored.chainId,
-          grantKind: "generic"
-        }
-      })
-    } catch {
-      // A successful onchain revoke is authoritative; uninstall failures surface below.
-    }
-    if (uninstallFailed) {
-      throw new Error(
-        `Wallet permission ${stored.permissionId} could not be revoked onchain.`
-      )
-    }
+    await revokeSliceWalletGrantState({
+      clearSession: async () => {
+        await (await getFrame()).request({
+          method: "clearSession",
+          params: {
+            account: stored.account,
+            chainId: stored.chainId,
+            grantKind: "generic"
+          }
+        })
+      },
+      clearStored: () => clearStoredSliceWalletGrant(storage, config.chain.id),
+      permissionId: stored.permissionId,
+      uninstall: () => uninstallGrant(stored)
+    })
   }
 
   const createGrant = async ({
@@ -661,19 +653,25 @@ export const createSliceWalletProviderRuntime = (
       const revocations = [...chainConfigs.keys()].map((chainId) =>
         getChainRuntime(chainId).revokeGrant()
       )
-      clearStoredSliceWalletAccount(storage)
-      for (const chainId of chainConfigs.keys()) {
-        clearStoredSliceWalletGrant(storage, chainId)
-      }
       const results = await Promise.allSettled(revocations)
       for (const runtime of runtimes.values()) runtime.destroy()
       runtimes.clear()
-      const failures = results.filter((result) => result.status === "rejected")
+      const failures: Error[] = []
+      for (const result of results) {
+        if (result.status !== "rejected") continue
+        failures.push(
+          result.reason instanceof Error
+            ? result.reason
+            : new Error("Wallet permission revocation failed unexpectedly.")
+        )
+      }
       if (failures.length > 0) {
-        throw new Error(
+        throw new AggregateError(
+          failures,
           `${failures.length} wallet permission revocation${failures.length === 1 ? "" : "s"} failed during disconnect.`
         )
       }
+      clearStoredSliceWalletAccount(storage)
     },
     forwardRpc: (...args: Parameters<SliceWalletChainRuntime["forwardRpc"]>) =>
       getChainRuntime().forwardRpc(...args),

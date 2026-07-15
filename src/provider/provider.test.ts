@@ -353,6 +353,10 @@ describe("Slice Wallet provider dispatch", () => {
       ]),
       -32602
     )
+    await expectRpcError(
+      request(provider, "wallet_revokePermissions", [{ personal_sign: {} }]),
+      -32602
+    )
     expect(disconnect).not.toHaveBeenCalled()
     expect(
       await request(provider, "wallet_revokePermissions", [
