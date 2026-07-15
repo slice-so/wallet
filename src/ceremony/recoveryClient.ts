@@ -16,6 +16,7 @@ import {
 
 export const registerRecoveredSliceWalletCredential = async ({
   account,
+  chainId,
   idOrigin,
   recoveryPermissionId,
   recoverySignerAddress,
@@ -24,6 +25,7 @@ export const registerRecoveredSliceWalletCredential = async ({
   window
 }: {
   account: `0x${string}`
+  chainId: number
   idOrigin: string
   recoveryPermissionId: `0x${string}`
   recoverySignerAddress: `0x${string}`
@@ -38,7 +40,7 @@ export const registerRecoveredSliceWalletCredential = async ({
   const { port, surface } = await openSliceWalletCeremonyChannel({
     idOrigin,
     nonce,
-    path: `/ceremony/recovery?account=${encodeURIComponent(account)}`,
+    path: `/ceremony/recovery?account=${encodeURIComponent(account)}&chainId=${chainId}`,
     window
   })
 
@@ -64,6 +66,7 @@ export const registerRecoveredSliceWalletCredential = async ({
             )
             if (
               request.nonce !== nonce ||
+              request.chainId !== chainId ||
               request.account.toLowerCase() !== account.toLowerCase()
             ) {
               throw new Error(
@@ -75,6 +78,7 @@ export const registerRecoveredSliceWalletCredential = async ({
                 accountAddress: request.account,
                 accountIndex: request.accountIndex,
                 challenge: request.challenge,
+                chainId: request.chainId,
                 credentialIdHash: request.credentialIdHash,
                 factoryVersion: request.factoryVersion,
                 publicKey: request.publicKey

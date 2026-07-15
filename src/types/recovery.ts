@@ -133,6 +133,7 @@ export type SliceWalletRecoveryHandoffAuthorizationRequest = {
   account: Address
   accountIndex: number
   challenge: Hex
+  chainId: number
   credentialIdHash: Hex
   factoryVersion: string
   message: string

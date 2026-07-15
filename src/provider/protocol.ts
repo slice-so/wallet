@@ -325,7 +325,23 @@ export const parseSliceWalletTransaction = (
     throw invalidProviderRequest("eth_sendTransaction expects one parameter.")
   }
   const input = record(items[0], "Transaction request")
-  assertKeys(input, ["from", "to"], ["data", "value"])
+  const ignoredQuantityFields = [
+    "chainId",
+    "gas",
+    "gasPrice",
+    "maxFeePerGas",
+    "maxPriorityFeePerGas",
+    "nonce",
+    "type"
+  ] as const
+  assertKeys(input, ["from", "to"], ["data", ...ignoredQuantityFields, "value"])
+  // EOA transaction gas and nonce hints cannot be honored by an ERC-4337
+  // account. Validate their wire shape, then derive the UserOperation fields.
+  for (const field of ignoredQuantityFields) {
+    if (input[field] !== undefined) {
+      quantity(input[field], `Transaction ${field}`)
+    }
+  }
   return {
     call: {
       data:

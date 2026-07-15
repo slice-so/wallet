@@ -26,6 +26,7 @@ export type SliceWalletRegistryCredential = {
 
 export type SliceWalletRegistryChallenge = {
   challenge: Hex
+  chainId: number
   expiresAt: string
   registrationKind: SliceWalletCredentialRegistrationKind
 }
@@ -35,6 +36,7 @@ export type RegisterSliceWalletCredentialInput = {
   accountFactory?: Address
   accountFactoryData?: Hex
   challenge: Hex
+  chainId: number
   credentialId: string
   credentialProof: SliceWalletCredentialProof
   publicKey: Hex

@@ -119,6 +119,7 @@ export const parseSliceWalletRecoveryHandoffAuthorizationRequest = (
     "account",
     "accountIndex",
     "challenge",
+    "chainId",
     "credentialIdHash",
     "factoryVersion",
     "message",
@@ -133,10 +134,13 @@ export const parseSliceWalletRecoveryHandoffAuthorizationRequest = (
   ) {
     throw new Error("Recovery authorization request is invalid.")
   }
+  const chainId = integerValue(input.chainId, "Recovery chain id")
+  if (chainId === 0) throw new Error("Recovery chain id must be positive.")
   return {
     account: addressValue(input.account, "Recovery account"),
     accountIndex: integerValue(input.accountIndex, "Recovery account index"),
     challenge: hexValue(input.challenge, "Registry challenge", 32),
+    chainId,
     credentialIdHash: hexValue(
       input.credentialIdHash,
       "Credential id hash",

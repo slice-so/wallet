@@ -30,6 +30,7 @@ export const formatSliceWalletExistingCredentialAuthorization = ({
   accountAddress,
   accountIndex,
   challenge,
+  chainId,
   credentialIdHash,
   factoryVersion,
   publicKey
@@ -37,6 +38,7 @@ export const formatSliceWalletExistingCredentialAuthorization = ({
   accountAddress: string
   accountIndex: number
   challenge: Hex
+  chainId: number
   credentialIdHash: Hex
   factoryVersion: string
   publicKey: Hex
@@ -46,8 +48,9 @@ export const formatSliceWalletExistingCredentialAuthorization = ({
     "",
     "Authorize this credential as a root for the existing wallet.",
     "",
-    "Version: 1",
+    "Version: 2",
     `Account: ${accountAddress.toLowerCase()}`,
+    `Chain ID: ${chainId}`,
     `Credential ID Hash: ${credentialIdHash}`,
     `Public Key Hash: ${keccak256(publicKey)}`,
     `Factory Version: ${factoryVersion}`,
@@ -74,12 +77,14 @@ export const createSliceWalletRegistryClient = ({
   return {
     createChallenge: (
       registrationKind: SliceWalletCredentialRegistrationKind,
+      chainId: number,
       accountAddress?: string
     ) =>
       readJson<SliceWalletRegistryChallenge>(
         fetchImpl(url("/v1/registry/challenges"), {
           body: JSON.stringify({
             ...(accountAddress === undefined ? {} : { accountAddress }),
+            chainId,
             registrationKind
           }),
           headers: { "content-type": "application/json" },
@@ -112,12 +117,14 @@ export const createSliceWalletRegistryClient = ({
 
 export const getSliceWalletRegistryProofChallenge = ({
   challenge,
+  chainId,
   credentialIdHash,
   publicKey,
   recoverySignerAddress,
   registrationKind
 }: {
   challenge: Hex
+  chainId: number
   credentialIdHash: Hex
   publicKey: Hex
   recoverySignerAddress?: `0x${string}`
@@ -130,8 +137,9 @@ export const getSliceWalletRegistryProofChallenge = ({
   keccak256(
     stringToHex(
       [
-        "Slice Wallet Credential Registration v1",
+        "Slice Wallet Credential Registration v2",
         registrationKind,
+        String(chainId),
         challenge,
         credentialIdHash,
         keccak256(publicKey),

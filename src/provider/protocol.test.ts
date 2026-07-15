@@ -5,7 +5,8 @@ import type { SliceWalletProviderValue } from "../types"
 import { SliceWalletProviderRpcError } from "./errors"
 import {
   parseSliceWalletGrantPermissions,
-  parseSliceWalletSendCalls
+  parseSliceWalletSendCalls,
+  parseSliceWalletTransaction
 } from "./protocol"
 
 const account = "0x0000000000000000000000000000000000000001" as Address
@@ -17,6 +18,29 @@ const now = 1_800_000_000
 const asProviderValue = (value: SliceWalletProviderValue) => value
 
 describe("portable wallet provider protocol", () => {
+  test("accepts standard EOA transaction hints without forwarding them", () => {
+    expect(
+      parseSliceWalletTransaction([
+        {
+          chainId: "0x2105",
+          data: "0x1234",
+          from: account,
+          gas: "0x5208",
+          gasPrice: "0x3b9aca00",
+          maxFeePerGas: "0x77359400",
+          maxPriorityFeePerGas: "0x3b9aca00",
+          nonce: "0x7",
+          to: recipient,
+          type: "0x2",
+          value: "0x1"
+        }
+      ])
+    ).toEqual({
+      call: { data: "0x1234", to: recipient, value: 1n },
+      from: account
+    })
+  })
+
   test("maps supported generic templates to exact on-chain rules", () => {
     const parsed = parseSliceWalletGrantPermissions({
       account,

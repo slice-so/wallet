@@ -8,6 +8,7 @@ import {
 
 const account = "0x1000000000000000000000000000000000000001" as const
 const challenge = `0x${"11".repeat(32)}` as const
+const chainId = 8453
 const credentialIdHash = `0x${"22".repeat(32)}` as const
 const nonce = `0x${"33".repeat(32)}` as const
 const publicKey = `0x04${"44".repeat(64)}` as const
@@ -16,6 +17,7 @@ const message = formatSliceWalletExistingCredentialAuthorization({
   accountAddress: account,
   accountIndex: 0,
   challenge,
+  chainId,
   credentialIdHash,
   factoryVersion,
   publicKey
@@ -27,6 +29,7 @@ describe("recovery handoff protocol", () => {
       account,
       accountIndex: 0,
       challenge,
+      chainId,
       credentialIdHash,
       factoryVersion,
       message,
@@ -37,7 +40,7 @@ describe("recovery handoff protocol", () => {
     } as const
     expect(
       parseSliceWalletRecoveryHandoffAuthorizationRequest(request)
-    ).toMatchObject({ account, credentialIdHash, nonce })
+    ).toMatchObject({ account, chainId, credentialIdHash, nonce })
     expect(() =>
       parseSliceWalletRecoveryHandoffAuthorizationRequest({
         ...request,

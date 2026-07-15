@@ -1,5 +1,6 @@
 export * from "./account"
 export * from "./calls"
+export { getSliceWalletChainManifest } from "./chains"
 export * from "./constants"
 export * from "./frame/messages"
 export {
