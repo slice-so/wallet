@@ -163,13 +163,20 @@ const assertEthAccountsRevocation = (
 ) => {
   const values = paramsArray(params, "wallet_revokePermissions")
   const permission = values[0]
-  if (
-    values.length !== 1 ||
-    typeof permission !== "object" ||
-    permission === null ||
-    Array.isArray(permission) ||
-    permission.parentCapability !== "eth_accounts"
-  ) {
+  const keyedRequest =
+    typeof permission === "object" &&
+    permission !== null &&
+    !Array.isArray(permission) &&
+    Object.keys(permission).length === 1 &&
+    typeof permission.eth_accounts === "object" &&
+    permission.eth_accounts !== null &&
+    !Array.isArray(permission.eth_accounts)
+  const returnedPermission =
+    typeof permission === "object" &&
+    permission !== null &&
+    !Array.isArray(permission) &&
+    permission.parentCapability === "eth_accounts"
+  if (values.length !== 1 || (!keyedRequest && !returnedPermission)) {
     throw invalidProviderRequest("Only eth_accounts permission is supported.")
   }
 }
@@ -410,8 +417,14 @@ export const createSliceWalletProviderInternal = (
         transaction.chainId !== undefined &&
         transaction.chainId !== runtime.chainId
       ) {
+        if (!runtime.supportedChainIds.includes(transaction.chainId)) {
+          throw new SliceWalletProviderRpcError(
+            4902,
+            "Requested chain is not configured in Slice Wallet."
+          )
+        }
         throw new SliceWalletProviderRpcError(
-          5710,
+          4901,
           "Requested chain is configured but inactive; switch chains first."
         )
       }

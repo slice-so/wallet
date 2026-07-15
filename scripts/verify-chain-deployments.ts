@@ -189,14 +189,30 @@ const rip7212Available =
   isRejectedP256Result(
     await callP256Verifier(rip7212Precompile, invalidP256CanaryInput)
   )
-const daimoVerifierPassed = isSuccessfulP256Result(
-  await callP256Verifier(getAddress(deployment.contracts.p256Verifier.address))
-)
-const soladyVerifierPassed = isSuccessfulP256Result(
-  await callP256Verifier(
-    getAddress(deployment.contracts.soladyP256Verifier.address)
+const daimoVerifierPassed =
+  isSuccessfulP256Result(
+    await callP256Verifier(
+      getAddress(deployment.contracts.p256Verifier.address)
+    )
+  ) &&
+  isRejectedP256Result(
+    await callP256Verifier(
+      getAddress(deployment.contracts.p256Verifier.address),
+      invalidP256CanaryInput
+    )
   )
-)
+const soladyVerifierPassed =
+  isSuccessfulP256Result(
+    await callP256Verifier(
+      getAddress(deployment.contracts.soladyP256Verifier.address)
+    )
+  ) &&
+  isRejectedP256Result(
+    await callP256Verifier(
+      getAddress(deployment.contracts.soladyP256Verifier.address),
+      invalidP256CanaryInput
+    )
+  )
 const p256CanaryPassed =
   daimoVerifierPassed &&
   soladyVerifierPassed &&

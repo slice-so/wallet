@@ -34,6 +34,39 @@ describe("wallet chain admission evidence", () => {
     expect(
       hasCompleteSliceWalletAdmissionEvidence({
         ...completeEvidence,
+        status: "pending"
+      })
+    ).toBe(false)
+    expect(
+      hasCompleteSliceWalletAdmissionEvidence({
+        ...completeEvidence,
+        verification: {
+          ...completeEvidence.verification,
+          factoryStakerApproved: false
+        }
+      })
+    ).toBe(false)
+    expect(
+      hasCompleteSliceWalletAdmissionEvidence({
+        ...completeEvidence,
+        verification: {
+          ...completeEvidence.verification,
+          p256CanaryPassed: false
+        }
+      })
+    ).toBe(false)
+    expect(
+      hasCompleteSliceWalletAdmissionEvidence({
+        ...completeEvidence,
+        verification: {
+          ...completeEvidence.verification,
+          verifiedAtBlock: null
+        }
+      })
+    ).toBe(false)
+    expect(
+      hasCompleteSliceWalletAdmissionEvidence({
+        ...completeEvidence,
         verification: {
           ...completeEvidence.verification,
           userOperationCanary: null

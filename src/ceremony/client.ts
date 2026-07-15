@@ -78,7 +78,9 @@ const getCeremonyUrl = ({
   return url
 }
 
-const assertBatchSessions = (sessions: readonly SliceWalletFrameSession[]) => {
+export const assertSliceWalletBatchSessions = (
+  sessions: readonly SliceWalletFrameSession[]
+) => {
   const first = sessions[0]
   if (first === undefined || sessions.length > 8) {
     throw new Error("Wallet batch authorization requires 1 to 8 sessions.")
@@ -89,6 +91,9 @@ const assertBatchSessions = (sessions: readonly SliceWalletFrameSession[]) => {
     if (
       session.account.toLowerCase() !== first.account.toLowerCase() ||
       session.grantKind !== first.grantKind ||
+      session.policy.account.toLowerCase() !== session.account.toLowerCase() ||
+      session.policy.chainId !== session.chainId ||
+      session.policy.grantKind !== session.grantKind ||
       chainIds.has(session.chainId)
     ) {
       throw new Error(
@@ -114,7 +119,7 @@ const getBatchCeremonyUrl = ({
   nonce: Hex
   sessions: readonly SliceWalletFrameSession[]
 }) => {
-  const first = assertBatchSessions(sessions)
+  const first = assertSliceWalletBatchSessions(sessions)
   const url = new URL("/ceremony/grants", new URL(idOrigin).origin)
   url.searchParams.set("account", first.account)
   url.searchParams.set(
@@ -298,7 +303,7 @@ export const authorizeSliceWalletSessions = async ({
   timeoutMs = 5 * 60_000,
   window
 }: AuthorizeSliceWalletSessionsParameters) => {
-  assertBatchSessions(sessions)
+  assertSliceWalletBatchSessions(sessions)
   const normalizedIdOrigin = new URL(idOrigin).origin
   const nonce = randomNonce(window)
   const continueFromFrame = async () => {

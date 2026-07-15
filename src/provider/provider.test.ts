@@ -312,7 +312,13 @@ describe("Slice Wallet provider dispatch", () => {
           to: account
         }
       ]),
-      5710
+      4901
+    )
+    await expectRpcError(
+      request(provider, "eth_sendTransaction", [
+        { chainId: "0x89", from: account, to: account }
+      ]),
+      4902
     )
   })
 
@@ -350,10 +356,17 @@ describe("Slice Wallet provider dispatch", () => {
     expect(disconnect).not.toHaveBeenCalled()
     expect(
       await request(provider, "wallet_revokePermissions", [
-        { parentCapability: "eth_accounts" }
+        { eth_accounts: {} }
       ])
     ).toBeNull()
     expect(disconnect).toHaveBeenCalledTimes(1)
+
+    expect(
+      await request(provider, "wallet_revokePermissions", [
+        { parentCapability: "eth_accounts" }
+      ])
+    ).toBeNull()
+    expect(disconnect).toHaveBeenCalledTimes(2)
   })
 
   test("emits local disconnect state before cleanup settles", async () => {

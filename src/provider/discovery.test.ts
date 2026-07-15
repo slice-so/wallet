@@ -8,6 +8,7 @@ import { announceSliceWalletProvider } from "./discovery"
 describe("EIP-6963 discovery", () => {
   it("announces immediately and again on provider requests", () => {
     const details: SliceWalletEip6963ProviderDetail[] = []
+    const eventTypes: string[] = []
     let requestListener: EventListener | null = null
     const browserWindow = Object.assign(Object.create(null) as Window, {
       addEventListener: (type: string, listener: EventListener) => {
@@ -15,6 +16,7 @@ describe("EIP-6963 discovery", () => {
       },
       crypto: globalThis.crypto,
       dispatchEvent: (event: Event) => {
+        eventTypes.push(event.type)
         if (event instanceof CustomEvent) {
           details.push(event.detail as SliceWalletEip6963ProviderDetail)
         }
@@ -44,6 +46,10 @@ describe("EIP-6963 discovery", () => {
     listener?.(new Event("eip6963:requestProvider"))
 
     expect(details).toHaveLength(2)
+    expect(eventTypes).toEqual([
+      "eip6963:announceProvider",
+      "eip6963:announceProvider"
+    ])
     expect(details[0]?.provider).toBe(provider)
     expect(details[0]?.info).toMatchObject({
       name: "Slice Wallet",
