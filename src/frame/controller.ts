@@ -8,6 +8,7 @@ import {
 } from "viem"
 import { getUserOperationHash } from "viem/account-abstraction"
 import { sliceWalletDefaultRpId, sliceWalletEntryPoint } from "../constants"
+import { assertSliceWalletExecutionSafety } from "../executionSafety"
 import {
   encodeSliceWalletSyntheticWebAuthnSignature,
   generateSliceWalletP256KeyPair,
@@ -292,6 +293,10 @@ export const attachSliceWalletSignerFrame = ({
         decodeScopedCalls(request.params.userOperation.callData),
         stored.session
       )
+      assertSliceWalletExecutionSafety({
+        chainId: stored.session.chainId,
+        userOperation: request.params.userOperation
+      })
       const userOperationHash = getUserOperationHash({
         chainId: stored.session.chainId,
         entryPointAddress: sliceWalletEntryPoint.address,
@@ -382,6 +387,10 @@ export const attachSliceWalletSignerFrame = ({
         decodeScopedCalls(request.params.userOperation.callData),
         stored.session.policy
       )
+      assertSliceWalletExecutionSafety({
+        chainId: stored.session.chainId,
+        userOperation: request.params.userOperation
+      })
       const userOperationHash = getUserOperationHash({
         chainId: stored.session.chainId,
         entryPointAddress: sliceWalletEntryPoint.address,

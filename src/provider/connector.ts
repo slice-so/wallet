@@ -1,19 +1,20 @@
 import { createConnector } from "@wagmi/core"
 import { type Address, isAddress } from "viem"
-import type {
-  SliceWalletProvider,
-  SliceWalletProviderConfig,
-  SliceWalletProviderValue
-} from "../types"
-import { sliceWalletProviderIcon } from "./discovery"
-import { createSliceWalletProvider } from "./provider"
+import type { SliceWalletProvider, SliceWalletProviderValue } from "../types"
+import type { SliceWalletProviderConfig } from "../types/providerInternal"
+import {
+  announceSliceWalletProvider,
+  sliceWalletProviderIcon
+} from "./discovery"
+import { createSliceWalletProviderInternal } from "./provider"
 
 export const sliceWalletConnector = (parameters: SliceWalletProviderConfig) => {
   let provider: SliceWalletProvider | null = null
+  let stopAnnouncement: (() => void) | null = null
 
   return createConnector<SliceWalletProvider>((config) => {
     const getProvider = () => {
-      provider ??= createSliceWalletProvider(parameters)
+      provider ??= createSliceWalletProviderInternal(parameters)
       return provider
     }
 
@@ -32,6 +33,14 @@ export const sliceWalletConnector = (parameters: SliceWalletProviderConfig) => {
       type: "slice-wallet",
       async setup() {
         const walletProvider = getProvider()
+        if (parameters.announce === true && stopAnnouncement === null) {
+          stopAnnouncement = announceSliceWalletProvider({
+            provider: walletProvider,
+            ...(parameters.window === undefined
+              ? {}
+              : { window: parameters.window })
+          })
+        }
         walletProvider.on("accountsChanged", (accounts) =>
           this.onAccountsChanged([...accounts])
         )
@@ -54,8 +63,7 @@ export const sliceWalletConnector = (parameters: SliceWalletProviderConfig) => {
             ? accounts.map((address) => ({
                 address,
                 capabilities: {
-                  atomic: { status: "supported" },
-                  permissions: { supported: true }
+                  atomic: { status: "supported" }
                 }
               }))
             : accounts) as never,

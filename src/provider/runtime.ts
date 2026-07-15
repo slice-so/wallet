@@ -14,6 +14,7 @@ import { connectSliceWalletAccount } from "../ceremony/accountClient"
 import { authorizeSliceWalletSession } from "../ceremony/client"
 import { parseSliceWalletFrameSession } from "../ceremony/protocol"
 import { createSliceWalletCeremonyKernelAccount } from "../ceremony/rootAccountClient"
+import { getSliceWalletChainManifest } from "../chains"
 import { connectSliceWalletSignerFrame } from "../frame/client"
 import { getSliceWalletP256SignerId } from "../p256Server"
 import {
@@ -34,14 +35,17 @@ import type {
   SliceWalletFrameSession,
   SliceWalletGenericGrant,
   SliceWalletGenericPermission,
-  SliceWalletProviderConfig,
   SliceWalletProviderValue,
   SliceWalletRegistryCredential,
   SliceWalletSignerFrameClient,
   WalletCall,
   WalletPolicyDescriptor
 } from "../types"
-import type { StoredGenericGrant } from "../types/providerInternal"
+import type {
+  SliceWalletProviderConfig,
+  SliceWalletRequestPaymasterService,
+  StoredGenericGrant
+} from "../types/providerInternal"
 import { createSliceWalletCallTracker } from "./callTracker"
 import {
   invalidProviderRequest,
@@ -109,6 +113,9 @@ const toFrameSession = (grant: StoredGenericGrant): SliceWalletFrameSession => {
 export const createSliceWalletProviderRuntime = (
   config: SliceWalletProviderConfig
 ) => {
+  if (config.requireAdmittedChain === true) {
+    getSliceWalletChainManifest(config.chain.id)
+  }
   const { browserDocument, browserWindow, storage } =
     getBrowserDependencies(config)
   const idOrigin = new URL(config.idOrigin).origin
@@ -117,10 +124,6 @@ export const createSliceWalletProviderRuntime = (
     chain: config.chain,
     transport: http(config.rpcUrl)
   })
-  const paymasterClient =
-    config.paymasterUrl === undefined
-      ? undefined
-      : createPaymasterClient({ transport: http(config.paymasterUrl) })
   const receiptClient = createBundlerClient({
     chain: config.chain,
     client: publicClient,
@@ -211,14 +214,26 @@ export const createSliceWalletProviderRuntime = (
     return framePromise
   }
 
-  const createAccountBundler = (account: SmartAccount) =>
-    createBundlerClient({
+  const createAccountBundler = (
+    account: SmartAccount,
+    paymasterService?: SliceWalletRequestPaymasterService
+  ) => {
+    const paymasterUrl = paymasterService?.url ?? config.paymasterUrl
+    const paymasterClient =
+      paymasterUrl === undefined
+        ? undefined
+        : createPaymasterClient({ transport: http(paymasterUrl) })
+    return createBundlerClient({
       account,
       chain: config.chain,
       client: publicClient,
       ...(paymasterClient === undefined ? {} : { paymaster: paymasterClient }),
+      ...(paymasterService?.context === undefined
+        ? {}
+        : { paymasterContext: paymasterService.context.value }),
       transport: http(config.bundlerUrl)
     })
+  }
 
   const waitForSuccessfulUserOperation = async (hash: Hex) => {
     const receipt = await receiptClient.waitForUserOperationReceipt({ hash })
@@ -306,16 +321,20 @@ export const createSliceWalletProviderRuntime = (
     return { session, stored }
   }
 
-  const sendCallsWithBestAuthority = async (calls: readonly WalletCall[]) => {
+  const sendCallsWithBestAuthority = async (
+    calls: readonly WalletCall[],
+    paymasterService?: SliceWalletRequestPaymasterService
+  ) => {
     const wallet = await requireActiveWallet()
     const grant = await hydrateGrant()
     if (grant !== null) {
       try {
         assertWalletCallsMatchPolicy(calls, grant.session.policy)
       } catch {
-        return createAccountBundler(wallet.rootAccount).sendUserOperation({
-          calls
-        })
+        return createAccountBundler(
+          wallet.rootAccount,
+          paymasterService
+        ).sendUserOperation({ calls })
       }
       const permissionAccount = await createSliceWalletPermissionAccount({
         address: wallet.rootAccount.address,
@@ -330,11 +349,15 @@ export const createSliceWalletProviderRuntime = (
         mode: "generic",
         session: grant.session
       })
-      return createAccountBundler(permissionAccount).sendUserOperation({
-        calls
-      })
+      return createAccountBundler(
+        permissionAccount,
+        paymasterService
+      ).sendUserOperation({ calls })
     }
-    return createAccountBundler(wallet.rootAccount).sendUserOperation({ calls })
+    return createAccountBundler(
+      wallet.rootAccount,
+      paymasterService
+    ).sendUserOperation({ calls })
   }
 
   const callTracker = createSliceWalletCallTracker({
@@ -449,15 +472,12 @@ export const createSliceWalletProviderRuntime = (
       }
       writeStoredSliceWalletGrant(storage, stored)
       return {
-        expiry: session.expiresAt,
-        ...(authorization.accountFactory === undefined
-          ? {}
-          : { factory: authorization.accountFactory }),
-        ...(authorization.accountFactoryData === undefined
-          ? {}
-          : { factoryData: authorization.accountFactoryData }),
-        grantedPermissions: permissions,
-        permissionsContext: session.permissionId
+        account: session.account,
+        chainId: session.chainId,
+        expiresAt: session.expiresAt,
+        permissionId: session.permissionId,
+        permissions,
+        version: "1" as const
       }
     } catch (error) {
       await frame.request({
@@ -551,7 +571,7 @@ export const createSliceWalletProviderRuntime = (
     },
     getCallsStatus: callTracker.getCallsStatus,
     getGrants,
-    paymasterAvailable: paymasterClient !== undefined,
+    paymasterAvailable: config.paymasterUrl !== undefined,
     revokeGrant,
     rotateGrant,
     sendCalls: callTracker.sendCalls,

@@ -12,7 +12,7 @@ import {
 import { sliceWalletKernelAddresses } from "./constants"
 import { buildRecoveryPermissionInitConfig } from "./recovery"
 import { encodeSliceWalletRootValidatorData } from "./rootValidator"
-import type { PredictSliceWalletKernelAccountAddressParameters } from "./types"
+import type { PredictSliceWalletKernelAccountAddressParameters } from "./types/recovery"
 
 export const sliceWalletKernelProxyInitCodeHash =
   "0xc452397f1e7518f8cea0566ac057e243bb1643f6298aba8eec8cdee78ee3b3dd" as const

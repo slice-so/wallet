@@ -1,5 +1,4 @@
-import type { Address, Chain, Hex } from "viem"
-import type { SliceWalletCeremonyMode } from "./ceremony"
+import type { Address, Hex } from "viem"
 import type { SerializedWalletPolicyDescriptor } from "./policy"
 
 export type SliceWalletProviderValue =
@@ -46,17 +45,16 @@ export type SliceWalletProvider = {
   ) => Promise<SliceWalletProviderValue | undefined>
 }
 
-export type SliceWalletProviderConfig = {
-  bundlerUrl: string
-  ceremonyMode?: SliceWalletCeremonyMode
-  chain: Chain
-  document?: Document
-  fetch?: typeof fetch
-  idOrigin: string
-  paymasterUrl?: string
-  rpcUrl: string
-  storage?: Storage
-  window?: Window
+export type SliceWalletTransportOverrides = {
+  bundlerUrl?: string
+  rpcUrl?: string
+}
+
+export type SliceWalletParameters = {
+  announce?: boolean
+  chainIds?: readonly number[]
+  defaultChainId?: number
+  transports?: Readonly<Record<number, SliceWalletTransportOverrides>>
 }
 
 export type SliceWalletGenericPermissionData =

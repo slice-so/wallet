@@ -1,11 +1,11 @@
 import { type Address, type Hex, isAddress, isHex, numberToHex } from "viem"
 import type {
   SliceWalletProvider,
-  SliceWalletProviderConfig,
   SliceWalletProviderEventMap,
   SliceWalletProviderRequestArguments,
   SliceWalletProviderValue
 } from "../types"
+import type { SliceWalletProviderConfig } from "../types/providerInternal"
 import {
   invalidProviderRequest,
   SliceWalletProviderRpcError,
@@ -22,6 +22,19 @@ import { createSliceWalletProviderRuntime } from "./runtime"
 type ProviderEvent = keyof SliceWalletProviderEventMap
 type ProviderEventPayload = SliceWalletProviderEventMap[ProviderEvent]
 type ProviderEventListener = (payload: ProviderEventPayload) => void
+type FullProviderRuntime = ReturnType<typeof createSliceWalletProviderRuntime>
+type ProviderRuntime = Omit<
+  FullProviderRuntime,
+  "connect" | "waitForSuccessfulUserOperation"
+> & {
+  connect: () => Promise<{ rootAccount: { address: Address } }>
+  waitForSuccessfulUserOperation: (
+    hash: Hex
+  ) => Promise<{ receipt: { transactionHash: Hex } }>
+}
+type ProviderDependencies = {
+  createRuntime?: (config: SliceWalletProviderConfig) => ProviderRuntime
+}
 
 const paramsArray = (
   params: SliceWalletProviderRequestArguments["params"],
@@ -44,6 +57,16 @@ const singleStringParam = (
   return values[0]
 }
 
+const assertNoParams = (
+  params: SliceWalletProviderRequestArguments["params"],
+  label: string
+) => {
+  if (params === undefined) return
+  if (paramsArray(params, label).length !== 0) {
+    throw invalidProviderRequest(`${label} expects no parameters.`)
+  }
+}
+
 const singlePermissionId = (
   params: SliceWalletProviderRequestArguments["params"],
   label: string
@@ -56,7 +79,7 @@ const singlePermissionId = (
 }
 
 const getConnectedAccount = async (
-  runtime: ReturnType<typeof createSliceWalletProviderRuntime>
+  runtime: Pick<ProviderRuntime, "getAccounts">
 ) => {
   const accounts = await runtime.getAccounts()
   const account = accounts[0]
@@ -71,6 +94,64 @@ const accountPermission = (origin: string) => ({
   invoker: origin,
   parentCapability: "eth_accounts"
 })
+
+const parseWalletConnect = (
+  params: SliceWalletProviderRequestArguments["params"]
+) => {
+  const values = paramsArray(params, "wallet_connect")
+  const input = values[0]
+  if (
+    values.length !== 1 ||
+    typeof input !== "object" ||
+    input === null ||
+    Array.isArray(input) ||
+    Object.keys(input).some(
+      (key) => key !== "version" && key !== "capabilities"
+    ) ||
+    input.version !== "1"
+  ) {
+    throw invalidProviderRequest("Slice Wallet supports wallet_connect v1.")
+  }
+  if (input.capabilities === undefined) return
+  if (
+    typeof input.capabilities !== "object" ||
+    input.capabilities === null ||
+    Array.isArray(input.capabilities)
+  ) {
+    throw invalidProviderRequest(
+      "wallet_connect capabilities must be an object."
+    )
+  }
+  const capabilities = Object.keys(input.capabilities)
+  if (capabilities.length > 0) {
+    throw new SliceWalletProviderRpcError(
+      5700,
+      `Unsupported wallet_connect capability: ${capabilities[0]}.`
+    )
+  }
+}
+
+const parseCapabilityChainIds = (
+  value: SliceWalletProviderValue | undefined
+) => {
+  if (value === undefined) return null
+  if (!Array.isArray(value)) {
+    throw invalidProviderRequest("Capability chain ids must be an array.")
+  }
+  return value.map((chainId) => {
+    if (
+      typeof chainId !== "string" ||
+      !/^0x(?:0|[1-9a-fA-F][0-9a-fA-F]*)$/.test(chainId)
+    ) {
+      throw invalidProviderRequest("Capability chain id must be hex.")
+    }
+    const parsedChainId = BigInt(chainId)
+    if (parsedChainId > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw invalidProviderRequest("Capability chain id is too large.")
+    }
+    return Number(parsedChainId)
+  })
+}
 
 const assertAccountParam = (
   value: SliceWalletProviderValue,
@@ -88,10 +169,13 @@ const assertAccountParam = (
   }
 }
 
-export const createSliceWalletProvider = (
-  config: SliceWalletProviderConfig
+export const createSliceWalletProviderInternal = (
+  config: SliceWalletProviderConfig,
+  {
+    createRuntime = createSliceWalletProviderRuntime
+  }: ProviderDependencies = {}
 ): SliceWalletProvider => {
-  const runtime = createSliceWalletProviderRuntime(config)
+  const runtime = createRuntime(config)
   const origin = new URL(
     config.window?.location.href ?? globalThis.location.href
   ).origin
@@ -120,7 +204,10 @@ export const createSliceWalletProvider = (
   const disconnect = async () => {
     const before = await runtime.getAccounts()
     await runtime.disconnect()
-    if (before.length > 0) emit("accountsChanged", [])
+    if (before.length > 0) {
+      emit("accountsChanged", [])
+      emit("disconnect", { code: 4900, message: "Slice Wallet disconnected." })
+    }
   }
 
   const request = async ({
@@ -134,21 +221,13 @@ export const createSliceWalletProvider = (
     if (method === "eth_accounts") return runtime.getAccounts()
     if (method === "eth_requestAccounts") return [await connect()]
     if (method === "wallet_connect") {
-      if (params !== undefined) {
-        const values = paramsArray(params, "wallet_connect")
-        if (values.length !== 1) {
-          throw invalidProviderRequest("wallet_connect expects one parameter.")
-        }
-      }
+      parseWalletConnect(params)
       const account = await connect()
       return {
         accounts: [
           {
             address: account,
-            capabilities: {
-              atomic: { status: "supported" },
-              permissions: { supported: true }
-            }
+            capabilities: {}
           }
         ]
       }
@@ -200,7 +279,29 @@ export const createSliceWalletProvider = (
         value.chainId !== numberToHex(runtime.chainId)
       ) {
         throw new SliceWalletProviderRpcError(
-          4901,
+          4902,
+          "Requested chain is unsupported."
+        )
+      }
+      return null
+    }
+    if (method === "wallet_addEthereumChain") {
+      const values = paramsArray(params, "wallet_addEthereumChain")
+      const value = values[0]
+      if (
+        values.length !== 1 ||
+        typeof value !== "object" ||
+        value === null ||
+        Array.isArray(value) ||
+        typeof value.chainId !== "string"
+      ) {
+        throw invalidProviderRequest(
+          "wallet_addEthereumChain expects one chain object."
+        )
+      }
+      if (value.chainId !== numberToHex(runtime.chainId)) {
+        throw new SliceWalletProviderRpcError(
+          4902,
           "Requested chain is unsupported."
         )
       }
@@ -208,15 +309,24 @@ export const createSliceWalletProvider = (
     }
     if (method === "wallet_getCapabilities") {
       const account = await getConnectedAccount(runtime)
-      if (params !== undefined) {
-        const values = paramsArray(params, "wallet_getCapabilities")
-        if (values[0] !== undefined) assertAccountParam(values[0], account)
+      const values = paramsArray(params, "wallet_getCapabilities")
+      if (values.length < 1 || values.length > 2) {
+        throw invalidProviderRequest(
+          "wallet_getCapabilities expects an account and optional chain ids."
+        )
+      }
+      assertAccountParam(values[0], account)
+      const requestedChainIds = parseCapabilityChainIds(values[1])
+      if (
+        requestedChainIds !== null &&
+        !requestedChainIds.includes(runtime.chainId)
+      ) {
+        return {}
       }
       return {
         [numberToHex(runtime.chainId)]: {
           atomic: { status: "supported" },
-          paymasterService: { supported: runtime.paymasterAvailable },
-          permissions: { supported: true }
+          paymasterService: { supported: true }
         }
       }
     }
@@ -228,10 +338,21 @@ export const createSliceWalletProvider = (
         params,
         paymasterAvailable: runtime.paymasterAvailable
       })
-      return { id: (await runtime.sendCalls(request.calls, request.id)).id }
+      return {
+        id: (
+          await runtime.sendCalls(
+            request.calls,
+            request.id,
+            request.paymasterService
+          )
+        ).id
+      }
     }
     if (method === "wallet_getCallsStatus") {
       return runtime.getCallsStatus(singleStringParam(params, method))
+    }
+    if (method === "wallet_showCallsStatus") {
+      throw unsupportedProviderMethod(method)
     }
     if (
       method === "eth_sendTransaction" ||
@@ -284,30 +405,14 @@ export const createSliceWalletProvider = (
         })
       )
     }
-    if (method === "wallet_getSupportedExecutionPermissions") {
-      return {
-        "slice-call": {
-          chainIds: [numberToHex(runtime.chainId)],
-          ruleTypes: ["rate-limit"],
-          templates: [
-            "native-transfer",
-            "erc20-transfer",
-            "erc20-approve",
-            "erc20-transfer-from"
-          ]
-        }
-      }
-    }
-    if (
-      method === "slice_getGrants" ||
-      method === "wallet_getGrantedExecutionPermissions"
-    ) {
+    if (method === "wallet_getSessionPermissions") {
+      assertNoParams(params, method)
       return runtime.getGrants()
     }
-    if (method === "slice_rotateGrant") {
+    if (method === "wallet_rotateSessionPermission") {
       return runtime.rotateGrant(singlePermissionId(params, method))
     }
-    if (method === "slice_revokeGrant") {
+    if (method === "wallet_revokeSessionPermission") {
       await runtime.revokeGrant(singlePermissionId(params, method))
       return null
     }

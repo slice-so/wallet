@@ -1,7 +1,10 @@
 import { type Address, bytesToHex, type Hex, numberToHex } from "viem"
 import type { WalletCall } from "../types"
-import type { StoredWalletCall } from "../types/providerInternal"
-import { invalidProviderRequest, SliceWalletProviderRpcError } from "./errors"
+import type {
+  SliceWalletRequestPaymasterService,
+  StoredWalletCall
+} from "../types/providerInternal"
+import { SliceWalletProviderRpcError } from "./errors"
 import {
   readStoredSliceWalletCall,
   writeStoredSliceWalletCall
@@ -32,7 +35,10 @@ export const createSliceWalletCallTracker = ({
   chainId: number
   crypto: Crypto
   getUserOperationReceipt: (hash: Hex) => Promise<UserOperationReceipt>
-  sendUserOperation: (calls: readonly WalletCall[]) => Promise<Hex>
+  sendUserOperation: (
+    calls: readonly WalletCall[],
+    paymasterService?: SliceWalletRequestPaymasterService
+  ) => Promise<Hex>
   storage: Storage | null
 }) => {
   const memoryCalls = new Map<string, StoredWalletCall>()
@@ -69,7 +75,7 @@ export const createSliceWalletCallTracker = ({
     getCallsStatus: async (id: string) => {
       const call = memoryCalls.get(id) ?? readStoredSliceWalletCall(storage, id)
       if (call === null || call === undefined) {
-        throw invalidProviderRequest("Unknown wallet call id.")
+        throw new SliceWalletProviderRpcError(5730, "Unknown wallet call id.")
       }
       try {
         const operation = await getUserOperationReceipt(call.userOperationHash)
@@ -110,10 +116,17 @@ export const createSliceWalletCallTracker = ({
         throw error
       }
     },
-    sendCalls: async (calls: readonly WalletCall[], requestedId?: string) => {
+    sendCalls: async (
+      calls: readonly WalletCall[],
+      requestedId?: string,
+      paymasterService?: SliceWalletRequestPaymasterService
+    ) => {
       const id = reserveCallId(requestedId)
       try {
-        const userOperationHash = await sendUserOperation(calls)
+        const userOperationHash = await sendUserOperation(
+          calls,
+          paymasterService
+        )
         const stored = {
           chainId,
           createdAt: Date.now(),

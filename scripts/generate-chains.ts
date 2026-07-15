@@ -1,0 +1,175 @@
+#!/usr/bin/env bun
+
+import { spawnSync } from "node:child_process"
+import { readFileSync, writeFileSync } from "node:fs"
+import { resolve } from "node:path"
+import deployments from "../../contracts/core/deployments/addresses.json"
+import policy from "../config/chains.policy.json"
+
+const outputPath = resolve(import.meta.dir, "../src/chains.ts")
+const checkOnly = process.argv.includes("--check")
+
+if (deployments.version !== 1 || policy.version !== 1) {
+  throw new Error("Unsupported Slice wallet chain input version.")
+}
+
+const chainIds = Object.keys(policy.chains).sort(
+  (first, second) => Number(first) - Number(second)
+)
+
+const entries = chainIds.map((chainId) => {
+  const policyChain = policy.chains[chainId as keyof typeof policy.chains]
+  const deployment =
+    deployments.chains[chainId as keyof typeof deployments.chains]
+  if (deployment === undefined || deployment.chainId !== Number(chainId)) {
+    throw new Error(`Missing deployment facts for wallet chain ${chainId}.`)
+  }
+
+  const contracts = Object.fromEntries(
+    Object.entries(deployment.contracts).map(([name, contract]) => [
+      name,
+      {
+        address: contract.address,
+        deployedRuntimeCodeHash: contract.deployedRuntimeCodeHash,
+        expectedRuntimeCodeHash: contract.expectedRuntimeCodeHash,
+        ...("version" in contract ? { version: contract.version } : {})
+      }
+    ])
+  )
+  const runtimeHashesMatch = Object.values(deployment.contracts).every(
+    (contract) =>
+      contract.deployedRuntimeCodeHash !== null &&
+      contract.deployedRuntimeCodeHash === contract.expectedRuntimeCodeHash
+  )
+  const admitted =
+    deployment.status === "admitted" &&
+    runtimeHashesMatch &&
+    deployment.verification.factoryStakerApproved &&
+    deployment.verification.p256CanaryPassed &&
+    deployment.verification.userOperationCanary !== null &&
+    deployment.verification.verifiedAtBlock !== null
+
+  return {
+    admitted,
+    chain: {
+      blockExplorers: {
+        default: {
+          name: `${policyChain.chain.name} Explorer`,
+          url: policyChain.chain.blockExplorerUrl
+        }
+      },
+      id: deployment.chainId,
+      name: policyChain.chain.name,
+      nativeCurrency: policyChain.chain.nativeCurrency,
+      rpcUrls: {
+        default: { http: [policyChain.defaultTransports.rpcUrl] }
+      }
+    },
+    contracts,
+    defaultTransports: policyChain.defaultTransports,
+    executionSafety: policyChain.executionSafety,
+    funding: policyChain.funding,
+    rip7212Available: deployment.verification.rip7212Available
+  }
+})
+
+const generated = `// Auto-generated from contracts deployment facts and wallet chain policy.
+// Run: bun run generate:chains
+
+import type { SliceWalletChainManifest } from "./types/chains"
+
+const parseBigIntFields = (manifest: Omit<SliceWalletChainManifest, "executionSafety"> & {
+  executionSafety: { readonly [Key in keyof SliceWalletChainManifest["executionSafety"]]: string }
+}): SliceWalletChainManifest => ({
+  ...manifest,
+  executionSafety: Object.freeze({
+    maxCallGasLimit: BigInt(manifest.executionSafety.maxCallGasLimit),
+    maxFeePerGas: BigInt(manifest.executionSafety.maxFeePerGas),
+    maxNativeCostWei: BigInt(manifest.executionSafety.maxNativeCostWei),
+    maxPaymasterPostOpGasLimit: BigInt(manifest.executionSafety.maxPaymasterPostOpGasLimit),
+    maxPaymasterVerificationGasLimit: BigInt(manifest.executionSafety.maxPaymasterVerificationGasLimit),
+    maxPrefundWei: BigInt(manifest.executionSafety.maxPrefundWei),
+    maxPreVerificationGas: BigInt(manifest.executionSafety.maxPreVerificationGas),
+    maxPriorityFeePerGas: BigInt(manifest.executionSafety.maxPriorityFeePerGas),
+    maxVerificationGasLimit: BigInt(manifest.executionSafety.maxVerificationGasLimit)
+  })
+})
+
+const freezeManifest = (manifest: SliceWalletChainManifest) => {
+  Object.freeze(manifest.chain.nativeCurrency)
+  Object.freeze(manifest.chain.rpcUrls.default.http)
+  Object.freeze(manifest.chain.rpcUrls.default)
+  Object.freeze(manifest.chain.rpcUrls)
+  if (manifest.chain.blockExplorers !== undefined) {
+    Object.freeze(manifest.chain.blockExplorers.default)
+    Object.freeze(manifest.chain.blockExplorers)
+  }
+  Object.freeze(manifest.chain)
+  for (const contract of Object.values(manifest.contracts)) {
+    Object.freeze(contract)
+  }
+  Object.freeze(manifest.contracts)
+  Object.freeze(manifest.defaultTransports)
+  Object.freeze(manifest.funding.sponsoredSecurityOperations)
+  Object.freeze(manifest.funding)
+  return Object.freeze(manifest)
+}
+
+const manifests = ${JSON.stringify(entries, null, 2)} as const
+
+export const sliceWalletChainManifests = Object.freeze(
+  Object.fromEntries(
+    manifests.map((manifest) => [
+      manifest.chain.id,
+      freezeManifest(parseBigIntFields(manifest))
+    ])
+  ) as Readonly<Record<number, SliceWalletChainManifest>>
+)
+
+export const sliceWalletSupportedChainIds = Object.freeze(
+  manifests.filter((manifest) => manifest.admitted).map((manifest) => manifest.chain.id)
+)
+
+export const getSliceWalletChainManifest = (chainId: number) => {
+  const manifest = sliceWalletChainManifests[chainId]
+  if (manifest === undefined || !manifest.admitted) {
+    throw new Error(\`Slice Wallet chain \${chainId} is not provisioned.\`)
+  }
+  return manifest
+}
+
+export const getSliceWalletChainPolicy = (chainId: number) => {
+  const manifest = sliceWalletChainManifests[chainId]
+  if (manifest === undefined) {
+    throw new Error(\`Slice Wallet chain \${chainId} is unsupported.\`)
+  }
+  return manifest
+}
+`
+
+const formatResult = spawnSync(
+  "bunx",
+  ["biome", "format", "--stdin-file-path", outputPath],
+  {
+    cwd: resolve(import.meta.dir, "../../.."),
+    encoding: "utf8",
+    input: generated
+  }
+)
+if (formatResult.status !== 0) {
+  throw new Error(
+    `Could not format the generated chain manifest:\n${formatResult.stderr}`
+  )
+}
+const formatted = formatResult.stdout
+
+if (checkOnly) {
+  const current = readFileSync(outputPath, "utf8")
+  if (current !== formatted) {
+    throw new Error(
+      "Generated Slice wallet chain manifest is stale. Run bun run generate:chains."
+    )
+  }
+} else {
+  writeFileSync(outputPath, formatted)
+}

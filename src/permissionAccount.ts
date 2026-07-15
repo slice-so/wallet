@@ -344,6 +344,9 @@ export const createSliceWalletPermissionAccount = async (
       return wrapEnableSignature(concat(["0xff", result.signature]))
     }
 
+    // The P-256 proposal intentionally excludes gas. The frame proof and API
+    // co-signer bind the finalized full UserOperation hash before this 2-of-2
+    // permission can execute.
     const challenge = await parameters.checkoutCoSigner.createChallenge(
       parameters.delegationId
     )

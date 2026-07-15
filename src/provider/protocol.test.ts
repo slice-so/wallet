@@ -158,6 +158,7 @@ describe("portable wallet provider protocol", () => {
             atomicRequired: true,
             calls: [{ to: recipient }],
             capabilities: { paymasterService: {} },
+            chainId: numberToHex(chainId),
             version: "2.0.0"
           }
         ])
@@ -167,6 +168,112 @@ describe("portable wallet provider protocol", () => {
       expect(error).toBeInstanceOf(SliceWalletProviderRpcError)
       expect((error as SliceWalletProviderRpcError).code).toBe(5700)
     }
+  })
+
+  test("requires a 5792 chain id and canonicalizes request-scoped paymaster context", () => {
+    const parsed = parseSliceWalletSendCalls({
+      account,
+      chainId,
+      params: asProviderValue([
+        {
+          atomicRequired: true,
+          calls: [{ to: recipient }],
+          capabilities: {
+            paymasterService: {
+              context: {
+                policy: { version: 1, id: "checkout" },
+                tags: ["portable", "buyer"]
+              },
+              url: "https://paymaster.example"
+            }
+          },
+          chainId: numberToHex(chainId),
+          version: "2.0.0"
+        }
+      ]),
+      paymasterAvailable: false
+    })
+
+    expect(parsed.paymasterService).toMatchObject({
+      context: {
+        canonicalJson:
+          '{"policy":{"id":"checkout","version":1},"tags":["portable","buyer"]}',
+        value: {
+          policy: { id: "checkout", version: 1 },
+          tags: ["portable", "buyer"]
+        }
+      },
+      url: "https://paymaster.example/"
+    })
+    expect(Object.isFrozen(parsed.paymasterService?.context?.value)).toBe(true)
+
+    expect(() =>
+      parseSliceWalletSendCalls({
+        account,
+        chainId,
+        params: asProviderValue([
+          {
+            atomicRequired: true,
+            calls: [{ to: recipient }],
+            version: "2.0.0"
+          }
+        ]),
+        paymasterAvailable: false
+      })
+    ).toThrow("missing a required field")
+  })
+
+  test("rejects request-scoped paymasters on individual calls", () => {
+    expect(() =>
+      parseSliceWalletSendCalls({
+        account,
+        chainId,
+        params: asProviderValue([
+          {
+            atomicRequired: true,
+            calls: [
+              {
+                capabilities: {
+                  paymasterService: {
+                    url: "https://paymaster.example"
+                  }
+                },
+                to: recipient
+              }
+            ],
+            chainId: numberToHex(chainId),
+            version: "2.0.0"
+          }
+        ]),
+        paymasterAvailable: false
+      })
+    ).toThrow("Unsupported required wallet capability: paymasterService")
+  })
+
+  test("enforces the final EIP-5792 call-id byte limit", () => {
+    const request = (id: string) =>
+      parseSliceWalletSendCalls({
+        account,
+        chainId,
+        params: asProviderValue([
+          {
+            atomicRequired: true,
+            calls: [{ to: recipient }],
+            chainId: numberToHex(chainId),
+            id,
+            version: "2.0.0"
+          }
+        ]),
+        paymasterAvailable: false
+      })
+
+    expect(request("a".repeat(4_096)).id).toHaveLength(4_096)
+    expect(() => request("a".repeat(4_097))).toThrow(
+      "Call id must contain between 1 and 4096"
+    )
+    expect(() => request("💳".repeat(1_025))).toThrow(
+      "Call id must contain between 1 and 4096"
+    )
   })
 
   test("normalizes all public maximum amounts as hex quantities", () => {

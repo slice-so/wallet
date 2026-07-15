@@ -1,6 +1,6 @@
 # `@slicekit/wallet`
 
-Portable Kernel wallet primitives for Slice and third-party applications. The package is commerce-independent: it contains account construction, signer-frame and ceremony clients, normalized policies, recovery, EIP-1193/EIP-6963/EIP-5792 provider support, ERC-7715 permission mapping, and a wagmi connector.
+Portable Kernel wallet primitives for Slice and third-party applications. The package is commerce-independent: it contains account construction, signer-frame and ceremony clients, normalized policies, recovery, EIP-1193/EIP-6963/EIP-5792 provider support, and a wagmi connector.
 
 ## Security Boundary
 
@@ -25,6 +25,8 @@ Slice commerce policies, checkout decoding, allowance clients, and ProductsModul
 
 ## Provider
 
-Applications supply an `id.slice.so` origin, chain transport, bundler URL, and optional paymaster URL. The provider exposes root-confirmed account/signature/call methods and maps only supported normalized ERC-7715 templates to promptless permissions. Calls that do not match an active permission are sent through the visible root ceremony.
+Use `sliceWallet()` from `@slicekit/wallet/wagmi`, or `createSliceWalletProvider()` from `@slicekit/wallet/provider`. The canonical factory fixes the identity origin and all account security metadata; applications may select admitted chains and override only RPC and bundler transports. A request may supply its own ERC-7677 paymaster URL and canonical JSON-compatible context.
+
+The provider exposes root-confirmed account, signature, and call methods plus Slice's versioned session-permission methods. Slice does not advertise ERC-7710 or ERC-7715 compatibility. Calls that do not match an active Slice permission are sent through the visible root ceremony.
 
 The public provider remains a beta surface until the signer contract audit, Base deployment canary, real-browser bridge matrix, API security review, and external-origin rollout gate are complete.

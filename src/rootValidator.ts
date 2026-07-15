@@ -19,6 +19,7 @@ import {
   sliceWalletKernelAddresses,
   sliceWalletKernelVersion
 } from "./constants"
+import { assertSliceWalletExecutionSafety } from "./executionSafety"
 import type {
   CreateSliceWalletRegisteredKernelAccountParameters,
   SliceWalletKernelTypedData,
@@ -283,19 +284,28 @@ export const createSliceWalletRootValidator = ({
     isEnabled: async () => true,
     signUserOperation: async (userOperation) => {
       const { chainId: operationChainId, ...operation } = userOperation
+      const effectiveChainId = operationChainId ?? chainId
+      if (effectiveChainId !== chainId) {
+        throw new Error("Root operation chain does not match the wallet chain.")
+      }
+      const unsignedUserOperation = toUnsignedUserOperation({
+        ...operation,
+        chainId: operationChainId,
+        signature: "0x"
+      })
+      assertSliceWalletExecutionSafety({
+        chainId: effectiveChainId,
+        userOperation: unsignedUserOperation
+      })
       const hash = getUserOperationHash({
-        chainId: operationChainId ?? chainId,
+        chainId: effectiveChainId,
         entryPointAddress: sliceWalletEntryPoint.address,
         entryPointVersion: sliceWalletEntryPoint.version,
         userOperation: { ...operation, signature: "0x" }
       })
       return rootSigner(hash, "user_operation", {
         purpose: "user_operation",
-        userOperation: toUnsignedUserOperation({
-          ...operation,
-          chainId: operationChainId,
-          signature: "0x"
-        })
+        userOperation: unsignedUserOperation
       })
     },
     source: "SliceWalletWebAuthnRootValidator",

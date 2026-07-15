@@ -59,6 +59,40 @@ describe("portable provider runtime helpers", () => {
     }
   })
 
+  it("returns a finalized EIP-5792 receipt for a successful UserOperation", async () => {
+    const tracker = createSliceWalletCallTracker({
+      chainId: 8453,
+      crypto,
+      getUserOperationReceipt: async () => ({
+        actualGasUsed: 10n,
+        logs: [{ address: account, data: "0x", topics: [hash] }],
+        receipt: { blockHash, blockNumber: 2n, transactionHash },
+        success: true
+      }),
+      sendUserOperation: async () => hash,
+      storage: null
+    })
+    await tracker.sendCalls([{ data: "0x", to: account, value: 0n }], "call-2")
+
+    await expect(tracker.getCallsStatus("call-2")).resolves.toEqual({
+      atomic: true,
+      chainId: "0x2105",
+      id: "call-2",
+      receipts: [
+        {
+          blockHash,
+          blockNumber: "0x2",
+          gasUsed: "0xa",
+          logs: [{ address: account, data: "0x", topics: [hash] }],
+          status: "0x1",
+          transactionHash
+        }
+      ],
+      status: 200,
+      version: "2.0.0"
+    })
+  })
+
   it("reports an unmined UserOperation as pending", async () => {
     const tracker = createSliceWalletCallTracker({
       chainId: 8453,
@@ -77,5 +111,25 @@ describe("portable provider runtime helpers", () => {
         status: 100
       }
     )
+  })
+
+  it("returns the final-spec unknown-bundle error for an untracked id", async () => {
+    const tracker = createSliceWalletCallTracker({
+      chainId: 8453,
+      crypto,
+      getUserOperationReceipt: async () => {
+        throw new Error("Unexpected receipt lookup.")
+      },
+      sendUserOperation: async () => hash,
+      storage: null
+    })
+
+    try {
+      await tracker.getCallsStatus("missing-call")
+      throw new Error("Expected unknown wallet call rejection.")
+    } catch (error) {
+      expect(error).toBeInstanceOf(SliceWalletProviderRpcError)
+      expect((error as SliceWalletProviderRpcError).code).toBe(5730)
+    }
   })
 })

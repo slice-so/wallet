@@ -74,7 +74,7 @@ const recoveryKernelVersion = sliceWalletKernelVersion
 
 const sliceKernelBaseV33Addresses = sliceWalletKernelAddresses
 export const sliceWalletTimelockPolicyAddress =
-  "0x7f66B69270f96EC6793c545742CCBbBe028Be3f6" satisfies Address
+  sliceWalletKernelAddresses.timelockPolicy
 const sliceKernelTimelockPolicyAddress = sliceWalletTimelockPolicyAddress
 const sliceKernelWebAuthnValidatorAddress =
   sliceWalletKernelAddresses.webAuthnRootValidator
@@ -332,7 +332,7 @@ const createRecoveryPermissionValidator = async ({
 }
 
 const sliceWalletRecoveryEcdsaSignerAddress =
-  "0x6A6F069E2a08c2468e7724Ab3250CdBFBA14D4FF" satisfies Address
+  sliceWalletKernelAddresses.ecdsaSigner
 
 type BuildRecoveryPermissionInitConfigParameters = {
   client: KernelSmartAccountImplementation["client"]

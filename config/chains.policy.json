@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "chains": {
+    "8453": {
+      "chain": {
+        "blockExplorerUrl": "https://basescan.org",
+        "name": "Base",
+        "nativeCurrency": {
+          "decimals": 18,
+          "name": "Ether",
+          "symbol": "ETH"
+        }
+      },
+      "defaultTransports": {
+        "bundlerUrl": "https://api.slice.so/wallet-rpc/8453/bundler",
+        "rpcUrl": "https://mainnet.base.org"
+      },
+      "executionSafety": {
+        "maxCallGasLimit": "3000000",
+        "maxFeePerGas": "20000000000",
+        "maxNativeCostWei": "10000000000000000",
+        "maxPaymasterPostOpGasLimit": "500000",
+        "maxPaymasterVerificationGasLimit": "1000000",
+        "maxPrefundWei": "20000000000000000",
+        "maxPreVerificationGas": "500000",
+        "maxPriorityFeePerGas": "2000000000",
+        "maxVerificationGasLimit": "5000000"
+      },
+      "funding": {
+        "defaultPath": "self-funded-or-request-paymaster",
+        "sliceSponsorshipForExternalOrigins": false,
+        "sponsoredSecurityOperations": ["recovery-cancel"]
+      }
+    }
+  }
+}

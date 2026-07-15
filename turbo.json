@@ -4,7 +4,13 @@
     "build": {
       "dependsOn": ["^build"],
       "envMode": "loose",
-      "inputs": ["src/**/*.ts", "build.ts"],
+      "inputs": [
+        "src/**/*.ts",
+        "build.ts",
+        "config/chains.policy.json",
+        "scripts/generate-chains.ts",
+        "../contracts/core/deployments/addresses.json"
+      ],
       "outputs": ["dist/**"]
     }
   }

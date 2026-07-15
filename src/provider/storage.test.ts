@@ -3,7 +3,9 @@ import type { Address, Hex } from "viem"
 import { getSliceWalletP256SignerId } from "../p256"
 import { serializeWalletPolicyDescriptor } from "../policy"
 import {
+  readStoredSliceWalletCall,
   readStoredSliceWalletGrant,
+  writeStoredSliceWalletCall,
   writeStoredSliceWalletGrant
 } from "./storage"
 
@@ -87,5 +89,28 @@ describe("portable wallet provider storage", () => {
     )
     expect(readStoredSliceWalletGrant(storage, 1_800_000_001)).toBeNull()
     expect(storage.getItem(key)).toBeNull()
+  })
+
+  test("persists a tracked call by opaque id and expires it after retention", () => {
+    const storage = new MemoryStorage()
+    const call = {
+      chainId: 8453,
+      createdAt: 1_800_000_000_000,
+      id: "checkout-call",
+      userOperationHash: `0x${"22".repeat(32)}` as Hex,
+      version: 1 as const
+    }
+    writeStoredSliceWalletCall(storage, call)
+
+    expect(
+      readStoredSliceWalletCall(storage, call.id, call.createdAt + 1)
+    ).toEqual(call)
+    expect(
+      readStoredSliceWalletCall(
+        storage,
+        call.id,
+        call.createdAt + 24 * 60 * 60 * 1000 + 1
+      )
+    ).toBeNull()
   })
 })

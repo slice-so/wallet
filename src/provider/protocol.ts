@@ -21,9 +21,11 @@ import type {
 } from "../types"
 import type {
   ParsedSliceWalletSendCalls,
-  ParsedSliceWalletTransaction
+  ParsedSliceWalletTransaction,
+  SliceWalletRequestPaymasterService
 } from "../types/providerInternal"
 import { invalidProviderRequest, SliceWalletProviderRpcError } from "./errors"
+import { canonicalizeSliceWalletPaymasterContext } from "./paymasterContext"
 
 type ProviderRecord = {
   readonly [key: string]: SliceWalletProviderValue | undefined
@@ -136,6 +138,88 @@ const isOptionalCapability = (value: SliceWalletProviderValue | undefined) => {
   return (value as ProviderRecord).optional === true
 }
 
+const normalizePaymasterUrl = (value: SliceWalletProviderValue) => {
+  const input = string(value, "Paymaster service URL")
+  if (input.length > 2_048) {
+    throw invalidProviderRequest("Paymaster service URL is too long.")
+  }
+  let url: URL
+  try {
+    url = new URL(input)
+  } catch {
+    throw invalidProviderRequest("Paymaster service URL is invalid.")
+  }
+  const localHttp =
+    url.protocol === "http:" &&
+    (url.hostname === "localhost" || url.hostname === "127.0.0.1")
+  if (
+    (url.protocol !== "https:" && !localHttp) ||
+    url.username !== "" ||
+    url.password !== "" ||
+    url.hash !== ""
+  ) {
+    throw invalidProviderRequest("Paymaster service URL is not permitted.")
+  }
+  return url.href
+}
+
+const parseSliceWalletCapabilities = ({
+  allowRequestPaymaster,
+  capabilities,
+  paymasterAvailable
+}: {
+  allowRequestPaymaster: boolean
+  capabilities: SliceWalletProviderValue | undefined
+  paymasterAvailable: boolean
+}): SliceWalletRequestPaymasterService | undefined => {
+  if (capabilities === undefined) return undefined
+  const input = record(capabilities, "Wallet capabilities")
+  let paymasterService: SliceWalletRequestPaymasterService | undefined
+  for (const [name, value] of Object.entries(input)) {
+    if (name === "atomic") continue
+    if (name === "paymasterService" && allowRequestPaymaster) {
+      const paymaster = record(value, "Paymaster service capability")
+      assertKeys(paymaster, [], ["context", "optional", "url"])
+      if (
+        paymaster.optional !== undefined &&
+        typeof paymaster.optional !== "boolean"
+      ) {
+        throw invalidProviderRequest(
+          "Paymaster service optional flag must be boolean."
+        )
+      }
+      const url =
+        paymaster.url === undefined
+          ? undefined
+          : normalizePaymasterUrl(paymaster.url)
+      const supported = url !== undefined || paymasterAvailable
+      if (!supported) {
+        if (paymaster.optional === true) continue
+        throw new SliceWalletProviderRpcError(
+          5700,
+          "Unsupported required wallet capability: paymasterService."
+        )
+      }
+      const context =
+        paymaster.context === undefined
+          ? undefined
+          : canonicalizeSliceWalletPaymasterContext(paymaster.context)
+      paymasterService = {
+        ...(context === undefined ? {} : { context }),
+        ...(url === undefined ? {} : { url })
+      }
+      continue
+    }
+    if (!isOptionalCapability(value)) {
+      throw new SliceWalletProviderRpcError(
+        5700,
+        `Unsupported required wallet capability: ${name}.`
+      )
+    }
+  }
+  return paymasterService
+}
+
 export const assertSliceWalletCapabilities = ({
   capabilities,
   paymasterAvailable
@@ -143,18 +227,11 @@ export const assertSliceWalletCapabilities = ({
   capabilities: SliceWalletProviderValue | undefined
   paymasterAvailable: boolean
 }) => {
-  if (capabilities === undefined) return
-  const input = record(capabilities, "Wallet capabilities")
-  for (const [name, value] of Object.entries(input)) {
-    const supported =
-      name === "atomic" || (name === "paymasterService" && paymasterAvailable)
-    if (!supported && !isOptionalCapability(value)) {
-      throw new SliceWalletProviderRpcError(
-        5700,
-        `Unsupported required wallet capability: ${name}.`
-      )
-    }
-  }
+  parseSliceWalletCapabilities({
+    allowRequestPaymaster: true,
+    capabilities,
+    paymasterAvailable
+  })
 }
 
 export const parseSliceWalletSendCalls = ({
@@ -175,8 +252,8 @@ export const parseSliceWalletSendCalls = ({
   const input = record(items[0], "wallet_sendCalls request")
   assertKeys(
     input,
-    ["atomicRequired", "calls", "version"],
-    ["capabilities", "chainId", "from", "id"]
+    ["atomicRequired", "calls", "chainId", "version"],
+    ["capabilities", "from", "id"]
   )
   if (input.version !== "2.0.0") {
     throw invalidProviderRequest(
@@ -192,16 +269,15 @@ export const parseSliceWalletSendCalls = ({
   ) {
     throw new SliceWalletProviderRpcError(4100, "Call sender is not connected.")
   }
-  if (input.chainId !== undefined) {
-    const requestedChain = quantity(input.chainId, "Call chain id")
-    if (requestedChain !== BigInt(chainId)) {
-      throw new SliceWalletProviderRpcError(
-        5710,
-        "Requested chain is unsupported."
-      )
-    }
+  const requestedChain = quantity(input.chainId, "Call chain id")
+  if (requestedChain !== BigInt(chainId)) {
+    throw new SliceWalletProviderRpcError(
+      5710,
+      "Requested chain is unsupported."
+    )
   }
-  assertSliceWalletCapabilities({
+  const paymasterService = parseSliceWalletCapabilities({
+    allowRequestPaymaster: true,
     capabilities: input.capabilities,
     paymasterAvailable
   })
@@ -214,9 +290,10 @@ export const parseSliceWalletSendCalls = ({
   const calls = callInputs.map((value) => {
     const call = record(value, "Wallet call")
     assertKeys(call, ["to"], ["capabilities", "data", "value"])
-    assertSliceWalletCapabilities({
+    parseSliceWalletCapabilities({
+      allowRequestPaymaster: false,
       capabilities: call.capabilities,
-      paymasterAvailable
+      paymasterAvailable: false
     })
     return {
       data: call.data === undefined ? "0x" : hex(call.data, "Call data"),
@@ -225,12 +302,19 @@ export const parseSliceWalletSendCalls = ({
     }
   })
   const id = input.id === undefined ? undefined : string(input.id, "Call id")
-  if (id !== undefined && (id.length === 0 || id.length > 4096)) {
+  if (
+    id !== undefined &&
+    (id.length === 0 || new TextEncoder().encode(id).length > 4_096)
+  ) {
     throw invalidProviderRequest(
       "Call id must contain between 1 and 4096 characters."
     )
   }
-  return { calls, ...(id === undefined ? {} : { id }) }
+  return {
+    calls,
+    ...(id === undefined ? {} : { id }),
+    ...(paymasterService === undefined ? {} : { paymasterService })
+  }
 }
 
 export const parseSliceWalletTransaction = (
