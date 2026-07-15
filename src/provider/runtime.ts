@@ -11,7 +11,7 @@ import {
   type SmartAccount
 } from "viem/account-abstraction"
 import { connectSliceWalletAccount } from "../ceremony/accountClient"
-import { authorizeSliceWalletSession } from "../ceremony/client"
+import { authorizeSliceWalletSessions } from "../ceremony/client"
 import { parseSliceWalletFrameSession } from "../ceremony/protocol"
 import { createSliceWalletCeremonyKernelAccount } from "../ceremony/rootAccountClient"
 import { getSliceWalletChainManifest } from "../chains"
@@ -445,14 +445,17 @@ const createSliceWalletChainRuntime = (
     }
     const session = parseSliceWalletFrameSession(result)
     try {
-      const authorization = await authorizeSliceWalletSession({
+      const [authorization] = await authorizeSliceWalletSessions({
         ceremonyMode: config.ceremonyMode,
         document: browserDocument,
         frameClient: frame,
         idOrigin,
-        session,
+        sessions: [session],
         window: browserWindow
       })
+      if (authorization === undefined) {
+        throw new Error("Wallet ceremony returned no authorization.")
+      }
       if (
         previous !== null &&
         previous.permissionId.toLowerCase() !==

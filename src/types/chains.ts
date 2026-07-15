@@ -43,7 +43,12 @@ export type SliceWalletExecutionSafetyEnvelope = {
 export type SliceWalletFundingPolicy = {
   readonly defaultPath: "self-funded-or-request-paymaster"
   readonly sliceSponsorshipForExternalOrigins: false
-  readonly sponsoredSecurityOperations: readonly "recovery-cancel"[]
+  readonly sponsoredSecurityOperations: readonly (
+    | "device-add"
+    | "device-remove"
+    | "recovery-cancel"
+    | "session-install"
+  )[]
 }
 
 export type SliceWalletChainManifest = {

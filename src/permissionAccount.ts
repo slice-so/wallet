@@ -65,6 +65,25 @@ const kernelPermissionLifecycleAbi = [
   },
   {
     inputs: [
+      { name: "vIds", type: "bytes21[]" },
+      {
+        components: [
+          { name: "nonce", type: "uint32" },
+          { name: "hook", type: "address" }
+        ],
+        name: "configs",
+        type: "tuple[]"
+      },
+      { name: "validationData", type: "bytes[]" },
+      { name: "hookData", type: "bytes[]" }
+    ],
+    name: "installValidations",
+    outputs: [],
+    stateMutability: "payable",
+    type: "function"
+  },
+  {
+    inputs: [
       { name: "vId", type: "bytes21" },
       { name: "data", type: "bytes" },
       { name: "hookData", type: "bytes" }
@@ -444,6 +463,55 @@ export const buildSliceWalletPermissionUninstallCalls = async ({
           abi: kernelPermissionLifecycleAbi,
           args: [validationId, validationData, "0x"],
           functionName: "uninstallValidation"
+        }),
+        to: account,
+        value: 0n
+      }
+    ],
+    permissionId
+  }
+}
+
+export const buildSliceWalletPermissionInstallCalls = async ({
+  account,
+  client,
+  session
+}: {
+  account: Address
+  client: KernelSmartAccountImplementation["client"]
+  session: SliceWalletFrameSession
+}) => {
+  const validator = await createPermissionValidator({
+    client,
+    mode: session.grantKind,
+    session
+  })
+  const permissionId = validator.getIdentifier()
+  if (await validator.isEnabled(account, kernelExecuteSelector)) {
+    return { calls: [], permissionId }
+  }
+  const validationId = toExecutionValidationId(permissionId)
+  return {
+    calls: [
+      {
+        data: encodeFunctionData({
+          abi: kernelPermissionLifecycleAbi,
+          args: [
+            [validationId],
+            [{ hook: zeroAddress, nonce: 1 }],
+            [await validator.getEnableData(account)],
+            ["0x"]
+          ],
+          functionName: "installValidations"
+        }),
+        to: account,
+        value: 0n
+      },
+      {
+        data: encodeFunctionData({
+          abi: kernelPermissionLifecycleAbi,
+          args: [validationId, kernelExecuteSelector, true],
+          functionName: "grantAccess"
         }),
         to: account,
         value: 0n

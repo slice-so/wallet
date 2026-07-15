@@ -22,6 +22,7 @@ import {
   sliceWalletKernelAddresses,
   sliceWalletKernelVersion
 } from "./constants"
+import { assertSliceWalletExecutionSafety } from "./executionSafety"
 import {
   encodeSliceWalletWebAuthnSignerData,
   toSliceWalletWebAuthnSigner
@@ -176,6 +177,13 @@ export const isSliceWalletDevicePermissionIdAvailable = async ({
   return isAddressEqual(config.signer, zeroAddress)
 }
 
+export const isSliceWalletDeviceActive = async (
+  parameters: BuildSliceWalletDeviceCallsParameters
+) => {
+  const validator = await createSliceWalletDeviceValidator(parameters)
+  return validator.isEnabled(parameters.account, executeSelector)
+}
+
 export const buildDeviceInstallCalls = async (
   parameters: BuildSliceWalletDeviceCallsParameters
 ): Promise<{
@@ -298,7 +306,7 @@ export const createSliceWalletDeviceKernelAccount = async ({
     createSliceWalletDeviceValidator({ chainId, client, ...parameters }),
     createSliceWalletRootValidator({ chainId, credential: rootCredential })
   ])
-  return createKernelAccount(client, {
+  const deviceAccount = await createKernelAccount(client, {
     address: account,
     accountImplementationAddress: sliceWalletKernelAddresses.implementation,
     entryPoint: sliceWalletEntryPoint,
@@ -309,4 +317,24 @@ export const createSliceWalletDeviceKernelAccount = async ({
     plugins: { regular: deviceValidator, sudo: rootValidator },
     useMetaFactory: true
   })
+  const signUserOperation: typeof deviceAccount.signUserOperation = async (
+    userOperation
+  ) => {
+    const effectiveChainId = userOperation.chainId ?? chainId
+    if (effectiveChainId !== chainId) {
+      throw new Error("Device operation chain does not match the wallet chain.")
+    }
+    assertSliceWalletExecutionSafety({
+      chainId,
+      userOperation: {
+        ...userOperation,
+        sender: userOperation.sender ?? account
+      }
+    })
+    return deviceAccount.signUserOperation(userOperation)
+  }
+  return {
+    ...deviceAccount,
+    signUserOperation
+  }
 }

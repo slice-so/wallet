@@ -306,6 +306,24 @@ export const parseSliceWalletCeremonyResponse = (
   value: SliceWalletProtocolValue
 ): SliceWalletCeremonyResponse => {
   const input = record(value, "Ceremony response")
+  if (input.type === "slice-wallet:ceremony-authorizations") {
+    assertKeys(input, ["authorizations", "nonce", "type", "version"])
+    if (
+      input.version !== 1 ||
+      !Array.isArray(input.authorizations) ||
+      input.authorizations.length === 0
+    ) {
+      throw new Error("Ceremony batch response is invalid.")
+    }
+    return {
+      authorizations: input.authorizations.map((authorization) =>
+        parseSliceWalletPermissionAuthorization(authorization)
+      ),
+      nonce: hexValue(input.nonce, "Ceremony nonce", 32),
+      type: "slice-wallet:ceremony-authorizations",
+      version: 1
+    }
+  }
   if (input.type === "slice-wallet:ceremony-authorization") {
     assertKeys(input, ["authorization", "nonce", "type", "version"])
     if (input.version !== 1) throw new Error("Ceremony response is invalid.")

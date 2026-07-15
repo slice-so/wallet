@@ -2,7 +2,8 @@ export * from "./account"
 export * from "./calls"
 export {
   getSliceWalletChainManifest,
-  getSliceWalletChainPolicy
+  getSliceWalletChainPolicy,
+  sliceWalletSupportedChainIds
 } from "./chains"
 export * from "./constants"
 export {

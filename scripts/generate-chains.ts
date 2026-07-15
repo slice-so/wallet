@@ -17,6 +17,45 @@ const chainIds = Object.keys(policy.chains).sort(
   (first, second) => Number(first) - Number(second)
 )
 
+// Runtime helpers still encode these canonical CREATE2 addresses directly.
+// Fail generation before a differing chain can ever be admitted silently.
+const pinnedAddressContractNames = [
+  "callPolicy",
+  "ecdsaSigner",
+  "entryPoint",
+  "kernelFactory",
+  "kernelImplementation",
+  "kernelMetaFactory",
+  "p256Verifier",
+  "sudoPolicy",
+  "timelockPolicy",
+  "webAuthnRootValidator",
+  "webAuthnSigner",
+  "weightedEcdsaSigner",
+  "weightedP256Signer"
+] as const
+const canonicalDeployment = deployments.chains["8453"]
+
+if (canonicalDeployment === undefined) {
+  throw new Error("The canonical Base deployment facts are missing.")
+}
+
+for (const chainId of chainIds) {
+  const deployment =
+    deployments.chains[chainId as keyof typeof deployments.chains]
+  if (deployment === undefined) continue
+  for (const contractName of pinnedAddressContractNames) {
+    if (
+      deployment.contracts[contractName].address.toLowerCase() !==
+      canonicalDeployment.contracts[contractName].address.toLowerCase()
+    ) {
+      throw new Error(
+        `${contractName} on chain ${chainId} differs from the canonical address used by cross-chain account encoding.`
+      )
+    }
+  }
+}
+
 const entries = chainIds.map((chainId) => {
   const policyChain = policy.chains[chainId as keyof typeof policy.chains]
   const deployment =

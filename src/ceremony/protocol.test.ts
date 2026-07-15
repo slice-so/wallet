@@ -6,6 +6,7 @@ import type { SliceWalletProtocolValue } from "../types"
 import {
   parseSliceWalletBridgeRecord,
   parseSliceWalletCeremonyAccountResponse,
+  parseSliceWalletCeremonyResponse,
   parseSliceWalletCeremonyRootSignRequest,
   parseSliceWalletPermissionAuthorization
 } from "./protocol"
@@ -103,6 +104,28 @@ describe("wallet ceremony protocol parser", () => {
       appOrigin: "https://shop.example",
       session: { account, signerId }
     })
+  })
+
+  it("accepts a non-empty batch of per-chain authorizations", () => {
+    expect(
+      parseSliceWalletCeremonyResponse({
+        authorizations: [authorization],
+        nonce,
+        type: "slice-wallet:ceremony-authorizations",
+        version: 1
+      })
+    ).toMatchObject({
+      authorizations: [{ session: { chainId: 8453 } }],
+      type: "slice-wallet:ceremony-authorizations"
+    })
+    expect(() =>
+      parseSliceWalletCeremonyResponse({
+        authorizations: [],
+        nonce,
+        type: "slice-wallet:ceremony-authorizations",
+        version: 1
+      })
+    ).toThrow("batch response")
   })
 
   it("requires an execution proof for management authorizations", () => {

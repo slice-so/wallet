@@ -2,6 +2,7 @@ import { bytesToHex, type Hex } from "viem"
 import { getWalletPolicyHash } from "../policy"
 import type {
   AuthorizeSliceWalletSessionParameters,
+  AuthorizeSliceWalletSessionsParameters,
   SliceWalletFrameSession,
   SliceWalletPermissionAuthorization,
   SliceWalletProtocolValue
@@ -43,6 +44,48 @@ const getCeremonyUrl = ({
   url.searchParams.set("account", session.account)
   url.searchParams.set("chainId", String(session.chainId))
   url.searchParams.set("grantKind", session.grantKind)
+  url.searchParams.set("nonce", nonce)
+  return url
+}
+
+const assertBatchSessions = (sessions: readonly SliceWalletFrameSession[]) => {
+  const first = sessions[0]
+  if (first === undefined || sessions.length > 8) {
+    throw new Error("Wallet batch authorization requires 1 to 8 sessions.")
+  }
+  const chainIds = new Set<number>()
+  for (const session of sessions) {
+    if (
+      session.account.toLowerCase() !== first.account.toLowerCase() ||
+      session.grantKind !== first.grantKind ||
+      chainIds.has(session.chainId)
+    ) {
+      throw new Error(
+        "Wallet batch sessions must use one account, one grant kind, and distinct chains."
+      )
+    }
+    chainIds.add(session.chainId)
+  }
+  return first
+}
+
+const getBatchCeremonyUrl = ({
+  idOrigin,
+  nonce,
+  sessions
+}: {
+  idOrigin: string
+  nonce: Hex
+  sessions: readonly SliceWalletFrameSession[]
+}) => {
+  const first = assertBatchSessions(sessions)
+  const url = new URL("/ceremony/grants", new URL(idOrigin).origin)
+  url.searchParams.set("account", first.account)
+  url.searchParams.set(
+    "chainIds",
+    sessions.map(({ chainId }) => String(chainId)).join(",")
+  )
+  url.searchParams.set("grantKind", first.grantKind)
   url.searchParams.set("nonce", nonce)
   return url
 }
@@ -185,6 +228,9 @@ export const authorizeSliceWalletSession = async ({
             ? new SliceWalletBridgeUnavailableError(response.message)
             : new Error(response.message)
         }
+        if (response.type !== "slice-wallet:ceremony-authorization") {
+          throw new Error("Wallet ceremony returned a batch response.")
+        }
         if (
           !isMatchingAuthorization(
             response.authorization,
@@ -195,6 +241,110 @@ export const authorizeSliceWalletSession = async ({
           throw new Error("Wallet ceremony returned an invalid authorization.")
         }
         return response.authorization
+      },
+      port: channel.port,
+      surface: channel.surface,
+      timeoutMs
+    })
+  } catch (error) {
+    if (!(error instanceof SliceWalletBridgeUnavailableError)) throw error
+    return continueFromFrame()
+  }
+}
+
+export const authorizeSliceWalletSessions = async ({
+  ceremonyMode = "popup",
+  document,
+  frameClient,
+  idOrigin,
+  popupReadyTimeoutMs = 10_000,
+  sessions,
+  timeoutMs = 5 * 60_000,
+  window
+}: AuthorizeSliceWalletSessionsParameters) => {
+  assertBatchSessions(sessions)
+  const normalizedIdOrigin = new URL(idOrigin).origin
+  const nonce = randomNonce(window)
+  const continueFromFrame = async () => {
+    frameClient.setContinuationVisible(true)
+    try {
+      const authorizations = []
+      for (const session of sessions) {
+        authorizations.push(
+          await waitForFrameAuthorization({
+            appOrigin: window.location.origin,
+            frameClient,
+            session,
+            timeoutMs
+          })
+        )
+      }
+      return authorizations
+    } finally {
+      frameClient.setContinuationVisible(false)
+    }
+  }
+
+  const resolvedMode = resolveSliceWalletCeremonyMode({
+    document,
+    mode: ceremonyMode,
+    window
+  })
+  if (
+    resolvedMode === "popup" &&
+    window.navigator.userActivation?.isActive === false
+  ) {
+    return continueFromFrame()
+  }
+
+  let channel: Awaited<ReturnType<typeof openSliceWalletCeremonyChannel>>
+  try {
+    channel = await openSliceWalletCeremonyChannel({
+      document,
+      idOrigin: normalizedIdOrigin,
+      mode: resolvedMode,
+      nonce,
+      path: getBatchCeremonyUrl({
+        idOrigin: normalizedIdOrigin,
+        nonce,
+        sessions
+      }).href,
+      readyTimeoutMs: popupReadyTimeoutMs,
+      window
+    })
+  } catch {
+    return continueFromFrame()
+  }
+
+  try {
+    return await waitForSliceWalletCeremonyMessage({
+      parse: (value: SliceWalletProtocolValue) => {
+        const response = parseSliceWalletCeremonyResponse(value)
+        if (response.nonce !== nonce) {
+          throw new Error("Wallet ceremony response nonce does not match.")
+        }
+        if (response.type === "slice-wallet:ceremony-error") {
+          throw response.code === "bridge_unavailable"
+            ? new SliceWalletBridgeUnavailableError(response.message)
+            : new Error(response.message)
+        }
+        if (
+          response.type !== "slice-wallet:ceremony-authorizations" ||
+          response.authorizations.length !== sessions.length ||
+          response.authorizations.some(
+            (authorization, index) =>
+              !isMatchingAuthorization(
+                authorization,
+                sessions[index] as SliceWalletFrameSession,
+                window.location.origin
+              )
+          )
+        ) {
+          throw new Error(
+            "Wallet ceremony returned invalid batch authorizations."
+          )
+        }
+        return response.authorizations
       },
       port: channel.port,
       surface: channel.surface,

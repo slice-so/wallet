@@ -198,7 +198,12 @@ const manifests = [
     funding: {
       defaultPath: "self-funded-or-request-paymaster",
       sliceSponsorshipForExternalOrigins: false,
-      sponsoredSecurityOperations: ["recovery-cancel"]
+      sponsoredSecurityOperations: [
+        "device-add",
+        "device-remove",
+        "recovery-cancel",
+        "session-install"
+      ]
     },
     rip7212Available: true
   }

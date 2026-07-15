@@ -7,7 +7,10 @@ import type {
   SliceWalletProtocolValue,
   SliceWalletSignerFrameClient
 } from "../types"
-import { authorizeSliceWalletSession } from "./client"
+import {
+  authorizeSliceWalletSession,
+  authorizeSliceWalletSessions
+} from "./client"
 
 const account = "0x1000000000000000000000000000000000000001" as Address
 const coSigner = "0x2000000000000000000000000000000000000002" as Address
@@ -80,6 +83,44 @@ const createFrameClient = () => {
 }
 
 describe("authorizeSliceWalletSession", () => {
+  it("authorizes distinct per-chain sessions through one batch continuation", async () => {
+    const secondPublicKey = `0x04${"66".repeat(64)}` as Hex
+    const secondSignerId = getSliceWalletP256SignerId(secondPublicKey)
+    const secondPolicy = { ...policy, chainId: 10 } as const
+    const secondSession = {
+      ...session,
+      chainId: 10,
+      permissionId: getWalletPermissionId(secondPolicy, secondSignerId),
+      policy: secondPolicy,
+      publicKey: secondPublicKey,
+      signerId: secondSignerId
+    } as const
+    const secondAuthorization = {
+      ...authorization,
+      session: secondSession
+    } satisfies SliceWalletPermissionAuthorization
+    const visibility: boolean[] = []
+    const frameClient: SliceWalletSignerFrameClient = {
+      destroy: () => undefined,
+      request: async (request) =>
+        "chainId" in request.params && request.params.chainId === 10
+          ? secondAuthorization
+          : authorization,
+      setContinuationVisible: (visible) => visibility.push(visible)
+    }
+
+    await expect(
+      authorizeSliceWalletSessions({
+        frameClient,
+        idOrigin: "https://id.slice.so",
+        sessions: [session, secondSession],
+        timeoutMs: 100,
+        window: createWindow({ isActive: false, open: () => null })
+      })
+    ).resolves.toEqual([authorization, secondAuthorization])
+    expect(visibility).toEqual([true, false])
+  })
+
   it("uses the frame continuation without attempting a popup after activation expires", async () => {
     const open = mock(() => null)
     const { client, visibility } = createFrameClient()

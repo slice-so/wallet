@@ -1,21 +1,38 @@
 #!/usr/bin/env bun
 
 import {
+  concat,
   createPublicClient,
   createWalletClient,
   defineChain,
   getAddress,
   http
 } from "viem"
-import { createBundlerClient, entryPoint07Abi } from "viem/account-abstraction"
+import {
+  createBundlerClient,
+  entryPoint07Abi,
+  getUserOperationHash
+} from "viem/account-abstraction"
 import { privateKeyToAccount } from "viem/accounts"
 import { createSliceWalletKernelAccount } from "../src/account"
 import { sliceWalletEntryPoint } from "../src/constants"
-import { generateSliceWalletP256KeyPair } from "../src/p256"
+import {
+  encodeSliceWalletSyntheticWebAuthnSignature,
+  generateSliceWalletP256KeyPair
+} from "../src/p256"
+import {
+  buildSliceWalletPermissionInstallCalls,
+  createSliceWalletPermissionAccount
+} from "../src/permissionAccount"
 import {
   createNativeTransferCallRule,
   getWalletPermissionId
 } from "../src/policy"
+import { getSliceWalletCredentialIdHash } from "../src/registry"
+import type {
+  SliceWalletFrameSession,
+  SliceWalletSignerFrameClient
+} from "../src/types/frame"
 import { canaryCredential, canaryGetFn, canaryRpId } from "./lib/canaryWebAuthn"
 
 const broadcaster = privateKeyToAccount(
@@ -66,7 +83,52 @@ const results = await Promise.all(
       validUntil,
       version: 1
     } as const
-    const permissionId = getWalletPermissionId(policy, sessionKey.signerId)
+    const session = {
+      account: account.address,
+      chainId,
+      expiresAt: validUntil,
+      grantKind: "generic",
+      permissionId: getWalletPermissionId(policy, sessionKey.signerId),
+      policy,
+      publicKey: sessionKey.publicKeyHex,
+      signerId: sessionKey.signerId
+    } satisfies SliceWalletFrameSession
+    const registeredRootCredential = {
+      credentialIdHash: getSliceWalletCredentialIdHash(canaryCredential.id),
+      publicKey: concat(["0x04", canaryCredential.publicKey])
+    }
+    const frameClient: SliceWalletSignerFrameClient = {
+      destroy: () => {},
+      request: async (request) => {
+        if (request.method !== "signScopedUserOperation") {
+          throw new Error(
+            "The two-chain drill received an unexpected frame request."
+          )
+        }
+        const userOperationHash = getUserOperationHash({
+          chainId,
+          entryPointAddress: sliceWalletEntryPoint.address,
+          entryPointVersion: "0.7",
+          userOperation: {
+            ...request.params.userOperation,
+            signature: "0x"
+          }
+        })
+        return {
+          proposalHash: `0x${"00".repeat(32)}`,
+          signature: await encodeSliceWalletSyntheticWebAuthnSignature({
+            chainId,
+            challenge: userOperationHash,
+            key: sessionKey.privateKey,
+            origin: "http://localhost",
+            rpId: "localhost",
+            usePrecompiled: false
+          }),
+          userOperationHash
+        }
+      },
+      setContinuationVisible: () => {}
+    }
     const walletClient = createWalletClient({
       account: broadcaster,
       chain,
@@ -81,22 +143,58 @@ const results = await Promise.all(
     })
     await publicClient.waitForTransactionReceipt({ hash: depositHash })
 
-    const bundlerClient = createBundlerClient({
+    const rootBundlerClient = createBundlerClient({
       account,
       chain,
       client: publicClient,
       transport: http(bundlerUrl)
     })
-    const fees = await publicClient.estimateFeesPerGas()
-    const userOperationHash = await bundlerClient.sendUserOperation({
-      callGasLimit: 500_000n,
-      calls: [{ data: "0x", to: recipient, value: 0n }],
-      maxFeePerGas: fees.maxFeePerGas,
-      maxPriorityFeePerGas: fees.maxPriorityFeePerGas,
-      preVerificationGas: 120_000n,
-      verificationGasLimit: 2_500_000n
+    const deploymentHash = await rootBundlerClient.sendUserOperation({
+      calls: [{ data: "0x", to: recipient, value: 0n }]
     })
-    const receipt = await bundlerClient.waitForUserOperationReceipt({
+    const deploymentReceipt =
+      await rootBundlerClient.waitForUserOperationReceipt({
+        hash: deploymentHash
+      })
+    if (!deploymentReceipt.success) {
+      throw new Error(`Wallet e2e deployment failed on chain ${chainId}.`)
+    }
+    const install = await buildSliceWalletPermissionInstallCalls({
+      account: account.address,
+      client: publicClient,
+      session
+    })
+    const installHash = await rootBundlerClient.sendUserOperation({
+      calls: install.calls
+    })
+    const installReceipt = await rootBundlerClient.waitForUserOperationReceipt({
+      hash: installHash
+    })
+    if (!installReceipt.success) {
+      throw new Error(
+        `Wallet e2e permission install failed on chain ${chainId}.`
+      )
+    }
+
+    const permissionAccount = await createSliceWalletPermissionAccount({
+      address: account.address,
+      client: publicClient,
+      credential: registeredRootCredential,
+      enableSignature: "0x",
+      frameClient,
+      mode: "generic",
+      session
+    })
+    const sessionBundlerClient = createBundlerClient({
+      account: permissionAccount,
+      chain,
+      client: publicClient,
+      transport: http(bundlerUrl)
+    })
+    const userOperationHash = await sessionBundlerClient.sendUserOperation({
+      calls: [{ data: "0x", to: recipient, value: 0n }]
+    })
+    const receipt = await sessionBundlerClient.waitForUserOperationReceipt({
       hash: userOperationHash
     })
     if (!receipt.success) {
@@ -111,8 +209,8 @@ const results = await Promise.all(
     return {
       account: getAddress(account.address),
       chainId,
-      permissionId,
-      signerId: sessionKey.signerId,
+      permissionId: session.permissionId,
+      signerId: session.signerId,
       userOperationHash
     }
   })

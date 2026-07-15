@@ -30,6 +30,13 @@ export type SliceWalletCeremonyAuthorizationMessage = {
   version: 1
 }
 
+export type SliceWalletCeremonyAuthorizationsMessage = {
+  authorizations: readonly SliceWalletPermissionAuthorization[]
+  nonce: Hex
+  type: "slice-wallet:ceremony-authorizations"
+  version: 1
+}
+
 export type SliceWalletCeremonyErrorMessage = {
   code: "authorization_failed" | "bridge_unavailable" | "invalid_request"
   message: string
@@ -40,6 +47,7 @@ export type SliceWalletCeremonyErrorMessage = {
 
 export type SliceWalletCeremonyResponse =
   | SliceWalletCeremonyAuthorizationMessage
+  | SliceWalletCeremonyAuthorizationsMessage
   | SliceWalletCeremonyErrorMessage
 
 export type SliceWalletCeremonyAccountMessage = {
@@ -86,6 +94,22 @@ export type SliceWalletCeremonyRootResponse =
   | SliceWalletCeremonyRootSignatureMessage
   | SliceWalletCeremonyErrorMessage
 
+export type SliceWalletCeremonyDeviceMessage = {
+  account: Address
+  action: "add" | "remove"
+  chainId: number
+  credentialIdHash: Hex
+  nonce: Hex
+  permissionId: Hex
+  type: "slice-wallet:ceremony-device"
+  userOperationHash: Hex | null
+  version: 1
+}
+
+export type SliceWalletCeremonyDeviceResponse =
+  | SliceWalletCeremonyDeviceMessage
+  | SliceWalletCeremonyErrorMessage
+
 export type AuthorizeSliceWalletSessionParameters = {
   ceremonyMode?: SliceWalletCeremonyMode
   document?: Document
@@ -95,6 +119,13 @@ export type AuthorizeSliceWalletSessionParameters = {
   session: SliceWalletFrameSession
   timeoutMs?: number
   window: Window
+}
+
+export type AuthorizeSliceWalletSessionsParameters = Omit<
+  AuthorizeSliceWalletSessionParameters,
+  "session"
+> & {
+  sessions: readonly SliceWalletFrameSession[]
 }
 
 export type ConnectSliceWalletAccountParameters = {
@@ -122,5 +153,16 @@ export type CreateSliceWalletCeremonyKernelAccountParameters = Omit<
   ceremonyMode?: SliceWalletCeremonyMode
   document?: Document
   idOrigin: string
+  window: Window
+}
+
+export type ManageSliceWalletDeviceParameters = {
+  account: Address
+  ceremonyMode?: SliceWalletCeremonyMode
+  chainId: number
+  credentialIdHash?: Hex
+  document?: Document
+  idOrigin: string
+  timeoutMs?: number
   window: Window
 }
