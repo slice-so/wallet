@@ -1,7 +1,5 @@
 import { Base64, Hex as OxHex, P256, PublicKey, WebAuthnP256 } from "ox"
 import type { Signature } from "ox/Signature"
-import { encodeAbiParameters, type Hex } from "viem"
-import { toWebAuthnAccount } from "viem/account-abstraction"
 import type { CreateSliceWalletKernelAccountParameters } from "../../src/types/account"
 
 const canaryPrivateKey =
@@ -104,35 +102,4 @@ export const canaryGetFn: NonNullable<
     },
     type: "public-key"
   }
-}
-
-export const signCanaryRootHash = async (hash: Hex) => {
-  const assertion = await toWebAuthnAccount({
-    credential: canaryCredential,
-    getFn: canaryGetFn,
-    rpId: canaryRpId
-  }).sign({ hash })
-  const signatureBytes = assertion.signature.slice(2)
-  if (signatureBytes.length < 128) {
-    throw new Error("The canary WebAuthn signature is malformed.")
-  }
-
-  return encodeAbiParameters(
-    [
-      { name: "authenticatorData", type: "bytes" },
-      { name: "clientDataJSON", type: "string" },
-      { name: "responseTypeLocation", type: "uint256" },
-      { name: "r", type: "uint256" },
-      { name: "s", type: "uint256" },
-      { name: "usePrecompiled", type: "bool" }
-    ],
-    [
-      assertion.webauthn.authenticatorData,
-      assertion.webauthn.clientDataJSON,
-      BigInt(assertion.webauthn.typeIndex ?? 0),
-      BigInt(`0x${signatureBytes.slice(0, 64)}`),
-      BigInt(`0x${signatureBytes.slice(64, 128)}`),
-      false
-    ]
-  )
 }

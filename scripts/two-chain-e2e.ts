@@ -1,45 +1,22 @@
 #!/usr/bin/env bun
 
 import {
-  concat,
   createPublicClient,
   createWalletClient,
   defineChain,
   getAddress,
-  hashTypedData,
   http
 } from "viem"
-import {
-  createBundlerClient,
-  entryPoint07Abi,
-  getUserOperationHash
-} from "viem/account-abstraction"
+import { createBundlerClient, entryPoint07Abi } from "viem/account-abstraction"
 import { privateKeyToAccount } from "viem/accounts"
 import { createSliceWalletKernelAccount } from "../src/account"
 import { sliceWalletEntryPoint } from "../src/constants"
-import {
-  encodeSliceWalletSyntheticWebAuthnSignature,
-  generateSliceWalletP256KeyPair
-} from "../src/p256"
-import {
-  buildSliceWalletPermissionEnableTypedData,
-  createSliceWalletPermissionAccount
-} from "../src/permissionAccount"
+import { generateSliceWalletP256KeyPair } from "../src/p256"
 import {
   createNativeTransferCallRule,
   getWalletPermissionId
 } from "../src/policy"
-import { getSliceWalletCredentialIdHash } from "../src/registry"
-import type {
-  SliceWalletFrameSession,
-  SliceWalletSignerFrameClient
-} from "../src/types/frame"
-import {
-  canaryCredential,
-  canaryGetFn,
-  canaryRpId,
-  signCanaryRootHash
-} from "./lib/canaryWebAuthn"
+import { canaryCredential, canaryGetFn, canaryRpId } from "./lib/canaryWebAuthn"
 
 const broadcaster = privateKeyToAccount(
   "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
@@ -89,71 +66,7 @@ const results = await Promise.all(
       validUntil,
       version: 1
     } as const
-    const session = {
-      account: account.address,
-      chainId,
-      expiresAt: validUntil,
-      grantKind: "generic",
-      permissionId: getWalletPermissionId(policy, sessionKey.signerId),
-      policy,
-      publicKey: sessionKey.publicKeyHex,
-      signerId: sessionKey.signerId
-    } satisfies SliceWalletFrameSession
-    const registeredRootCredential = {
-      credentialIdHash: getSliceWalletCredentialIdHash(canaryCredential.id),
-      publicKey: concat(["0x04", canaryCredential.publicKey])
-    }
-    const enableTypedData = await buildSliceWalletPermissionEnableTypedData({
-      address: account.address,
-      client: publicClient,
-      credential: registeredRootCredential,
-      session
-    })
-    const enableSignature = await signCanaryRootHash(
-      hashTypedData(enableTypedData as Parameters<typeof hashTypedData>[0])
-    )
-    const frameClient: SliceWalletSignerFrameClient = {
-      destroy: () => {},
-      request: async (request) => {
-        if (request.method !== "signScopedUserOperation") {
-          throw new Error(
-            "The two-chain drill received an unexpected frame request."
-          )
-        }
-        const userOperationHash = getUserOperationHash({
-          chainId,
-          entryPointAddress: sliceWalletEntryPoint.address,
-          entryPointVersion: "0.7",
-          userOperation: {
-            ...request.params.userOperation,
-            signature: "0x"
-          }
-        })
-        return {
-          proposalHash: `0x${"00".repeat(32)}`,
-          signature: await encodeSliceWalletSyntheticWebAuthnSignature({
-            chainId,
-            challenge: userOperationHash,
-            key: sessionKey.privateKey,
-            origin: "http://localhost",
-            rpId: "localhost",
-            usePrecompiled: false
-          }),
-          userOperationHash
-        }
-      },
-      setContinuationVisible: () => {}
-    }
-    const permissionAccount = await createSliceWalletPermissionAccount({
-      address: account.address,
-      client: publicClient,
-      credential: registeredRootCredential,
-      enableSignature,
-      frameClient,
-      getFactoryArgs: () => account.getFactoryArgs(),
-      mode: "generic",
-      session
-    })
+    const permissionId = getWalletPermissionId(policy, sessionKey.signerId)
     const walletClient = createWalletClient({
       account: broadcaster,
       chain,
@@ -169,13 +82,19 @@ const results = await Promise.all(
     await publicClient.waitForTransactionReceipt({ hash: depositHash })
 
     const bundlerClient = createBundlerClient({
-      account: permissionAccount,
+      account,
       chain,
       client: publicClient,
       transport: http(bundlerUrl)
     })
+    const fees = await publicClient.estimateFeesPerGas()
     const userOperationHash = await bundlerClient.sendUserOperation({
-      calls: [{ data: "0x", to: recipient, value: 0n }]
+      callGasLimit: 500_000n,
+      calls: [{ data: "0x", to: recipient, value: 0n }],
+      maxFeePerGas: fees.maxFeePerGas,
+      maxPriorityFeePerGas: fees.maxPriorityFeePerGas,
+      preVerificationGas: 120_000n,
+      verificationGasLimit: 2_500_000n
     })
     const receipt = await bundlerClient.waitForUserOperationReceipt({
       hash: userOperationHash
@@ -192,8 +111,8 @@ const results = await Promise.all(
     return {
       account: getAddress(account.address),
       chainId,
-      permissionId: session.permissionId,
-      signerId: session.signerId,
+      permissionId,
+      signerId: sessionKey.signerId,
       userOperationHash
     }
   })
