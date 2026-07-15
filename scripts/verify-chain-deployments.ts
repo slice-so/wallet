@@ -16,8 +16,8 @@ import deployments from "../../contracts/core/deployments/addresses.json"
 import policy from "../config/chains.policy.json"
 
 const rpcEnvironmentVariables = {
-  1: "RPC_URL_MAINNET",
-  10: "RPC_URL_OPTIMISM",
+  1: "RPC_URL_ETHEREUM",
+  10: "RPC_URL_OP",
   8453: "RPC_URL_BASE",
   42161: "RPC_URL_ARBITRUM"
 } as const

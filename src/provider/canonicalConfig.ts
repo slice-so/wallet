@@ -7,6 +7,7 @@ import type { SliceWalletProviderConfig } from "../types/providerInternal"
 import { invalidProviderRequest } from "./errors"
 
 const sliceIdOrigin = "https://id.slice.so"
+const defaultSliceWalletChainId = 8453
 
 const normalizeTransportUrl = (value: string, label: string) => {
   if (value.length > 2_048) {
@@ -53,7 +54,12 @@ export const resolveCanonicalSliceWalletConfig = (
     throw invalidProviderRequest("Slice Wallet announce must be boolean.")
   }
 
-  const chainIds = parameters.chainIds ?? sliceWalletSupportedChainIds
+  const chainIds = parameters.chainIds ?? [
+    defaultSliceWalletChainId,
+    ...sliceWalletSupportedChainIds.filter(
+      (chainId) => chainId !== defaultSliceWalletChainId
+    )
+  ]
   if (
     !Array.isArray(chainIds) ||
     chainIds.length === 0 ||
@@ -64,7 +70,11 @@ export const resolveCanonicalSliceWalletConfig = (
       "Slice Wallet requires unique supported chains."
     )
   }
-  const defaultChainId = parameters.defaultChainId ?? chainIds[0]
+  const defaultChainId =
+    parameters.defaultChainId ??
+    (chainIds.includes(defaultSliceWalletChainId)
+      ? defaultSliceWalletChainId
+      : chainIds[0])
   if (defaultChainId === undefined || !chainIds.includes(defaultChainId)) {
     throw invalidProviderRequest(
       "The default Slice Wallet chain must be configured."

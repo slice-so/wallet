@@ -100,8 +100,8 @@ describe("Slice Wallet execution safety", () => {
   })
 
   test("rejects unknown chains instead of accepting parent-supplied policy", () => {
-    expect(() => getSliceWalletExecutionSafetyEnvelope(1)).toThrow(
-      "Slice Wallet chain 1 is unsupported."
+    expect(() => getSliceWalletExecutionSafetyEnvelope(137)).toThrow(
+      "Slice Wallet chain 137 is unsupported."
     )
   })
 })

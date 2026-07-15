@@ -25,14 +25,17 @@ describe("Slice Wallet chain manifest", () => {
   })
 
   test("exposes only chains with complete admission evidence", () => {
-    expect(getSliceWalletChainPolicy(8453).admitted).toBe(true)
-    expect(sliceWalletSupportedChainIds).toEqual([8453])
+    expect(sliceWalletSupportedChainIds).toEqual([1, 10, 8453, 42161])
+    for (const chainId of sliceWalletSupportedChainIds) {
+      expect(getSliceWalletChainPolicy(chainId).admitted).toBe(true)
+      expect(getSliceWalletChainManifest(chainId).chain.id).toBe(chainId)
+    }
     expect(getSliceWalletChainManifest(8453).chain.id).toBe(8453)
   })
 
   test("rejects chains missing from the generated inputs", () => {
-    expect(() => getSliceWalletChainPolicy(10)).toThrow(
-      "Slice Wallet chain 10 is unsupported."
+    expect(() => getSliceWalletChainPolicy(137)).toThrow(
+      "Slice Wallet chain 137 is unsupported."
     )
   })
 })

@@ -22,11 +22,14 @@ import { canaryCredential, canaryGetFn, canaryRpId } from "./lib/canaryWebAuthn"
 
 const canaryRecipient =
   "0x0000000000000000000000000000000000008128" satisfies Address
-const entryPointDepositTarget = 200_000_000_000_000n
+const minimumEntryPointDeposit = 200_000_000_000_000n
+const callGasLimit = 500_000n
+const preVerificationGas = 120_000n
+const verificationGasLimit = 1_500_000n
 
 const rpcEnvironmentVariables: Readonly<Record<number, string>> = {
-  1: "RPC_URL_MAINNET",
-  10: "RPC_URL_OPTIMISM",
+  1: "RPC_URL_ETHEREUM",
+  10: "RPC_URL_OP",
   8453: "RPC_URL_BASE",
   42161: "RPC_URL_ARBITRUM"
 }
@@ -120,6 +123,16 @@ if (factory === undefined || factoryData === undefined) {
   throw new Error("The canary account is missing counterfactual factory data.")
 }
 
+const fees = await publicClient.estimateFeesPerGas()
+const maxFeePerGas = fees.maxFeePerGas ?? parseGwei("0.1")
+const maxPriorityFeePerGas = fees.maxPriorityFeePerGas ?? parseGwei("0.01")
+const calculatedDeposit =
+  (callGasLimit + preVerificationGas + verificationGasLimit) * maxFeePerGas * 2n
+const entryPointDepositTarget =
+  calculatedDeposit > minimumEntryPointDeposit
+    ? calculatedDeposit
+    : minimumEntryPointDeposit
+
 const existingDeposit = await publicClient.readContract({
   abi: entryPoint07Abi,
   address: manifest.contracts.entryPoint.address,
@@ -153,21 +166,20 @@ if (existingAccountBalance < 1n) {
 const recipientBalanceBefore = await publicClient.getBalance({
   address: canaryRecipient
 })
-const fees = await publicClient.estimateFeesPerGas()
 const unsignedUserOperation = {
   callData: await account.encodeCalls([
     { data: "0x", to: canaryRecipient, value: 1n }
   ]),
-  callGasLimit: 500_000n,
+  callGasLimit,
   factory,
   factoryData,
-  maxFeePerGas: fees.maxFeePerGas ?? parseGwei("0.1"),
-  maxPriorityFeePerGas: fees.maxPriorityFeePerGas ?? parseGwei("0.01"),
+  maxFeePerGas,
+  maxPriorityFeePerGas,
   nonce: await account.getNonce(),
-  preVerificationGas: 120_000n,
+  preVerificationGas,
   sender: account.address,
   signature: "0x",
-  verificationGasLimit: 1_500_000n
+  verificationGasLimit
 } satisfies UserOperation<"0.7">
 const userOperation = {
   ...unsignedUserOperation,
@@ -211,14 +223,8 @@ if (event === undefined || event.args.success !== true) {
 }
 
 const [accountCode, recipientBalanceAfter] = await Promise.all([
-  publicClient.getCode({
-    address: account.address,
-    blockNumber: receipt.blockNumber
-  }),
-  publicClient.getBalance({
-    address: canaryRecipient,
-    blockNumber: receipt.blockNumber
-  })
+  publicClient.getCode({ address: account.address }),
+  publicClient.getBalance({ address: canaryRecipient })
 ])
 if (accountCode === undefined || accountCode === "0x") {
   throw new Error("The canary did not deploy its Kernel account.")

@@ -17,7 +17,10 @@ import {
 
 describe("P-256 session keys", () => {
   it("selects RIP-7212 only from generated chain policy", () => {
+    expect(isSliceWalletRip7212Available(1)).toBe(true)
+    expect(isSliceWalletRip7212Available(10)).toBe(true)
     expect(isSliceWalletRip7212Available(8453)).toBe(true)
+    expect(isSliceWalletRip7212Available(42161)).toBe(true)
     expect(isSliceWalletRip7212Available(31337)).toBe(false)
   })
   it("keeps the private key non-extractable and derives a stable signer id", async () => {

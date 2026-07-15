@@ -3,18 +3,20 @@ import type { SliceWalletParameters } from "../types"
 import { resolveCanonicalSliceWalletConfig } from "./canonicalConfig"
 
 describe("canonical Slice Wallet config", () => {
-  test("defaults to the admitted Base deployment", () => {
+  test("defaults to Base while exposing every admitted wallet chain", () => {
     const config = resolveCanonicalSliceWalletConfig()
 
     expect(config.defaultChainId).toBe(8453)
-    expect(config.chains.map(({ chain }) => chain.id)).toEqual([8453])
+    expect(config.chains.map(({ chain }) => chain.id)).toEqual([
+      8453, 1, 10, 42161
+    ])
     expect(config.requireAdmittedChain).toBe(true)
   })
 
   test("rejects unsupported chains and security-metadata overrides", () => {
-    expect(() => resolveCanonicalSliceWalletConfig({ chainIds: [10] })).toThrow(
-      "not provisioned"
-    )
+    expect(() =>
+      resolveCanonicalSliceWalletConfig({ chainIds: [137] })
+    ).toThrow("not provisioned")
     expect(() =>
       resolveCanonicalSliceWalletConfig({
         chainIds: [8453],
@@ -28,6 +30,12 @@ describe("canonical Slice Wallet config", () => {
     ).toThrow("unknown field")
   })
 
+  test("uses the first configured chain when Base is omitted", () => {
+    const config = resolveCanonicalSliceWalletConfig({ chainIds: [10, 1] })
+
+    expect(config.defaultChainId).toBe(10)
+  })
+
   test("applies only valid transport URL overrides", () => {
     const config = resolveCanonicalSliceWalletConfig({
       transports: {
@@ -38,7 +46,7 @@ describe("canonical Slice Wallet config", () => {
       }
     })
 
-    expect(config.chains[0]).toMatchObject({
+    expect(config.chains.find(({ chain }) => chain.id === 8453)).toMatchObject({
       bundlerUrl: "https://bundler.example/rpc",
       rpcUrl: "https://rpc.example/"
     })

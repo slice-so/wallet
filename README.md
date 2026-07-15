@@ -29,4 +29,6 @@ Use `sliceWallet()` from `@slicekit/wallet/wagmi`, or `createSliceWalletProvider
 
 The provider exposes root-confirmed account, signature, and call methods plus Slice's versioned session-permission methods. Slice does not advertise ERC-7710 or ERC-7715 compatibility. Calls that do not match an active Slice permission are sent through the visible root ceremony.
 
+The canonical wallet is admitted on Ethereum, OP Mainnet, Base, and Arbitrum One, with Base as the default chain. Wallet contract addresses and the resulting counterfactual account address are consistent across chains. Slice commerce contracts and policies are Base-only; admitting a wallet chain does not imply ProductsModule, checkout, pricing, indexing, co-signing, or Slice sponsorship support there.
+
 The public provider remains a beta surface until the signer contract audit, Base deployment canary, real-browser bridge matrix, API security review, and external-origin rollout gate are complete.

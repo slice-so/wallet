@@ -3,7 +3,13 @@
   "tasks": {
     "admit:canary": {
       "cache": false,
-      "env": ["PRIVATE_KEY", "RPC_URL_BASE"]
+      "env": [
+        "PRIVATE_KEY",
+        "RPC_URL_ARBITRUM",
+        "RPC_URL_BASE",
+        "RPC_URL_ETHEREUM",
+        "RPC_URL_OP"
+      ]
     },
     "build": {
       "dependsOn": ["^build"],
