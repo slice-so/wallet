@@ -1,6 +1,10 @@
 {
   "extends": ["//"],
   "tasks": {
+    "admit:canary": {
+      "cache": false,
+      "env": ["PRIVATE_KEY", "RPC_URL_BASE"]
+    },
     "build": {
       "dependsOn": ["^build"],
       "envMode": "loose",

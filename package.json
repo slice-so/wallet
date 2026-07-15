@@ -93,6 +93,7 @@
     "./dist"
   ],
   "scripts": {
+    "admit:canary": "bun --conditions=development scripts/create-user-operation-canary.ts",
     "build": "bun run generate:chains:check && bun run build.ts",
     "check": "biome check --write --unsafe && bun scripts/check-import-boundaries.ts",
     "format": "biome format --write",
@@ -123,7 +124,8 @@
   },
   "devDependencies": {
     "@slice/typescript-config": "workspace:*",
-    "@wagmi/core": "catalog:"
+    "@wagmi/core": "catalog:",
+    "ox": "catalog:"
   },
   "repository": {
     "type": "git",

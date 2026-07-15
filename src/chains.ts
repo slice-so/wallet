@@ -54,7 +54,7 @@ const freezeManifest = (manifest: SliceWalletChainManifest) => {
 
 const manifests = [
   {
-    admitted: false,
+    admitted: true,
     chain: {
       blockExplorers: {
         default: {
@@ -167,9 +167,10 @@ const manifests = [
       },
       weightedP256Signer: {
         address: "0xAD6e9430244f179101207D614F3c810f987d0786",
-        deployedRuntimeCodeHash: null,
+        deployedRuntimeCodeHash:
+          "0xe9b3e9cb5ce3aca28fd9e1246997f51ae1eb2b98766b6e1a082f2fff059bbb5c",
         expectedRuntimeCodeHash:
-          "0x7d8c784b26107ccadfbdd7f646fee05077473e6496d389ee600b6cdc24a5e0f4"
+          "0xe9b3e9cb5ce3aca28fd9e1246997f51ae1eb2b98766b6e1a082f2fff059bbb5c"
       },
       timelockPolicy: {
         address: "0x7f66B69270f96EC6793c545742CCBbBe028Be3f6",

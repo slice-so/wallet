@@ -3,10 +3,12 @@ import type { SliceWalletParameters } from "../types"
 import { resolveCanonicalSliceWalletConfig } from "./canonicalConfig"
 
 describe("canonical Slice Wallet config", () => {
-  test("fails closed while no generated chain has admission evidence", () => {
-    expect(() => resolveCanonicalSliceWalletConfig()).toThrow(
-      "requires unique supported chains"
-    )
+  test("defaults to the admitted Base deployment", () => {
+    const config = resolveCanonicalSliceWalletConfig()
+
+    expect(config.defaultChainId).toBe(8453)
+    expect(config.chains.map(({ chain }) => chain.id)).toEqual([8453])
+    expect(config.requireAdmittedChain).toBe(true)
   })
 
   test("rejects unsupported chains and security-metadata overrides", () => {

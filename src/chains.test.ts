@@ -24,12 +24,10 @@ describe("Slice Wallet chain manifest", () => {
     ).toThrow()
   })
 
-  test("distinguishes known deployment policy from admitted wallet chains", () => {
-    expect(getSliceWalletChainPolicy(8453).admitted).toBe(false)
-    expect(sliceWalletSupportedChainIds).toEqual([])
-    expect(() => getSliceWalletChainManifest(8453)).toThrow(
-      "Slice Wallet chain 8453 is not provisioned."
-    )
+  test("exposes only chains with complete admission evidence", () => {
+    expect(getSliceWalletChainPolicy(8453).admitted).toBe(true)
+    expect(sliceWalletSupportedChainIds).toEqual([8453])
+    expect(getSliceWalletChainManifest(8453).chain.id).toBe(8453)
   })
 
   test("rejects chains missing from the generated inputs", () => {
