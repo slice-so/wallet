@@ -22,6 +22,16 @@
         "../contracts/core/deployments/addresses.json"
       ],
       "outputs": ["dist/**"]
+    },
+    "type-check": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "tsconfig.json",
+        "src/**/*.ts",
+        "config/chains.policy.json",
+        "scripts/generate-chains.ts",
+        "../contracts/core/deployments/addresses.json"
+      ]
     }
   }
 }

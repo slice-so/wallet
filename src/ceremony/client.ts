@@ -31,6 +31,36 @@ const sessionKey = (session: SliceWalletFrameSession) => ({
   grantKind: session.grantKind
 })
 
+const batchPolicyFingerprint = (session: SliceWalletFrameSession) =>
+  JSON.stringify({
+    checkout:
+      session.checkout === undefined
+        ? null
+        : {
+            allowanceUsdMicros: session.checkout.allowanceUsdMicros,
+            budgetPeriodSec: session.checkout.budgetPeriodSec ?? null,
+            coSignerAddress: session.checkout.coSignerAddress.toLowerCase()
+          },
+    expiresAt: session.expiresAt,
+    policy: {
+      calls: session.policy.calls.map((call) => ({
+        parameterRules: call.parameterRules.map((rule) => ({
+          condition: rule.condition,
+          offset: rule.offset,
+          params: rule.params.map((param) => param.toLowerCase())
+        })),
+        selector: call.selector.toLowerCase(),
+        target: call.target.toLowerCase(),
+        valueLimit: call.valueLimit.toString()
+      })),
+      grantKind: session.policy.grantKind,
+      rateLimit: session.policy.rateLimit ?? null,
+      validAfter: session.policy.validAfter,
+      validUntil: session.policy.validUntil,
+      version: session.policy.version
+    }
+  })
+
 const getCeremonyUrl = ({
   idOrigin,
   nonce,
@@ -54,6 +84,7 @@ const assertBatchSessions = (sessions: readonly SliceWalletFrameSession[]) => {
     throw new Error("Wallet batch authorization requires 1 to 8 sessions.")
   }
   const chainIds = new Set<number>()
+  const expectedPolicy = batchPolicyFingerprint(first)
   for (const session of sessions) {
     if (
       session.account.toLowerCase() !== first.account.toLowerCase() ||
@@ -62,6 +93,11 @@ const assertBatchSessions = (sessions: readonly SliceWalletFrameSession[]) => {
     ) {
       throw new Error(
         "Wallet batch sessions must use one account, one grant kind, and distinct chains."
+      )
+    }
+    if (batchPolicyFingerprint(session) !== expectedPolicy) {
+      throw new Error(
+        "Wallet batch sessions must disclose the same policy on every chain."
       )
     }
     chainIds.add(session.chainId)

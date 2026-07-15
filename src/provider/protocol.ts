@@ -238,12 +238,14 @@ export const parseSliceWalletSendCalls = ({
   account,
   chainId,
   params,
-  paymasterAvailable
+  paymasterAvailable,
+  supportedChainIds = [chainId]
 }: {
   account: Address
   chainId: number
   params: SliceWalletProviderValue | undefined
-  paymasterAvailable: boolean
+  paymasterAvailable: boolean | ((requestedChainId: number) => boolean)
+  supportedChainIds?: readonly number[]
 }): ParsedSliceWalletSendCalls => {
   const items = array(params, "wallet_sendCalls params")
   if (items.length !== 1) {
@@ -270,7 +272,11 @@ export const parseSliceWalletSendCalls = ({
     throw new SliceWalletProviderRpcError(4100, "Call sender is not connected.")
   }
   const requestedChain = quantity(input.chainId, "Call chain id")
-  if (requestedChain !== BigInt(chainId)) {
+  if (requestedChain > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw invalidProviderRequest("Call chain id is too large.")
+  }
+  const requestedChainId = Number(requestedChain)
+  if (!supportedChainIds.includes(requestedChainId)) {
     throw new SliceWalletProviderRpcError(
       5710,
       "Requested chain is unsupported."
@@ -279,7 +285,10 @@ export const parseSliceWalletSendCalls = ({
   const paymasterService = parseSliceWalletCapabilities({
     allowRequestPaymaster: true,
     capabilities: input.capabilities,
-    paymasterAvailable
+    paymasterAvailable:
+      typeof paymasterAvailable === "function"
+        ? paymasterAvailable(requestedChainId)
+        : paymasterAvailable
   })
   const callInputs = array(input.calls, "Wallet calls")
   if (callInputs.length === 0 || callInputs.length > 64) {
@@ -312,6 +321,7 @@ export const parseSliceWalletSendCalls = ({
   }
   return {
     calls,
+    chainId: requestedChainId,
     ...(id === undefined ? {} : { id }),
     ...(paymasterService === undefined ? {} : { paymasterService })
   }
@@ -326,7 +336,6 @@ export const parseSliceWalletTransaction = (
   }
   const input = record(items[0], "Transaction request")
   const ignoredQuantityFields = [
-    "chainId",
     "gas",
     "gasPrice",
     "maxFeePerGas",
@@ -334,13 +343,27 @@ export const parseSliceWalletTransaction = (
     "nonce",
     "type"
   ] as const
-  assertKeys(input, ["from", "to"], ["data", ...ignoredQuantityFields, "value"])
+  assertKeys(
+    input,
+    ["from", "to"],
+    ["chainId", "data", ...ignoredQuantityFields, "value"]
+  )
   // EOA transaction gas and nonce hints cannot be honored by an ERC-4337
   // account. Validate their wire shape, then derive the UserOperation fields.
   for (const field of ignoredQuantityFields) {
     if (input[field] !== undefined) {
       quantity(input[field], `Transaction ${field}`)
     }
+  }
+  const transactionChainId =
+    input.chainId === undefined
+      ? undefined
+      : quantity(input.chainId, "Transaction chainId")
+  if (
+    transactionChainId !== undefined &&
+    transactionChainId > BigInt(Number.MAX_SAFE_INTEGER)
+  ) {
+    throw invalidProviderRequest("Transaction chainId is too large.")
   }
   return {
     call: {
@@ -352,6 +375,9 @@ export const parseSliceWalletTransaction = (
           ? 0n
           : quantity(input.value, "Transaction value")
     },
+    ...(transactionChainId === undefined
+      ? {}
+      : { chainId: Number(transactionChainId) }),
     from: address(input.from, "Transaction sender")
   }
 }

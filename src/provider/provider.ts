@@ -123,12 +123,54 @@ const parseWalletConnect = (
       "wallet_connect capabilities must be an object."
     )
   }
-  const capabilities = Object.keys(input.capabilities)
-  if (capabilities.length > 0) {
+  for (const [name, capability] of Object.entries(input.capabilities)) {
+    if (
+      typeof capability === "object" &&
+      capability !== null &&
+      !Array.isArray(capability) &&
+      Reflect.get(capability, "optional") === true
+    ) {
+      continue
+    }
     throw new SliceWalletProviderRpcError(
       5700,
-      `Unsupported wallet_connect capability: ${capabilities[0]}.`
+      `Unsupported wallet_connect capability: ${name}.`
     )
+  }
+}
+
+const assertEthAccountsRequest = (
+  params: SliceWalletProviderRequestArguments["params"]
+) => {
+  const values = paramsArray(params, "wallet_requestPermissions")
+  const permissions = values[0]
+  if (
+    values.length !== 1 ||
+    typeof permissions !== "object" ||
+    permissions === null ||
+    Array.isArray(permissions) ||
+    Object.keys(permissions).length !== 1 ||
+    typeof permissions.eth_accounts !== "object" ||
+    permissions.eth_accounts === null ||
+    Array.isArray(permissions.eth_accounts)
+  ) {
+    throw invalidProviderRequest("Only eth_accounts permission is supported.")
+  }
+}
+
+const assertEthAccountsRevocation = (
+  params: SliceWalletProviderRequestArguments["params"]
+) => {
+  const values = paramsArray(params, "wallet_revokePermissions")
+  const permission = values[0]
+  if (
+    values.length !== 1 ||
+    typeof permission !== "object" ||
+    permission === null ||
+    Array.isArray(permission) ||
+    permission.parentCapability !== "eth_accounts"
+  ) {
+    throw invalidProviderRequest("Only eth_accounts permission is supported.")
   }
 }
 
@@ -218,11 +260,12 @@ export const createSliceWalletProviderInternal = (
 
   const disconnect = async () => {
     const before = await runtime.getAccounts()
-    await runtime.disconnect()
+    const cleanup = runtime.disconnect()
     if (before.length > 0) {
       emit("accountsChanged", [])
       emit("disconnect", { code: 4900, message: "Slice Wallet disconnected." })
     }
+    await cleanup
   }
 
   const request = async ({
@@ -252,25 +295,7 @@ export const createSliceWalletProviderInternal = (
       return undefined
     }
     if (method === "wallet_requestPermissions") {
-      const values = paramsArray(params, "wallet_requestPermissions")
-      if (values.length !== 1) {
-        throw invalidProviderRequest(
-          "wallet_requestPermissions expects one parameter."
-        )
-      }
-      const permissions = values[0]
-      if (
-        typeof permissions !== "object" ||
-        permissions === null ||
-        Array.isArray(permissions) ||
-        Object.keys(permissions).length !== 1 ||
-        typeof permissions.eth_accounts !== "object" ||
-        permissions.eth_accounts === null
-      ) {
-        throw invalidProviderRequest(
-          "Only eth_accounts permission is supported."
-        )
-      }
+      assertEthAccountsRequest(params)
       await connect()
       return [accountPermission(origin)]
     }
@@ -280,6 +305,7 @@ export const createSliceWalletProviderInternal = (
         : [accountPermission(origin)]
     }
     if (method === "wallet_revokePermissions") {
+      assertEthAccountsRevocation(params)
       await disconnect()
       return null
     }
@@ -356,14 +382,16 @@ export const createSliceWalletProviderInternal = (
         account,
         chainId: runtime.chainId,
         params,
-        paymasterAvailable: runtime.paymasterAvailable(runtime.chainId)
+        paymasterAvailable: runtime.paymasterAvailable,
+        supportedChainIds: runtime.supportedChainIds
       })
       return {
         id: (
           await runtime.sendCalls(
             request.calls,
             request.id,
-            request.paymasterService
+            request.paymasterService,
+            request.chainId
           )
         ).id
       }
@@ -378,6 +406,15 @@ export const createSliceWalletProviderInternal = (
       const account = await getConnectedAccount(runtime)
       const transaction = parseSliceWalletTransaction(params)
       assertAccountParam(transaction.from, account)
+      if (
+        transaction.chainId !== undefined &&
+        transaction.chainId !== runtime.chainId
+      ) {
+        throw new SliceWalletProviderRpcError(
+          5710,
+          "Requested chain is configured but inactive; switch chains first."
+        )
+      }
       const chainId = runtime.chainId
       const submitted = await runtime.sendCalls([transaction.call])
       const receipt = await runtime.waitForSuccessfulUserOperation(

@@ -36,4 +36,20 @@ describe("device ceremony protocol", () => {
       })
     ).toThrow("invalid")
   })
+
+  it("accepts an atomic device promotion result", () => {
+    expect(
+      parseSliceWalletCeremonyDeviceResponse({
+        account: "0x1000000000000000000000000000000000000001",
+        action: "promote",
+        chainId: 8453,
+        credentialIdHash,
+        nonce,
+        permissionId: "0x12345678",
+        type: "slice-wallet:ceremony-device",
+        userOperationHash: `0x${"44".repeat(32)}`,
+        version: 1
+      })
+    ).toMatchObject({ action: "promote", credentialIdHash })
+  })
 })

@@ -24,7 +24,9 @@ export const parseSliceWalletCeremonyDeviceResponse = (
   if (
     Object.keys(value).length !== 9 ||
     value.version !== 1 ||
-    (value.action !== "add" && value.action !== "remove") ||
+    (value.action !== "add" &&
+      value.action !== "promote" &&
+      value.action !== "remove") ||
     typeof value.account !== "string" ||
     !isAddress(value.account) ||
     typeof value.chainId !== "number" ||

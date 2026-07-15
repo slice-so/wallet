@@ -10,7 +10,7 @@ import {
 } from "./popup"
 
 const manageSliceWalletDevice = async (
-  action: "add" | "remove",
+  action: "add" | "promote" | "remove",
   {
     account,
     ceremonyMode = "popup",
@@ -22,8 +22,8 @@ const manageSliceWalletDevice = async (
     window
   }: ManageSliceWalletDeviceParameters
 ) => {
-  if (action === "remove" && credentialIdHash === undefined) {
-    throw new Error("Removing a device requires its credential id hash.")
+  if (action !== "add" && credentialIdHash === undefined) {
+    throw new Error("This device action requires its credential id hash.")
   }
   const nonceBytes = new Uint8Array(32)
   window.crypto.getRandomValues(nonceBytes)
@@ -80,3 +80,7 @@ export const addSliceWalletDevice = (
 export const removeSliceWalletDevice = (
   parameters: ManageSliceWalletDeviceParameters
 ) => manageSliceWalletDevice("remove", parameters)
+
+export const promoteSliceWalletDevice = (
+  parameters: ManageSliceWalletDeviceParameters
+) => manageSliceWalletDevice("promote", parameters)

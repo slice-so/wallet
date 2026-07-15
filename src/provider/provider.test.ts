@@ -81,6 +81,10 @@ const createRuntime = () => {
   const getGrants = mock(async () => [publicGrant])
   const revokeGrant = mock(async () => {})
   const rotateGrant = mock(async () => publicGrant)
+  const sendCalls = mock(async (_calls, requestedId?: string) => ({
+    id: requestedId ?? "generated-id",
+    userOperationHash
+  }))
   const runtime = {
     get chainId() {
       return chainId
@@ -102,10 +106,7 @@ const createRuntime = () => {
     paymasterAvailable: mock(() => false),
     revokeGrant,
     rotateGrant,
-    sendCalls: mock(async (_calls, requestedId?: string) => ({
-      id: requestedId ?? "generated-id",
-      userOperationHash
-    })),
+    sendCalls,
     signMessage: mock(async () => userOperationHash),
     signTypedData: mock(async () => userOperationHash),
     supportedChainIds: [base.id, optimism.id],
@@ -126,6 +127,7 @@ const createRuntime = () => {
     getGrants,
     revokeGrant,
     rotateGrant,
+    sendCalls,
     runtime
   }
 }
@@ -175,6 +177,14 @@ describe("Slice Wallet provider dispatch", () => {
       ]),
       5700
     )
+    expect(
+      await request(provider, "wallet_connect", [
+        {
+          capabilities: { signInWithEthereum: { optional: true } },
+          version: "1"
+        }
+      ])
+    ).toEqual({ accounts: [{ address: account, capabilities: {} }] })
     await expectRpcError(
       request(provider, "wallet_connect", [{ capabilities: {}, version: "2" }]),
       -32602
@@ -276,5 +286,95 @@ describe("Slice Wallet provider dispatch", () => {
     expect(disconnectEvents).toEqual([
       { code: 4900, message: "Slice Wallet disconnected." }
     ])
+  })
+
+  test("accepts configured add-chain requests and rejects unknown chains", async () => {
+    const { provider } = createProvider()
+
+    expect(
+      await request(provider, "wallet_addEthereumChain", [
+        { chainId: numberToHex(optimism.id), chainName: "Optimism" }
+      ])
+    ).toBeNull()
+    await expectRpcError(
+      request(provider, "wallet_addEthereumChain", [{ chainId: "0x89" }]),
+      4902
+    )
+  })
+
+  test("rejects a transaction bound to a configured but inactive chain", async () => {
+    const { provider } = createProvider()
+    await expectRpcError(
+      request(provider, "eth_sendTransaction", [
+        {
+          chainId: numberToHex(optimism.id),
+          from: account,
+          to: account
+        }
+      ]),
+      5710
+    )
+  })
+
+  test("routes sendCalls to a configured inactive chain", async () => {
+    const { provider, sendCalls } = createProvider()
+
+    expect(
+      await request(provider, "wallet_sendCalls", [
+        {
+          atomicRequired: true,
+          calls: [{ to: account }],
+          chainId: numberToHex(optimism.id),
+          from: account,
+          version: "2.0.0"
+        }
+      ])
+    ).toEqual({ id: "generated-id" })
+    expect(sendCalls).toHaveBeenCalledWith(
+      [{ data: "0x", to: account, value: 0n }],
+      undefined,
+      undefined,
+      optimism.id
+    )
+  })
+
+  test("validates the permission being revoked", async () => {
+    const { disconnect, provider } = createProvider()
+
+    await expectRpcError(
+      request(provider, "wallet_revokePermissions", [
+        { parentCapability: "personal_sign" }
+      ]),
+      -32602
+    )
+    expect(disconnect).not.toHaveBeenCalled()
+    expect(
+      await request(provider, "wallet_revokePermissions", [
+        { parentCapability: "eth_accounts" }
+      ])
+    ).toBeNull()
+    expect(disconnect).toHaveBeenCalledTimes(1)
+  })
+
+  test("emits local disconnect state before cleanup settles", async () => {
+    const { disconnect, provider } = createProvider()
+    const events: string[] = []
+    let rejectCleanup: ((error: Error) => void) | undefined
+    disconnect.mockImplementation(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectCleanup = reject
+        })
+    )
+    provider.on("accountsChanged", () => events.push("accountsChanged"))
+    provider.on("disconnect", () => events.push("disconnect"))
+
+    const requestPromise = request(provider, "wallet_disconnect")
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(events).toEqual(["accountsChanged", "disconnect"])
+
+    rejectCleanup?.(new Error("cleanup failed"))
+    await expect(requestPromise).rejects.toThrow("cleanup failed")
   })
 })

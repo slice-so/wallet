@@ -121,6 +121,40 @@ describe("authorizeSliceWalletSession", () => {
     expect(visibility).toEqual([true, false])
   })
 
+  it("rejects a multichain batch whose hidden policy differs", async () => {
+    const secondPublicKey = `0x04${"66".repeat(64)}` as Hex
+    const secondSignerId = getSliceWalletP256SignerId(secondPublicKey)
+    const secondPolicy = {
+      ...policy,
+      calls: [
+        createErc20ApproveCallRule({
+          maximumAmount: 1_000n,
+          spender,
+          token
+        })
+      ],
+      chainId: 10
+    } as const
+    const broaderSession = {
+      ...session,
+      chainId: 10,
+      permissionId: getWalletPermissionId(secondPolicy, secondSignerId),
+      policy: secondPolicy,
+      publicKey: secondPublicKey,
+      signerId: secondSignerId
+    } as const
+
+    await expect(
+      authorizeSliceWalletSessions({
+        frameClient: createFrameClient().client,
+        idOrigin: "https://id.slice.so",
+        sessions: [session, broaderSession],
+        timeoutMs: 100,
+        window: createWindow({ isActive: false, open: () => null })
+      })
+    ).rejects.toThrow("same policy")
+  })
+
   it("uses the frame continuation without attempting a popup after activation expires", async () => {
     const open = mock(() => null)
     const { client, visibility } = createFrameClient()

@@ -96,7 +96,7 @@ export type SliceWalletCeremonyRootResponse =
 
 export type SliceWalletCeremonyDeviceMessage = {
   account: Address
-  action: "add" | "remove"
+  action: "add" | "promote" | "remove"
   chainId: number
   credentialIdHash: Hex
   nonce: Hex

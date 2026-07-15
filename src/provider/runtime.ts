@@ -7,7 +7,6 @@ import {
 } from "viem"
 import {
   createBundlerClient,
-  createPaymasterClient,
   type SmartAccount
 } from "viem/account-abstraction"
 import { connectSliceWalletAccount } from "../ceremony/accountClient"
@@ -47,6 +46,7 @@ import type {
   SliceWalletRequestPaymasterService,
   StoredGenericGrant
 } from "../types/providerInternal"
+import { createSliceWalletAccountBundler } from "./accountBundler"
 import { createSliceWalletCallTracker } from "./callTracker"
 import {
   invalidProviderRequest,
@@ -227,23 +227,17 @@ const createSliceWalletChainRuntime = (
   const createAccountBundler = (
     account: SmartAccount,
     paymasterService?: SliceWalletRequestPaymasterService
-  ) => {
-    const paymasterUrl = paymasterService?.url ?? config.paymasterUrl
-    const paymasterClient =
-      paymasterUrl === undefined
-        ? undefined
-        : createPaymasterClient({ transport: http(paymasterUrl) })
-    return createBundlerClient({
+  ) =>
+    createSliceWalletAccountBundler({
       account,
+      bundlerUrl: config.bundlerUrl,
       chain: config.chain,
       client: publicClient,
-      ...(paymasterClient === undefined ? {} : { paymaster: paymasterClient }),
-      ...(paymasterService?.context === undefined
+      ...(config.paymasterUrl === undefined
         ? {}
-        : { paymasterContext: paymasterService.context.value }),
-      transport: http(config.bundlerUrl)
+        : { defaultPaymasterUrl: config.paymasterUrl }),
+      ...(paymasterService === undefined ? {} : { paymasterService })
     })
-  }
 
   const waitForSuccessfulUserOperation = async (hash: Hex) => {
     const receipt = await receiptClient.waitForUserOperationReceipt({ hash })
@@ -575,6 +569,7 @@ const createSliceWalletChainRuntime = (
       const wallet = await hydrate()
       return wallet === null ? [] : [wallet.rootAccount.address]
     },
+    hasCall: callTracker.hasCall,
     getCallsStatus: callTracker.getCallsStatus,
     getGrants,
     paymasterAvailable: config.paymasterUrl !== undefined,
@@ -627,7 +622,11 @@ export const createSliceWalletProviderRuntime = (
   const getCallRuntime = (id: string) => {
     const { storage } = getBrowserDependencies(config)
     const call = readStoredSliceWalletCall(storage, id)
-    return getChainRuntime(call?.chainId ?? activeChainId)
+    if (call !== null) return getChainRuntime(call.chainId)
+    for (const runtime of runtimes.values()) {
+      if (runtime.hasCall(id)) return runtime
+    }
+    return getChainRuntime(activeChainId)
   }
 
   return {
@@ -643,11 +642,15 @@ export const createSliceWalletProviderRuntime = (
       runtimes.clear()
     },
     disconnect: async () => {
-      for (const chainId of chainConfigs.keys()) {
-        await getChainRuntime(chainId).revokeGrant()
-      }
       const { storage } = getBrowserDependencies(config)
+      const revocations = [...chainConfigs.keys()].map((chainId) =>
+        getChainRuntime(chainId).revokeGrant()
+      )
       clearStoredSliceWalletAccount(storage)
+      for (const chainId of chainConfigs.keys()) {
+        clearStoredSliceWalletGrant(storage, chainId)
+      }
+      await Promise.allSettled(revocations)
       for (const runtime of runtimes.values()) runtime.destroy()
       runtimes.clear()
     },
@@ -665,8 +668,13 @@ export const createSliceWalletProviderRuntime = (
     rotateGrant: (
       ...args: Parameters<SliceWalletChainRuntime["rotateGrant"]>
     ) => getChainRuntime().rotateGrant(...args),
-    sendCalls: (...args: Parameters<SliceWalletChainRuntime["sendCalls"]>) =>
-      getChainRuntime().sendCalls(...args),
+    sendCalls: (
+      calls: Parameters<SliceWalletChainRuntime["sendCalls"]>[0],
+      requestedId?: Parameters<SliceWalletChainRuntime["sendCalls"]>[1],
+      paymasterService?: Parameters<SliceWalletChainRuntime["sendCalls"]>[2],
+      chainId = activeChainId
+    ) =>
+      getChainRuntime(chainId).sendCalls(calls, requestedId, paymasterService),
     signMessage: (
       ...args: Parameters<SliceWalletChainRuntime["signMessage"]>
     ) => getChainRuntime().signMessage(...args),

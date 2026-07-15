@@ -76,6 +76,10 @@ const p256CanaryInput = concatHex([
   "0x4a03ef9f92eb268cafa601072489a56380fa0dc43171d7712813b3a19a1eb5e5",
   "0x3e213e28a608ce9a2f4a17fd830c6654018a79b3e0263d91a8ba90622df6f2f0"
 ])
+const invalidP256CanaryInput = concatHex([
+  p256CanaryInput.slice(0, -2) as Hex,
+  p256CanaryInput.endsWith("00") ? "0x01" : "0x00"
+])
 
 type UserOperationCanary = {
   accountAddress: Address
@@ -169,16 +173,29 @@ assert(
   "FactoryStaker deployment facts do not match live state."
 )
 
-const callP256Verifier = async (address: Address) =>
-  (await client.call({ data: p256CanaryInput, to: address })).data ===
-  successfulP256Result
+const callP256Verifier = async (
+  address: Address,
+  input: Hex = p256CanaryInput
+) => (await client.call({ data: input, to: address })).data
 
-const rip7212Available = await callP256Verifier(rip7212Precompile)
-const daimoVerifierPassed = await callP256Verifier(
-  getAddress(deployment.contracts.p256Verifier.address)
+const isSuccessfulP256Result = (result: Hex | undefined) =>
+  result === successfulP256Result
+
+const isRejectedP256Result = (result: Hex | undefined) =>
+  result === undefined || /^0x0*$/.test(result)
+
+const rip7212Available =
+  isSuccessfulP256Result(await callP256Verifier(rip7212Precompile)) &&
+  isRejectedP256Result(
+    await callP256Verifier(rip7212Precompile, invalidP256CanaryInput)
+  )
+const daimoVerifierPassed = isSuccessfulP256Result(
+  await callP256Verifier(getAddress(deployment.contracts.p256Verifier.address))
 )
-const soladyVerifierPassed = await callP256Verifier(
-  getAddress(deployment.contracts.soladyP256Verifier.address)
+const soladyVerifierPassed = isSuccessfulP256Result(
+  await callP256Verifier(
+    getAddress(deployment.contracts.soladyP256Verifier.address)
+  )
 )
 const p256CanaryPassed =
   daimoVerifierPassed &&

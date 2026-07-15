@@ -5,6 +5,7 @@ import { readFileSync, writeFileSync } from "node:fs"
 import { resolve } from "node:path"
 import deployments from "../../contracts/core/deployments/addresses.json"
 import policy from "../config/chains.policy.json"
+import { hasCompleteSliceWalletAdmissionEvidence } from "./lib/chainAdmission"
 
 const outputPath = resolve(import.meta.dir, "../src/chains.ts")
 const checkOnly = process.argv.includes("--check")
@@ -75,18 +76,7 @@ const entries = chainIds.map((chainId) => {
       }
     ])
   )
-  const runtimeHashesMatch = Object.values(deployment.contracts).every(
-    (contract) =>
-      contract.deployedRuntimeCodeHash !== null &&
-      contract.deployedRuntimeCodeHash === contract.expectedRuntimeCodeHash
-  )
-  const admitted =
-    deployment.status === "admitted" &&
-    runtimeHashesMatch &&
-    deployment.verification.factoryStakerApproved &&
-    deployment.verification.p256CanaryPassed &&
-    deployment.verification.userOperationCanary !== null &&
-    deployment.verification.verifiedAtBlock !== null
+  const admitted = hasCompleteSliceWalletAdmissionEvidence(deployment)
 
   return {
     admitted,

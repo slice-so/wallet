@@ -1,11 +1,11 @@
 #!/usr/bin/env bun
 
 import {
-  concat,
   createPublicClient,
   createWalletClient,
   defineChain,
   getAddress,
+  hashTypedData,
   http
 } from "viem"
 import {
@@ -14,32 +14,37 @@ import {
   getUserOperationHash
 } from "viem/account-abstraction"
 import { privateKeyToAccount } from "viem/accounts"
-import { createSliceWalletKernelAccount } from "../src/account"
 import { sliceWalletEntryPoint } from "../src/constants"
 import {
   encodeSliceWalletSyntheticWebAuthnSignature,
   generateSliceWalletP256KeyPair
 } from "../src/p256"
 import {
-  buildSliceWalletPermissionInstallCalls,
+  buildSliceWalletPermissionEnableTypedData,
   createSliceWalletPermissionAccount
 } from "../src/permissionAccount"
 import {
   createNativeTransferCallRule,
   getWalletPermissionId
 } from "../src/policy"
-import { getSliceWalletCredentialIdHash } from "../src/registry"
+import { buildRecoveryPermissionInitConfig } from "../src/recovery"
+import { createSliceWalletRegisteredKernelAccount } from "../src/rootValidator"
 import type {
   SliceWalletFrameSession,
   SliceWalletSignerFrameClient
 } from "../src/types/frame"
-import { canaryCredential, canaryGetFn, canaryRpId } from "./lib/canaryWebAuthn"
 
 const broadcaster = privateKeyToAccount(
   "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 )
 const recipient = "0x0000000000000000000000000000000000008128" as const
 const depositValue = 20_000_000_000_000_000n
+const rootKey = await generateSliceWalletP256KeyPair()
+const registeredRootCredential = {
+  credentialIdHash:
+    "0xa5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5" as const,
+  publicKey: rootKey.publicKeyHex
+}
 
 const configurations = [
   {
@@ -66,11 +71,24 @@ const results = await Promise.all(
     if ((await publicClient.getChainId()) !== chainId) {
       throw new Error(`Wallet e2e RPC ${rpcUrl} returned the wrong chain.`)
     }
-    const account = await createSliceWalletKernelAccount({
+    const recovery = await buildRecoveryPermissionInitConfig({
       client: publicClient,
-      credential: canaryCredential,
-      getFn: canaryGetFn,
-      rpId: canaryRpId
+      recoverySignerAddress: broadcaster.address
+    })
+    const account = await createSliceWalletRegisteredKernelAccount({
+      chainId,
+      client: publicClient,
+      credential: registeredRootCredential,
+      initConfig: recovery.initConfig,
+      rootSigner: (challenge) =>
+        encodeSliceWalletSyntheticWebAuthnSignature({
+          chainId,
+          challenge,
+          key: rootKey.privateKey,
+          origin: "http://localhost",
+          rpId: "localhost",
+          usePrecompiled: false
+        })
     })
     const sessionKey = await generateSliceWalletP256KeyPair()
     const validUntil = Math.floor(Date.now() / 1_000) + 3_600
@@ -93,10 +111,6 @@ const results = await Promise.all(
       publicKey: sessionKey.publicKeyHex,
       signerId: sessionKey.signerId
     } satisfies SliceWalletFrameSession
-    const registeredRootCredential = {
-      credentialIdHash: getSliceWalletCredentialIdHash(canaryCredential.id),
-      publicKey: concat(["0x04", canaryCredential.publicKey])
-    }
     const frameClient: SliceWalletSignerFrameClient = {
       destroy: () => {},
       request: async (request) => {
@@ -159,28 +173,26 @@ const results = await Promise.all(
     if (!deploymentReceipt.success) {
       throw new Error(`Wallet e2e deployment failed on chain ${chainId}.`)
     }
-    const install = await buildSliceWalletPermissionInstallCalls({
-      account: account.address,
+    const enableTypedData = await buildSliceWalletPermissionEnableTypedData({
+      address: account.address,
       client: publicClient,
+      credential: registeredRootCredential,
       session
     })
-    const installHash = await rootBundlerClient.sendUserOperation({
-      calls: install.calls
+    const enableSignature = await encodeSliceWalletSyntheticWebAuthnSignature({
+      chainId,
+      challenge: hashTypedData(enableTypedData),
+      key: rootKey.privateKey,
+      origin: "http://localhost",
+      rpId: "localhost",
+      usePrecompiled: false
     })
-    const installReceipt = await rootBundlerClient.waitForUserOperationReceipt({
-      hash: installHash
-    })
-    if (!installReceipt.success) {
-      throw new Error(
-        `Wallet e2e permission install failed on chain ${chainId}.`
-      )
-    }
 
     const permissionAccount = await createSliceWalletPermissionAccount({
       address: account.address,
       client: publicClient,
       credential: registeredRootCredential,
-      enableSignature: "0x",
+      enableSignature,
       frameClient,
       mode: "generic",
       session

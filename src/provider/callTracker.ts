@@ -72,6 +72,7 @@ export const createSliceWalletCallTracker = ({
   }
 
   return {
+    hasCall: (id: string) => memoryCalls.has(id),
     getCallsStatus: async (id: string) => {
       const call = memoryCalls.get(id) ?? readStoredSliceWalletCall(storage, id)
       if (call === null || call === undefined) {

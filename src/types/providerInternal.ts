@@ -41,6 +41,7 @@ export type StoredWalletCall = {
 
 export type ParsedSliceWalletSendCalls = {
   calls: readonly WalletCall[]
+  chainId: number
   id?: string
   paymasterService?: SliceWalletRequestPaymasterService
 }
@@ -63,5 +64,6 @@ export type SliceWalletRequestPaymasterService = {
 
 export type ParsedSliceWalletTransaction = {
   call: WalletCall
+  chainId?: number
   from: Address
 }

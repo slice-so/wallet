@@ -37,8 +37,26 @@ describe("portable wallet provider protocol", () => {
       ])
     ).toEqual({
       call: { data: "0x1234", to: recipient, value: 1n },
+      chainId,
       from: account
     })
+  })
+
+  test("preserves the transaction chain binding while dropping EOA-only hints", () => {
+    expect(
+      parseSliceWalletTransaction([
+        { chainId: "0xa", from: account, to: recipient }
+      ]).chainId
+    ).toBe(10)
+    expect(() =>
+      parseSliceWalletTransaction([
+        {
+          chainId: "0x20000000000000",
+          from: account,
+          to: recipient
+        }
+      ])
+    ).toThrow("chainId is too large")
   })
 
   test("maps supported generic templates to exact on-chain rules", () => {
@@ -174,6 +192,21 @@ describe("portable wallet provider protocol", () => {
       { data: "0x", to: recipient, value: 1n }
     ])
 
+    expect(
+      parseSliceWalletSendCalls({
+        ...baseRequest,
+        params: asProviderValue([
+          {
+            atomicRequired: true,
+            calls: [{ to: recipient }],
+            chainId: "0xa",
+            version: "2.0.0"
+          }
+        ]),
+        supportedChainIds: [chainId, 10]
+      }).chainId
+    ).toBe(10)
+
     try {
       parseSliceWalletSendCalls({
         ...baseRequest,
@@ -245,6 +278,43 @@ describe("portable wallet provider protocol", () => {
         paymasterAvailable: false
       })
     ).toThrow("missing a required field")
+
+    expect(() =>
+      parseSliceWalletSendCalls({
+        account,
+        chainId,
+        params: asProviderValue([
+          {
+            atomicRequired: true,
+            calls: [{ to: recipient }],
+            chainId: numberToHex(chainId),
+            version: "1.0.0"
+          }
+        ]),
+        paymasterAvailable: false
+      })
+    ).toThrow("wallet_sendCalls 2.0.0")
+
+    try {
+      parseSliceWalletSendCalls({
+        account,
+        chainId,
+        params: asProviderValue([
+          {
+            atomicRequired: true,
+            calls: [{ to: recipient }],
+            chainId: "0x89",
+            version: "2.0.0"
+          }
+        ]),
+        paymasterAvailable: false,
+        supportedChainIds: [chainId, 10]
+      })
+      throw new Error("Expected unsupported chain rejection.")
+    } catch (error) {
+      expect(error).toBeInstanceOf(SliceWalletProviderRpcError)
+      expect((error as SliceWalletProviderRpcError).code).toBe(5710)
+    }
   })
 
   test("rejects request-scoped paymasters on individual calls", () => {
