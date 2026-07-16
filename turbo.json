@@ -19,7 +19,7 @@
         "build.ts",
         "config/chains.policy.json",
         "scripts/generate-chains.ts",
-        "../contracts/core/deployments/addresses.json"
+        "../contracts/wallet/deployments/addresses.json"
       ],
       "outputs": ["dist/**"]
     },
@@ -30,7 +30,7 @@
         "src/**/*.ts",
         "config/chains.policy.json",
         "scripts/generate-chains.ts",
-        "../contracts/core/deployments/addresses.json"
+        "../contracts/wallet/deployments/addresses.json"
       ]
     }
   }

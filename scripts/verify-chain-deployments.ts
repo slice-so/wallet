@@ -12,7 +12,7 @@ import {
   parseEventLogs,
   zeroAddress
 } from "viem"
-import deployments from "../../contracts/core/deployments/addresses.json"
+import deployments from "../../contracts/wallet/deployments/addresses.json"
 import policy from "../config/chains.policy.json"
 
 const rpcEnvironmentVariables = {
