@@ -95,15 +95,15 @@
   "scripts": {
     "admit:canary": "bun --conditions=development scripts/create-user-operation-canary.ts",
     "build": "bun run generate:chains:check && bun run build.ts",
-    "check": "biome check --write --unsafe && bun scripts/check-import-boundaries.ts",
-    "format": "biome format --write",
     "generate:chains": "bun scripts/generate-chains.ts",
     "generate:chains:check": "bun scripts/generate-chains.ts --check",
-    "lint": "biome lint --write && bun scripts/check-import-boundaries.ts",
     "test": "bun test",
     "test:e2e:two-chain": "bash ../../scripts/run-wallet-two-chain-e2e.sh",
+    "verify:chains": "bun scripts/verify-chain-deployments.ts",
     "type-check": "bun run generate:chains:check && tsc -p tsconfig.json --noEmit",
-    "verify:chains": "bun scripts/verify-chain-deployments.ts"
+    "format": "biome format --write",
+    "lint": "biome lint --write && bun scripts/check-import-boundaries.ts",
+    "check": "biome check --write --unsafe && bun scripts/check-import-boundaries.ts"
   },
   "publishConfig": {
     "access": "public"
