@@ -1,4 +1,4 @@
-import { toHex } from "viem"
+import { hashMessage, toHex } from "viem"
 import { createSliceWalletRegisteredKernelAccount } from "../rootValidator"
 import type {
   CreateSliceWalletCeremonyKernelAccountParameters,
@@ -60,7 +60,10 @@ export const createSliceWalletCeremonyKernelAccount = async ({
       throw new Error("A Slice Wallet root ceremony is already pending.")
     }
     const message = parameters.message
-    pendingMessage =
+    const request: Extract<
+      SliceWalletRootSignatureRequest,
+      { purpose: "message" }
+    > =
       typeof message === "string"
         ? { message, messageFormat: "text", purpose: "message" }
         : {
@@ -71,8 +74,9 @@ export const createSliceWalletCeremonyKernelAccount = async ({
             messageFormat: "hex",
             purpose: "message"
           }
+    pendingMessage = request
     try {
-      return await account.signMessage(parameters)
+      return await ceremonySigner(hashMessage(message), "message", request)
     } finally {
       pendingMessage = null
     }
