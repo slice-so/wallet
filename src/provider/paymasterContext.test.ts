@@ -31,11 +31,14 @@ describe("ERC-7677 paymaster context canonicalization", () => {
     Number.NaN,
     Number.POSITIVE_INFINITY,
     new Date(0)
-  ] as SliceWalletProviderValue[])("rejects non-JSON or non-plain context %#", (value) => {
-    expect(() => canonicalizeSliceWalletPaymasterContext(value)).toThrow(
-      "Paymaster context"
-    )
-  })
+  ] as SliceWalletProviderValue[])(
+    "rejects non-JSON or non-plain context %#",
+    (value) => {
+      expect(() => canonicalizeSliceWalletPaymasterContext(value)).toThrow(
+        "Paymaster context"
+      )
+    }
+  )
 
   test("rejects cycles, sparse arrays, and accessor properties", () => {
     const cycle: { self?: SliceWalletProviderValue } = {}
