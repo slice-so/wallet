@@ -2,12 +2,8 @@ import { buildPackage } from "../../build"
 import { dependencies, peerDependencies } from "./package.json"
 
 await buildPackage({
-  external: [...Object.keys(dependencies), ...Object.keys(peerDependencies)],
-  target: "browser"
-})
-
-const secondaryBuild = await Bun.build({
   entrypoints: [
+    "./src/index.ts",
     "./src/argon2id.ts",
     "./src/frame.ts",
     "./src/policy.ts",
@@ -17,16 +13,5 @@ const secondaryBuild = await Bun.build({
     "./src/wagmi.ts"
   ],
   external: [...Object.keys(dependencies), ...Object.keys(peerDependencies)],
-  format: "esm",
-  minify: true,
-  outdir: "./dist/esm",
-  sourcemap: "external",
   target: "browser"
 })
-
-if (!secondaryBuild.success) {
-  throw new AggregateError(
-    secondaryBuild.logs,
-    "Slice wallet subpath build failed"
-  )
-}

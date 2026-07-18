@@ -112,6 +112,7 @@
     "@zerodev/permissions": "5.6.3",
     "@zerodev/sdk": "5.5.10",
     "hash-wasm": "catalog:",
+    "ox": "catalog:",
     "permissionless": "catalog:",
     "viem": "catalog:"
   },
@@ -125,8 +126,7 @@
   },
   "devDependencies": {
     "@slice/typescript-config": "workspace:*",
-    "@wagmi/core": "catalog:",
-    "ox": "catalog:"
+    "@wagmi/core": "catalog:"
   },
   "repository": {
     "type": "git",
