@@ -35,6 +35,13 @@ const isSafariWebKit = (window: Window) => {
   )
 }
 
+const isIframeCapableOrigin = (location: Location) =>
+  location.protocol === "https:" ||
+  (location.protocol === "http:" &&
+    (location.hostname === "localhost" ||
+      location.hostname === "127.0.0.1" ||
+      location.hostname === "[::1]"))
+
 export const resolveSliceWalletCeremonyMode = ({
   document,
   mode,
@@ -52,6 +59,7 @@ export const resolveSliceWalletCeremonyMode = ({
       return "popup"
     }
   }
+  if (!isIframeCapableOrigin(window.location)) return "popup"
   if (mode === "popup") return mode
   if (mode === "iframe") return document === undefined ? "popup" : mode
   if (

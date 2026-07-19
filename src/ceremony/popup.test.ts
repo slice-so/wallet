@@ -182,6 +182,7 @@ describe("openSliceWalletCeremonyChannel", () => {
         }
       }) as Window["addEventListener"],
       isSecureContext: true,
+      location: { hostname: "shop.slice.so", protocol: "https:" },
       navigator: { userAgent: "Mozilla/5.0 Chrome/140.0 Safari/537.36" },
       removeEventListener: mock(() => undefined)
     })
@@ -240,6 +241,7 @@ describe("resolveSliceWalletCeremonyMode", () => {
   it("forces non-grant routes into a top-level popup", () => {
     const window = Object.assign(Object.create(null) as Window, {
       isSecureContext: true,
+      location: { hostname: "shop.slice.so", protocol: "https:" },
       navigator: { userAgent: "Mozilla/5.0 Chrome/140.0 Safari/537.36" }
     })
 
@@ -256,6 +258,7 @@ describe("resolveSliceWalletCeremonyMode", () => {
   it("uses the iframe tray on supported secure browsers", () => {
     const window = Object.assign(Object.create(null) as Window, {
       isSecureContext: true,
+      location: { hostname: "shop.slice.so", protocol: "https:" },
       navigator: { userAgent: "Mozilla/5.0 Chrome/140.0 Safari/537.36" }
     })
 
@@ -271,6 +274,7 @@ describe("resolveSliceWalletCeremonyMode", () => {
   it("uses a top-level surface on Safari", () => {
     const window = Object.assign(Object.create(null) as Window, {
       isSecureContext: true,
+      location: { hostname: "shop.slice.so", protocol: "https:" },
       navigator: {
         userAgent:
           "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Version/18.5 Safari/605.1.15"
@@ -285,4 +289,41 @@ describe("resolveSliceWalletCeremonyMode", () => {
       })
     ).toBe("popup")
   })
+
+  it("uses a top-level surface on non-loopback HTTP origins", () => {
+    const window = Object.assign(Object.create(null) as Window, {
+      isSecureContext: false,
+      location: { hostname: "shop.example", protocol: "http:" },
+      navigator: { userAgent: "Mozilla/5.0 Chrome/140.0 Safari/537.36" }
+    })
+
+    expect(
+      resolveSliceWalletCeremonyMode({
+        document: Object.create(null) as Document,
+        mode: "iframe",
+        path: "/ceremony/grant",
+        window
+      })
+    ).toBe("popup")
+  })
+
+  it.each(["localhost", "127.0.0.1", "[::1]"])(
+    "permits the iframe tray on HTTP loopback host %s",
+    (hostname) => {
+      const window = Object.assign(Object.create(null) as Window, {
+        isSecureContext: true,
+        location: { hostname, protocol: "http:" },
+        navigator: { userAgent: "Mozilla/5.0 Chrome/140.0 Safari/537.36" }
+      })
+
+      expect(
+        resolveSliceWalletCeremonyMode({
+          document: Object.create(null) as Document,
+          mode: "auto",
+          path: "/ceremony/grant",
+          window
+        })
+      ).toBe("iframe")
+    }
+  )
 })
