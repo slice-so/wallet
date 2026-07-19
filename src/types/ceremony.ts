@@ -1,4 +1,4 @@
-import type { Address, Hex } from "viem"
+import type { Address, Hex, SignableMessage } from "viem"
 import type {
   CreateSliceWalletRegisteredKernelAccountParameters,
   SliceWalletRootSignatureRequest
@@ -144,7 +144,9 @@ export type AuthorizeSliceWalletSessionsParameters = Omit<
 
 export type ConnectSliceWalletAccountParameters = {
   ceremonyBroker?: SliceWalletCeremonyBroker
+  ceremonyMode?: SliceWalletCeremonyMode
   chainId: number
+  document?: Document
   fetch?: typeof fetch
   idOrigin: string
   timeoutMs?: number
@@ -181,6 +183,20 @@ export type ManageSliceWalletDeviceParameters = {
   credentialIdHash?: Hex
   document?: Document
   idOrigin: string
+  timeoutMs?: number
+  window: Window
+}
+
+export type RegisterRecoveredSliceWalletCredentialParameters = {
+  account: Address
+  ceremonyBroker?: SliceWalletCeremonyBroker
+  ceremonyMode?: SliceWalletCeremonyMode
+  chainId: number
+  document?: Document
+  idOrigin: string
+  recoveryPermissionId: Hex
+  recoverySignerAddress: Address
+  signMessage: (message: SignableMessage) => Promise<Hex>
   timeoutMs?: number
   window: Window
 }

@@ -69,6 +69,10 @@ const createPopupWindow = ({
         type: "slice-wallet:ceremony-authorization"
       }
     | {
+        authorizations: readonly SliceWalletPermissionAuthorization[]
+        type: "slice-wallet:ceremony-authorizations"
+      }
+    | {
         reason: "visibility_unstable"
         type: "slice-wallet:popup-required"
       }
@@ -116,8 +120,16 @@ const createPopupWindow = ({
       onMessage = listener
     },
     crypto: globalThis.crypto,
-    location: { origin: "https://shop.example" },
-    navigator: { userActivation: { isActive: true } },
+    isSecureContext: true,
+    location: {
+      hostname: "shop.example",
+      origin: "https://shop.example",
+      protocol: "https:"
+    },
+    navigator: {
+      userActivation: { isActive: true },
+      userAgent: "Mozilla/5.0 Chrome/140.0 Safari/537.36"
+    },
     open: mock(() => popup),
     removeEventListener: (_type: "message", listener: typeof onMessage) => {
       if (onMessage === listener) onMessage = null
@@ -274,6 +286,35 @@ describe("authorizeSliceWalletSession", () => {
         window: harnesslessWindow
       })
     ).rejects.toThrow("same policy")
+  })
+
+  it("forces direct broker-less batch iframe requests into a popup", async () => {
+    const harness = createPopupWindow({
+      responseForAttempt: () => ({
+        authorizations: [authorization],
+        type: "slice-wallet:ceremony-authorizations"
+      })
+    })
+    const result = authorizeSliceWalletSessions({
+      ceremonyMode: "iframe",
+      document: Object.create(null) as Document,
+      idOrigin: "https://id.slice.so",
+      sessions: [session],
+      timeoutMs: 100,
+      window: harness.window
+    })
+    queueMicrotask(() => {
+      harness.ready()?.(
+        new MessageEvent("message", {
+          data: { type: "slice-wallet:ceremony-ready", version: 1 },
+          origin: "https://id.slice.so",
+          source: harness.popup
+        })
+      )
+    })
+
+    await expect(result).resolves.toEqual([authorization])
+    expect(harness.window.open).toHaveBeenCalledTimes(1)
   })
 })
 

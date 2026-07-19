@@ -1,5 +1,10 @@
 import { describe, expect, it, mock } from "bun:test"
+import {
+  sliceWalletBrokerRequiredDialogRoutes,
+  sliceWalletDialogCeremonyRoutes
+} from "../ceremonyRoutes"
 import type { SliceWalletProtocolValue } from "../types"
+import { SliceWalletUserGestureRequiredError } from "./broker"
 import {
   openSliceWalletCeremonyChannel,
   resolveSliceWalletCeremonyMode,
@@ -86,7 +91,7 @@ describe("waitForSliceWalletCeremonyMessage", () => {
 })
 
 describe("openSliceWalletCeremonyChannel", () => {
-  it("opens the account ceremony in its top-level popup window", async () => {
+  it("keeps the direct public opener enforcing broker-required routes", async () => {
     const popup = Object.assign(Object.create(null) as WindowProxy, {
       close: mock(() => undefined),
       closed: false,
@@ -100,6 +105,8 @@ describe("openSliceWalletCeremonyChannel", () => {
       addEventListener: ((_type: "message", listener: typeof onMessage) => {
         onMessage = listener
       }) as Window["addEventListener"],
+      isSecureContext: true,
+      location: { hostname: "shop.slice.so", protocol: "https:" },
       matchMedia: () => ({ matches: false }),
       navigator: { userAgent: "Mozilla/5.0 Chrome/140.0 Safari/537.36" },
       open,
@@ -109,7 +116,9 @@ describe("openSliceWalletCeremonyChannel", () => {
     })
 
     const channelPromise = openSliceWalletCeremonyChannel({
+      document: Object.create(null) as Document,
       idOrigin: "https://id.slice.so",
+      mode: "iframe",
       nonce: `0x${"11".repeat(32)}`,
       path: "/ceremony/connect",
       readyTimeoutMs: 100,
@@ -235,10 +244,143 @@ describe("openSliceWalletCeremonyChannel", () => {
     channel.port.close()
     channel.surface.close()
   })
+
+  it("classifies only iframe readiness timeouts as unstable visibility", async () => {
+    const popup = Object.assign(Object.create(null) as WindowProxy, {
+      close: mock(() => undefined),
+      closed: false,
+      postMessage: mock(() => undefined)
+    })
+    const popupWindow = Object.assign(Object.create(null) as Window, {
+      addEventListener: mock(() => undefined),
+      matchMedia: () => ({ matches: false }),
+      navigator: { userAgent: "Mozilla/5.0 Chrome/140.0 Safari/537.36" },
+      open: () => popup,
+      removeEventListener: mock(() => undefined)
+    })
+    await expect(
+      openSliceWalletCeremonyChannel({
+        idOrigin: "https://id.slice.so",
+        nonce: `0x${"33".repeat(32)}`,
+        path: "/ceremony/root",
+        readyTimeoutMs: 1,
+        window: popupWindow
+      })
+    ).rejects.toThrow("bridge timed out")
+
+    const iframe = Object.assign(Object.create(null) as HTMLIFrameElement, {
+      contentWindow: Object.create(null) as WindowProxy,
+      sandbox: { add: () => undefined },
+      style: {}
+    })
+    const dialog = Object.assign(Object.create(null) as HTMLDivElement, {
+      appendChild: () => iframe,
+      dataset: {},
+      remove: () => undefined,
+      setAttribute: () => undefined,
+      style: {}
+    })
+    const document = Object.assign(Object.create(null) as Document, {
+      body: { appendChild: () => dialog },
+      createElement: ((tagName: string) =>
+        tagName === "iframe" ? iframe : dialog) as Document["createElement"]
+    })
+    const iframeWindow = Object.assign(Object.create(null) as Window, {
+      addEventListener: mock(() => undefined),
+      isSecureContext: true,
+      location: { hostname: "shop.slice.so", protocol: "https:" },
+      navigator: { userAgent: "Mozilla/5.0 Chrome/140.0 Safari/537.36" },
+      removeEventListener: mock(() => undefined)
+    })
+    const error = await openSliceWalletCeremonyChannel({
+      document,
+      idOrigin: "https://id.slice.so",
+      mode: "iframe",
+      nonce: `0x${"44".repeat(32)}`,
+      path: "/ceremony/root",
+      readyTimeoutMs: 1,
+      window: iframeWindow
+    }).catch((error: Error) => error)
+    expect(error).toBeInstanceOf(SliceWalletUserGestureRequiredError)
+    expect((error as SliceWalletUserGestureRequiredError).reason).toBe(
+      "visibility_unstable"
+    )
+  })
 })
 
 describe("resolveSliceWalletCeremonyMode", () => {
-  it("forces non-grant routes into a top-level popup", () => {
+  it("uses the shared route contract and rejects unknown or handoff routes", () => {
+    const window = Object.assign(Object.create(null) as Window, {
+      isSecureContext: true,
+      location: { hostname: "shop.slice.so", protocol: "https:" },
+      navigator: { userAgent: "Mozilla/5.0 Chrome/140.0 Safari/537.36" }
+    })
+    const brokerRequired = new Set<string>(
+      sliceWalletBrokerRequiredDialogRoutes
+    )
+    for (const route of sliceWalletDialogCeremonyRoutes) {
+      expect(
+        resolveSliceWalletCeremonyMode({
+          brokerAvailable: true,
+          document: Object.create(null) as Document,
+          mode: "iframe",
+          path: `/ceremony/${route}`,
+          window
+        })
+      ).toBe("iframe")
+      if (brokerRequired.has(route)) {
+        expect(
+          resolveSliceWalletCeremonyMode({
+            document: Object.create(null) as Document,
+            mode: "iframe",
+            path: `/ceremony/${route}`,
+            window
+          })
+        ).toBe("popup")
+      }
+    }
+    for (const route of ["device-handoff", "unknown"]) {
+      expect(
+        resolveSliceWalletCeremonyMode({
+          brokerAvailable: true,
+          document: Object.create(null) as Document,
+          mode: "iframe",
+          path: `/ceremony/${route}`,
+          window
+        })
+      ).toBe("popup")
+    }
+  })
+
+  it("never embeds without a document and lets explicit iframe override Safari", () => {
+    const window = Object.assign(Object.create(null) as Window, {
+      isSecureContext: false,
+      location: { hostname: "shop.slice.so", protocol: "https:" },
+      navigator: {
+        userAgent:
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Version/18.5 Safari/605.1.15"
+      }
+    })
+    expect(
+      resolveSliceWalletCeremonyMode({
+        brokerAvailable: true,
+        mode: "iframe",
+        path: "/ceremony/connect",
+        window
+      })
+    ).toBe("popup")
+    expect(
+      resolveSliceWalletCeremonyMode({
+        brokerAvailable: true,
+        document: Object.create(null) as Document,
+        mode: "iframe",
+        path: "/ceremony/connect",
+        window
+      })
+    ).toBe("iframe")
+  })
+
+  it("allows contracted non-grant routes in the iframe tray", () => {
     const window = Object.assign(Object.create(null) as Window, {
       isSecureContext: true,
       location: { hostname: "shop.slice.so", protocol: "https:" },
@@ -252,7 +394,7 @@ describe("resolveSliceWalletCeremonyMode", () => {
         path: "/ceremony/root",
         window
       })
-    ).toBe("popup")
+    ).toBe("iframe")
   })
 
   it("uses the iframe tray on supported secure browsers", () => {

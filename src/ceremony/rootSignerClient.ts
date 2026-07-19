@@ -10,6 +10,7 @@ import {
 import {
   createSliceWalletCeremonyNonce,
   openSliceWalletCeremonyChannel,
+  resolveSliceWalletCeremonyMode,
   waitForSliceWalletCeremonyMessage
 } from "./popup"
 import { parseSliceWalletCeremonyRootResponse } from "./protocol"
@@ -39,17 +40,29 @@ export const createSliceWalletCeremonyRootSigner =
       type: "slice-wallet:root-sign-request",
       version: 1
     } as const satisfies SliceWalletCeremonyRootSignRequest
-    const run = async (requireActiveGesture: boolean) => {
+    const resolvedMode = resolveSliceWalletCeremonyMode({
+      brokerAvailable: ceremonyBroker !== undefined,
+      document,
+      mode: ceremonyMode,
+      path: "/ceremony/root",
+      window
+    })
+    const run = async (
+      mode: "iframe" | "popup",
+      requireActiveGesture: boolean
+    ) => {
       if (
+        mode === "popup" &&
         requireActiveGesture &&
         window.navigator.userActivation?.isActive === false
       ) {
         throw new SliceWalletUserGestureRequiredError("user_activation_expired")
       }
       const { port, surface } = await openSliceWalletCeremonyChannel({
+        brokerAvailable: ceremonyBroker !== undefined,
         document,
         idOrigin,
-        mode: ceremonyMode,
+        mode,
         nonce: message.nonce,
         path: `/ceremony/root?account=${encodeURIComponent(account)}&chainId=${chainId}`,
         window
@@ -78,14 +91,14 @@ export const createSliceWalletCeremonyRootSigner =
       return response.signature
     }
     try {
-      return await run(true)
+      return await run(resolvedMode, true)
     } catch (error) {
       if (!(error instanceof SliceWalletUserGestureRequiredError)) throw error
       return requireSliceWalletPopupGesture({
         broker: ceremonyBroker,
         kind: "root_sign",
         reason: error.reason,
-        resume: () => run(false)
+        resume: () => run("popup", false)
       })
     }
   }

@@ -99,6 +99,7 @@ const grantKindValue = (value: SliceWalletProtocolValue): WalletGrantKind => {
 }
 
 const popupRequiredReasons = new Set([
+  "capability_unsupported",
   "io_v2_unsupported",
   "popup_blocked",
   "user_activation_expired",

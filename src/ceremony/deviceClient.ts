@@ -10,6 +10,7 @@ import {
 import { parseSliceWalletCeremonyDeviceResponse } from "./deviceProtocol"
 import {
   openSliceWalletCeremonyChannel,
+  resolveSliceWalletCeremonyMode,
   waitForSliceWalletCeremonyMessage
 } from "./popup"
 
@@ -42,17 +43,29 @@ const manageSliceWalletDevice = async (
   if (credentialIdHash !== undefined) {
     idUrl.searchParams.set("credentialIdHash", credentialIdHash)
   }
-  const run = async (requireActiveGesture: boolean) => {
+  const resolvedMode = resolveSliceWalletCeremonyMode({
+    brokerAvailable: ceremonyBroker !== undefined,
+    document,
+    mode: ceremonyMode,
+    path: `/ceremony/device-${action}`,
+    window
+  })
+  const run = async (
+    mode: "iframe" | "popup",
+    requireActiveGesture: boolean
+  ) => {
     if (
+      mode === "popup" &&
       requireActiveGesture &&
       window.navigator.userActivation?.isActive === false
     ) {
       throw new SliceWalletUserGestureRequiredError("user_activation_expired")
     }
     const channel = await openSliceWalletCeremonyChannel({
+      brokerAvailable: ceremonyBroker !== undefined,
       document,
       idOrigin,
-      mode: ceremonyMode,
+      mode,
       nonce,
       path: idUrl.href,
       popupName: `slice-wallet-device-${action}`,
@@ -88,7 +101,7 @@ const manageSliceWalletDevice = async (
     })
   }
   try {
-    return await run(true)
+    return await run(resolvedMode, true)
   } catch (error) {
     if (!(error instanceof SliceWalletUserGestureRequiredError)) throw error
     return requireSliceWalletPopupGesture({
@@ -100,7 +113,7 @@ const manageSliceWalletDevice = async (
             ? "device_handoff"
             : "device_enroll",
       reason: error.reason,
-      resume: () => run(false)
+      resume: () => run("popup", false)
     })
   }
 }

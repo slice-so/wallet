@@ -128,6 +128,35 @@ describe("wallet ceremony protocol parser", () => {
     ).toThrow("batch response")
   })
 
+  it("pins the complete popup-required reason contract", () => {
+    for (const reason of [
+      "capability_unsupported",
+      "io_v2_unsupported",
+      "popup_blocked",
+      "user_activation_expired",
+      "visibility_unstable",
+      "viewport_too_small",
+      "webauthn_unavailable"
+    ]) {
+      expect(
+        parseSliceWalletCeremonyResponse({
+          nonce,
+          reason,
+          type: "slice-wallet:popup-required",
+          version: 1
+        })
+      ).toMatchObject({ reason })
+    }
+    expect(() =>
+      parseSliceWalletCeremonyResponse({
+        nonce,
+        reason: "unknown_reason",
+        type: "slice-wallet:popup-required",
+        version: 1
+      })
+    ).toThrow("Ceremony popup response is invalid")
+  })
+
   it("requires an execution proof for management authorizations", () => {
     expect(
       parseSliceWalletPermissionAuthorization(managementAuthorization)

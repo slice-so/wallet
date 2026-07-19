@@ -12,29 +12,45 @@ import {
 import {
   createSliceWalletCeremonyNonce,
   openSliceWalletCeremonyChannel,
+  resolveSliceWalletCeremonyMode,
   waitForSliceWalletCeremonyMessage
 } from "./popup"
 import { parseSliceWalletCeremonyAccountResponse } from "./protocol"
 
 export const connectSliceWalletAccount = async ({
   ceremonyBroker,
+  ceremonyMode = "popup",
   chainId,
+  document,
   fetch,
   idOrigin,
   timeoutMs,
   window
 }: ConnectSliceWalletAccountParameters): Promise<SliceWalletConnectedAccount> => {
   const nonce = createSliceWalletCeremonyNonce(window)
-  const run = async (requireActiveGesture: boolean) => {
+  const resolvedMode = resolveSliceWalletCeremonyMode({
+    brokerAvailable: ceremonyBroker !== undefined,
+    document,
+    mode: ceremonyMode,
+    path: "/ceremony/connect",
+    window
+  })
+  const run = async (
+    mode: "iframe" | "popup",
+    requireActiveGesture: boolean
+  ) => {
     if (
+      mode === "popup" &&
       requireActiveGesture &&
       window.navigator.userActivation?.isActive === false
     ) {
       throw new SliceWalletUserGestureRequiredError("user_activation_expired")
     }
     const { port, surface } = await openSliceWalletCeremonyChannel({
+      brokerAvailable: ceremonyBroker !== undefined,
+      document,
       idOrigin,
-      mode: "popup",
+      mode,
       nonce,
       path: `/ceremony/connect?chainId=${chainId}`,
       window
@@ -60,14 +76,14 @@ export const connectSliceWalletAccount = async ({
   }
   let account: SliceWalletCeremonyAccountMessage
   try {
-    account = await run(true)
+    account = await run(resolvedMode, true)
   } catch (error) {
     if (!(error instanceof SliceWalletUserGestureRequiredError)) throw error
     account = await requireSliceWalletPopupGesture({
       broker: ceremonyBroker,
       kind: "connect",
       reason: error.reason,
-      resume: () => run(false)
+      resume: () => run("popup", false)
     })
   }
   const credential = await createSliceWalletRegistryClient({

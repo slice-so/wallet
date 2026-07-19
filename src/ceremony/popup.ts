@@ -1,4 +1,8 @@
 import { bytesToHex, type Hex } from "viem"
+import {
+  sliceWalletBrokerRequiredDialogRoutes,
+  sliceWalletDialogCeremonyRoutes
+} from "../ceremonyRoutes"
 import type {
   SliceWalletCeremonyMode,
   SliceWalletProtocolValue
@@ -42,25 +46,45 @@ const isIframeCapableOrigin = (location: Location) =>
       location.hostname === "127.0.0.1" ||
       location.hostname === "[::1]"))
 
+const dialogRoutes = new Set<string>(sliceWalletDialogCeremonyRoutes)
+const brokerRequiredDialogRoutes = new Set<string>(
+  sliceWalletBrokerRequiredDialogRoutes
+)
+
+const getCeremonyRoute = (path: string) => {
+  const match = /^\/ceremony\/([^/]+)$/.exec(
+    new URL(path, "https://slice.invalid").pathname
+  )
+  return match?.[1]
+}
+
 export const resolveSliceWalletCeremonyMode = ({
+  brokerAvailable = false,
   document,
   mode,
   path,
   window
 }: {
+  brokerAvailable?: boolean
   document?: Document
   mode: SliceWalletCeremonyMode
   path?: string
   window: Window
 }): Exclude<SliceWalletCeremonyMode, "auto"> => {
+  let route: string | undefined
   if (path !== undefined) {
-    const pathname = new URL(path, "https://slice.invalid").pathname
-    if (pathname !== "/ceremony/grant" && pathname !== "/ceremony/grants") {
-      return "popup"
-    }
+    route = getCeremonyRoute(path)
+    if (route === undefined || !dialogRoutes.has(route)) return "popup"
   }
-  if (!isIframeCapableOrigin(window.location)) return "popup"
   if (mode === "popup") return mode
+  if (!isIframeCapableOrigin(window.location)) return "popup"
+  if (
+    route !== undefined &&
+    brokerRequiredDialogRoutes.has(route) &&
+    !brokerAvailable
+  ) {
+    return "popup"
+  }
   if (mode === "iframe") return document === undefined ? "popup" : mode
   if (
     document === undefined ||
@@ -183,6 +207,7 @@ const createIframeSurface = ({
 }
 
 export const openSliceWalletCeremonyChannel = ({
+  brokerAvailable = false,
   document,
   idOrigin,
   mode = "popup",
@@ -192,6 +217,7 @@ export const openSliceWalletCeremonyChannel = ({
   readyTimeoutMs = 10_000,
   window
 }: {
+  brokerAvailable?: boolean
   document?: Document
   idOrigin: string
   mode?: SliceWalletCeremonyMode
@@ -203,16 +229,14 @@ export const openSliceWalletCeremonyChannel = ({
 }) => {
   const origin = new URL(idOrigin).origin
   const resolvedMode = resolveSliceWalletCeremonyMode({
+    brokerAvailable,
     document,
     mode,
     path,
     window
   })
   const url = new URL(path, origin)
-  if (
-    resolvedMode === "iframe" &&
-    (url.pathname === "/ceremony/grant" || url.pathname === "/ceremony/grants")
-  ) {
+  if (resolvedMode === "iframe" && getCeremonyRoute(url.href) !== undefined) {
     url.pathname = url.pathname.replace(/^\/ceremony\//, "/dialog/")
   }
   url.searchParams.set("nonce", nonce)
@@ -238,7 +262,11 @@ export const openSliceWalletCeremonyChannel = ({
     const timeout = setTimeout(() => {
       cleanup()
       surface.close()
-      reject(new Error("Slice Wallet ceremony bridge timed out."))
+      reject(
+        resolvedMode === "iframe"
+          ? new SliceWalletUserGestureRequiredError("visibility_unstable")
+          : new Error("Slice Wallet ceremony bridge timed out.")
+      )
     }, readyTimeoutMs)
     const closedPoll = setInterval(() => {
       if (!surface.closed) return

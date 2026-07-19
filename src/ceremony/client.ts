@@ -174,6 +174,7 @@ export const authorizeSliceWalletSession = async ({
   const normalizedIdOrigin = new URL(idOrigin).origin
   const nonce = randomNonce(window)
   const resolvedMode = resolveSliceWalletCeremonyMode({
+    brokerAvailable: ceremonyBroker !== undefined,
     document,
     mode: ceremonyMode,
     path: "/ceremony/grant",
@@ -191,6 +192,7 @@ export const authorizeSliceWalletSession = async ({
       throw new SliceWalletUserGestureRequiredError("user_activation_expired")
     }
     const channel = await openSliceWalletCeremonyChannel({
+      brokerAvailable: ceremonyBroker !== undefined,
       document,
       idOrigin: normalizedIdOrigin,
       mode,
@@ -261,6 +263,7 @@ export const authorizeSliceWalletSessions = async ({
   const normalizedIdOrigin = new URL(idOrigin).origin
   const nonce = randomNonce(window)
   const resolvedMode = resolveSliceWalletCeremonyMode({
+    brokerAvailable: ceremonyBroker !== undefined,
     document,
     mode: ceremonyMode,
     path: "/ceremony/grants",
@@ -278,6 +281,7 @@ export const authorizeSliceWalletSessions = async ({
       throw new SliceWalletUserGestureRequiredError("user_activation_expired")
     }
     const channel = await openSliceWalletCeremonyChannel({
+      brokerAvailable: ceremonyBroker !== undefined,
       document,
       idOrigin: normalizedIdOrigin,
       mode,

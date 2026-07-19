@@ -28,6 +28,16 @@
       "import": "./dist/esm/argon2id.js",
       "default": "./dist/esm/argon2id.js"
     },
+    "./ceremony-routes": {
+      "development": {
+        "types": "./src/ceremonyRoutes.ts",
+        "import": "./src/ceremonyRoutes.ts",
+        "default": "./src/ceremonyRoutes.ts"
+      },
+      "types": "./dist/esm/ceremonyRoutes.d.ts",
+      "import": "./dist/esm/ceremonyRoutes.js",
+      "default": "./dist/esm/ceremonyRoutes.js"
+    },
     "./frame": {
       "development": {
         "types": "./src/frame.ts",

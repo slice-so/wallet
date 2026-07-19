@@ -5,6 +5,7 @@ await buildPackage({
   entrypoints: [
     "./src/index.ts",
     "./src/argon2id.ts",
+    "./src/ceremonyRoutes.ts",
     "./src/frame.ts",
     "./src/policy.ts",
     "./src/provider.ts",

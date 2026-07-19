@@ -3,6 +3,7 @@ import type { SliceWalletPermissionAuthorization } from "./frame"
 import type { SliceWalletRegistryCredential } from "./registry"
 
 export type SliceWalletPopupRequiredReason =
+  | "capability_unsupported"
   | "io_v2_unsupported"
   | "popup_blocked"
   | "user_activation_expired"

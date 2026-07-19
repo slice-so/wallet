@@ -1,7 +1,6 @@
-import type { Address, Hex, SignableMessage } from "viem"
 import { formatSliceWalletExistingCredentialAuthorization } from "../registry"
 import type {
-  SliceWalletCeremonyBroker,
+  RegisterRecoveredSliceWalletCredentialParameters,
   SliceWalletProtocolValue,
   SliceWalletRecoveryHandoffAuthorizationResponse,
   SliceWalletRegistryCredential
@@ -12,8 +11,10 @@ import {
 } from "./broker"
 import {
   createSliceWalletCeremonyNonce,
-  openSliceWalletCeremonyChannel
+  openSliceWalletCeremonyChannel,
+  resolveSliceWalletCeremonyMode
 } from "./popup"
+import { parseSliceWalletCeremonyResponse } from "./protocol"
 import {
   parseSliceWalletRecoveryHandoffAuthorizationRequest,
   parseSliceWalletRecoveryHandoffResult
@@ -22,37 +23,43 @@ import {
 export const registerRecoveredSliceWalletCredential = async ({
   account,
   ceremonyBroker,
+  ceremonyMode = "popup",
   chainId,
+  document,
   idOrigin,
   recoveryPermissionId,
   recoverySignerAddress,
   signMessage,
   timeoutMs = 5 * 60_000,
   window
-}: {
-  account: Address
-  ceremonyBroker?: SliceWalletCeremonyBroker
-  chainId: number
-  idOrigin: string
-  recoveryPermissionId: Hex
-  recoverySignerAddress: Address
-  signMessage: (message: SignableMessage) => Promise<Hex>
-  timeoutMs?: number
-  window: Window
-}): Promise<{
+}: RegisterRecoveredSliceWalletCredentialParameters): Promise<{
   credentialId: string
   registry: SliceWalletRegistryCredential
 }> => {
   const nonce = createSliceWalletCeremonyNonce(window)
-  const run = async (requireActiveGesture: boolean) => {
+  const resolvedMode = resolveSliceWalletCeremonyMode({
+    brokerAvailable: ceremonyBroker !== undefined,
+    document,
+    mode: ceremonyMode,
+    path: "/ceremony/recovery",
+    window
+  })
+  const run = async (
+    mode: "iframe" | "popup",
+    requireActiveGesture: boolean
+  ) => {
     if (
+      mode === "popup" &&
       requireActiveGesture &&
       window.navigator.userActivation?.isActive === false
     ) {
       throw new SliceWalletUserGestureRequiredError("user_activation_expired")
     }
     const { port, surface } = await openSliceWalletCeremonyChannel({
+      brokerAvailable: ceremonyBroker !== undefined,
+      document,
       idOrigin,
+      mode,
       nonce,
       path: `/ceremony/recovery?account=${encodeURIComponent(account)}&chainId=${chainId}`,
       window
@@ -76,6 +83,22 @@ export const registerRecoveredSliceWalletCredential = async ({
         "message",
         async (event: MessageEvent<SliceWalletProtocolValue>) => {
           try {
+            if (
+              typeof event.data === "object" &&
+              event.data !== null &&
+              !Array.isArray(event.data) &&
+              "type" in event.data &&
+              event.data.type === "slice-wallet:popup-required"
+            ) {
+              const response = parseSliceWalletCeremonyResponse(event.data)
+              if (
+                response.type !== "slice-wallet:popup-required" ||
+                response.nonce !== nonce
+              ) {
+                throw new Error("Recovery popup response nonce does not match.")
+              }
+              throw new SliceWalletUserGestureRequiredError(response.reason)
+            }
             if (!signed) {
               const request =
                 parseSliceWalletRecoveryHandoffAuthorizationRequest(event.data)
@@ -147,14 +170,14 @@ export const registerRecoveredSliceWalletCredential = async ({
     })
   }
   try {
-    return await run(true)
+    return await run(resolvedMode, true)
   } catch (error) {
     if (!(error instanceof SliceWalletUserGestureRequiredError)) throw error
     return requireSliceWalletPopupGesture({
       broker: ceremonyBroker,
       kind: "recovery",
       reason: error.reason,
-      resume: () => run(false)
+      resume: () => run("popup", false)
     })
   }
 }
