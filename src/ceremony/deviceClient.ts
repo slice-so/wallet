@@ -93,7 +93,12 @@ const manageSliceWalletDevice = async (
     if (!(error instanceof SliceWalletUserGestureRequiredError)) throw error
     return requireSliceWalletPopupGesture({
       broker: ceremonyBroker,
-      kind: action === "promote" ? "device_promote" : "device_enroll",
+      kind:
+        action === "promote"
+          ? "device_promote"
+          : action === "add" && credentialIdHash === undefined
+            ? "device_handoff"
+            : "device_enroll",
       reason: error.reason,
       resume: () => run(false)
     })

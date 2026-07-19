@@ -172,6 +172,12 @@ export type SliceWalletFrameRequest =
     }
   | {
       id: string
+      method: "getPendingSession"
+      params: SliceWalletFrameSessionKey
+      version: 1
+    }
+  | {
+      id: string
       method: "signCheckoutProposal"
       params: {
         callData: Hex
@@ -208,7 +214,11 @@ export type SliceWalletFrameRequest =
       id: string
       method: "signSessionRequest"
       params: {
-        action: "finalize_replacement" | "revoke" | "status"
+        action:
+          | "finalize_replacement"
+          | "predecessor_descriptors"
+          | "revoke"
+          | "status"
         challenge: Hex
         delegationId: string
         expiresAt: number

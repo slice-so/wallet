@@ -1,4 +1,8 @@
 import type { Address, Hex } from "viem"
+import type {
+  SliceWalletCeremonyContinuationResult,
+  SliceWalletPendingCeremony
+} from "./pendingCeremony"
 import type { SerializedWalletPolicyDescriptor } from "./policy"
 
 export type SliceWalletProviderValue =
@@ -31,7 +35,10 @@ export type SliceWalletProviderEventMap = {
 }
 
 export type SliceWalletProvider = {
+  cancelPendingCeremony: () => void
+  continueInPopup: () => Promise<SliceWalletCeremonyContinuationResult>
   destroy: () => void
+  readonly pendingCeremony: SliceWalletPendingCeremony | null
   on: <Event extends keyof SliceWalletProviderEventMap>(
     event: Event,
     listener: (payload: SliceWalletProviderEventMap[Event]) => void

@@ -6,6 +6,7 @@ import type {
   SliceWalletPermissionAuthorization,
   SliceWalletProtocolValue
 } from "../types"
+import { createSliceWalletCeremonyBroker } from "./broker"
 import {
   authorizeSliceWalletSession,
   authorizeSliceWalletSessions
@@ -56,8 +57,24 @@ const authorization = {
   session
 } as const satisfies SliceWalletPermissionAuthorization
 
-const createPopupWindow = () => {
+const createPopupWindow = ({
+  responseForAttempt = () => ({
+    authorization,
+    type: "slice-wallet:ceremony-authorization" as const
+  })
+}: {
+  responseForAttempt?: (attempt: number) =>
+    | {
+        authorization: SliceWalletPermissionAuthorization
+        type: "slice-wallet:ceremony-authorization"
+      }
+    | {
+        reason: "visibility_unstable"
+        type: "slice-wallet:popup-required"
+      }
+} = {}) => {
   const close = mock(() => undefined)
+  let attempt = 0
   const popup = Object.assign(new MessageChannel().port1, {
     close,
     postMessage: ((
@@ -79,12 +96,12 @@ const createPopupWindow = () => {
       if (typeof input.nonce !== "string" || !(port instanceof MessagePort)) {
         throw new Error("Ceremony connect channel is invalid.")
       }
+      attempt += 1
       setTimeout(
         () =>
           port.postMessage({
-            authorization,
             nonce: input.nonce,
-            type: "slice-wallet:ceremony-authorization",
+            ...responseForAttempt(attempt),
             version: 1
           }),
         20
@@ -109,6 +126,16 @@ const createPopupWindow = () => {
   return { close, popup, ready: () => onMessage, window }
 }
 
+const waitForPendingCeremony = async (
+  broker: ReturnType<typeof createSliceWalletCeremonyBroker>
+) => {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    if (broker.getPending() !== null) return
+    await Bun.sleep(1)
+  }
+  throw new Error("The ceremony was not deferred.")
+}
+
 describe("authorizeSliceWalletSession", () => {
   it("keeps the consent timeout separate from popup readiness", async () => {
     const harness = createPopupWindow()
@@ -130,6 +157,94 @@ describe("authorizeSliceWalletSession", () => {
     })
     await expect(resultPromise).resolves.toEqual(authorization)
     expect(harness.close).toHaveBeenCalledTimes(1)
+  })
+
+  it("defers an activation-expired grant and resumes the exact session", async () => {
+    const broker = createSliceWalletCeremonyBroker()
+    const harness = createPopupWindow()
+    harness.window.navigator.userActivation = {
+      hasBeenActive: true,
+      isActive: false
+    }
+
+    const original = authorizeSliceWalletSession({
+      ceremonyBroker: broker,
+      idOrigin: "https://id.slice.so",
+      session,
+      timeoutMs: 100,
+      window: harness.window
+    })
+    await waitForPendingCeremony(broker)
+    expect(broker.getPending()).toMatchObject({
+      kind: "grant",
+      reason: "user_activation_expired"
+    })
+
+    const continuation = broker.continueInPopup()
+    queueMicrotask(() => {
+      harness.ready()?.(
+        new MessageEvent("message", {
+          data: { type: "slice-wallet:ceremony-ready", version: 1 },
+          origin: "https://id.slice.so",
+          source: harness.popup
+        })
+      )
+    })
+
+    await expect(continuation).resolves.toEqual(authorization)
+    await expect(original).resolves.toEqual(authorization)
+  })
+
+  it("treats popup_required as terminal for the dialog and resumes in a popup", async () => {
+    const broker = createSliceWalletCeremonyBroker()
+    const harness = createPopupWindow({
+      responseForAttempt: (attempt) =>
+        attempt === 1
+          ? {
+              reason: "visibility_unstable",
+              type: "slice-wallet:popup-required"
+            }
+          : {
+              authorization,
+              type: "slice-wallet:ceremony-authorization"
+            }
+    })
+    const original = authorizeSliceWalletSession({
+      ceremonyBroker: broker,
+      idOrigin: "https://id.slice.so",
+      session,
+      timeoutMs: 100,
+      window: harness.window
+    })
+    queueMicrotask(() => {
+      harness.ready()?.(
+        new MessageEvent("message", {
+          data: { type: "slice-wallet:ceremony-ready", version: 1 },
+          origin: "https://id.slice.so",
+          source: harness.popup
+        })
+      )
+    })
+    await waitForPendingCeremony(broker)
+    expect(broker.getPending()).toMatchObject({
+      kind: "grant",
+      reason: "visibility_unstable"
+    })
+
+    const continuation = broker.continueInPopup()
+    queueMicrotask(() => {
+      harness.ready()?.(
+        new MessageEvent("message", {
+          data: { type: "slice-wallet:ceremony-ready", version: 1 },
+          origin: "https://id.slice.so",
+          source: harness.popup
+        })
+      )
+    })
+
+    await expect(continuation).resolves.toEqual(authorization)
+    await expect(original).resolves.toEqual(authorization)
+    expect(harness.close).toHaveBeenCalledTimes(2)
   })
 
   it("rejects a multichain batch whose policy differs", async () => {

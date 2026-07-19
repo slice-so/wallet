@@ -298,6 +298,7 @@ export const parseSliceWalletFrameRequest = (
   }
   if (
     method === "getSession" ||
+    method === "getPendingSession" ||
     method === "clearSession" ||
     method === "commitSession" ||
     method === "discardSession" ||
@@ -368,6 +369,7 @@ export const parseSliceWalletFrameRequest = (
     ])
     if (
       params.action !== "finalize_replacement" &&
+      params.action !== "predecessor_descriptors" &&
       params.action !== "revoke" &&
       params.action !== "status"
     ) {

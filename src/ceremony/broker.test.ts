@@ -79,4 +79,23 @@ describe("Slice Wallet ceremony broker", () => {
     await expect(timedOutResult).rejects.toThrow("timed out")
     expect(timedOut.getPending()).toBeNull()
   })
+
+  it("rejects conflicting deferrals and continuation without an intent", async () => {
+    const broker = createSliceWalletCeremonyBroker()
+    await expect(broker.continueInPopup()).rejects.toThrow("No Slice Wallet")
+    const original = broker.defer({
+      kind: "connect",
+      reason: "popup_blocked",
+      resume: async () => result
+    })
+    await expect(
+      broker.defer({
+        kind: "root_sign",
+        reason: "user_activation_expired",
+        resume: async () => result
+      })
+    ).rejects.toThrow("Another Slice Wallet ceremony")
+    broker.cancel()
+    await expect(original).rejects.toThrow("cancelled")
+  })
 })

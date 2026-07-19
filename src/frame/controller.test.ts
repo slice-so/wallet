@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import type { Address, Hex } from "viem"
+import { type Address, type Hex, hexToBytes } from "viem"
+import { verifySliceWalletP256 } from "../p256Server"
 import { createNativeTransferCallRule } from "../policy"
 import type {
   SliceWalletFrameResponse,
@@ -10,6 +11,7 @@ import type {
   SliceWalletWindowMessage
 } from "../types/frame"
 import { attachSliceWalletSignerFrame } from "./controller"
+import { hashSliceWalletSessionRequest } from "./messages"
 
 const account = "0x1000000000000000000000000000000000000001" as Address
 const recipient = "0x2000000000000000000000000000000000000002" as Address
@@ -307,6 +309,203 @@ describe("isolated signer-frame controller", () => {
     } satisfies SliceWalletProtocolValue)
     expect(await signed).toMatchObject({
       id: "status",
+      result: expect.stringMatching(/^0x[0-9a-f]{128}$/)
+    })
+    detach()
+  })
+
+  test("signs replacement finalization with the pending checkout key", async () => {
+    const parent = new MessageChannel()
+    const window = new MockMessageWindow(parent.port1)
+    const store = new MemorySessionStore()
+    const detach = attachSliceWalletSignerFrame({
+      decodeScopedCalls: () => [],
+      now: () => 100,
+      selfOrigin: "https://id.slice.so",
+      sessionStore: store,
+      validateCheckoutCalls: () => {},
+      window
+    })
+    const connection = new MessageChannel()
+    const connected = receive(connection.port1)
+    window.dispatch({
+      data: { id: "connect", method: "connect", version: 1 },
+      origin: "https://app.example",
+      ports: [connection.port2],
+      source: parent.port1
+    })
+    await connected
+    const policy = {
+      account,
+      calls: [createNativeTransferCallRule({ maximumValue: 1n, recipient })],
+      chainId: 8453,
+      grantKind: "checkout",
+      validAfter: 90,
+      validUntil: 1_000,
+      version: 1
+    } as const
+    const create = async (id: string) => {
+      const response = receive(connection.port1)
+      connection.port1.postMessage({
+        id,
+        method: "createSession",
+        params: {
+          checkout: {
+            allowanceUsdMicros: "100000000",
+            coSignerAddress: recipient
+          },
+          policy
+        },
+        version: 1
+      } satisfies SliceWalletProtocolValue)
+      await response
+      const created = [...store.pending.values()][0]?.session
+      if (created === undefined) throw new Error("Missing pending session.")
+      return created
+    }
+    const committedSession = await create("old")
+    const committed = receive(connection.port1)
+    connection.port1.postMessage({
+      id: "commit",
+      method: "commitSession",
+      params: { account, chainId: 8453, grantKind: "checkout" },
+      version: 1
+    } satisfies SliceWalletProtocolValue)
+    await committed
+    const pendingSession = await create("new")
+    const signed = receive(connection.port1)
+    connection.port1.postMessage({
+      id: "finalize",
+      method: "signSessionRequest",
+      params: {
+        action: "finalize_replacement",
+        challenge: nonce,
+        delegationId: "new-delegation",
+        expiresAt: 200,
+        session: { account, chainId: 8453, grantKind: "checkout" }
+      },
+      version: 1
+    } satisfies SliceWalletProtocolValue)
+    const response = await signed
+    if (
+      response === null ||
+      !("result" in response) ||
+      typeof response.result !== "string"
+    ) {
+      throw new Error("Missing replacement signature.")
+    }
+    const signature = response.result as Hex
+    const message = hexToBytes(
+      hashSliceWalletSessionRequest({
+        action: "finalize_replacement",
+        appOrigin: "https://app.example",
+        challenge: nonce,
+        delegationId: "new-delegation",
+        expiresAt: 200,
+        session: pendingSession
+      })
+    )
+    expect(
+      await verifySliceWalletP256({
+        message,
+        publicKey: pendingSession.publicKey,
+        signature
+      })
+    ).toBe(true)
+    expect(
+      await verifySliceWalletP256({
+        message,
+        publicKey: committedSession.publicKey,
+        signature
+      })
+    ).toBe(false)
+    detach()
+  })
+
+  test("signs replacement finalization from a pending management session", async () => {
+    const parent = new MessageChannel()
+    const window = new MockMessageWindow(parent.port1)
+    const store = new MemorySessionStore()
+    const detach = attachSliceWalletSignerFrame({
+      decodeScopedCalls: () => [],
+      now: () => 100,
+      selfOrigin: "https://id.slice.so",
+      sessionStore: store,
+      validateCheckoutCalls: () => {},
+      window
+    })
+    const connection = new MessageChannel()
+    const connected = receive(connection.port1)
+    window.dispatch({
+      data: { id: "connect", method: "connect", version: 1 },
+      origin: "https://app.example",
+      ports: [connection.port2],
+      source: parent.port1
+    })
+    await connected
+    const response = receive(connection.port1)
+    connection.port1.postMessage({
+      id: "create",
+      method: "createSession",
+      params: {
+        policy: {
+          account,
+          calls: [
+            createNativeTransferCallRule({ maximumValue: 0n, recipient })
+          ],
+          chainId: 8453,
+          grantKind: "management",
+          validAfter: 90,
+          validUntil: 1_000,
+          version: 1
+        }
+      },
+      version: 1
+    } satisfies SliceWalletProtocolValue)
+    await response
+    const pendingSession = [...store.pending.values()][0]?.session
+    const signed = receive(connection.port1)
+    connection.port1.postMessage({
+      id: "finalize",
+      method: "signSessionRequest",
+      params: {
+        action: "finalize_replacement",
+        challenge: nonce,
+        delegationId: "management-delegation",
+        expiresAt: 200,
+        session: { account, chainId: 8453, grantKind: "management" }
+      },
+      version: 1
+    } satisfies SliceWalletProtocolValue)
+    expect(await signed).toMatchObject({
+      id: "finalize",
+      result: expect.stringMatching(/^0x[0-9a-f]{128}$/)
+    })
+    expect(pendingSession.grantKind).toBe("management")
+
+    const committed = receive(connection.port1)
+    connection.port1.postMessage({
+      id: "commit",
+      method: "commitSession",
+      params: { account, chainId: 8453, grantKind: "management" },
+      version: 1
+    } satisfies SliceWalletProtocolValue)
+    await committed
+    const revoked = receive(connection.port1)
+    connection.port1.postMessage({
+      id: "revoke",
+      method: "signSessionRequest",
+      params: {
+        action: "revoke",
+        challenge: nonce,
+        delegationId: "management-delegation",
+        expiresAt: 200,
+        session: { account, chainId: 8453, grantKind: "management" }
+      },
+      version: 1
+    } satisfies SliceWalletProtocolValue)
+    expect(await revoked).toMatchObject({
+      id: "revoke",
       result: expect.stringMatching(/^0x[0-9a-f]{128}$/)
     })
     detach()

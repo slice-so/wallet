@@ -161,6 +161,20 @@ export const attachSliceWalletSignerFrame = ({
     return stored
   }
 
+  const getPendingOrStoredSession = async (
+    key: SliceWalletFrameSessionKey
+  ): Promise<SliceWalletStoredSession> => {
+    if (parentOrigin === null) throw new Error("Wallet frame is not connected.")
+    const stored =
+      (await sessionStore.getPending(parentOrigin, key)) ??
+      (await sessionStore.get(parentOrigin, key))
+    if (stored === null) throw new Error("Wallet session is unavailable.")
+    if (stored.session.expiresAt <= now()) {
+      throw new Error("Wallet session has expired.")
+    }
+    return stored
+  }
+
   const handleRequest = async (request: SliceWalletFrameRequest) => {
     if (parentOrigin === null) throw new Error("Wallet frame is not connected.")
 
@@ -193,6 +207,12 @@ export const attachSliceWalletSignerFrame = ({
     if (request.method === "getSession") {
       return (
         (await sessionStore.get(parentOrigin, request.params))?.session ?? null
+      )
+    }
+    if (request.method === "getPendingSession") {
+      return (
+        (await sessionStore.getPending(parentOrigin, request.params))
+          ?.session ?? null
       )
     }
     if (request.method === "consumeAuthorization") {
@@ -231,7 +251,12 @@ export const attachSliceWalletSignerFrame = ({
         message: stringToBytes(message)
       })
     }
-    const stored = await getStoredSession(request.params.session)
+    const stored =
+      request.method === "signSessionRequest" &&
+      (request.params.action === "finalize_replacement" ||
+        request.params.action === "predecessor_descriptors")
+        ? await getPendingOrStoredSession(request.params.session)
+        : await getStoredSession(request.params.session)
     if (request.method === "signCheckoutProposal") {
       if (stored.session.grantKind !== "checkout") {
         throw new Error("Only checkout sessions may sign checkout proposals.")
@@ -331,7 +356,12 @@ export const attachSliceWalletSignerFrame = ({
       }
     }
     if (request.method === "signSessionRequest") {
-      if (stored.session.grantKind !== "checkout") {
+      if (
+        request.params.action !== "finalize_replacement" &&
+        request.params.action !== "predecessor_descriptors" &&
+        request.params.action !== "revoke" &&
+        stored.session.grantKind !== "checkout"
+      ) {
         throw new Error("Only checkout sessions may sign session requests.")
       }
       if (

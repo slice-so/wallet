@@ -90,6 +90,8 @@ const createRuntime = () => {
       return chainId
     },
     connect,
+    cancelPendingCeremony: mock(() => {}),
+    continueInPopup: mock(async () => userOperationHash),
     createGrant,
     destroy: mock(() => {}),
     disconnect,
@@ -104,6 +106,7 @@ const createRuntime = () => {
     })),
     getGrants,
     paymasterAvailable: mock(() => false),
+    pendingCeremony: null,
     revokeGrant,
     rotateGrant,
     sendCalls,

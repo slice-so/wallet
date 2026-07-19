@@ -67,7 +67,11 @@ export const hashSliceWalletSessionRequest = ({
   expiresAt,
   session
 }: {
-  action: "finalize_replacement" | "revoke" | "status"
+  action:
+    | "finalize_replacement"
+    | "predecessor_descriptors"
+    | "revoke"
+    | "status"
   appOrigin: string
   challenge: Hex
   delegationId: string

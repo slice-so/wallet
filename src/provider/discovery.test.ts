@@ -32,8 +32,11 @@ describe("EIP-6963 discovery", () => {
       }
     })
     const provider: SliceWalletProvider = {
+      cancelPendingCeremony: () => undefined,
+      continueInPopup: async () => "0x",
       destroy: () => undefined,
       on: () => undefined,
+      pendingCeremony: null,
       removeListener: () => undefined,
       request: async () => undefined
     }

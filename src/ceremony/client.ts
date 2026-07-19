@@ -5,8 +5,7 @@ import type {
   AuthorizeSliceWalletSessionsParameters,
   SliceWalletFrameSession,
   SliceWalletPermissionAuthorization,
-  SliceWalletProtocolValue,
-  SliceWalletSignerFrameClient
+  SliceWalletProtocolValue
 } from "../types"
 import {
   requireSliceWalletPopupGesture,
@@ -17,22 +16,13 @@ import {
   resolveSliceWalletCeremonyMode,
   waitForSliceWalletCeremonyMessage
 } from "./popup"
-import {
-  parseSliceWalletCeremonyResponse,
-  parseSliceWalletPermissionAuthorization
-} from "./protocol"
+import { parseSliceWalletCeremonyResponse } from "./protocol"
 
 const randomNonce = (window: Window) => {
   const bytes = new Uint8Array(32)
   window.crypto.getRandomValues(bytes)
   return bytesToHex(bytes)
 }
-
-const sessionKey = (session: SliceWalletFrameSession) => ({
-  account: session.account,
-  chainId: session.chainId,
-  grantKind: session.grantKind
-})
 
 const batchPolicyFingerprint = (session: SliceWalletFrameSession) =>
   JSON.stringify({
@@ -169,40 +159,6 @@ const isMatchingAuthorization = (
     session.signerId.toLowerCase() === expected.signerId.toLowerCase() &&
     getWalletPolicyHash(session.policy) === getWalletPolicyHash(expected.policy)
   )
-}
-
-const _waitForFrameAuthorization = async ({
-  appOrigin,
-  frameClient,
-  session,
-  timeoutMs
-}: {
-  appOrigin: string
-  frameClient: SliceWalletSignerFrameClient
-  session: SliceWalletFrameSession
-  timeoutMs?: number
-}) => {
-  const deadline = Date.now() + (timeoutMs ?? 5 * 60_000)
-  while (Date.now() < deadline) {
-    const result = await frameClient.request({
-      method: "consumeAuthorization",
-      params: sessionKey(session)
-    })
-    if (result !== null && typeof result === "object") {
-      try {
-        const authorization = parseSliceWalletPermissionAuthorization(
-          result as SliceWalletProtocolValue
-        )
-        if (isMatchingAuthorization(authorization, session, appOrigin)) {
-          return authorization
-        }
-      } catch {
-        // Keep polling: a stale or malformed one-shot result is not authority.
-      }
-    }
-    await new Promise((resolve) => setTimeout(resolve, 500))
-  }
-  throw new Error("Wallet frame authorization timed out.")
 }
 
 export const authorizeSliceWalletSession = async ({

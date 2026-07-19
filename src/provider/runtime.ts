@@ -10,6 +10,7 @@ import {
   type SmartAccount
 } from "viem/account-abstraction"
 import { connectSliceWalletAccount } from "../ceremony/accountClient"
+import { createSliceWalletCeremonyBroker } from "../ceremony/broker"
 import { authorizeSliceWalletSessions } from "../ceremony/client"
 import { parseSliceWalletFrameSession } from "../ceremony/protocol"
 import { createSliceWalletCeremonyKernelAccount } from "../ceremony/rootAccountClient"
@@ -30,6 +31,7 @@ import {
 import { getSliceWalletRegistryRecoveryInitConfig } from "../recovery"
 import { createSliceWalletRegistryClient } from "../registry"
 import type {
+  SliceWalletCeremonyBroker,
   SliceWalletConnectedAccount,
   SliceWalletFrameSession,
   SliceWalletGenericGrant,
@@ -78,7 +80,9 @@ type SliceWalletChainRuntimeConfig = Omit<
   SliceWalletProviderConfig,
   "chains" | "defaultChainId"
 > &
-  SliceWalletProviderChainConfig
+  SliceWalletProviderChainConfig & {
+    ceremonyBroker: SliceWalletCeremonyBroker
+  }
 
 const getBrowserDependencies = (
   config: Pick<SliceWalletProviderConfig, "document" | "storage" | "window">
@@ -153,6 +157,7 @@ const createSliceWalletChainRuntime = (
     })
     return createSliceWalletCeremonyKernelAccount({
       address: credential.accountAddress,
+      ceremonyBroker: config.ceremonyBroker,
       ceremonyMode: config.ceremonyMode,
       chainId: config.chain.id,
       client: publicClient,
@@ -273,6 +278,7 @@ const createSliceWalletChainRuntime = (
     const hydrated = await hydrate()
     if (hydrated !== null) return hydrated
     const connected = await connectSliceWalletAccount({
+      ceremonyBroker: config.ceremonyBroker,
       chainId: config.chain.id,
       fetch: fetchImpl,
       idOrigin,
@@ -442,6 +448,7 @@ const createSliceWalletChainRuntime = (
     const session = parseSliceWalletFrameSession(result)
     try {
       const [authorization] = await authorizeSliceWalletSessions({
+        ceremonyBroker: config.ceremonyBroker,
         ceremonyMode: config.ceremonyMode,
         document: browserDocument,
         idOrigin,
@@ -593,6 +600,7 @@ export const createSliceWalletProviderRuntime = (
 ) => {
   const createChainRuntime =
     dependencies.createChainRuntime ?? createSliceWalletChainRuntime
+  const ceremonyBroker = createSliceWalletCeremonyBroker()
   const chainConfigs = new Map(
     config.chains.map((chainConfig) => [chainConfig.chain.id, chainConfig])
   )
@@ -619,7 +627,8 @@ export const createSliceWalletProviderRuntime = (
     if (runtime === undefined) {
       runtime = createChainRuntime({
         ...config,
-        ...chainConfig
+        ...chainConfig,
+        ceremonyBroker
       })
       runtimes.set(chainId, runtime)
     }
@@ -640,14 +649,18 @@ export const createSliceWalletProviderRuntime = (
       return activeChainId
     },
     connect: () => getChainRuntime().connect(),
+    continueInPopup: () => ceremonyBroker.continueInPopup(),
+    cancelPendingCeremony: () => ceremonyBroker.cancel(),
     createGrant: (
       ...args: Parameters<SliceWalletChainRuntime["createGrant"]>
     ) => getChainRuntime().createGrant(...args),
     destroy: () => {
+      ceremonyBroker.cancel()
       for (const runtime of runtimes.values()) runtime.destroy()
       runtimes.clear()
     },
     disconnect: async () => {
+      ceremonyBroker.cancel()
       const { storage } = getBrowserDependencies(config)
       const revocations = [...chainConfigs.keys()].map((chainId) =>
         getChainRuntime(chainId).revokeGrant()
@@ -680,6 +693,9 @@ export const createSliceWalletProviderRuntime = (
     getGrants: () => getChainRuntime().getGrants(),
     paymasterAvailable: (chainId = activeChainId) =>
       getChainRuntime(chainId).paymasterAvailable,
+    get pendingCeremony() {
+      return ceremonyBroker.getPending()
+    },
     revokeGrant: (
       ...args: Parameters<SliceWalletChainRuntime["revokeGrant"]>
     ) => getChainRuntime().revokeGrant(...args),
@@ -702,6 +718,7 @@ export const createSliceWalletProviderRuntime = (
     supportedChainIds: Object.freeze([...chainConfigs.keys()]),
     switchChain: (chainId: number) => {
       getChainRuntime(chainId)
+      if (activeChainId !== chainId) ceremonyBroker.cancel()
       activeChainId = chainId
     },
     waitForSuccessfulUserOperation: (hash: Hex, chainId = activeChainId) =>

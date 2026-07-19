@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test"
 import { numberToHex } from "viem"
 import { base, optimism } from "viem/chains"
+import type { SliceWalletCeremonyBroker } from "../types"
 import type { SliceWalletProviderConfig } from "../types/providerInternal"
 import { createSliceWalletProviderRuntime } from "./runtime"
 import {
@@ -57,11 +58,13 @@ const config = {
 beforeEach(() => storageValues.clear())
 
 const createRuntimeFixture = () => {
+  const brokerByChain = new Map<number, SliceWalletCeremonyBroker>()
   const callsByChain = new Map<number, Set<string>>()
   const sendCallsByChain = new Map<number, ReturnType<typeof mock>>()
   const revokeGrantByChain = new Map<number, ReturnType<typeof mock>>()
   const statusChains: number[] = []
   const createChainRuntime: ChainRuntimeFactory = (chainConfig) => {
+    brokerByChain.set(chainConfig.chain.id, chainConfig.ceremonyBroker)
     const calls = new Set<string>()
     callsByChain.set(chainConfig.chain.id, calls)
     const sendCalls = mock(async (_calls, requestedId?: string) => ({
@@ -100,6 +103,7 @@ const createRuntimeFixture = () => {
     } satisfies ChainRuntime
   }
   return {
+    brokerByChain,
     callsByChain,
     createChainRuntime,
     revokeGrantByChain,
@@ -182,5 +186,29 @@ describe("multichain provider runtime routing", () => {
     }
     expect(baseRevocation).toHaveBeenCalledTimes(1)
     expect(optimismRevocation).toHaveBeenCalledTimes(1)
+  })
+
+  test("cancels pending ceremonies on chain changes and teardown", async () => {
+    const fixture = createRuntimeFixture()
+    const runtime = createSliceWalletProviderRuntime(config, fixture)
+    runtime.getChainRuntime(base.id)
+    const broker = fixture.brokerByChain.get(base.id)
+    if (broker === undefined) throw new Error("Missing runtime broker.")
+    const switched = broker.defer({
+      kind: "grant",
+      reason: "popup_blocked",
+      resume: async () => userOperationHash
+    })
+    runtime.switchChain(optimism.id)
+    await expect(switched).rejects.toThrow("cancelled")
+    expect(runtime.pendingCeremony).toBeNull()
+
+    const teardown = broker.defer({
+      kind: "root_sign",
+      reason: "user_activation_expired",
+      resume: async () => userOperationHash
+    })
+    runtime.destroy()
+    await expect(teardown).rejects.toThrow("cancelled")
   })
 })

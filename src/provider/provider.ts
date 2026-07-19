@@ -492,6 +492,8 @@ export const createSliceWalletProviderInternal = (
   }
 
   return {
+    cancelPendingCeremony: () => runtime.cancelPendingCeremony(),
+    continueInPopup: () => runtime.continueInPopup(),
     destroy: () => {
       runtime.destroy()
       listeners.clear()
@@ -503,6 +505,9 @@ export const createSliceWalletProviderInternal = (
     },
     removeListener: (event, listener) => {
       listeners.get(event)?.delete(listener as ProviderEventListener)
+    },
+    get pendingCeremony() {
+      return runtime.pendingCeremony
     },
     request
   }

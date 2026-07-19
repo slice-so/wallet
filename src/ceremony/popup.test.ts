@@ -237,6 +237,22 @@ describe("openSliceWalletCeremonyChannel", () => {
 })
 
 describe("resolveSliceWalletCeremonyMode", () => {
+  it("forces non-grant routes into a top-level popup", () => {
+    const window = Object.assign(Object.create(null) as Window, {
+      isSecureContext: true,
+      navigator: { userAgent: "Mozilla/5.0 Chrome/140.0 Safari/537.36" }
+    })
+
+    expect(
+      resolveSliceWalletCeremonyMode({
+        document: Object.create(null) as Document,
+        mode: "iframe",
+        path: "/ceremony/root",
+        window
+      })
+    ).toBe("popup")
+  })
+
   it("uses the iframe tray on supported secure browsers", () => {
     const window = Object.assign(Object.create(null) as Window, {
       isSecureContext: true,
