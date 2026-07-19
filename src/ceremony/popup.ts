@@ -3,6 +3,7 @@ import type {
   SliceWalletCeremonyMode,
   SliceWalletProtocolValue
 } from "../types"
+import { SliceWalletUserGestureRequiredError } from "./broker"
 import { parseSliceWalletCeremonyReadyMessage } from "./protocol"
 
 const ceremonyClosedPollIntervalMs = 100
@@ -37,12 +38,20 @@ const isSafariWebKit = (window: Window) => {
 export const resolveSliceWalletCeremonyMode = ({
   document,
   mode,
+  path,
   window
 }: {
   document?: Document
   mode: SliceWalletCeremonyMode
+  path?: string
   window: Window
 }): Exclude<SliceWalletCeremonyMode, "auto"> => {
+  if (path !== undefined) {
+    const pathname = new URL(path, "https://slice.invalid").pathname
+    if (pathname !== "/ceremony/grant" && pathname !== "/ceremony/grants") {
+      return "popup"
+    }
+  }
   if (mode === "popup") return mode
   if (mode === "iframe") return document === undefined ? "popup" : mode
   if (
@@ -72,7 +81,9 @@ const createPopupSurface = ({
   window: Window
 }): SliceWalletCeremonySurface => {
   const popup = window.open(url, name, popupFeatures(window))
-  if (popup === null) throw new Error("Slice Wallet popup was blocked.")
+  if (popup === null) {
+    throw new SliceWalletUserGestureRequiredError("popup_blocked")
+  }
   return {
     close: () => popup.close(),
     get closed() {
@@ -186,10 +197,14 @@ export const openSliceWalletCeremonyChannel = ({
   const resolvedMode = resolveSliceWalletCeremonyMode({
     document,
     mode,
+    path,
     window
   })
   const url = new URL(path, origin)
-  if (resolvedMode === "iframe") {
+  if (
+    resolvedMode === "iframe" &&
+    (url.pathname === "/ceremony/grant" || url.pathname === "/ceremony/grants")
+  ) {
     url.pathname = url.pathname.replace(/^\/ceremony\//, "/dialog/")
   }
   url.searchParams.set("nonce", nonce)

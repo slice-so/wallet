@@ -16,7 +16,10 @@ export const parseSliceWalletCeremonyDeviceResponse = (
   if (!isRecord(value)) throw new Error("Device ceremony response is invalid.")
   if (value.type !== "slice-wallet:ceremony-device") {
     const response = parseSliceWalletCeremonyResponse(value)
-    if (response.type !== "slice-wallet:ceremony-error") {
+    if (
+      response.type !== "slice-wallet:ceremony-error" &&
+      response.type !== "slice-wallet:popup-required"
+    ) {
       throw new Error("Device ceremony response is invalid.")
     }
     return response

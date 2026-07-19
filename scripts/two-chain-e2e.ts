@@ -140,8 +140,7 @@ const results = await Promise.all(
           }),
           userOperationHash
         }
-      },
-      setContinuationVisible: () => {}
+      }
     }
     const walletClient = createWalletClient({
       account: broadcaster,

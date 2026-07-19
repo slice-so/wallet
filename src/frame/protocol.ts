@@ -366,7 +366,11 @@ export const parseSliceWalletFrameRequest = (
       "expiresAt",
       "session"
     ])
-    if (params.action !== "revoke" && params.action !== "status") {
+    if (
+      params.action !== "finalize_replacement" &&
+      params.action !== "revoke" &&
+      params.action !== "status"
+    ) {
       throw new Error("Unsupported wallet session request action.")
     }
     return {

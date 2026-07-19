@@ -18,7 +18,10 @@ export {
   normalizeSliceWalletP256Signature,
   verifySliceWalletP256
 } from "./p256Server"
-export { buildSliceWalletPermissionEnableTypedData } from "./permissionAccount"
+export {
+  buildSliceWalletPermissionEnableTypedData,
+  buildSliceWalletPermissionRevocationCalls
+} from "./permissionAccount"
 export * from "./policy"
 export {
   assertRecoveryPermissionInitConfig,

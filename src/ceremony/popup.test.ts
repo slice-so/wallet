@@ -192,7 +192,7 @@ describe("openSliceWalletCeremonyChannel", () => {
       idOrigin: "https://id.slice.so",
       mode: "iframe",
       nonce,
-      path: "/ceremony/account",
+      path: "/ceremony/grant",
       readyTimeoutMs: 100,
       window
     })
@@ -226,7 +226,7 @@ describe("openSliceWalletCeremonyChannel", () => {
     expect(iframe.allow).toBe(
       "publickey-credentials-create https://id.slice.so; publickey-credentials-get https://id.slice.so"
     )
-    expect(iframe.src).toContain("/dialog/account")
+    expect(iframe.src).toContain("/dialog/grant")
     expect(dialog.style.pointerEvents).toBe("auto")
     expect(iframe.style.pointerEvents).toBe("auto")
     expect(dialog.style.zIndex).toBe("2147483647")

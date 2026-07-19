@@ -98,6 +98,15 @@ const grantKindValue = (value: SliceWalletProtocolValue): WalletGrantKind => {
   return value
 }
 
+const popupRequiredReasons = new Set([
+  "io_v2_unsupported",
+  "popup_blocked",
+  "user_activation_expired",
+  "viewport_too_small",
+  "visibility_unstable",
+  "webauthn_unavailable"
+])
+
 const stringArray = (
   value: SliceWalletProtocolValue,
   label: string
@@ -336,6 +345,22 @@ export const parseSliceWalletCeremonyResponse = (
       version: 1
     }
   }
+  if (input.type === "slice-wallet:popup-required") {
+    assertKeys(input, ["nonce", "reason", "type", "version"])
+    const reason = stringValue(input.reason, "Popup reason")
+    if (input.version !== 1 || !popupRequiredReasons.has(reason)) {
+      throw new Error("Ceremony popup response is invalid.")
+    }
+    return {
+      nonce: hexValue(input.nonce, "Ceremony nonce", 32),
+      reason: reason as Extract<
+        SliceWalletCeremonyResponse,
+        { type: "slice-wallet:popup-required" }
+      >["reason"],
+      type: "slice-wallet:popup-required",
+      version: 1
+    }
+  }
   assertKeys(input, ["code", "message", "nonce", "type", "version"])
   if (
     input.type !== "slice-wallet:ceremony-error" ||
@@ -405,7 +430,10 @@ export const parseSliceWalletCeremonyAccountResponse = (
     return parseSliceWalletCeremonyAccountMessage(value)
   }
   const response = parseSliceWalletCeremonyResponse(value)
-  if (response.type !== "slice-wallet:ceremony-error") {
+  if (
+    response.type !== "slice-wallet:ceremony-error" &&
+    response.type !== "slice-wallet:popup-required"
+  ) {
     throw new Error("Ceremony account response is invalid.")
   }
   return response
@@ -570,7 +598,10 @@ export const parseSliceWalletCeremonyRootResponse = (
     }
   }
   const response = parseSliceWalletCeremonyResponse(value)
-  if (response.type !== "slice-wallet:ceremony-error") {
+  if (
+    response.type !== "slice-wallet:ceremony-error" &&
+    response.type !== "slice-wallet:popup-required"
+  ) {
     throw new Error("Root signature response is invalid.")
   }
   return response

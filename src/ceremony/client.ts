@@ -5,8 +5,13 @@ import type {
   AuthorizeSliceWalletSessionsParameters,
   SliceWalletFrameSession,
   SliceWalletPermissionAuthorization,
-  SliceWalletProtocolValue
+  SliceWalletProtocolValue,
+  SliceWalletSignerFrameClient
 } from "../types"
+import {
+  requireSliceWalletPopupGesture,
+  SliceWalletUserGestureRequiredError
+} from "./broker"
 import {
   openSliceWalletCeremonyChannel,
   resolveSliceWalletCeremonyMode,
@@ -16,8 +21,6 @@ import {
   parseSliceWalletCeremonyResponse,
   parseSliceWalletPermissionAuthorization
 } from "./protocol"
-
-class SliceWalletBridgeUnavailableError extends Error {}
 
 const randomNonce = (window: Window) => {
   const bytes = new Uint8Array(32)
@@ -168,15 +171,17 @@ const isMatchingAuthorization = (
   )
 }
 
-const waitForFrameAuthorization = async ({
+const _waitForFrameAuthorization = async ({
   appOrigin,
   frameClient,
   session,
   timeoutMs
-}: Pick<
-  AuthorizeSliceWalletSessionParameters,
-  "frameClient" | "session" | "timeoutMs"
-> & { appOrigin: string }) => {
+}: {
+  appOrigin: string
+  frameClient: SliceWalletSignerFrameClient
+  session: SliceWalletFrameSession
+  timeoutMs?: number
+}) => {
   const deadline = Date.now() + (timeoutMs ?? 5 * 60_000)
   while (Date.now() < deadline) {
     const result = await frameClient.request({
@@ -201,9 +206,9 @@ const waitForFrameAuthorization = async ({
 }
 
 export const authorizeSliceWalletSession = async ({
+  ceremonyBroker,
   ceremonyMode = "popup",
   document,
-  frameClient,
   idOrigin,
   popupReadyTimeoutMs = 10_000,
   session,
@@ -212,38 +217,27 @@ export const authorizeSliceWalletSession = async ({
 }: AuthorizeSliceWalletSessionParameters) => {
   const normalizedIdOrigin = new URL(idOrigin).origin
   const nonce = randomNonce(window)
-  const continueFromFrame = async () => {
-    frameClient.setContinuationVisible(true)
-    try {
-      return await waitForFrameAuthorization({
-        appOrigin: window.location.origin,
-        frameClient,
-        session,
-        timeoutMs
-      })
-    } finally {
-      frameClient.setContinuationVisible(false)
-    }
-  }
-
   const resolvedMode = resolveSliceWalletCeremonyMode({
     document,
     mode: ceremonyMode,
+    path: "/ceremony/grant",
     window
   })
-  if (
-    resolvedMode === "popup" &&
-    window.navigator.userActivation?.isActive === false
-  ) {
-    return continueFromFrame()
-  }
-
-  let channel: Awaited<ReturnType<typeof openSliceWalletCeremonyChannel>>
-  try {
-    channel = await openSliceWalletCeremonyChannel({
+  const run = async (
+    mode: "iframe" | "popup",
+    requireActiveGesture: boolean
+  ) => {
+    if (
+      mode === "popup" &&
+      requireActiveGesture &&
+      window.navigator.userActivation?.isActive === false
+    ) {
+      throw new SliceWalletUserGestureRequiredError("user_activation_expired")
+    }
+    const channel = await openSliceWalletCeremonyChannel({
       document,
       idOrigin: normalizedIdOrigin,
-      mode: resolvedMode,
+      mode,
       nonce,
       path: getCeremonyUrl({
         idOrigin: normalizedIdOrigin,
@@ -253,11 +247,6 @@ export const authorizeSliceWalletSession = async ({
       readyTimeoutMs: popupReadyTimeoutMs,
       window
     })
-  } catch {
-    return continueFromFrame()
-  }
-
-  try {
     return await waitForSliceWalletCeremonyMessage({
       parse: (value: SliceWalletProtocolValue) => {
         const response = parseSliceWalletCeremonyResponse(value)
@@ -265,9 +254,10 @@ export const authorizeSliceWalletSession = async ({
           throw new Error("Wallet ceremony response nonce does not match.")
         }
         if (response.type === "slice-wallet:ceremony-error") {
-          throw response.code === "bridge_unavailable"
-            ? new SliceWalletBridgeUnavailableError(response.message)
-            : new Error(response.message)
+          throw new Error(response.message)
+        }
+        if (response.type === "slice-wallet:popup-required") {
+          throw new SliceWalletUserGestureRequiredError(response.reason)
         }
         if (response.type !== "slice-wallet:ceremony-authorization") {
           throw new Error("Wallet ceremony returned a batch response.")
@@ -287,16 +277,24 @@ export const authorizeSliceWalletSession = async ({
       surface: channel.surface,
       timeoutMs
     })
+  }
+  try {
+    return await run(resolvedMode, true)
   } catch (error) {
-    if (!(error instanceof SliceWalletBridgeUnavailableError)) throw error
-    return continueFromFrame()
+    if (!(error instanceof SliceWalletUserGestureRequiredError)) throw error
+    return requireSliceWalletPopupGesture({
+      broker: ceremonyBroker,
+      kind: "grant",
+      reason: error.reason,
+      resume: () => run("popup", false)
+    })
   }
 }
 
 export const authorizeSliceWalletSessions = async ({
+  ceremonyBroker,
   ceremonyMode = "popup",
   document,
-  frameClient,
   idOrigin,
   popupReadyTimeoutMs = 10_000,
   sessions,
@@ -306,44 +304,27 @@ export const authorizeSliceWalletSessions = async ({
   assertSliceWalletBatchSessions(sessions)
   const normalizedIdOrigin = new URL(idOrigin).origin
   const nonce = randomNonce(window)
-  const continueFromFrame = async () => {
-    frameClient.setContinuationVisible(true)
-    try {
-      const authorizations = []
-      for (const session of sessions) {
-        authorizations.push(
-          await waitForFrameAuthorization({
-            appOrigin: window.location.origin,
-            frameClient,
-            session,
-            timeoutMs
-          })
-        )
-      }
-      return authorizations
-    } finally {
-      frameClient.setContinuationVisible(false)
-    }
-  }
-
   const resolvedMode = resolveSliceWalletCeremonyMode({
     document,
     mode: ceremonyMode,
+    path: "/ceremony/grants",
     window
   })
-  if (
-    resolvedMode === "popup" &&
-    window.navigator.userActivation?.isActive === false
-  ) {
-    return continueFromFrame()
-  }
-
-  let channel: Awaited<ReturnType<typeof openSliceWalletCeremonyChannel>>
-  try {
-    channel = await openSliceWalletCeremonyChannel({
+  const run = async (
+    mode: "iframe" | "popup",
+    requireActiveGesture: boolean
+  ) => {
+    if (
+      mode === "popup" &&
+      requireActiveGesture &&
+      window.navigator.userActivation?.isActive === false
+    ) {
+      throw new SliceWalletUserGestureRequiredError("user_activation_expired")
+    }
+    const channel = await openSliceWalletCeremonyChannel({
       document,
       idOrigin: normalizedIdOrigin,
-      mode: resolvedMode,
+      mode,
       nonce,
       path: getBatchCeremonyUrl({
         idOrigin: normalizedIdOrigin,
@@ -353,11 +334,6 @@ export const authorizeSliceWalletSessions = async ({
       readyTimeoutMs: popupReadyTimeoutMs,
       window
     })
-  } catch {
-    return continueFromFrame()
-  }
-
-  try {
     return await waitForSliceWalletCeremonyMessage({
       parse: (value: SliceWalletProtocolValue) => {
         const response = parseSliceWalletCeremonyResponse(value)
@@ -365,9 +341,10 @@ export const authorizeSliceWalletSessions = async ({
           throw new Error("Wallet ceremony response nonce does not match.")
         }
         if (response.type === "slice-wallet:ceremony-error") {
-          throw response.code === "bridge_unavailable"
-            ? new SliceWalletBridgeUnavailableError(response.message)
-            : new Error(response.message)
+          throw new Error(response.message)
+        }
+        if (response.type === "slice-wallet:popup-required") {
+          throw new SliceWalletUserGestureRequiredError(response.reason)
         }
         if (
           response.type !== "slice-wallet:ceremony-authorizations" ||
@@ -391,8 +368,16 @@ export const authorizeSliceWalletSessions = async ({
       surface: channel.surface,
       timeoutMs
     })
+  }
+  try {
+    return await run(resolvedMode, true)
   } catch (error) {
-    if (!(error instanceof SliceWalletBridgeUnavailableError)) throw error
-    return continueFromFrame()
+    if (!(error instanceof SliceWalletUserGestureRequiredError)) throw error
+    return requireSliceWalletPopupGesture({
+      broker: ceremonyBroker,
+      kind: "grant",
+      reason: error.reason,
+      resume: () => run("popup", false)
+    })
   }
 }

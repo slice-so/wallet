@@ -108,7 +108,6 @@ export type SliceWalletSignerFrameControllerOptions = {
   ) => Promise<SliceWalletPermissionAuthorization | null>
   cryptoImpl?: Crypto
   decodeScopedCalls: (callData: Hex) => readonly WalletCall[]
-  managementOrigins?: readonly string[]
   now?: () => number
   onSessionCreated?: (
     session: SliceWalletFrameSession,
@@ -209,7 +208,7 @@ export type SliceWalletFrameRequest =
       id: string
       method: "signSessionRequest"
       params: {
-        action: "revoke" | "status"
+        action: "finalize_replacement" | "revoke" | "status"
         challenge: Hex
         delegationId: string
         expiresAt: number
@@ -290,7 +289,6 @@ export type SliceWalletSignerFrameClient = {
       { result: object | string | null }
     >["result"]
   >
-  setContinuationVisible: (visible: boolean) => void
 }
 
 export type SliceWalletBridgeChallenge = {

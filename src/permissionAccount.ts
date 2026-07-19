@@ -472,6 +472,57 @@ export const buildSliceWalletPermissionUninstallCalls = async ({
   }
 }
 
+export const buildSliceWalletPermissionRevocationCalls = async ({
+  account,
+  client,
+  includeUninstall,
+  session
+}: {
+  account: Address
+  client: KernelSmartAccountImplementation["client"]
+  includeUninstall?: boolean
+  session: SliceWalletFrameSession
+}) => {
+  const validator = await createPermissionValidator({
+    client,
+    mode: session.grantKind,
+    session
+  })
+  const permissionId = validator.getIdentifier()
+  const validationId = toExecutionValidationId(permissionId)
+  const checkpoint = {
+    data: encodeFunctionData({
+      abi: kernelPermissionLifecycleAbi,
+      args: [validationId, kernelExecuteSelector, false],
+      functionName: "grantAccess"
+    }),
+    to: account,
+    value: 0n
+  }
+  const shouldUninstall =
+    includeUninstall ??
+    (await validator.isEnabled(account, kernelExecuteSelector))
+  if (!shouldUninstall) {
+    return { calls: [checkpoint], permissionId }
+  }
+  const validationData = await validator.getEnableData(account)
+  return {
+    calls: [
+      checkpoint,
+      {
+        data: encodeFunctionData({
+          abi: kernelPermissionLifecycleAbi,
+          args: [validationId, validationData, "0x"],
+          functionName: "uninstallValidation"
+        }),
+        to: account,
+        value: 0n
+      }
+    ],
+    permissionId
+  }
+}
+
 export const buildSliceWalletPermissionInstallCalls = async ({
   account,
   client,

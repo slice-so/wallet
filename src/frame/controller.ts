@@ -137,7 +137,6 @@ export const attachSliceWalletSignerFrame = ({
   consumeAuthorization,
   cryptoImpl = crypto,
   decodeScopedCalls,
-  managementOrigins = [],
   now = () => Math.floor(Date.now() / 1000),
   onSessionCreated,
   rpId = sliceWalletDefaultRpId,
@@ -148,9 +147,6 @@ export const attachSliceWalletSignerFrame = ({
   window
 }: SliceWalletSignerFrameControllerOptions) => {
   const normalizedSelfOrigin = new URL(selfOrigin).origin
-  const normalizedManagementOrigins = new Set(
-    managementOrigins.map((origin) => new URL(origin).origin)
-  )
   let parentOrigin: string | null = null
   let parentPort: MessagePort | null = null
 
@@ -172,14 +168,6 @@ export const attachSliceWalletSignerFrame = ({
       const policy = request.params.policy
       if (policy.validUntil <= now())
         throw new Error("Wallet policy is already expired.")
-      if (
-        policy.grantKind === "management" &&
-        !normalizedManagementOrigins.has(parentOrigin)
-      ) {
-        throw new Error(
-          "Store management permissions are unavailable for this origin."
-        )
-      }
       const keyPair = await generateSliceWalletP256KeyPair(cryptoImpl)
       const session: SliceWalletFrameSession = {
         account: policy.account,

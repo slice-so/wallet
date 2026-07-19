@@ -8,6 +8,7 @@ import { createSliceWalletCeremonyRootSigner } from "./rootSignerClient"
 
 export const createSliceWalletCeremonyKernelAccount = async ({
   address,
+  ceremonyBroker,
   ceremonyMode = "popup",
   chainId,
   client,
@@ -33,6 +34,7 @@ export const createSliceWalletCeremonyKernelAccount = async ({
   > | null = null
   const ceremonySigner = createSliceWalletCeremonyRootSigner({
     account: address,
+    ceremonyBroker,
     ceremonyMode,
     chainId,
     document,

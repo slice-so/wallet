@@ -3,6 +3,10 @@ import type {
   ManageSliceWalletDeviceParameters,
   SliceWalletProtocolValue
 } from "../types"
+import {
+  requireSliceWalletPopupGesture,
+  SliceWalletUserGestureRequiredError
+} from "./broker"
 import { parseSliceWalletCeremonyDeviceResponse } from "./deviceProtocol"
 import {
   openSliceWalletCeremonyChannel,
@@ -13,6 +17,7 @@ const manageSliceWalletDevice = async (
   action: "add" | "promote" | "remove",
   {
     account,
+    ceremonyBroker,
     ceremonyMode = "popup",
     chainId,
     credentialIdHash,
@@ -37,40 +42,62 @@ const manageSliceWalletDevice = async (
   if (credentialIdHash !== undefined) {
     idUrl.searchParams.set("credentialIdHash", credentialIdHash)
   }
-  const channel = await openSliceWalletCeremonyChannel({
-    document,
-    idOrigin,
-    mode: ceremonyMode,
-    nonce,
-    path: idUrl.href,
-    popupName: `slice-wallet-device-${action}`,
-    window
-  })
-  return waitForSliceWalletCeremonyMessage({
-    parse: (value: SliceWalletProtocolValue) => {
-      const response = parseSliceWalletCeremonyDeviceResponse(value)
-      if (response.nonce !== nonce) {
-        throw new Error("Device ceremony response nonce does not match.")
-      }
-      if (response.type === "slice-wallet:ceremony-error") {
-        throw new Error(response.message)
-      }
-      if (
-        response.action !== action ||
-        response.account.toLowerCase() !== account.toLowerCase() ||
-        response.chainId !== chainId ||
-        (credentialIdHash !== undefined &&
-          response.credentialIdHash.toLowerCase() !==
-            credentialIdHash.toLowerCase())
-      ) {
-        throw new Error("Device ceremony returned a mismatched result.")
-      }
-      return response
-    },
-    port: channel.port,
-    surface: channel.surface,
-    timeoutMs
-  })
+  const run = async (requireActiveGesture: boolean) => {
+    if (
+      requireActiveGesture &&
+      window.navigator.userActivation?.isActive === false
+    ) {
+      throw new SliceWalletUserGestureRequiredError("user_activation_expired")
+    }
+    const channel = await openSliceWalletCeremonyChannel({
+      document,
+      idOrigin,
+      mode: ceremonyMode,
+      nonce,
+      path: idUrl.href,
+      popupName: `slice-wallet-device-${action}`,
+      window
+    })
+    return waitForSliceWalletCeremonyMessage({
+      parse: (value: SliceWalletProtocolValue) => {
+        const response = parseSliceWalletCeremonyDeviceResponse(value)
+        if (response.nonce !== nonce) {
+          throw new Error("Device ceremony response nonce does not match.")
+        }
+        if (response.type === "slice-wallet:ceremony-error") {
+          throw new Error(response.message)
+        }
+        if (response.type === "slice-wallet:popup-required") {
+          throw new SliceWalletUserGestureRequiredError(response.reason)
+        }
+        if (
+          response.action !== action ||
+          response.account.toLowerCase() !== account.toLowerCase() ||
+          response.chainId !== chainId ||
+          (credentialIdHash !== undefined &&
+            response.credentialIdHash.toLowerCase() !==
+              credentialIdHash.toLowerCase())
+        ) {
+          throw new Error("Device ceremony returned a mismatched result.")
+        }
+        return response
+      },
+      port: channel.port,
+      surface: channel.surface,
+      timeoutMs
+    })
+  }
+  try {
+    return await run(true)
+  } catch (error) {
+    if (!(error instanceof SliceWalletUserGestureRequiredError)) throw error
+    return requireSliceWalletPopupGesture({
+      broker: ceremonyBroker,
+      kind: action === "promote" ? "device_promote" : "device_enroll",
+      reason: error.reason,
+      resume: () => run(false)
+    })
+  }
 }
 
 export const addSliceWalletDevice = (

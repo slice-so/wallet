@@ -43,13 +43,6 @@ export const connectSliceWalletSignerFrame = async ({
   iframe.style.width = "1px"
   iframe.style.zIndex = "2147483647"
 
-  const setContinuationVisible = (visible: boolean) => {
-    iframe.style.height = visible ? "100dvh" : "1px"
-    iframe.style.inset = visible ? "0" : "auto 16px 16px auto"
-    iframe.style.pointerEvents = visible ? "auto" : "none"
-    iframe.style.width = visible ? "100vw" : "1px"
-  }
-
   const ready = new Promise<void>((resolve, reject) => {
     const timeout = setTimeout(() => {
       cleanup()
@@ -161,7 +154,6 @@ export const connectSliceWalletSignerFrame = async ({
         ...request,
         id: window.crypto.randomUUID(),
         version: 1
-      } as SliceWalletFrameRequest),
-    setContinuationVisible
+      } as SliceWalletFrameRequest)
   }
 }

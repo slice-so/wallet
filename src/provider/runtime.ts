@@ -444,7 +444,6 @@ const createSliceWalletChainRuntime = (
       const [authorization] = await authorizeSliceWalletSessions({
         ceremonyMode: config.ceremonyMode,
         document: browserDocument,
-        frameClient: frame,
         idOrigin,
         sessions: [session],
         window: browserWindow

@@ -1,9 +1,11 @@
 import {
   decodeAbiParameters,
   decodeFunctionData,
+  encodeAbiParameters,
   type Hex,
   hexToBigInt,
   isAddress,
+  keccak256,
   sliceHex
 } from "viem"
 import type { WalletCall } from "./types/policy"
@@ -32,6 +34,29 @@ const erc7579BatchParameters = [
     type: "tuple[]"
   }
 ] as const
+
+const walletCallsHashParameters = [
+  {
+    components: [
+      { name: "target", type: "address" },
+      { name: "value", type: "uint256" },
+      { name: "callData", type: "bytes" }
+    ],
+    name: "calls",
+    type: "tuple[]"
+  }
+] as const
+
+export const getSliceWalletCallsHash = (calls: readonly WalletCall[]) =>
+  keccak256(
+    encodeAbiParameters(walletCallsHashParameters, [
+      calls.map((call) => ({
+        callData: call.data ?? "0x",
+        target: call.to,
+        value: call.value ?? 0n
+      }))
+    ])
+  )
 
 const singleCallMode =
   "0x0000000000000000000000000000000000000000000000000000000000000000"
