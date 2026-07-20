@@ -35,6 +35,7 @@ const policy = createSliceCheckoutPolicyDescriptor({
 })
 const permissionId = getWalletPermissionId(policy, signer)
 const authorization = {
+  accountIndex: 3,
   appOrigin: "https://store.example",
   enableSignature: "0x01",
   executionGrant: {
@@ -103,6 +104,7 @@ describe("Slice checkout execution client", () => {
     await client.registerAuthorization(authorization)
     const body = JSON.parse(requestBody) as {
       accountAddress: Address
+      accountIndex: number
       appOrigin: string
       enableSignature: Hex
       permissionId: Hex
@@ -114,6 +116,7 @@ describe("Slice checkout execution client", () => {
     }
     expect(body).toMatchObject({
       accountAddress: account,
+      accountIndex: 3,
       appOrigin: "https://store.example",
       enableSignature: "0x01",
       permissionId,
@@ -206,6 +209,7 @@ describe("Slice management execution client", () => {
       signer
     )
     const managementAuthorization = {
+      accountIndex: 2,
       appOrigin: "https://dashboard.example",
       enableSignature: "0x01",
       executionGrant: {
@@ -251,6 +255,7 @@ describe("Slice management execution client", () => {
       slicerId: 2913
     })
     const body = JSON.parse(requestBody) as {
+      accountIndex: number
       enableSignature: Hex
       grantKind: string
       privateKey?: string
@@ -260,6 +265,7 @@ describe("Slice management execution client", () => {
       slicerId: number
     }
     expect(body).toMatchObject({
+      accountIndex: 2,
       grantKind: "management",
       enableSignature: "0x01",
       rootCredentialIdHash: rootCredential.credentialIdHash,

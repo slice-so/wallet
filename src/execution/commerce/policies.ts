@@ -84,8 +84,6 @@ const productManagementSelectors = sliceStoreManagementOperations
   )
   .map((functionName) => getSelector({ abi: productsModuleAbi, functionName }))
 
-type GeneratedHookDeployment = { address: string }
-
 const generatedHookAddresses = generatedHookAddressList
 
 const uniqueAddresses = (values: readonly Address[]) => [

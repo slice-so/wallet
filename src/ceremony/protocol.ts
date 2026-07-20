@@ -302,7 +302,13 @@ export const parseSliceWalletPermissionAuthorization = (
   const input = record(value, "Wallet authorization")
   assertKeys(
     input,
-    ["appOrigin", "enableSignature", "rootCredential", "session"],
+    [
+      "accountIndex",
+      "appOrigin",
+      "enableSignature",
+      "rootCredential",
+      "session"
+    ],
     ["accountFactory", "accountFactoryData", "executionGrant"]
   )
   if (
@@ -349,6 +355,9 @@ export const parseSliceWalletPermissionAuthorization = (
     throw new Error("Execution grant does not match the wallet grant kind.")
   }
   return {
+    accountIndex: assertSliceWalletAccountIndex(
+      integerValue(input.accountIndex, "Wallet account index")
+    ),
     ...(input.accountFactory === undefined
       ? {}
       : {

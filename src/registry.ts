@@ -130,7 +130,8 @@ export const createSliceWalletRegistryClient = ({
       chainId: number,
       accountAddress?: string,
       credentialIdHash?: Hex,
-      accountIndex?: number
+      accountIndex?: number,
+      challenge?: Hex
     ) =>
       readJson<SliceWalletRegistryChallenge>(
         fetchImpl(url("/v1/registry/challenges"), {
@@ -140,6 +141,7 @@ export const createSliceWalletRegistryClient = ({
             ...(accountIndex === undefined
               ? {}
               : { accountIndex: assertSliceWalletAccountIndex(accountIndex) }),
+            ...(challenge === undefined ? {} : { challenge }),
             chainId,
             registrationKind
           }),

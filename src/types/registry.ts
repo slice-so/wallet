@@ -47,6 +47,7 @@ export type RegisterSliceWalletCredentialInput = {
   recoverySignerAddress?: Address
   registrationKind: SliceWalletCredentialRegistrationKind
   rootSignature?: Hex
+  sessionGrantMessage?: string
 }
 
 export type SliceWalletCredentialListChallenge = {

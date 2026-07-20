@@ -42,6 +42,7 @@ const session = {
   signerId
 } as const
 const authorization = {
+  accountIndex: 0,
   appOrigin: "https://shop.example",
   enableSignature: "0x01",
   executionGrant: {

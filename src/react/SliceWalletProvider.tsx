@@ -213,7 +213,10 @@ export function SliceWalletProvider({
     ? adapters.storeManagement
     : undefined
   const walletChain = useMemo(
-    () => getSliceWalletChainManifest(preferredChainId).chain,
+    () =>
+      preferredChainId === anvil.id
+        ? anvil
+        : getSliceWalletChainManifest(preferredChainId).chain,
     [preferredChainId]
   )
   const normalizedIdOrigin = useMemo(() => new URL(idOrigin).origin, [idOrigin])

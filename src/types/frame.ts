@@ -38,6 +38,7 @@ export type SliceWalletFrameSessionKey = Pick<
 >
 
 export type SliceWalletPermissionAuthorization = {
+  accountIndex: number
   accountFactory?: Address
   accountFactoryData?: Hex
   appOrigin: string

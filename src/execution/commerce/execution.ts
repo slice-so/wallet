@@ -377,6 +377,7 @@ export const createSliceWalletCheckoutExecutionClient = ({
             {
               body: JSON.stringify({
                 accountAddress: session.account,
+                accountIndex: authorization.accountIndex,
                 ...(authorization.accountFactory === undefined
                   ? {}
                   : { accountFactory: authorization.accountFactory }),
@@ -526,6 +527,7 @@ export const createSliceWalletManagementExecutionClient = ({
           {
             body: JSON.stringify({
               accountAddress: session.account,
+              accountIndex: authorization.accountIndex,
               ...(authorization.accountFactory === undefined
                 ? {}
                 : { accountFactory: authorization.accountFactory }),

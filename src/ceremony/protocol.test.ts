@@ -46,6 +46,7 @@ const session = {
   signerId
 } as const
 const authorization = {
+  accountIndex: 3,
   appOrigin: "https://shop.example",
   enableSignature: "0x01",
   executionGrant: {
@@ -101,6 +102,7 @@ describe("wallet ceremony protocol parser", () => {
     expect(
       parseSliceWalletPermissionAuthorization(authorization)
     ).toMatchObject({
+      accountIndex: 3,
       appOrigin: "https://shop.example",
       session: { account, signerId }
     })
@@ -183,6 +185,7 @@ describe("wallet ceremony protocol parser", () => {
     ).toThrow("does not match its policy")
     expect(() =>
       parseSliceWalletPermissionAuthorization({
+        accountIndex: authorization.accountIndex,
         appOrigin: authorization.appOrigin,
         enableSignature: authorization.enableSignature,
         rootCredential,

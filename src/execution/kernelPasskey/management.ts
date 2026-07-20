@@ -46,8 +46,6 @@ const configureProductSelector = getFunctionSelector({
   functionName: "configureProduct"
 })
 
-type GeneratedHookDeployment = { address: string }
-
 const generatedHookAddresses = generatedHookAddressList
 
 export const createStoreManagementCallPolicy = (chainId: number) => {
