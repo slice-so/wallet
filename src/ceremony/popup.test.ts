@@ -120,7 +120,7 @@ describe("openSliceWalletCeremonyChannel", () => {
       idOrigin: "https://id.slice.so",
       mode: "iframe",
       nonce: `0x${"11".repeat(32)}`,
-      path: "/ceremony/connect",
+      path: "/ceremony/recovery",
       readyTimeoutMs: 100,
       window
     })
@@ -392,6 +392,14 @@ describe("resolveSliceWalletCeremonyMode", () => {
         document: Object.create(null) as Document,
         mode: "iframe",
         path: "/ceremony/root",
+        window
+      })
+    ).toBe("iframe")
+    expect(
+      resolveSliceWalletCeremonyMode({
+        document: Object.create(null) as Document,
+        mode: "iframe",
+        path: "/ceremony/connect",
         window
       })
     ).toBe("iframe")

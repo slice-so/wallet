@@ -10,7 +10,6 @@ export const sliceWalletDialogCeremonyRoutes = Object.freeze([
 ] as const)
 
 export const sliceWalletBrokerRequiredDialogRoutes = Object.freeze([
-  "connect",
   "grants",
   "recovery",
   "device-add"
