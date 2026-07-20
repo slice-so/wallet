@@ -103,6 +103,9 @@ const createRuntimeFixture = (
       hasCall: (id: string) => calls.has(id),
       paymasterAvailable: false,
       revokeGrant,
+      requestSession: mock(async () => ({
+        status: "preparation_failed" as const
+      })),
       rotateGrant: mock(async () => null as never),
       sendCalls,
       signMessage: mock(async () => userOperationHash),

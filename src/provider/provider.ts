@@ -28,6 +28,7 @@ type ProviderRuntime = Omit<
   | "connect"
   | "connectWithSession"
   | "getChainRuntime"
+  | "requestSession"
   | "switchAccount"
   | "waitForSuccessfulUserOperation"
 > & {
@@ -40,6 +41,7 @@ type ProviderRuntime = Omit<
     >["session"]
     wallet: { rootAccount: { address: Address } }
   }>
+  requestSession: () => ReturnType<FullProviderRuntime["requestSession"]>
   switchAccount: () => Promise<{ rootAccount: { address: Address } }>
   waitForSuccessfulUserOperation: (
     hash: Hex,
@@ -397,6 +399,9 @@ export const createSliceWalletProviderInternal = (
     }
   }
 
+  const requestSession: SliceWalletProvider["requestSession"] = () =>
+    runtime.requestSession()
+
   const request = async ({
     method,
     params
@@ -433,6 +438,11 @@ export const createSliceWalletProviderInternal = (
     if (method === "wallet_switchAccount") {
       assertNoParams(params, method)
       return switchAccount()
+    }
+    if (method === "wallet_requestSession") {
+      assertNoParams(params, method)
+      await getConnectedAccount(runtime)
+      return requestSession()
     }
     if (method === "wallet_requestPermissions") {
       assertEthAccountsRequest(params)
@@ -644,6 +654,7 @@ export const createSliceWalletProviderInternal = (
       return runtime.pendingCeremony
     },
     request,
+    requestSession,
     switchAccount
   }
 }

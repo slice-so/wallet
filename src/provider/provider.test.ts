@@ -80,6 +80,9 @@ const createRuntime = () => {
   }))
   const getGrants = mock(async () => [publicGrant])
   const revokeGrant = mock(async () => {})
+  const requestSession = mock(async () => ({
+    status: "preparation_failed" as const
+  }))
   const rotateGrant = mock(async () => publicGrant)
   const sendCalls = mock(async (_calls, requestedId?: string) => ({
     id: requestedId ?? "generated-id",
@@ -111,6 +114,7 @@ const createRuntime = () => {
     paymasterAvailable: mock(() => false),
     pendingCeremony: null,
     revokeGrant,
+    requestSession,
     rotateGrant,
     sendCalls,
     signMessage: mock(async () => userOperationHash),
@@ -133,6 +137,7 @@ const createRuntime = () => {
     disconnect,
     getGrants,
     revokeGrant,
+    requestSession,
     rotateGrant,
     sendCalls,
     runtime
@@ -169,6 +174,20 @@ const expectRpcError = async (
 }
 
 describe("Slice Wallet provider dispatch", () => {
+  test("requests consent for an already-connected account without reconnecting", async () => {
+    const { provider, requestSession, runtime } = createProvider()
+
+    expect(await provider.requestSession()).toEqual({
+      status: "preparation_failed"
+    })
+    expect(await request(provider, "wallet_requestSession", [])).toEqual({
+      status: "preparation_failed"
+    })
+    expect(requestSession).toHaveBeenCalledTimes(2)
+    expect(runtime.connect).not.toHaveBeenCalled()
+    expect(runtime.connectWithSession).not.toHaveBeenCalled()
+  })
+
   test("pins wallet_connect v1 and returns only granted capabilities", async () => {
     const { provider } = createProvider()
 

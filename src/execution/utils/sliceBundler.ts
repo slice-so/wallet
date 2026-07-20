@@ -1,5 +1,19 @@
 import type { Address, Hex } from "viem"
 import { base } from "viem/chains"
+import type {
+  SliceBundlerUpstreamErrorClassifier,
+  SliceBundlerUserOperationAuthorizer
+} from "../../types/bundler"
+import type {
+  JsonObject,
+  JsonValue,
+  SliceAcceptedSenderCode,
+  SliceJsonRpcId,
+  SliceSenderAccountFetch,
+  SliceUpstreamJsonRpcError,
+  SliceUserOperation,
+  SliceUserOperationPolicyFetch
+} from "../../types/userOperation"
 import { getSlicePaymasterRpcUrl } from "./slicePaymaster"
 import {
   createJsonRpcError,
@@ -9,16 +23,8 @@ import {
   isHexString,
   isJsonObject,
   isJsonRpcId,
-  type JsonObject,
-  type JsonValue,
   parseSliceUserOperation,
-  readUpstreamJsonRpcError,
-  type SliceAcceptedSenderCode,
-  type SliceJsonRpcId,
-  type SliceSenderAccountFetch,
-  type SliceUpstreamJsonRpcError,
-  type SliceUserOperation,
-  type SliceUserOperationPolicyFetch
+  readUpstreamJsonRpcError
 } from "./sliceUserOperationPolicy"
 
 type SliceBundlerSendMethod =
@@ -62,16 +68,6 @@ type SliceBundlerRequest =
   | SliceBundlerSupportedEntryPointsRequest
   | SliceBundlerUserOperationRequest
 
-export type SliceBundlerUserOperationAuthorizationInput = {
-  chainId: number
-  entryPoint: Address
-  userOperation: SliceUserOperation
-}
-
-export type SliceBundlerUserOperationAuthorizer = (
-  input: SliceBundlerUserOperationAuthorizationInput
-) => boolean | Promise<boolean>
-
 type SliceBundlerConfig = {
   /** Adds a narrower condition after the built-in or replacement policy. */
   acceptUserOperation?: SliceBundlerUserOperationAuthorizer
@@ -96,10 +92,6 @@ type SliceBundlerConfig = {
 }
 
 type BundlerFetch = SliceUserOperationPolicyFetch
-export type SliceBundlerRetryReason = "fee_floor" | "replacement_underpriced"
-export type SliceBundlerUpstreamErrorClassifier = (
-  error: SliceUpstreamJsonRpcError
-) => SliceBundlerRetryReason | null
 type SliceBundlerUpstreamErrorEvent = {
   error: SliceUpstreamJsonRpcError
   id?: SliceJsonRpcId

@@ -11,8 +11,10 @@ import type {
 import type {
   P256Credential,
   PaymasterActions,
+  PrepareUserOperationParameterType,
   SmartAccount,
   ToWebAuthnAccountParameters,
+  UserOperation,
   UserOperationReceipt
 } from "viem/account-abstraction"
 
@@ -137,4 +139,68 @@ export type SliceKernelPasskeySendUserOperationParameters = {
   calls: readonly SliceAccountClientCall[]
   paymaster?: SliceKernelPasskeyPaymasterClient
   paymasterContext?: SliceAccountClientPaymasterContext
+}
+
+export type SliceKernelPasskeyBundlerClient = {
+  prepareUserOperation?: (
+    parameters: {
+      account: SmartAccount
+      paymaster?: SliceKernelPasskeyPaymasterClient
+      paymasterContext?: SliceAccountClientPaymasterContext
+      parameters?: readonly PrepareUserOperationParameterType[]
+    } & (
+      | {
+          callData: Hex
+          calls?: never
+          factory?: Address
+          factoryData?: Hex
+          nonce: bigint
+        }
+      | { callData?: never; calls: readonly SliceAccountClientCall[] }
+    )
+  ) => Promise<UserOperation<"0.7">>
+  sendPreparedUserOperation?: (
+    userOperation: UserOperation<"0.7">
+  ) => Promise<Hex>
+  sendUserOperation: (
+    parameters: SliceKernelPasskeySendUserOperationParameters
+  ) => Promise<Hex>
+  waitForUserOperationReceipt: (parameters: {
+    hash: Hex
+  }) => Promise<SliceKernelPasskeyBundlerReceipt>
+}
+
+export type CreateSliceKernelPasskeyBundlerClient = (parameters: {
+  bundlerUrl: string
+  chain: Chain
+  client: Client<Transport>
+}) => SliceKernelPasskeyBundlerClient
+
+export type CreateSliceKernelPasskeyPaymasterClient = (parameters: {
+  paymasterUrl: string
+}) => SliceKernelPasskeyPaymasterClient
+
+export type SliceKernelPasskeyUserOperationEvent =
+  | {
+      account: Address
+      type: "userOperationSubmitted"
+      userOperationHash: Hex
+    }
+  | {
+      account: Address
+      revertReason?: string
+      success: boolean
+      transactionHash: Hex
+      type: "userOperationReceipt"
+      userOperationHash: Hex
+    }
+
+export type CreateSliceKernelPasskeyTransportParameters = {
+  account: SmartAccount
+  bundlerUrl: string
+  chain?: Chain
+  client: Client<Transport>
+  createBundlerClient?: CreateSliceKernelPasskeyBundlerClient
+  createPaymasterClient?: CreateSliceKernelPasskeyPaymasterClient
+  onUserOperationEvent?: (event: SliceKernelPasskeyUserOperationEvent) => void
 }

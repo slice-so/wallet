@@ -1,4 +1,14 @@
 import type { Address } from "viem"
+import type {
+  JsonObject,
+  JsonValue,
+  SliceAcceptedSenderCode,
+  SliceJsonRpcId,
+  SliceSenderAccountFetch,
+  SliceUpstreamJsonRpcError,
+  SliceUserOperation,
+  SliceUserOperationPolicyFetch
+} from "../../types/userOperation"
 import {
   createJsonRpcError,
   createProxyResponse,
@@ -7,16 +17,8 @@ import {
   isJsonObject,
   isJsonRpcId,
   isSupportedSliceEntryPointRequest,
-  type JsonObject,
-  type JsonValue,
   parseSliceUserOperation,
   readUpstreamJsonRpcError,
-  type SliceAcceptedSenderCode,
-  type SliceJsonRpcId,
-  type SliceSenderAccountFetch,
-  type SliceUpstreamJsonRpcError,
-  type SliceUserOperation,
-  type SliceUserOperationPolicyFetch,
   sliceUserOperationPolicyDescription
 } from "./sliceUserOperationPolicy"
 

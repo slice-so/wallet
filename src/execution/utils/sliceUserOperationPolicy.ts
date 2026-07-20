@@ -19,6 +19,18 @@ import {
   entryPoint09Address
 } from "viem/account-abstraction"
 import type { SliceCheckoutSpendIntent } from "../../types/commerce"
+import type {
+  JsonObject,
+  JsonValue,
+  SliceAcceptedSenderCode,
+  SliceJsonRpcErrorCode,
+  SliceJsonRpcId,
+  SliceSenderAccountFetch,
+  SliceSenderAccountSnapshot,
+  SliceUpstreamJsonRpcError,
+  SliceUserOperation,
+  SliceUserOperationPolicyFetch
+} from "../../types/userOperation"
 import {
   defaultSliceChainId,
   supportedSliceCheckoutChainIds
@@ -35,58 +47,6 @@ import {
 } from "./sliceKernelAddresses"
 import { getSliceSmartAccountCalls } from "./sliceSmartAccountCalls"
 import { maxAcceptedSliceCallsPerBatch } from "./sliceUserOperationLimits"
-
-export type JsonPrimitive = string | number | boolean | null
-export type JsonValue = JsonPrimitive | JsonObject | JsonValue[]
-export type JsonObject = { [key: string]: JsonValue | undefined }
-export type SliceJsonRpcId = string | number | null
-export type SliceJsonRpcErrorCode =
-  | -32700
-  | -32600
-  | -32603
-  | -32031
-  | -32030
-  | -32000
-export type SliceUpstreamJsonRpcError = {
-  code: number
-  data?: JsonValue
-  message: string
-}
-
-export type SliceUserOperation = JsonObject & {
-  sender: Address
-  nonce: Hex
-  callData: Hex
-  factory?: Address | "0x7702"
-  factoryData?: Hex
-  initCode?: Hex
-  eip7702Auth?: JsonValue
-}
-
-export type SliceUserOperationPolicyFetch = (
-  input: RequestInfo | URL,
-  init?: RequestInit
-) => Promise<Response>
-
-export type SliceSenderAccountSnapshot = {
-  code: Hex
-  /** Raw 32-byte value of the ERC-1967 implementation slot. */
-  erc1967Implementation: Hex
-}
-
-export type SliceSenderAccountFetch = (
-  sender: Address
-) => Promise<SliceSenderAccountSnapshot | null>
-
-export type SliceAcceptedSenderCode = {
-  codeHash: Hex
-  /**
-   * Required ERC-1967 implementation for proxies whose runtime code does not
-   * embed the implementation address (it lives in the ERC-1967 slot, so the
-   * code hash alone does not pin what the account executes).
-   */
-  erc1967Implementation?: Address
-}
 
 type SliceSenderVerification = "unknown" | "verified"
 

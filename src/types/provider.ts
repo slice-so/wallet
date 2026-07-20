@@ -58,6 +58,7 @@ export type SliceWalletProvider = {
   request: (
     request: SliceWalletProviderRequestArguments
   ) => Promise<SliceWalletProviderValue | undefined>
+  requestSession: () => Promise<SliceWalletCeremonySessionResult>
   switchAccount: () => Promise<Address>
 }
 

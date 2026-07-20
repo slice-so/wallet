@@ -32,18 +32,22 @@ import {
   zeroAddress
 } from "viem"
 import type { WebAuthnAccount } from "viem/account-abstraction"
-import {
-  entryPoint07Address,
-  type UserOperation
-} from "viem/account-abstraction"
+import { entryPoint07Address } from "viem/account-abstraction"
 import { privateKeyToAccount } from "viem/accounts"
-import type { SliceAccountClientCall } from "../../types/accountClient"
+import type {
+  SliceAccountClientCall,
+  SliceKernelPasskeyCredential
+} from "../../types/accountClient"
+import type {
+  BuildSliceExecutionEnableTypedDataParameters,
+  CreateSliceExecutionAccountParameters,
+  SliceExecutionUserOperation
+} from "../../types/execution"
 import { getProductsModuleAddress } from "../generated/commerceFacts"
 import {
   sliceKernelBaseV33Addresses,
   sliceKernelWebAuthnValidatorAddress
 } from "../utils/sliceAccountClient"
-import type { SliceKernelPasskeyCredential } from "./account"
 import { createStoreManagementCallPolicy } from "./management"
 import {
   buildWeightedEcdsaStubSignature,
@@ -368,45 +372,6 @@ const createStoreManagementExecutionValidator = async ({
   })
 }
 
-export type SliceExecutionUserOperation = UserOperation<"0.7">
-
-type SliceExecutionAccountCommonParameters = {
-  /** The pinned permissionless-derived account address. */
-  address: Address
-  accountIndex: bigint
-  client: KernelSmartAccountImplementation["client"]
-  credential: SliceKernelPasskeyCredential
-  enableSignature?: Hex
-  /**
-   * Factory args from the permissionless account — required so an
-   * undeployed account deploys with the exact initcode that derived its
-   * address, never the ZeroDev-derived one.
-   */
-  getFactoryArgs?: () => Promise<{
-    factory?: Address | undefined
-    factoryData?: Hex | undefined
-  }>
-  sessionPrivateKey?: Hex
-  sessionSignerAddress: Address
-  /** Unix seconds; mirrors the delegation row expiry. */
-  validUntil: number
-}
-
-export type CreateSliceExecutionAccountParameters =
-  SliceExecutionAccountCommonParameters &
-    (
-      | {
-          coSignerAddress: Address
-          getCoSignature?: (args: {
-            userOperation: SliceExecutionUserOperation
-          }) => Promise<Hex>
-          mode: "checkout"
-        }
-      | {
-          mode: "store_management"
-        }
-    )
-
 export const createSliceExecutionAccount = async (
   parameters: CreateSliceExecutionAccountParameters
 ) => {
@@ -571,16 +536,6 @@ export const createSliceExecutionAccount = async (
     ...(getFactoryArgs === undefined ? {} : { getFactoryArgs })
   }
 }
-
-export type BuildSliceExecutionEnableTypedDataParameters =
-  CreateSliceExecutionAccountParameters extends infer Parameters
-    ? Parameters extends CreateSliceExecutionAccountParameters
-      ? Omit<
-          Parameters,
-          "enableSignature" | "getFactoryArgs" | "sessionPrivateKey"
-        >
-      : never
-    : never
 
 export const buildSliceExecutionEnableTypedData = async (
   parameters: BuildSliceExecutionEnableTypedDataParameters

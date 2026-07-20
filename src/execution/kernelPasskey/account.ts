@@ -1,48 +1,16 @@
-import {
-  type ToKernelSmartAccountReturnType,
-  toKernelSmartAccount
-} from "permissionless/accounts"
-import type {
-  Chain,
-  Client,
-  JsonRpcAccount,
-  LocalAccount,
-  Transport
-} from "viem"
+import { toKernelSmartAccount } from "permissionless/accounts"
 import {
   entryPoint07Address,
-  type P256Credential,
-  type ToWebAuthnAccountParameters,
   toWebAuthnAccount
 } from "viem/account-abstraction"
+import type {
+  CreateSliceKernelPasskeyAccountParameters,
+  SliceKernelPasskeyAccount
+} from "../../types/accountClient"
 import {
   sliceKernelBaseV33Addresses,
   sliceKernelWebAuthnValidatorAddress
 } from "../utils/sliceAccountClient"
-
-export type SliceKernelPasskeyCredential = Pick<
-  P256Credential,
-  "id" | "publicKey"
->
-
-export type SliceKernelPasskeyClient = Client<
-  Transport,
-  Chain | undefined,
-  JsonRpcAccount | LocalAccount | undefined
->
-
-export type SliceKernelPasskeyAccount = ToKernelSmartAccountReturnType<
-  "0.7",
-  false
->
-
-export type CreateSliceKernelPasskeyAccountParameters = {
-  address?: `0x${string}`
-  client: SliceKernelPasskeyClient
-  credential: SliceKernelPasskeyCredential
-  getFn?: ToWebAuthnAccountParameters["getFn"]
-  rpId?: ToWebAuthnAccountParameters["rpId"]
-}
 
 export const createSliceKernelPasskeyAccount = async ({
   address,

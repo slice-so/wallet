@@ -14,6 +14,10 @@ import {
 } from "viem"
 import { entryPoint07Address } from "viem/account-abstraction"
 import { base } from "viem/chains"
+import type {
+  SliceSenderAccountSnapshot,
+  SliceUserOperation
+} from "../../types/userOperation"
 import { getProductsModuleAddress } from "../generated/commerceFacts"
 import {
   sliceKernelBaseV33Addresses,
@@ -38,8 +42,6 @@ import {
   isAcceptedSliceIdSecurityOperationUserOperation,
   isAcceptedSliceRecoveryCancellationUserOperation,
   isAcceptedSliceWalletSenderUserOperation,
-  type SliceSenderAccountSnapshot,
-  type SliceUserOperation,
   sliceKernelBaseV33SenderCode
 } from "./sliceUserOperationPolicy"
 

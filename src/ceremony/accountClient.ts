@@ -71,6 +71,25 @@ const runSliceWalletAccountCeremony = async ({
           { status: "prepared" }
         >["request"]
       | null = null
+    const resultPromise = waitForSliceWalletCeremonyMessage({
+      parse: (value: SliceWalletProtocolValue) => {
+        const message = parseSliceWalletCeremonyAccountResponse(value)
+        if (message.nonce !== nonce) {
+          throw new Error("Slice Wallet account response nonce does not match.")
+        }
+        if (message.type === "slice-wallet:ceremony-error") {
+          throw new Error(message.message)
+        }
+        if (message.type === "slice-wallet:popup-required") {
+          throw new SliceWalletUserGestureRequiredError(message.reason)
+        }
+        return message
+      },
+      port,
+      surface,
+      timeoutMs
+    })
+    void resultPromise.catch(() => undefined)
     if (session === undefined) {
       port.postMessage({
         status: "none",
@@ -122,24 +141,7 @@ const runSliceWalletAccountCeremony = async ({
         } satisfies SliceWalletCeremonySessionRequestMessage)
       }
     }
-    const result = await waitForSliceWalletCeremonyMessage({
-      parse: (value: SliceWalletProtocolValue) => {
-        const message = parseSliceWalletCeremonyAccountResponse(value)
-        if (message.nonce !== nonce) {
-          throw new Error("Slice Wallet account response nonce does not match.")
-        }
-        if (message.type === "slice-wallet:ceremony-error") {
-          throw new Error(message.message)
-        }
-        if (message.type === "slice-wallet:popup-required") {
-          throw new SliceWalletUserGestureRequiredError(message.reason)
-        }
-        return message
-      },
-      port,
-      surface,
-      timeoutMs
-    })
+    const result = await resultPromise
     if (
       result.type === "slice-wallet:ceremony-account" &&
       result.session?.status === "granted" &&

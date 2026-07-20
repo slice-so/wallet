@@ -6,19 +6,16 @@ import type {
   StoredSliceWalletPendingReplacement
 } from "../types/react"
 
-/** Parent-side metadata only. Legacy records containing key bytes are deleted. */
 const DB_NAME = "slice-wallet"
 const STORE_NAME = "execution-sessions"
-const DB_VERSION = 2
+const DB_VERSION = 1
 
 const openDatabase = () =>
   new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
-    request.onupgradeneeded = (event) => {
+    request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains(STORE_NAME)) {
         request.result.createObjectStore(STORE_NAME)
-      } else if (event.oldVersion < 2) {
-        request.transaction?.objectStore(STORE_NAME).clear()
       }
     }
     request.onsuccess = () => resolve(request.result)

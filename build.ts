@@ -17,5 +17,6 @@ await buildPackage({
     "./src/wagmi.ts"
   ],
   external: [...Object.keys(dependencies), ...Object.keys(peerDependencies)],
+  root: "./src",
   target: "browser"
 })

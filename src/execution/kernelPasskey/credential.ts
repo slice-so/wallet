@@ -1,19 +1,8 @@
 import {
-  type CreateWebAuthnCredentialParameters,
   type CreateWebAuthnCredentialReturnType,
   createWebAuthnCredential
 } from "viem/account-abstraction"
-
-export type RegisterSliceKernelPasskeyCredentialParameters = {
-  authenticatorSelection?: CreateWebAuthnCredentialParameters["authenticatorSelection"]
-  excludeCredentialIds?: readonly string[]
-  name: string
-  rp?: {
-    id: string
-    name: string
-  }
-  timeout?: number
-}
+import type { RegisterSliceKernelPasskeyCredentialParameters } from "../../types/accountClient"
 
 type SliceBrowserCredential = {
   id: string

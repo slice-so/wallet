@@ -11,6 +11,11 @@ export * from "./execution/utils/sliceSmartAccountCalls"
 export * from "./execution/utils/sliceUserOperationLimits"
 export * from "./execution/utils/sliceUserOperationPolicy"
 export type {
+  CreateSliceKernelPasskeyAccountParameters,
+  CreateSliceKernelPasskeyBundlerClient,
+  CreateSliceKernelPasskeyPaymasterClient,
+  CreateSliceKernelPasskeyTransportParameters,
+  RegisterSliceKernelPasskeyCredentialParameters,
   SliceAccountClient,
   SliceAccountClientCall,
   SliceAccountClientExecutionReceipt,
@@ -19,7 +24,44 @@ export type {
   SliceAccountClientExecutionSubmission,
   SliceAccountClientPaymasterContext,
   SliceAccountClientSendCallsParameters,
-  SliceAccountClientTransport
+  SliceAccountClientTransport,
+  SliceKernelPasskeyAccount,
+  SliceKernelPasskeyBundlerClient,
+  SliceKernelPasskeyBundlerReceipt,
+  SliceKernelPasskeyClient,
+  SliceKernelPasskeyCredential,
+  SliceKernelPasskeyPaymasterClient,
+  SliceKernelPasskeySendUserOperationParameters,
+  SliceKernelPasskeyUserOperationEvent
 } from "./types/accountClient"
+export type {
+  SliceBundlerRequestOptions,
+  SliceBundlerRetryReason,
+  SliceBundlerUpstreamErrorClassifier,
+  SliceBundlerUserOperationAuthorizationInput,
+  SliceBundlerUserOperationAuthorizer
+} from "./types/bundler"
 export type * from "./types/commerce"
 export type * from "./types/delegation"
+export type {
+  BuildSliceExecutionEnableTypedDataParameters,
+  CreateSliceExecutionAccountParameters,
+  SliceExecutionUserOperation
+} from "./types/execution"
+export type {
+  JsonObject,
+  JsonPrimitive,
+  JsonValue,
+  SliceAcceptedSenderCode,
+  SliceJsonRpcErrorCode,
+  SliceJsonRpcId,
+  SliceSenderAccountFetch,
+  SliceSenderAccountSnapshot,
+  SliceUpstreamJsonRpcError,
+  SliceUserOperation,
+  SliceUserOperationPolicyFetch
+} from "./types/userOperation"
+export type {
+  WeightedEcdsaProposalTypedDataParameters,
+  WeightedEcdsaSignerParameters
+} from "./types/weightedSigner"

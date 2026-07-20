@@ -9,7 +9,10 @@ import {
   createBundlerClient,
   type SmartAccount
 } from "viem/account-abstraction"
-import { connectSliceWalletAccount } from "../ceremony/accountClient"
+import {
+  connectSliceWalletAccount,
+  requestSliceWalletSession
+} from "../ceremony/accountClient"
 import { createSliceWalletCeremonyBroker } from "../ceremony/broker"
 import { authorizeSliceWalletSessions } from "../ceremony/client"
 import { parseSliceWalletFrameSession } from "../ceremony/protocol"
@@ -364,6 +367,35 @@ const createSliceWalletChainRuntime = (
     return { session: selection.connected.session, wallet }
   }
 
+  const requestSession = async () => {
+    if (config.session === undefined) {
+      throw new Error("Slice Wallet session integration is not configured.")
+    }
+    const wallet = await requireActiveWallet()
+    const result = await requestSliceWalletSession({
+      account: wallet.rootAccount.address,
+      ceremonyBroker: config.ceremonyBroker,
+      ceremonyMode: config.ceremonyMode,
+      chainId: config.chain.id,
+      document: config.document,
+      fetch: fetchImpl,
+      idOrigin,
+      session: {
+        audience: config.session.audience,
+        prepare: config.session.prepare,
+        ...(config.session.scopes === undefined
+          ? {}
+          : { scopes: config.session.scopes }),
+        ...(config.session.ttlSeconds === undefined
+          ? {}
+          : { ttlSeconds: config.session.ttlSeconds })
+      },
+      window: browserWindow
+    })
+    await config.session.onSession?.(result)
+    return result
+  }
+
   const hydrateGrant = async () => {
     const wallet = await requireActiveWallet()
     const stored = readStoredSliceWalletGrant(
@@ -685,6 +717,7 @@ const createSliceWalletChainRuntime = (
     getGrants,
     paymasterAvailable: config.paymasterUrl !== undefined,
     revokeGrant,
+    requestSession,
     rotateGrant,
     sendCalls: callTracker.sendCalls,
     signMessage,
@@ -821,6 +854,7 @@ export const createSliceWalletProviderRuntime = (
     connect: () => getChainRuntime().connect(),
     connectWithSession: (session: SliceWalletSessionConnectInput) =>
       getChainRuntime().connectWithSession(session),
+    requestSession: () => getChainRuntime().requestSession(),
     continueInPopup: () => ceremonyBroker.continueInPopup(),
     cancelPendingCeremony: () => ceremonyBroker.cancel(),
     createGrant: (

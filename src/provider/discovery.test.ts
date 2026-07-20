@@ -42,6 +42,7 @@ describe("EIP-6963 discovery", () => {
       pendingCeremony: null,
       removeListener: () => undefined,
       request: async () => undefined,
+      requestSession: async () => ({ status: "preparation_failed" }),
       switchAccount: async () => "0x0000000000000000000000000000000000000001"
     }
 

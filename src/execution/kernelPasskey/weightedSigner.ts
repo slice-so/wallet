@@ -1,7 +1,11 @@
 import type { ModularSigner } from "@zerodev/permissions"
 import { addressToEmptyAccount, constants } from "@zerodev/sdk"
-import { type Address, concat, encodeAbiParameters, type Hex, pad } from "viem"
+import { concat, encodeAbiParameters, type Hex, pad } from "viem"
 import { privateKeyToAccount } from "viem/accounts"
+import type {
+  WeightedEcdsaProposalTypedDataParameters,
+  WeightedEcdsaSignerParameters
+} from "../../types/weightedSigner"
 import { sliceKernelWeightedEcdsaSignerAddress } from "../utils/sliceAccountClient"
 
 export const weightedEcdsaSignerSignatureLength = 130
@@ -9,22 +13,6 @@ export const weightedEcdsaSignerSignatureHexLength =
   2 + weightedEcdsaSignerSignatureLength * 2
 export const weightedEcdsaGuardianWeights = [1, 1] as const
 export const weightedEcdsaThreshold = 2
-
-export type WeightedEcdsaSignerParameters = {
-  coSignerAddress: Address
-  sessionPrivateKey?: Hex
-  sessionSignerAddress: Address
-  signerContractAddress?: Address
-}
-
-export type WeightedEcdsaProposalTypedDataParameters = {
-  account: Address
-  callData: Hex
-  chainId: number
-  nonce: bigint
-  permissionId: Hex
-  verifyingContract?: Address
-}
 
 export const encodeWeightedEcdsaSignerData = ({
   coSignerAddress,

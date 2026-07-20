@@ -31,10 +31,13 @@ export type SliceUserOperationPolicyFetch = (
 ) => Promise<Response>
 export type SliceSenderAccountSnapshot = {
   code: Hex
-  delegates: readonly Address[]
+  /** Raw 32-byte value of the ERC-1967 implementation slot. */
+  erc1967Implementation: Hex
 }
 export type SliceSenderAccountFetch = (
-  chainId: number,
   sender: Address
-) => Promise<SliceSenderAccountSnapshot>
-export type SliceAcceptedSenderCode = { hash: Hex; size: number }
+) => Promise<SliceSenderAccountSnapshot | null>
+export type SliceAcceptedSenderCode = {
+  codeHash: Hex
+  erc1967Implementation?: Address
+}

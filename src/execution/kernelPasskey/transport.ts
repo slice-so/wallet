@@ -1,65 +1,43 @@
 import {
   type Address,
   BaseError,
-  type Chain,
-  type Client,
   encodeAbiParameters,
   type Hex,
   http,
   keccak256,
   parseAbiParameters,
   RpcRequestError,
-  type Transport,
   zeroAddress
 } from "viem"
 import {
   createBundlerClient,
   createPaymasterClient,
   formatUserOperationRequest,
-  type PaymasterActions,
   type PrepareUserOperationParameterType,
   type SmartAccount,
-  type UserOperation,
-  type UserOperationReceipt
+  type UserOperation
 } from "viem/account-abstraction"
 import { base } from "viem/chains"
 import type {
+  CreateSliceKernelPasskeyBundlerClient,
+  CreateSliceKernelPasskeyPaymasterClient,
+  CreateSliceKernelPasskeyTransportParameters,
   SliceAccountClientCall,
   SliceAccountClientExecutionRequest,
   SliceAccountClientPaymasterContext,
-  SliceAccountClientTransport
+  SliceAccountClientTransport,
+  SliceKernelPasskeyPaymasterClient
 } from "../../types/accountClient"
+import type { SliceBundlerRetryReason } from "../../types/bundler"
 import {
   SliceAccountClientExecutionError,
   sliceKernelBaseV33Config,
   sliceKernelPasskeyBackend
 } from "../utils/sliceAccountClient"
 import {
-  type SliceBundlerRetryReason,
   sliceBundlerRetryDataCode,
   sliceBundlerRetryRpcCode
 } from "../utils/sliceBundler"
-
-export type SliceKernelPasskeyPaymasterClient = Pick<
-  PaymasterActions,
-  "getPaymasterData" | "getPaymasterStubData"
->
-
-export type SliceKernelPasskeyBundlerReceipt = Pick<
-  UserOperationReceipt<"0.7">,
-  "reason" | "success"
-> & {
-  receipt: {
-    transactionHash: Hex
-  }
-}
-
-export type SliceKernelPasskeySendUserOperationParameters = {
-  account: SmartAccount
-  calls: readonly SliceAccountClientCall[]
-  paymaster?: SliceKernelPasskeyPaymasterClient
-  paymasterContext?: SliceAccountClientPaymasterContext
-}
 
 type SliceKernelPasskeyPrepareUserOperationParameters = {
   account: SmartAccount
@@ -77,31 +55,6 @@ type SliceKernelPasskeyPrepareUserOperationParameters = {
   | { callData?: never; calls: readonly SliceAccountClientCall[] }
 )
 
-export type SliceKernelPasskeyBundlerClient = {
-  prepareUserOperation?: (
-    parameters: SliceKernelPasskeyPrepareUserOperationParameters
-  ) => Promise<UserOperation<"0.7">>
-  sendPreparedUserOperation?: (
-    userOperation: UserOperation<"0.7">
-  ) => Promise<Hex>
-  sendUserOperation: (
-    parameters: SliceKernelPasskeySendUserOperationParameters
-  ) => Promise<Hex>
-  waitForUserOperationReceipt: (parameters: {
-    hash: Hex
-  }) => Promise<SliceKernelPasskeyBundlerReceipt>
-}
-
-export type CreateSliceKernelPasskeyBundlerClient = (parameters: {
-  bundlerUrl: string
-  chain: Chain
-  client: Client<Transport>
-}) => SliceKernelPasskeyBundlerClient
-
-export type CreateSliceKernelPasskeyPaymasterClient = (parameters: {
-  paymasterUrl: string
-}) => SliceKernelPasskeyPaymasterClient
-
 const normalizePreparedUserOperation = (
   userOperation: UserOperation<"0.7">
 ): UserOperation<"0.7"> => {
@@ -117,35 +70,6 @@ const normalizePreparedUserOperation = (
     ...selfFundedUserOperation
   } = userOperation
   return selfFundedUserOperation
-}
-
-export type SliceKernelPasskeyUserOperationEvent =
-  | {
-      account: Address
-      type: "userOperationSubmitted"
-      userOperationHash: Hex
-    }
-  | {
-      account: Address
-      revertReason?: string
-      success: boolean
-      transactionHash: Hex
-      type: "userOperationReceipt"
-      userOperationHash: Hex
-    }
-
-export type CreateSliceKernelPasskeyTransportParameters = {
-  account: SmartAccount
-  bundlerUrl: string
-  /**
-   * Chain the Kernel account operates on. Defaults to Base; the staging fork
-   * runs the same pinned contracts under a different chain id.
-   */
-  chain?: Chain
-  client: Client<Transport>
-  createBundlerClient?: CreateSliceKernelPasskeyBundlerClient
-  createPaymasterClient?: CreateSliceKernelPasskeyPaymasterClient
-  onUserOperationEvent?: (event: SliceKernelPasskeyUserOperationEvent) => void
 }
 
 const normalizeAddress = (address: string) => address.toLowerCase()

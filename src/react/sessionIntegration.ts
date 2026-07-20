@@ -28,118 +28,164 @@ const validateSnapshot = ({
   return snapshot
 }
 
-export const useSliceWalletSessionIntegration = ({
-  account,
-  adapter,
-  audience,
-  chainId,
-  warn
-}: {
+type IntegrationConfig = {
   account: `0x${string}` | null
   adapter?: SliceWalletSessionAdapter
   audience?: string
   chainId: number
   warn: (message: string) => void
+}
+
+type IntegrationState = {
+  session: SliceWalletSessionSnapshot | null
+  sessionError: string | null
+}
+
+export const createSliceWalletSessionIntegration = ({
+  onChange
+}: {
+  onChange: (state: IntegrationState) => void
 }) => {
-  const [session, setSession] = useState<SliceWalletSessionSnapshot | null>(
-    null
-  )
-  const [sessionError, setSessionError] = useState<string | null>(null)
-  const generation = useRef(0)
-  const previousIdentity = useRef<string | null>(null)
+  let config: IntegrationConfig = {
+    account: null,
+    chainId: 0,
+    warn: () => undefined
+  }
+  let generation = 0
+  let previousIdentity: string | null = null
+  let state: IntegrationState = { session: null, sessionError: null }
 
-  const revoke = useCallback(async () => {
-    generation.current += 1
-    setSession(null)
-    setSessionError(null)
-    if (adapter === undefined) return
+  const updateState = (next: IntegrationState) => {
+    state = next
+    onChange(state)
+  }
+
+  const revoke = async () => {
+    generation += 1
+    updateState({ session: null, sessionError: null })
+    if (config.adapter === undefined) return
     try {
-      await adapter.end()
+      await config.adapter.end()
     } catch (error) {
-      const message =
+      config.warn(
         error instanceof Error ? error.message : "Session revocation failed."
-      warn(message)
+      )
     }
-  }, [adapter, warn])
+  }
 
-  useEffect(() => {
+  const configure = (nextConfig: IntegrationConfig) => {
+    config = nextConfig
     const identity =
-      account === null || audience === undefined
+      config.account === null || config.audience === undefined
         ? null
-        : `${account.toLowerCase()}:${chainId}:${audience}`
+        : `${config.account.toLowerCase()}:${config.chainId}:${config.audience}`
     if (
-      previousIdentity.current !== null &&
-      previousIdentity.current !== identity &&
-      session !== null
+      previousIdentity !== null &&
+      previousIdentity !== identity &&
+      state.session !== null
     ) {
       void revoke()
     }
-    previousIdentity.current = identity
-  }, [account, audience, chainId, revoke, session])
-
-  useEffect(() => {
-    if (account === null || adapter === undefined || audience === undefined) {
-      setSession(null)
+    previousIdentity = identity
+    if (
+      config.account === null ||
+      config.adapter === undefined ||
+      config.audience === undefined
+    ) {
+      generation += 1
+      updateState({ session: null, sessionError: null })
       return
     }
-    const capturedGeneration = ++generation.current
+    const capturedGeneration = ++generation
+    const { account, adapter, audience, chainId } = config
     void adapter
       .fetch()
       .then((snapshot) => {
-        if (capturedGeneration !== generation.current) return
-        setSession(
-          snapshot === null
-            ? null
-            : validateSnapshot({ account, audience, chainId, snapshot })
-        )
-        setSessionError(null)
+        if (capturedGeneration !== generation) return
+        updateState({
+          session:
+            snapshot === null
+              ? null
+              : validateSnapshot({ account, audience, chainId, snapshot }),
+          sessionError: null
+        })
       })
       .catch((error) => {
-        if (capturedGeneration !== generation.current) return
-        setSession(null)
-        setSessionError(
-          error instanceof Error ? error.message : "Session hydration failed."
-        )
-      })
-  }, [account, adapter, audience, chainId])
-
-  const complete = useCallback(
-    async (
-      result: SliceWalletCeremonySessionResult | undefined,
-      selectedAccount: `0x${string}` | null = account
-    ) => {
-      if (
-        result?.status !== "granted" ||
-        selectedAccount === null ||
-        adapter === undefined ||
-        audience === undefined
-      ) {
-        if (result !== undefined && result.status !== "granted") {
-          setSessionError(`Session ${result.status.replaceAll("_", " ")}.`)
-        }
-        return
-      }
-      const capturedGeneration = ++generation.current
-      try {
-        const snapshot = validateSnapshot({
-          account: selectedAccount,
-          audience,
-          chainId,
-          snapshot: await adapter.complete(result)
+        if (capturedGeneration !== generation) return
+        updateState({
+          session: null,
+          sessionError:
+            error instanceof Error ? error.message : "Session hydration failed."
         })
-        if (capturedGeneration !== generation.current) return
-        setSession(snapshot)
-        setSessionError(null)
-      } catch (error) {
-        if (capturedGeneration !== generation.current) return
-        setSession(null)
-        setSessionError(
-          error instanceof Error ? error.message : "Session completion failed."
-        )
+      })
+  }
+
+  const complete = async (
+    result: SliceWalletCeremonySessionResult | undefined,
+    selectedAccount: `0x${string}` | null = config.account
+  ) => {
+    if (
+      result?.status !== "granted" ||
+      selectedAccount === null ||
+      config.adapter === undefined ||
+      config.audience === undefined
+    ) {
+      if (result !== undefined && result.status !== "granted") {
+        updateState({
+          ...state,
+          sessionError: `Session ${result.status.replaceAll("_", " ")}.`
+        })
       }
-    },
-    [account, adapter, audience, chainId]
+      return
+    }
+    const capturedGeneration = ++generation
+    try {
+      const snapshot = validateSnapshot({
+        account: selectedAccount,
+        audience: config.audience,
+        chainId: config.chainId,
+        snapshot: await config.adapter.complete(result)
+      })
+      if (capturedGeneration !== generation) return
+      updateState({ session: snapshot, sessionError: null })
+    } catch (error) {
+      if (capturedGeneration !== generation) return
+      updateState({
+        session: null,
+        sessionError:
+          error instanceof Error ? error.message : "Session completion failed."
+      })
+    }
+  }
+
+  return { complete, configure, getState: () => state, revoke }
+}
+
+export const useSliceWalletSessionIntegration = (config: IntegrationConfig) => {
+  const { account, adapter, audience, chainId, warn } = config
+  const [state, setState] = useState<IntegrationState>({
+    session: null,
+    sessionError: null
+  })
+  const integrationRef = useRef<
+    ReturnType<typeof createSliceWalletSessionIntegration> | undefined
+  >(undefined)
+  integrationRef.current ??= createSliceWalletSessionIntegration({
+    onChange: setState
+  })
+  const integration = integrationRef.current
+
+  useEffect(
+    () => integration.configure({ account, adapter, audience, chainId, warn }),
+    [account, adapter, audience, chainId, warn, integration]
   )
 
-  return { complete, revoke, session, sessionError }
+  const complete = useCallback(
+    (...args: Parameters<typeof integration.complete>) =>
+      integration.complete(...args),
+    [integration]
+  )
+  const revoke = useCallback(() => integration.revoke(), [integration])
+
+  return { complete, revoke, ...state }
 }

@@ -22,6 +22,7 @@ import {
   entryPoint09Address
 } from "viem/account-abstraction"
 import { base } from "viem/chains"
+import type { SliceSenderAccountSnapshot } from "../../types/userOperation"
 import {
   generatedHookAddressList,
   getFundsModuleAddress,
@@ -40,7 +41,6 @@ import {
   kernelValidationManagementAbi,
   metaMaskDelegatorExecutionAbi
 } from "./slicePaymasterAbis"
-import type { SliceSenderAccountSnapshot } from "./sliceUserOperationPolicy"
 
 type Eip7702Auth = {
   address: Address

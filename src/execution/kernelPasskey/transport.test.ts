@@ -13,23 +13,23 @@ import type {
 } from "viem/account-abstraction"
 import { entryPoint07Address } from "viem/account-abstraction"
 import { anvil, base } from "viem/chains"
+import type {
+  SliceKernelPasskeyAccount,
+  SliceKernelPasskeyBundlerClient,
+  SliceKernelPasskeyBundlerReceipt,
+  SliceKernelPasskeyPaymasterClient,
+  SliceKernelPasskeySendUserOperationParameters
+} from "../../types/accountClient"
+import type { SliceBundlerRetryReason } from "../../types/bundler"
 import {
   SliceAccountClientExecutionError,
   sliceKernelPasskeyBackend
 } from "../utils/sliceAccountClient"
 import {
-  type SliceBundlerRetryReason,
   sliceBundlerRetryDataCode,
   sliceBundlerRetryRpcCode
 } from "../utils/sliceBundler"
-import type { SliceKernelPasskeyAccount } from "./account"
-import {
-  createSliceKernelPasskeyTransport,
-  type SliceKernelPasskeyBundlerClient,
-  type SliceKernelPasskeyBundlerReceipt,
-  type SliceKernelPasskeyPaymasterClient,
-  type SliceKernelPasskeySendUserOperationParameters
-} from "./transport"
+import { createSliceKernelPasskeyTransport } from "./transport"
 
 const accountAddress =
   "0x0000000000000000000000000000000000000001" satisfies Address

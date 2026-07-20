@@ -1,5 +1,7 @@
-import type { Address, Hex } from "viem"
+import type { Address } from "viem"
 import type {
+  JsonValue,
+  SliceAcceptedSenderCode,
   SliceSenderAccountFetch,
   SliceUserOperation,
   SliceUserOperationPolicyFetch
@@ -16,11 +18,11 @@ export type SliceBundlerUserOperationAuthorizer = (
 export type SliceBundlerRetryReason = "fee_floor" | "replacement_underpriced"
 export type SliceBundlerUpstreamErrorClassifier = (error: {
   code: number
-  data?: string
+  data?: JsonValue
   message: string
 }) => SliceBundlerRetryReason | null
 export type SliceBundlerRequestOptions = {
-  acceptedSenderCode?: readonly { hash: Hex; size: number }[]
+  acceptedSenderCode?: readonly SliceAcceptedSenderCode[]
   authorizeUserOperation?: SliceBundlerUserOperationAuthorizer
   fetch?: SliceUserOperationPolicyFetch
   fetchSenderAccount?: SliceSenderAccountFetch
