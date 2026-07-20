@@ -9,6 +9,14 @@ import { invalidProviderRequest } from "./errors"
 const sliceIdOrigin = "https://id.slice.so"
 const defaultSliceWalletChainId = 8453
 
+const isOrigin = (value: string) => {
+  try {
+    return new URL(value).origin === value
+  } catch {
+    return false
+  }
+}
+
 const normalizeTransportUrl = (value: string, label: string) => {
   if (value.length > 2_048) {
     throw invalidProviderRequest(`${label} is too long.`)
@@ -40,6 +48,7 @@ export const resolveCanonicalSliceWalletConfig = (
     "announce",
     "chainIds",
     "defaultChainId",
+    "session",
     "transports"
   ])
   if (Object.keys(parameters).some((key) => !allowedParameterKeys.has(key))) {
@@ -121,11 +130,42 @@ export const resolveCanonicalSliceWalletConfig = (
           : normalizeTransportUrl(overrides.rpcUrl, "RPC URL")
     }
   })
+  const session = parameters.session
+  if (
+    session !== undefined &&
+    (typeof session !== "object" ||
+      session === null ||
+      Array.isArray(session) ||
+      Object.keys(session).some(
+        (key) =>
+          ![
+            "audience",
+            "onSession",
+            "prepare",
+            "scopes",
+            "ttlSeconds"
+          ].includes(key)
+      ) ||
+      typeof session.audience !== "string" ||
+      !isOrigin(session.audience) ||
+      typeof session.prepare !== "function" ||
+      (session.onSession !== undefined &&
+        typeof session.onSession !== "function") ||
+      (session.scopes !== undefined &&
+        (!Array.isArray(session.scopes) ||
+          session.scopes.some((scope) => typeof scope !== "string"))) ||
+      (session.ttlSeconds !== undefined &&
+        (!Number.isSafeInteger(session.ttlSeconds) ||
+          session.ttlSeconds <= 0)))
+  ) {
+    throw invalidProviderRequest("Slice Wallet session config is invalid.")
+  }
   return {
     announce: parameters.announce ?? true,
     chains,
     defaultChainId,
     idOrigin: sliceIdOrigin,
-    requireAdmittedChain: true
+    requireAdmittedChain: true,
+    ...(session === undefined ? {} : { session })
   }
 }

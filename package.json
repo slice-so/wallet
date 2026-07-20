@@ -18,6 +18,16 @@
       "import": "./dist/esm/index.js",
       "default": "./dist/esm/index.js"
     },
+    "./execution": {
+      "development": {
+        "types": "./src/execution.ts",
+        "import": "./src/execution.ts",
+        "default": "./src/execution.ts"
+      },
+      "types": "./dist/esm/execution.d.ts",
+      "import": "./dist/esm/execution.js",
+      "default": "./dist/esm/execution.js"
+    },
     "./argon2id": {
       "development": {
         "types": "./src/argon2id.ts",
@@ -68,6 +78,16 @@
       "import": "./dist/esm/recovery.js",
       "default": "./dist/esm/recovery.js"
     },
+    "./react": {
+      "development": {
+        "types": "./src/react.ts",
+        "import": "./src/react.ts",
+        "default": "./src/react.ts"
+      },
+      "types": "./dist/esm/react.d.ts",
+      "import": "./dist/esm/react.js",
+      "default": "./dist/esm/react.js"
+    },
     "./provider": {
       "development": {
         "types": "./src/provider.ts",
@@ -88,6 +108,16 @@
       "import": "./dist/esm/server.js",
       "default": "./dist/esm/server.js"
     },
+    "./session": {
+      "development": {
+        "types": "./src/session.ts",
+        "import": "./src/session.ts",
+        "default": "./src/session.ts"
+      },
+      "types": "./dist/esm/session.d.ts",
+      "import": "./dist/esm/session.js",
+      "default": "./dist/esm/session.js"
+    },
     "./wagmi": {
       "development": {
         "types": "./src/wagmi.ts",
@@ -104,13 +134,15 @@
   ],
   "scripts": {
     "admit:canary": "bun --conditions=development scripts/create-user-operation-canary.ts",
-    "build": "bun run generate:chains:check && bun run build.ts",
+    "build": "bun run generate:chains:check && bun run generate:commerce:check && bun run build.ts",
     "generate:chains": "bun scripts/generate-chains.ts",
     "generate:chains:check": "bun scripts/generate-chains.ts --check",
+    "generate:commerce": "bun scripts/generate-commerce-facts.ts",
+    "generate:commerce:check": "bun scripts/generate-commerce-facts.ts --check",
     "test": "bun test",
     "test:e2e:two-chain": "bash ../../scripts/run-wallet-two-chain-e2e.sh",
     "verify:chains": "bun scripts/verify-chain-deployments.ts",
-    "type-check": "bun run generate:chains:check && tsc -p tsconfig.json --noEmit",
+    "type-check": "bun run generate:chains:check && bun run generate:commerce:check && tsc -p tsconfig.json --noEmit",
     "format": "biome format --write",
     "lint": "biome lint --write && bun scripts/check-import-boundaries.ts",
     "check": "biome check --write --unsafe && bun scripts/check-import-boundaries.ts"
@@ -119,6 +151,9 @@
     "access": "public"
   },
   "dependencies": {
+    "@slicekit/abi": "workspace:*",
+    "@slicekit/erc8128": "workspace:*",
+    "@zerodev/ecdsa-validator": "^5.4.9",
     "@zerodev/permissions": "5.6.3",
     "@zerodev/sdk": "5.5.10",
     "hash-wasm": "catalog:",
@@ -127,15 +162,21 @@
     "viem": "catalog:"
   },
   "peerDependencies": {
-    "@wagmi/core": "catalog:"
+    "@wagmi/core": "catalog:",
+    "react": ">=18"
   },
   "peerDependenciesMeta": {
     "@wagmi/core": {
       "optional": true
+    },
+    "react": {
+      "optional": true
     }
   },
   "devDependencies": {
+    "@slice/indexer-shared": "workspace:*",
     "@slice/typescript-config": "workspace:*",
+    "@types/react": "catalog:",
     "@wagmi/core": "catalog:"
   },
   "repository": {

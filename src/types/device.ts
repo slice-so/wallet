@@ -23,6 +23,7 @@ export type BuildSliceWalletDeviceCallsParameters =
 export type CreateSliceWalletDeviceKernelAccountParameters =
   CreateSliceWalletDeviceValidatorParameters & {
     account: Address
+    accountIndex: bigint
     rootCredential: SliceWalletRegisteredRootCredential
   }
 

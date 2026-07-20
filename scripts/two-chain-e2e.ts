@@ -173,6 +173,7 @@ const results = await Promise.all(
       throw new Error(`Wallet e2e deployment failed on chain ${chainId}.`)
     }
     const enableTypedData = await buildSliceWalletPermissionEnableTypedData({
+      accountIndex: 0n,
       address: account.address,
       client: publicClient,
       credential: registeredRootCredential,

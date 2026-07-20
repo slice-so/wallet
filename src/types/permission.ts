@@ -37,6 +37,7 @@ export type SliceWalletCheckoutCoSignerClient = {
 
 type SliceWalletPermissionAccountCommonParameters = {
   address: Address
+  accountIndex: bigint
   client: KernelSmartAccountImplementation["client"]
   credential: SliceWalletRegisteredRootCredential
   enableSignature?: Hex

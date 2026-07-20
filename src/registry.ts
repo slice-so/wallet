@@ -1,8 +1,11 @@
 import { type Hex, hexToBytes, isHex, keccak256, stringToHex } from "viem"
+import { assertSliceWalletAccountIndex } from "./accountIndex"
 import type {
   RegisterSliceWalletCredentialInput,
   SliceWalletCredentialListAuthorization,
   SliceWalletCredentialListChallenge,
+  SliceWalletCredentialAccountsAssertion,
+  SliceWalletCredentialAccountsChallenge,
   SliceWalletCredentialRegistrationKind,
   SliceWalletRegistryChallenge,
   SliceWalletRegistryCredential
@@ -83,11 +86,25 @@ export const formatSliceWalletCredentialListAuthorization = ({
     `Nonce: ${challenge}`
   ].join("\n")
 
+export class SliceWalletRegistryRequestError extends Error {
+  constructor(
+    readonly status: number,
+    readonly responseBody: string
+  ) {
+    super(`Slice wallet registry request failed with status ${status}.`)
+  }
+}
+
 const readJson = async <T>(
   responsePromise: Response | Promise<Response>
 ): Promise<T> => {
   const response = await responsePromise
-  if (!response.ok) throw new Error(await response.text())
+  if (!response.ok) {
+    throw new SliceWalletRegistryRequestError(
+      response.status,
+      await response.text()
+    )
+  }
   return (await response.json()) as T
 }
 
@@ -111,12 +128,18 @@ export const createSliceWalletRegistryClient = ({
     createChallenge: (
       registrationKind: SliceWalletCredentialRegistrationKind,
       chainId: number,
-      accountAddress?: string
+      accountAddress?: string,
+      credentialIdHash?: Hex,
+      accountIndex?: number
     ) =>
       readJson<SliceWalletRegistryChallenge>(
         fetchImpl(url("/v1/registry/challenges"), {
           body: JSON.stringify({
             ...(accountAddress === undefined ? {} : { accountAddress }),
+            ...(credentialIdHash === undefined ? {} : { credentialIdHash }),
+            ...(accountIndex === undefined
+              ? {}
+              : { accountIndex: assertSliceWalletAccountIndex(accountIndex) }),
             chainId,
             registrationKind
           }),
@@ -124,19 +147,58 @@ export const createSliceWalletRegistryClient = ({
           method: "POST"
         })
       ),
-    getCredential: async (credentialIdHash: Hex) => {
+    lookupCredential: async ({
+      accountAddress,
+      credentialIdHash
+    }: {
+      accountAddress: string
+      credentialIdHash: Hex
+    }) => {
       if (
         !isHex(credentialIdHash, { strict: true }) ||
         hexToBytes(credentialIdHash).length !== 32
       ) {
         throw new Error("Credential id hash must be 32-byte hex.")
       }
-      const response = await fetchImpl(
-        url(`/v1/registry/credentials/${credentialIdHash}`)
-      )
+      const response = await fetchImpl(url("/v1/registry/credentials/lookup"), {
+        body: JSON.stringify({ accountAddress, credentialIdHash }),
+        headers: { "content-type": "application/json" },
+        method: "POST"
+      })
       if (response.status === 404) return null
       return readJson<SliceWalletRegistryCredential>(response)
     },
+    createCredentialAccountsChallenge: (chainId: number) =>
+      readJson<SliceWalletCredentialAccountsChallenge>(
+        fetchImpl(url("/v1/registry/credential-accounts/challenges"), {
+          body: JSON.stringify({ chainId }),
+          headers: { "content-type": "application/json" },
+          method: "POST"
+        })
+      ),
+    listCredentialAccounts: ({
+      assertionResponse,
+      chainId,
+      challenge,
+      credentialId
+    }: {
+      assertionResponse: SliceWalletCredentialAccountsAssertion
+      chainId: number
+      challenge: Hex
+      credentialId: string
+    }) =>
+      readJson<readonly SliceWalletRegistryCredential[]>(
+        fetchImpl(url("/v1/registry/credential-accounts"), {
+          body: JSON.stringify({
+            assertionResponse,
+            chainId,
+            challenge,
+            credentialId
+          }),
+          headers: { "content-type": "application/json" },
+          method: "POST"
+        })
+      ),
     listAuthorizedAccountCredentials: (
       authorization: SliceWalletCredentialListAuthorization
     ) =>
@@ -162,11 +224,13 @@ export const getSliceWalletRegistryProofChallenge = ({
   challenge,
   chainId,
   credentialIdHash,
+  accountIndex,
   publicKey,
   recoverySignerAddress,
   registrationKind
 }: {
   challenge: Hex
+  accountIndex: number
   chainId: number
   credentialIdHash: Hex
   publicKey: Hex
@@ -180,11 +244,12 @@ export const getSliceWalletRegistryProofChallenge = ({
   keccak256(
     stringToHex(
       [
-        "Slice Wallet Credential Registration v2",
+        "Slice Wallet Credential Registration v3",
         registrationKind,
         String(chainId),
         challenge,
         credentialIdHash,
+        String(assertSliceWalletAccountIndex(accountIndex)),
         keccak256(publicKey),
         recoverySignerAddress?.toLowerCase() ?? "none"
       ].join("\n")

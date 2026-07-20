@@ -12,6 +12,10 @@ import type {
   SliceWalletPopupRequiredReason
 } from "./pendingCeremony"
 import type { SliceWalletRegistryCredential } from "./registry"
+import type {
+  SliceWalletCeremonySessionResult,
+  SliceWalletSessionConnectInput
+} from "./session"
 
 export type SliceWalletCeremonyMode = "auto" | "iframe" | "popup"
 
@@ -63,14 +67,16 @@ export type SliceWalletCeremonyResponse =
 
 export type SliceWalletCeremonyAccountMessage = {
   account: Address
+  accountIndex: number
   credentialIdHash: Hex
   nonce: Hex
   recovery?: {
     permissionId: Hex
     signerAddress: Address
   }
+  session?: SliceWalletCeremonySessionResult
   type: "slice-wallet:ceremony-account"
-  version: 1
+  version: 2
 }
 
 export type SliceWalletCeremonyAccountResponse =
@@ -83,6 +89,7 @@ export type SliceWalletConnectedAccount = SliceWalletRegistryCredential & {
     permissionId: Hex
     signerAddress: Address
   }
+  session?: SliceWalletCeremonySessionResult
 }
 
 export type SliceWalletCeremonyRootSignRequest = {
@@ -149,8 +156,17 @@ export type ConnectSliceWalletAccountParameters = {
   document?: Document
   fetch?: typeof fetch
   idOrigin: string
+  session?: SliceWalletSessionConnectInput
   timeoutMs?: number
   window: Window
+}
+
+export type RequestSliceWalletSessionParameters = Omit<
+  ConnectSliceWalletAccountParameters,
+  "session"
+> & {
+  account: Address
+  session: SliceWalletSessionConnectInput
 }
 
 export type CreateSliceWalletCeremonyRootSignerParameters = {
@@ -189,6 +205,7 @@ export type ManageSliceWalletDeviceParameters = {
 
 export type RegisterRecoveredSliceWalletCredentialParameters = {
   account: Address
+  accountIndex: number
   ceremonyBroker?: SliceWalletCeremonyBroker
   ceremonyMode?: SliceWalletCeremonyMode
   chainId: number

@@ -1,5 +1,5 @@
 {
-  "extends": "@slice/typescript-config/base.json",
+  "extends": "@slice/typescript-config/react-library.json",
   "compilerOptions": {
     "lib": ["ES2025", "DOM"],
     "outDir": "./dist/esm",

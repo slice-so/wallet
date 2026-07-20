@@ -1,4 +1,5 @@
 import { type Address, type Hex, hexToBytes, isAddress, isHex } from "viem"
+import { assertSliceWalletAccountIndex } from "../accountIndex"
 import {
   parseSliceWalletPolicyDescriptor,
   parseSliceWalletUnsignedUserOperation
@@ -16,6 +17,7 @@ import type {
   SliceWalletCeremonyResponse,
   SliceWalletCeremonyRootResponse,
   SliceWalletCeremonyRootSignRequest,
+  SliceWalletCeremonySessionRequestMessage,
   SliceWalletCheckoutGrant,
   SliceWalletFrameSession,
   SliceWalletPermissionAuthorization,
@@ -25,6 +27,65 @@ import type {
 } from "../types"
 
 type ProtocolRecord = { readonly [key: string]: SliceWalletProtocolValue }
+
+export const parseSliceWalletCeremonySessionRequestMessage = (
+  value: SliceWalletProtocolValue
+): SliceWalletCeremonySessionRequestMessage => {
+  const input = record(value, "Ceremony session request")
+  const status = stringValue(input.status, "Ceremony session request status")
+  if (
+    input.type !== "slice-wallet:ceremony-session-request" ||
+    input.version !== 1
+  ) {
+    throw new Error("Ceremony session request is invalid.")
+  }
+  if (status === "none" || status === "preparing" || status === "preparation_failed") {
+    assertKeys(input, ["status", "type", "version"])
+    return { status, type: input.type, version: 1 }
+  }
+  if (status !== "prepared") {
+    throw new Error("Ceremony session request status is invalid.")
+  }
+  assertKeys(input, ["request", "status", "type", "version"])
+  const request = record(input.request, "Prepared session request")
+  assertKeys(request, ["audience", "sessionSigner"], ["nonce", "pendingId", "scopes", "ttlSeconds"])
+  const audience = originValue(request.audience, "Session audience")
+  const sessionSigner = addressValue(request.sessionSigner, "Session signer")
+  const nonce = request.nonce === undefined ? undefined : stringValue(request.nonce, "Session nonce")
+  const pendingId = request.pendingId === undefined ? undefined : stringValue(request.pendingId, "Pending session id")
+  const ttlSeconds = request.ttlSeconds === undefined ? undefined : integerValue(request.ttlSeconds, "Session TTL")
+  if (
+    (nonce !== undefined && !/^[A-Za-z0-9_-]{16,256}$/.test(nonce)) ||
+    (pendingId !== undefined && !/^[A-Za-z0-9_-]{1,64}$/.test(pendingId)) ||
+    (ttlSeconds !== undefined && (ttlSeconds <= 0 || ttlSeconds > 30 * 24 * 60 * 60)) ||
+    (request.scopes !== undefined && (!Array.isArray(request.scopes) || request.scopes.length > 16))
+  ) {
+    throw new Error("Prepared session request is invalid.")
+  }
+  const scopes = request.scopes?.map((scope) => {
+    const value = stringValue(scope, "Session scope")
+    if (!/^[a-z0-9][a-z0-9_.:-]{0,63}$/.test(value)) {
+      throw new Error("Session scope is invalid.")
+    }
+    return value
+  })
+  if (scopes !== undefined && new Set(scopes).size !== scopes.length) {
+    throw new Error("Session scopes must be unique.")
+  }
+  return {
+    request: {
+      audience,
+      ...(nonce === undefined ? {} : { nonce }),
+      ...(pendingId === undefined ? {} : { pendingId }),
+      ...(scopes === undefined ? {} : { scopes }),
+      sessionSigner,
+      ...(ttlSeconds === undefined ? {} : { ttlSeconds })
+    },
+    status,
+    type: input.type,
+    version: 1
+  }
+}
 
 const record = (
   value: SliceWalletProtocolValue,
@@ -387,10 +448,17 @@ export const parseSliceWalletCeremonyAccountMessage = (
   const input = record(value, "Ceremony account response")
   assertKeys(
     input,
-    ["account", "credentialIdHash", "nonce", "type", "version"],
-    ["recovery"]
+    [
+      "account",
+      "accountIndex",
+      "credentialIdHash",
+      "nonce",
+      "type",
+      "version"
+    ],
+    ["recovery", "session"]
   )
-  if (input.type !== "slice-wallet:ceremony-account" || input.version !== 1) {
+  if (input.type !== "slice-wallet:ceremony-account" || input.version !== 2) {
     throw new Error("Ceremony account response is invalid.")
   }
   let recovery: SliceWalletCeremonyAccountMessage["recovery"]
@@ -409,8 +477,60 @@ export const parseSliceWalletCeremonyAccountMessage = (
       )
     }
   }
+  let session: SliceWalletCeremonyAccountMessage["session"]
+  if (input.session !== undefined) {
+    const sessionInput = record(input.session, "Ceremony session result")
+    const status = stringValue(sessionInput.status, "Ceremony session status")
+    if (status === "granted") {
+      assertKeys(
+        sessionInput,
+        [
+          "expiresAt",
+          "grantMessage",
+          "sessionSigner",
+          "signature",
+          "status"
+        ],
+        ["pendingId"]
+      )
+      const pendingId =
+        sessionInput.pendingId === undefined
+          ? undefined
+          : stringValue(sessionInput.pendingId, "Pending session id")
+      if (
+        pendingId !== undefined &&
+        (!/^[A-Za-z0-9_-]{1,64}$/.test(pendingId) || pendingId.length > 64)
+      ) {
+        throw new Error("Pending session id is invalid.")
+      }
+      session = {
+        expiresAt: stringValue(sessionInput.expiresAt, "Session expiry"),
+        grantMessage: stringValue(sessionInput.grantMessage, "Session grant"),
+        ...(pendingId === undefined ? {} : { pendingId }),
+        sessionSigner: addressValue(
+          sessionInput.sessionSigner,
+          "Session signer"
+        ),
+        signature: hexValue(sessionInput.signature, "Session signature"),
+        status
+      }
+    } else {
+      assertKeys(sessionInput, ["status"])
+      if (
+        status !== "cancelled" &&
+        status !== "preparation_failed" &&
+        status !== "timed_out"
+      ) {
+        throw new Error("Ceremony session status is invalid.")
+      }
+      session = { status }
+    }
+  }
   return {
     account: addressValue(input.account, "Wallet account"),
+    accountIndex: assertSliceWalletAccountIndex(
+      integerValue(input.accountIndex, "Wallet account index")
+    ),
     credentialIdHash: hexValue(
       input.credentialIdHash,
       "Credential id hash",
@@ -418,8 +538,9 @@ export const parseSliceWalletCeremonyAccountMessage = (
     ),
     nonce: hexValue(input.nonce, "Ceremony nonce", 32),
     ...(recovery === undefined ? {} : { recovery }),
+    ...(session === undefined ? {} : { session }),
     type: "slice-wallet:ceremony-account",
-    version: 1
+    version: 2
   }
 }
 

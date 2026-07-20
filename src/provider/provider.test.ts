@@ -1,12 +1,12 @@
 import { describe, expect, mock, test } from "bun:test"
-import { numberToHex } from "viem"
+import { type Address, numberToHex } from "viem"
 import { base, optimism } from "viem/chains"
 import type { SliceWalletProviderValue } from "../types"
 import type { SliceWalletProviderConfig } from "../types/providerInternal"
 import { SliceWalletProviderRpcError } from "./errors"
 import { createSliceWalletProviderInternal } from "./provider"
 
-const account = "0x0000000000000000000000000000000000000001" as const
+const account: Address = "0x0000000000000000000000000000000000000001"
 const permissionId = "0x12345678" as const
 const userOperationHash = `0x${"ab".repeat(32)}` as const
 const transactionHash = `0x${"cd".repeat(32)}` as const
@@ -90,6 +90,9 @@ const createRuntime = () => {
       return chainId
     },
     connect,
+    connectWithSession: mock(async () => ({
+      wallet: { rootAccount: { address: account } }
+    })),
     cancelPendingCeremony: mock(() => {}),
     continueInPopup: mock(async () => userOperationHash),
     createGrant,
@@ -113,6 +116,7 @@ const createRuntime = () => {
     signMessage: mock(async () => userOperationHash),
     signTypedData: mock(async () => userOperationHash),
     supportedChainIds: [base.id, optimism.id],
+    switchAccount: mock(async () => ({ rootAccount: { address: account } })),
     switchChain: mock((nextChainId: number) => {
       if (nextChainId !== base.id && nextChainId !== optimism.id) {
         throw new SliceWalletProviderRpcError(4902, "Unsupported chain.")
@@ -190,6 +194,56 @@ describe("Slice Wallet provider dispatch", () => {
     ).toEqual({ accounts: [{ address: account, capabilities: {} }] })
     await expectRpcError(
       request(provider, "wallet_connect", [{ capabilities: {}, version: "2" }]),
+      -32602
+    )
+  })
+
+  test("accepts only closed pre-prepared wallet_connect session scalars", async () => {
+    const { provider, runtime } = createProvider()
+    const sessionSigner =
+      "0x0000000000000000000000000000000000000002" as const
+    expect(
+      await request(provider, "wallet_connect", [
+        {
+          capabilities: {
+            session: {
+              audience: "https://api.example",
+              nonce: "abcdefghijklmnop",
+              optional: true,
+              pendingId: "pending-id",
+              scopes: ["orders:read"],
+              sessionSigner,
+              ttlSeconds: 60
+            }
+          },
+          version: "1"
+        }
+      ])
+    ).toEqual({ accounts: [{ address: account, capabilities: {} }] })
+    expect(runtime.connectWithSession).toHaveBeenCalledWith({
+      audience: "https://api.example",
+      prepared: {
+        nonce: "abcdefghijklmnop",
+        pendingId: "pending-id",
+        sessionSigner
+      },
+      scopes: ["orders:read"],
+      ttlSeconds: 60
+    })
+    await expectRpcError(
+      request(provider, "wallet_connect", [
+        {
+          capabilities: {
+            session: {
+              audience: "https://api.example",
+              optional: true,
+              pendingId: "a".repeat(65),
+              sessionSigner
+            }
+          },
+          version: "1"
+        }
+      ]),
       -32602
     )
   })
@@ -289,6 +343,30 @@ describe("Slice Wallet provider dispatch", () => {
     expect(disconnectEvents).toEqual([
       { code: 4900, message: "Slice Wallet disconnected." }
     ])
+  })
+
+  test("emits accountsChanged only after a different account is committed", async () => {
+    const { provider, runtime } = createProvider()
+    const events: string[][] = []
+    provider.on("accountsChanged", (accounts) => events.push([...accounts]))
+
+    await provider.switchAccount()
+    expect(events).toEqual([])
+
+    const next = "0x0000000000000000000000000000000000000003" as const
+    runtime.switchAccount.mockImplementation(async () => ({
+      rootAccount: { address: next }
+    }))
+    expect(await request(provider, "wallet_switchAccount", [])).toBe(next)
+    expect(events).toEqual([[next]])
+
+    runtime.switchAccount.mockImplementation(async () => {
+      throw new Error("chooser cancelled")
+    })
+    await expect(request(provider, "wallet_switchAccount", [])).rejects.toThrow(
+      "chooser cancelled"
+    )
+    expect(events).toEqual([[next]])
   })
 
   test("accepts configured add-chain requests and rejects unknown chains", async () => {

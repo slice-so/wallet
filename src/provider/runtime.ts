@@ -38,6 +38,7 @@ import type {
   SliceWalletGenericPermission,
   SliceWalletProviderValue,
   SliceWalletRegistryCredential,
+  SliceWalletSessionConnectInput,
   SliceWalletSignerFrameClient,
   WalletCall,
   WalletPolicyDescriptor
@@ -82,6 +83,7 @@ type SliceWalletChainRuntimeConfig = Omit<
 > &
   SliceWalletProviderChainConfig & {
     ceremonyBroker: SliceWalletCeremonyBroker
+    getAccountGeneration: () => number
   }
 
 const getBrowserDependencies = (
@@ -184,31 +186,61 @@ const createSliceWalletChainRuntime = (
   const hydrate = async () => {
     if (activeWallet !== null) return activeWallet
     if (hydrationPromise !== null) return hydrationPromise
-    hydrationPromise = (async () => {
+    const generation = config.getAccountGeneration()
+    let pending!: Promise<ActiveWallet | null>
+    pending = (async () => {
       const metadata = readStoredSliceWalletAccount(storage)
       if (metadata === null) return null
       try {
         const credential = await createSliceWalletRegistryClient({
           baseUrl: idOrigin,
           fetch: fetchImpl
-        }).getCredential(metadata.credentialIdHash)
+        }).lookupCredential({
+          accountAddress: metadata.accountAddress,
+          credentialIdHash: metadata.credentialIdHash
+        })
         if (
           credential === null ||
-          !isAddressEqual(credential.accountAddress, metadata.accountAddress)
+          !isAddressEqual(credential.accountAddress, metadata.accountAddress) ||
+          credential.accountIndex !== metadata.accountIndex
         ) {
-          throw new Error("Stored wallet metadata does not match the registry.")
+          if (
+            config.getAccountGeneration() === generation &&
+            hydrationPromise === pending
+          ) {
+            clearStoredSliceWalletAccount(storage)
+            clearStoredSliceWalletGrant(
+              storage,
+              config.chain.id,
+              metadata.accountAddress
+            )
+          }
+          return null
         }
-        activeWallet = await toActiveWallet(credential)
-        return activeWallet
+        const resolved = await toActiveWallet(credential)
+        if (
+          config.getAccountGeneration() !== generation ||
+          hydrationPromise !== pending
+        ) {
+          return null
+        }
+        activeWallet = resolved
+        return resolved
       } catch {
-        clearStoredSliceWalletAccount(storage)
-        clearStoredSliceWalletGrant(storage, config.chain.id)
+        // Registry and chain outages are transient. Keep the indexed account so
+        // hydration can retry without silently disconnecting the user.
         return null
       }
     })().finally(() => {
-      hydrationPromise = null
+      if (
+        config.getAccountGeneration() === generation &&
+        hydrationPromise === pending
+      ) {
+        hydrationPromise = null
+      }
     })
-    return hydrationPromise
+    hydrationPromise = pending
+    return pending
   }
 
   const requireActiveWallet = async () => {
@@ -219,15 +251,23 @@ const createSliceWalletChainRuntime = (
 
   const getFrame = async () => {
     if (framePromise !== null) return framePromise
-    framePromise = connectSliceWalletSignerFrame({
+    const generation = config.getAccountGeneration()
+    let pending!: Promise<SliceWalletSignerFrameClient>
+    pending = connectSliceWalletSignerFrame({
       document: browserDocument,
       frameUrl: new URL("/frame", idOrigin).href,
       window: browserWindow
     }).catch((error) => {
-      framePromise = null
+      if (
+        config.getAccountGeneration() === generation &&
+        framePromise === pending
+      ) {
+        framePromise = null
+      }
       throw error
     })
-    return framePromise
+    framePromise = pending
+    return pending
   }
 
   const createAccountBundler = (
@@ -274,29 +314,59 @@ const createSliceWalletChainRuntime = (
     }
   }
 
-  const connect = async () => {
-    const hydrated = await hydrate()
-    if (hydrated !== null) return hydrated
+  const chooseAccount = async (session?: SliceWalletSessionConnectInput) => {
+    const generation = config.getAccountGeneration()
     const connected = await connectSliceWalletAccount({
       ceremonyBroker: config.ceremonyBroker,
       chainId: config.chain.id,
       fetch: fetchImpl,
       idOrigin,
+      ...(session === undefined ? {} : { session }),
       window: browserWindow
     })
     const wallet = await toActiveWallet(connected)
     await ensureRecovery(wallet, connected)
+    if (config.getAccountGeneration() !== generation) {
+      throw new Error("Wallet account selection was superseded.")
+    }
+    return { connected, wallet }
+  }
+
+  const commitAccount = ({
+    connected,
+    wallet
+  }: Awaited<ReturnType<typeof chooseAccount>>) => {
     activeWallet = wallet
     writeStoredSliceWalletAccount(storage, {
       accountAddress: connected.accountAddress,
+      accountIndex: connected.accountIndex,
       credentialIdHash: connected.credentialIdHash
     })
     return wallet
   }
 
+  const connect = async () => {
+    const hydrated = await hydrate()
+    if (hydrated !== null) return hydrated
+    if (readStoredSliceWalletAccount(storage) !== null) {
+      throw new Error("Slice Wallet account hydration is temporarily unavailable.")
+    }
+    return commitAccount(await chooseAccount())
+  }
+
+  const connectWithSession = async (session: SliceWalletSessionConnectInput) => {
+    const selection = await chooseAccount(session)
+    const wallet = commitAccount(selection)
+    return { session: selection.connected.session, wallet }
+  }
+
   const hydrateGrant = async () => {
     const wallet = await requireActiveWallet()
-    const stored = readStoredSliceWalletGrant(storage, config.chain.id)
+    const stored = readStoredSliceWalletGrant(
+      storage,
+      config.chain.id,
+      wallet.rootAccount.address
+    )
     if (
       stored === null ||
       stored.chainId !== config.chain.id ||
@@ -314,7 +384,11 @@ const createSliceWalletChainRuntime = (
       }
     })
     if (result === null || typeof result !== "object") {
-      clearStoredSliceWalletGrant(storage, config.chain.id)
+      clearStoredSliceWalletGrant(
+        storage,
+        config.chain.id,
+        wallet.rootAccount.address
+      )
       return null
     }
     const session = parseSliceWalletFrameSession(result)
@@ -326,7 +400,11 @@ const createSliceWalletChainRuntime = (
       getWalletPolicyHash(session.policy) !==
         getWalletPolicyHash(expected.policy)
     ) {
-      clearStoredSliceWalletGrant(storage, config.chain.id)
+      clearStoredSliceWalletGrant(
+        storage,
+        config.chain.id,
+        wallet.rootAccount.address
+      )
       return null
     }
     return { session, stored }
@@ -349,6 +427,7 @@ const createSliceWalletChainRuntime = (
       }
       const permissionAccount = await createSliceWalletPermissionAccount({
         address: wallet.rootAccount.address,
+        accountIndex: BigInt(wallet.credential.accountIndex),
         client: publicClient,
         credential: {
           credentialIdHash: wallet.credential.credentialIdHash,
@@ -402,7 +481,11 @@ const createSliceWalletChainRuntime = (
   }
 
   const revokeGrant = async (permissionId?: Hex) => {
-    const stored = readStoredSliceWalletGrant(storage, config.chain.id)
+    const account =
+      activeWallet?.credential.accountAddress ??
+      readStoredSliceWalletAccount(storage)?.accountAddress
+    if (account === undefined) return
+    const stored = readStoredSliceWalletGrant(storage, config.chain.id, account)
     if (stored === null) return
     if (
       permissionId !== undefined &&
@@ -423,7 +506,8 @@ const createSliceWalletChainRuntime = (
           }
         })
       },
-      clearStored: () => clearStoredSliceWalletGrant(storage, config.chain.id),
+      clearStored: () =>
+        clearStoredSliceWalletGrant(storage, config.chain.id, stored.account),
       permissionId: stored.permissionId,
       uninstall: () => uninstallGrant(stored)
     })
@@ -436,7 +520,12 @@ const createSliceWalletChainRuntime = (
     permissions: readonly SliceWalletGenericPermission[]
     policy: WalletPolicyDescriptor
   }) => {
-    const previous = readStoredSliceWalletGrant(storage, config.chain.id)
+    const wallet = await requireActiveWallet()
+    const previous = readStoredSliceWalletGrant(
+      storage,
+      config.chain.id,
+      wallet.rootAccount.address
+    )
     const frame = await getFrame()
     const result = await frame.request({
       method: "createSession",
@@ -519,7 +608,12 @@ const createSliceWalletChainRuntime = (
   }
 
   const rotateGrant = async (permissionId: Hex) => {
-    const stored = readStoredSliceWalletGrant(storage, config.chain.id)
+    const wallet = await requireActiveWallet()
+    const stored = readStoredSliceWalletGrant(
+      storage,
+      config.chain.id,
+      wallet.rootAccount.address
+    )
     if (
       stored === null ||
       stored.permissionId.toLowerCase() !== permissionId.toLowerCase()
@@ -557,11 +651,16 @@ const createSliceWalletChainRuntime = (
 
   return {
     chainId: config.chain.id,
+    chooseAccount,
+    commitAccount,
     connect,
+    connectWithSession,
     createGrant,
     destroy: () => {
       void framePromise?.then((frame) => frame.destroy())
       framePromise = null
+      hydrationPromise = null
+      activeWallet = null
     },
     forwardRpc: (
       method: string,
@@ -601,6 +700,7 @@ export const createSliceWalletProviderRuntime = (
   const createChainRuntime =
     dependencies.createChainRuntime ?? createSliceWalletChainRuntime
   const ceremonyBroker = createSliceWalletCeremonyBroker()
+  let accountGeneration = 0
   const chainConfigs = new Map(
     config.chains.map((chainConfig) => [chainConfig.chain.id, chainConfig])
   )
@@ -628,7 +728,8 @@ export const createSliceWalletProviderRuntime = (
       runtime = createChainRuntime({
         ...config,
         ...chainConfig,
-        ceremonyBroker
+        ceremonyBroker,
+        getAccountGeneration: () => accountGeneration
       })
       runtimes.set(chainId, runtime)
     }
@@ -644,11 +745,77 @@ export const createSliceWalletProviderRuntime = (
     return getChainRuntime(activeChainId)
   }
 
+  let switchQueue = Promise.resolve()
+  const withSwitchMutex = async <Result>(operation: () => Promise<Result>) => {
+    const previous = switchQueue
+    let release = () => {}
+    switchQueue = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    await previous
+    try {
+      return await operation()
+    } finally {
+      release()
+    }
+  }
+
+  const destroyChainRuntimes = () => {
+    for (const runtime of runtimes.values()) runtime.destroy()
+    runtimes.clear()
+  }
+
+  const switchAccount = () =>
+    withSwitchMutex(async () => {
+      accountGeneration += 1
+      const generation = accountGeneration
+      const { storage } = getBrowserDependencies(config)
+      const snapshot = readStoredSliceWalletAccount(storage)
+      if (snapshot === null) return getChainRuntime().connect()
+
+      ceremonyBroker.cancel()
+      destroyChainRuntimes()
+      try {
+        const runtime = getChainRuntime()
+        const selection = await runtime.chooseAccount()
+        if (accountGeneration !== generation) {
+          throw new Error("Wallet account switch was superseded.")
+        }
+        if (
+          isAddressEqual(
+            selection.connected.accountAddress,
+            snapshot.accountAddress
+          ) && selection.connected.accountIndex === snapshot.accountIndex
+        ) {
+          runtime.destroy()
+          runtimes.clear()
+          return getChainRuntime().connect()
+        }
+        for (const chainId of chainConfigs.keys()) {
+          clearStoredSliceWalletGrant(storage, chainId, snapshot.accountAddress)
+        }
+        return runtime.commitAccount(selection)
+      } catch (error) {
+        destroyChainRuntimes()
+        try {
+          await getChainRuntime().connect()
+        } catch (rollbackError) {
+          throw new AggregateError(
+            [error, rollbackError],
+            "Wallet account switch failed and the previous account could not be rehydrated."
+          )
+        }
+        throw error
+      }
+    })
+
   return {
     get chainId() {
       return activeChainId
     },
     connect: () => getChainRuntime().connect(),
+    connectWithSession: (session: SliceWalletSessionConnectInput) =>
+      getChainRuntime().connectWithSession(session),
     continueInPopup: () => ceremonyBroker.continueInPopup(),
     cancelPendingCeremony: () => ceremonyBroker.cancel(),
     createGrant: (
@@ -656,8 +823,8 @@ export const createSliceWalletProviderRuntime = (
     ) => getChainRuntime().createGrant(...args),
     destroy: () => {
       ceremonyBroker.cancel()
-      for (const runtime of runtimes.values()) runtime.destroy()
-      runtimes.clear()
+      accountGeneration += 1
+      destroyChainRuntimes()
     },
     disconnect: async () => {
       ceremonyBroker.cancel()
@@ -716,6 +883,7 @@ export const createSliceWalletProviderRuntime = (
       ...args: Parameters<SliceWalletChainRuntime["signTypedData"]>
     ) => getChainRuntime().signTypedData(...args),
     supportedChainIds: Object.freeze([...chainConfigs.keys()]),
+    switchAccount,
     switchChain: (chainId: number) => {
       getChainRuntime(chainId)
       if (activeChainId !== chainId) ceremonyBroker.cancel()

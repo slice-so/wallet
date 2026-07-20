@@ -179,6 +179,7 @@ const createPermissionValidator = async ({
 
 const createPermissionKernelAccount = async ({
   address,
+  accountIndex,
   client,
   credential,
   enableSignature,
@@ -188,6 +189,7 @@ const createPermissionKernelAccount = async ({
 }: Pick<
   CreateSliceWalletPermissionAccountParameters,
   | "address"
+  | "accountIndex"
   | "client"
   | "credential"
   | "enableSignature"
@@ -208,7 +210,7 @@ const createPermissionKernelAccount = async ({
     accountImplementationAddress: sliceWalletKernelAddresses.implementation,
     entryPoint: sliceWalletEntryPoint,
     factoryAddress: sliceWalletKernelAddresses.factory,
-    index: 0n,
+    index: accountIndex,
     kernelVersion: sliceWalletKernelVersion,
     metaFactoryAddress: sliceWalletKernelAddresses.metaFactory,
     plugins: {

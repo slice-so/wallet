@@ -10,6 +10,7 @@ import {
   zeroAddress
 } from "viem"
 import { sliceWalletKernelAddresses } from "./constants"
+import { assertSliceWalletAccountIndex } from "./accountIndex"
 import { buildRecoveryPermissionInitConfig } from "./recovery"
 import { encodeSliceWalletRootValidatorData } from "./rootValidator"
 import type { PredictSliceWalletKernelAccountAddressParameters } from "./types/recovery"
@@ -62,8 +63,10 @@ const getKernelProxyInitCode = () =>
 export const deriveSliceWalletRecoveryBootstrap = async ({
   chainId,
   credential,
+  index = 0n,
   recoverySignerAddress
 }: PredictSliceWalletKernelAccountAddressParameters) => {
+  assertSliceWalletAccountIndex(Number(index))
   const client = createOfflineClient(chainId)
   const recovery = await buildRecoveryPermissionInitConfig({
     client,
@@ -85,7 +88,7 @@ export const deriveSliceWalletRecoveryBootstrap = async ({
     throw new Error("Pinned Kernel proxy initcode hash does not match.")
   }
   const salt = keccak256(
-    concatHex([initializationData, toHex(0n, { size: 32 })])
+    concatHex([initializationData, toHex(index, { size: 32 })])
   )
   return {
     account: getContractAddress({

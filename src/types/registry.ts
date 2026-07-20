@@ -4,6 +4,7 @@ export type SliceWalletCredentialRegistrationKind =
   | "device"
   | "existing_account"
   | "initial"
+  | "sub_account"
 
 export type SliceWalletCredentialProof = {
   authenticatorData: Hex
@@ -26,6 +27,7 @@ export type SliceWalletRegistryCredential = {
 }
 
 export type SliceWalletRegistryChallenge = {
+  accountIndex: number
   challenge: Hex
   chainId: number
   expiresAt: string
@@ -36,6 +38,7 @@ export type RegisterSliceWalletCredentialInput = {
   accountAddress?: Address
   accountFactory?: Address
   accountFactoryData?: Hex
+  accountIndex: number
   challenge: Hex
   chainId: number
   credentialId: string
@@ -51,6 +54,26 @@ export type SliceWalletCredentialListChallenge = {
   chainId: number
   expiresAt: string
   purpose: "credential-list"
+}
+
+export type SliceWalletCredentialAccountsChallenge = {
+  challenge: Hex
+  chainId: number
+  expiresAt: string
+  purpose: "credential-accounts"
+}
+
+export type SliceWalletCredentialAccountsAssertion = {
+  authenticatorData: Hex
+  clientDataJSON: string
+  r: string
+  s: string
+  userVerificationRequired: true
+}
+
+export type SliceWalletCredentialRowClassification = {
+  credential: SliceWalletRegistryCredential
+  status: "active" | "inactive" | "unavailable"
 }
 
 export type SliceWalletCredentialListAuthorization = {

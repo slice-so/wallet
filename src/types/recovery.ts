@@ -30,6 +30,7 @@ export type SliceTimelockPolicy = Policy & {
 }
 
 export type CreateRecoveryPermissionAccountParameters = {
+  accountIndex: bigint
   address: Address
   chainId: number
   client: KernelSmartAccountImplementation["client"]
@@ -45,6 +46,7 @@ export type CreateRecoveryPermissionAccountParameters = {
 }
 
 export type CreateDeployedRecoveryPermissionAccountParameters = {
+  accountIndex: bigint
   address: Address
   chainId: number
   client: KernelSmartAccountImplementation["client"]
@@ -56,6 +58,7 @@ export type CreateDeployedRecoveryPermissionAccountParameters = {
 export type PredictSliceWalletKernelAccountAddressParameters = {
   chainId: number
   credential: SliceWalletRegisteredRootCredential
+  index?: bigint
   recoverySignerAddress: Address
 }
 

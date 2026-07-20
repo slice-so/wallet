@@ -1,6 +1,6 @@
 # `@slicekit/wallet`
 
-Portable Kernel wallet primitives for Slice and third-party applications. The package is commerce-independent: it contains account construction, signer-frame and ceremony clients, normalized policies, recovery, EIP-1193/EIP-6963/EIP-5792 provider support, and a wagmi connector.
+Portable Kernel wallet primitives for Slice and third-party applications, including account construction, signer-frame and ceremony clients, normalized commerce policies, recovery, React integration, EIP-1193/EIP-6963/EIP-5792 provider support, and a wagmi connector.
 
 ## Security Boundary
 
@@ -14,14 +14,14 @@ Portable Kernel wallet primitives for Slice and third-party applications. The pa
 ## Entry Points
 
 - `@slicekit/wallet`: account, credential, ceremony, frame, registry, and recovery primitives.
+- `@slicekit/wallet/execution`: Kernel passkey execution, commerce policies, bundler/paymaster handlers, and execution clients.
+- `@slicekit/wallet/react`: the Slice wallet provider and account/session hooks.
 - `@slicekit/wallet/frame`: the minimal signer-frame controller, protocol, session store, calls, and policy graph.
 - `@slicekit/wallet/policy`: canonical generic policy descriptors and permission ids.
 - `@slicekit/wallet/provider`: portable provider and EIP-6963 discovery.
 - `@slicekit/wallet/wagmi`: wagmi connector.
 - `@slicekit/wallet/recovery`: Timelock recovery operations. The root entry point also exports the primary password-manager recovery-code format and the advanced encrypted-file alternative.
 - `@slicekit/wallet/server`: server-only P-256 verification and proposal helpers.
-
-Slice commerce policies, checkout decoding, allowance clients, and ProductsModule integration remain internal to Slice applications in `@slicekit/common`; they are intentionally absent from this package.
 
 ## Provider
 

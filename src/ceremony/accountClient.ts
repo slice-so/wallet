@@ -1,7 +1,9 @@
 import { createSliceWalletRegistryClient } from "../registry"
 import type {
   ConnectSliceWalletAccountParameters,
+  RequestSliceWalletSessionParameters,
   SliceWalletCeremonyAccountMessage,
+  SliceWalletCeremonySessionRequestMessage,
   SliceWalletConnectedAccount,
   SliceWalletProtocolValue
 } from "../types"
@@ -17,16 +19,20 @@ import {
 } from "./popup"
 import { parseSliceWalletCeremonyAccountResponse } from "./protocol"
 
-export const connectSliceWalletAccount = async ({
+const runSliceWalletAccountCeremony = async ({
   ceremonyBroker,
   ceremonyMode = "popup",
   chainId,
   document,
   fetch,
   idOrigin,
+  session,
   timeoutMs,
-  window
-}: ConnectSliceWalletAccountParameters): Promise<SliceWalletConnectedAccount> => {
+  window,
+  requestedAccount
+}: ConnectSliceWalletAccountParameters & {
+  requestedAccount?: `0x${string}`
+}): Promise<SliceWalletConnectedAccount> => {
   const nonce = createSliceWalletCeremonyNonce(window)
   const resolvedMode = resolveSliceWalletCeremonyMode({
     brokerAvailable: ceremonyBroker !== undefined,
@@ -52,10 +58,66 @@ export const connectSliceWalletAccount = async ({
       idOrigin,
       mode,
       nonce,
-      path: `/ceremony/connect?chainId=${chainId}`,
+      path: `/ceremony/connect?chainId=${chainId}${
+        requestedAccount === undefined
+          ? ""
+          : `&account=${requestedAccount}&consentOnly=1`
+      }`,
       window
     })
-    return waitForSliceWalletCeremonyMessage({
+    let preparedSession:
+      | Extract<
+          SliceWalletCeremonySessionRequestMessage,
+          { status: "prepared" }
+        >["request"]
+      | null = null
+    if (session === undefined) {
+      port.postMessage({
+        status: "none",
+        type: "slice-wallet:ceremony-session-request",
+        version: 1
+      } satisfies SliceWalletCeremonySessionRequestMessage)
+    } else {
+      if ((session.prepare === undefined) === (session.prepared === undefined)) {
+        throw new Error("Session connect requires exactly one preparation mode.")
+      }
+      port.postMessage({
+        status: "preparing",
+        type: "slice-wallet:ceremony-session-request",
+        version: 1
+      } satisfies SliceWalletCeremonySessionRequestMessage)
+      const preparation = await (async () => {
+        try {
+          return session.prepared ?? (await session.prepare?.())
+        } catch {
+          return undefined
+        }
+      })()
+      if (preparation === undefined || session.signal?.aborted === true) {
+        port.postMessage({
+          status: "preparation_failed",
+          type: "slice-wallet:ceremony-session-request",
+          version: 1
+        } satisfies SliceWalletCeremonySessionRequestMessage)
+      } else {
+        const preparedRequest = {
+          audience: new URL(session.audience).origin,
+          ...preparation,
+          ...(session.scopes === undefined ? {} : { scopes: session.scopes }),
+          ...(session.ttlSeconds === undefined
+            ? {}
+            : { ttlSeconds: session.ttlSeconds })
+        }
+        preparedSession = preparedRequest
+        port.postMessage({
+          request: preparedRequest,
+          status: "prepared",
+          type: "slice-wallet:ceremony-session-request",
+          version: 1
+        } satisfies SliceWalletCeremonySessionRequestMessage)
+      }
+    }
+    const result = await waitForSliceWalletCeremonyMessage({
       parse: (value: SliceWalletProtocolValue) => {
         const message = parseSliceWalletCeremonyAccountResponse(value)
         if (message.nonce !== nonce) {
@@ -73,6 +135,17 @@ export const connectSliceWalletAccount = async ({
       surface,
       timeoutMs
     })
+    if (
+      result.type === "slice-wallet:ceremony-account" &&
+      result.session?.status === "granted" &&
+      (preparedSession === null ||
+        result.session.sessionSigner.toLowerCase() !==
+          preparedSession.sessionSigner.toLowerCase() ||
+        result.session.pendingId !== preparedSession.pendingId)
+    ) {
+      throw new Error("Slice Wallet session result does not match preparation.")
+    }
+    return result
   }
   let account: SliceWalletCeremonyAccountMessage
   try {
@@ -89,17 +162,46 @@ export const connectSliceWalletAccount = async ({
   const credential = await createSliceWalletRegistryClient({
     baseUrl: new URL(idOrigin).origin,
     ...(fetch === undefined ? {} : { fetch })
-  }).getCredential(account.credentialIdHash)
+  }).lookupCredential({
+    accountAddress: account.account,
+    credentialIdHash: account.credentialIdHash
+  })
   if (
     credential === null ||
+    credential.accountIndex !== account.accountIndex ||
     credential.accountAddress.toLowerCase() !== account.account.toLowerCase() ||
     credential.credentialIdHash.toLowerCase() !==
       account.credentialIdHash.toLowerCase()
   ) {
     throw new Error("Slice Wallet registry record does not match the account.")
   }
+  if (
+    requestedAccount !== undefined &&
+    credential.accountAddress.toLowerCase() !== requestedAccount.toLowerCase()
+  ) {
+    throw new Error("Slice Wallet session was signed by a different account.")
+  }
   return {
     ...credential,
-    ...(account.recovery === undefined ? {} : { recovery: account.recovery })
+    ...(account.recovery === undefined ? {} : { recovery: account.recovery }),
+    ...(account.session === undefined ? {} : { session: account.session })
   }
+}
+
+export const connectSliceWalletAccount = (
+  parameters: ConnectSliceWalletAccountParameters
+) => runSliceWalletAccountCeremony(parameters)
+
+export const requestSliceWalletSession = async ({
+  account,
+  ...parameters
+}: RequestSliceWalletSessionParameters) => {
+  const connected = await runSliceWalletAccountCeremony({
+    ...parameters,
+    requestedAccount: account
+  })
+  if (connected.session === undefined) {
+    throw new Error("Slice Wallet session request returned no result.")
+  }
+  return connected.session
 }

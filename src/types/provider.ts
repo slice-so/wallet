@@ -4,6 +4,11 @@ import type {
   SliceWalletPendingCeremony
 } from "./pendingCeremony"
 import type { SerializedWalletPolicyDescriptor } from "./policy"
+import type {
+  SliceWalletCeremonySessionResult,
+  SliceWalletSessionConnectInput,
+  SliceWalletSessionConnectResult
+} from "./session"
 
 export type SliceWalletProviderValue =
   | bigint
@@ -37,6 +42,9 @@ export type SliceWalletProviderEventMap = {
 export type SliceWalletProvider = {
   cancelPendingCeremony: () => void
   continueInPopup: () => Promise<SliceWalletCeremonyContinuationResult>
+  connectWithSession: (
+    session: SliceWalletSessionConnectInput
+  ) => Promise<SliceWalletSessionConnectResult>
   destroy: () => void
   readonly pendingCeremony: SliceWalletPendingCeremony | null
   on: <Event extends keyof SliceWalletProviderEventMap>(
@@ -50,6 +58,7 @@ export type SliceWalletProvider = {
   request: (
     request: SliceWalletProviderRequestArguments
   ) => Promise<SliceWalletProviderValue | undefined>
+  switchAccount: () => Promise<Address>
 }
 
 export type SliceWalletTransportOverrides = {
@@ -61,6 +70,13 @@ export type SliceWalletParameters = {
   announce?: boolean
   chainIds?: readonly number[]
   defaultChainId?: number
+  session?: {
+    audience: string
+    onSession?: (result: SliceWalletCeremonySessionResult | undefined) => void | Promise<void>
+    prepare: NonNullable<SliceWalletSessionConnectInput["prepare"]>
+    scopes?: readonly string[]
+    ttlSeconds?: number
+  }
   transports?: Readonly<Record<number, SliceWalletTransportOverrides>>
 }
 

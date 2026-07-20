@@ -1,4 +1,13 @@
 export * from "./account"
+export {
+  deriveSliceWalletRecoveryBootstrap,
+  predictSliceWalletKernelAccountAddress
+} from "./accountPrediction"
+export {
+  assertSliceWalletAccountIndex,
+  sliceWalletAccountIndexCap,
+  sliceWalletMaxAccountIndex
+} from "./accountIndex"
 export * from "./calls"
 export {
   getSliceWalletChainManifest,
@@ -6,6 +15,10 @@ export {
   sliceWalletSupportedChainIds
 } from "./chains"
 export * from "./constants"
+export {
+  classifySliceWalletCredentialRows,
+  isSliceWalletDevicePermissionActive
+} from "./credentialClassification"
 export {
   getSliceWalletDevicePermissionId,
   isSliceWalletDevicePermissionIdAvailable
@@ -49,5 +62,7 @@ export type {
 } from "./types/policy"
 export type {
   RegisterSliceWalletCredentialInput,
+  SliceWalletCredentialAccountsAssertion,
+  SliceWalletCredentialRowClassification,
   SliceWalletRegistryCredential
 } from "./types/registry"

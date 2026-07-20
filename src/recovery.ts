@@ -490,6 +490,7 @@ const createDeployedRecoveryRootValidator =
 
 const createRecoveryKernelAccount = async ({
   address,
+  accountIndex,
   chainId,
   client,
   enableSignature,
@@ -497,6 +498,7 @@ const createRecoveryKernelAccount = async ({
   rootValidator
 }: {
   address: Address
+  accountIndex: bigint
   chainId: number
   client: KernelSmartAccountImplementation["client"]
   enableSignature?: Hex
@@ -521,7 +523,7 @@ const createRecoveryKernelAccount = async ({
     accountImplementationAddress: sliceKernelBaseV33Addresses.implementation,
     entryPoint: recoveryEntryPoint,
     factoryAddress: sliceKernelBaseV33Addresses.factory,
-    index: 0n,
+    index: accountIndex,
     kernelVersion: recoveryKernelVersion,
     metaFactoryAddress: sliceKernelBaseV33Addresses.metaFactory,
     plugins,
@@ -531,6 +533,7 @@ const createRecoveryKernelAccount = async ({
 
 export const createRecoveryPermissionAccount = async ({
   address,
+  accountIndex,
   chainId,
   client,
   credential,
@@ -553,6 +556,7 @@ export const createRecoveryPermissionAccount = async ({
   ])
   const account = await createRecoveryKernelAccount({
     address,
+    accountIndex,
     chainId,
     client,
     enableSignature,
@@ -569,6 +573,7 @@ export const createRecoveryPermissionAccount = async ({
 
 export const createDeployedRecoveryPermissionAccount = async ({
   address,
+  accountIndex,
   chainId,
   client,
   recoveryPrivateKey,
@@ -585,6 +590,7 @@ export const createDeployedRecoveryPermissionAccount = async ({
   })
   const account = await createRecoveryKernelAccount({
     address,
+    accountIndex,
     chainId,
     client,
     recoveryValidator,

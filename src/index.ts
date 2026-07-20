@@ -1,4 +1,6 @@
 export * from "./account"
+export * from "./accountActivity"
+export * from "./accountIndex"
 export * from "./accountPrediction"
 export * from "./calls"
 export * from "./ceremony/accountClient"

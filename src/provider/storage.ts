@@ -16,16 +16,19 @@ import type {
   StoredGenericGrant,
   StoredWalletCall
 } from "../types/providerInternal"
+import { assertSliceWalletAccountIndex } from "../accountIndex"
 
-const accountStorageKey = "slice.wallet.provider.account.v1"
+const accountStorageKey = "slice.wallet.provider.account.v2"
+const legacyAccountStorageKey = "slice.wallet.provider.account.v1"
 const legacyGrantStorageKey = "slice.wallet.provider.generic-grant.v1"
-const grantStorageKey = (chainId: number) =>
-  `${legacyGrantStorageKey}:${chainId}`
+const grantStorageKey = (chainId: number, account: Address) =>
+  `slice.wallet.provider.generic-grant.v2:${chainId}:${account.toLowerCase()}`
 const callStoragePrefix = "slice.wallet.provider.call.v1:"
 const callRetentionMs = 24 * 60 * 60 * 1000
 
 type StoredAccount = {
   accountAddress: Address
+  accountIndex: number
   credentialIdHash: Hex
 }
 
@@ -77,22 +80,34 @@ const remove = (storage: Storage | null, key: string) => {
 export const readStoredSliceWalletAccount = (
   storage: Storage | null
 ): StoredAccount | null => {
+  remove(storage, legacyAccountStorageKey)
   const input = read(storage, accountStorageKey)
   const value = input === null ? null : record(input)
   if (
     value === null ||
-    !hasOnlyKeys(value, ["accountAddress", "credentialIdHash", "version"]) ||
-    value.version !== 1 ||
+    !hasOnlyKeys(value, [
+      "accountAddress",
+      "accountIndex",
+      "credentialIdHash",
+      "version"
+    ]) ||
+    value.version !== 2 ||
     typeof value.accountAddress !== "string" ||
     !isAddress(value.accountAddress) ||
+    typeof value.accountIndex !== "number" ||
+    !Number.isInteger(value.accountIndex) ||
+    value.accountIndex < 0 ||
+    value.accountIndex > 31 ||
     typeof value.credentialIdHash !== "string" ||
     !isHex(value.credentialIdHash, { strict: true }) ||
     hexToBytes(value.credentialIdHash).length !== 32
   ) {
+    remove(storage, accountStorageKey)
     return null
   }
   return {
     accountAddress: value.accountAddress,
+    accountIndex: assertSliceWalletAccountIndex(value.accountIndex),
     credentialIdHash: value.credentialIdHash
   }
 }
@@ -100,7 +115,7 @@ export const readStoredSliceWalletAccount = (
 export const writeStoredSliceWalletAccount = (
   storage: Storage | null,
   account: StoredAccount
-) => write(storage, accountStorageKey, { ...account, version: 1 })
+) => write(storage, accountStorageKey, { ...account, version: 2 })
 
 export const clearStoredSliceWalletAccount = (storage: Storage | null) =>
   remove(storage, accountStorageKey)
@@ -108,16 +123,12 @@ export const clearStoredSliceWalletAccount = (storage: Storage | null) =>
 export const readStoredSliceWalletGrant = (
   storage: Storage | null,
   chainId: number,
+  account: Address,
   now = Math.floor(Date.now() / 1000)
 ): StoredGenericGrant | null => {
-  let input = read(storage, grantStorageKey(chainId))
-  if (input === null && chainId === 8453) {
-    input = read(storage, legacyGrantStorageKey)
-    if (input !== null && typeof input === "object" && !Array.isArray(input)) {
-      write(storage, grantStorageKey(chainId), input)
-      remove(storage, legacyGrantStorageKey)
-    }
-  }
+  remove(storage, legacyGrantStorageKey)
+  remove(storage, `${legacyGrantStorageKey}:${chainId}`)
+  const input = read(storage, grantStorageKey(chainId, account))
   const value = input === null ? null : record(input)
   if (
     value === null ||
@@ -155,7 +166,7 @@ export const readStoredSliceWalletGrant = (
     value.policy === null ||
     Array.isArray(value.policy)
   ) {
-    clearStoredSliceWalletGrant(storage, chainId)
+    clearStoredSliceWalletGrant(storage, chainId, account)
     return null
   }
   try {
@@ -183,7 +194,7 @@ export const readStoredSliceWalletGrant = (
       version: 1
     }
   } catch {
-    clearStoredSliceWalletGrant(storage, chainId)
+    clearStoredSliceWalletGrant(storage, chainId, account)
     return null
   }
 }
@@ -191,12 +202,13 @@ export const readStoredSliceWalletGrant = (
 export const writeStoredSliceWalletGrant = (
   storage: Storage | null,
   grant: StoredGenericGrant
-) => write(storage, grantStorageKey(grant.chainId), grant)
+) => write(storage, grantStorageKey(grant.chainId, grant.account), grant)
 
 export const clearStoredSliceWalletGrant = (
   storage: Storage | null,
-  chainId: number
-) => remove(storage, grantStorageKey(chainId))
+  chainId: number,
+  account: Address
+) => remove(storage, grantStorageKey(chainId, account))
 
 const callStorageKey = (id: string) =>
   `${callStoragePrefix}${keccak256(stringToHex(id))}`

@@ -16,6 +16,34 @@ import type {
 } from "viem/account-abstraction"
 import type { SliceWalletUnsignedUserOperation } from "./frame"
 
+export type SliceWalletAccountIndex = number
+
+export type SliceWalletActivityTokenDescriptor = {
+  address: Address
+  symbol: string
+}
+
+export type SliceWalletAccountActivity = {
+  address: Address
+  code: Hex | null
+  nativeBalance: string
+  tokenBalances: Readonly<Record<string, string>>
+}
+
+export type SliceWalletAccountActivityBatchRequest = {
+  id: number
+  jsonrpc: "2.0"
+  method: "eth_call" | "eth_getBalance" | "eth_getCode"
+  params: readonly (string | { data: Hex; to: Address })[]
+}
+
+export type SliceWalletAccountActivityBatchResponse = {
+  error?: { code: number; message: string }
+  id: number
+  jsonrpc: "2.0"
+  result?: string
+}
+
 export type SliceWalletPasskeyCredential = Pick<
   P256Credential,
   "id" | "publicKey"

@@ -5,6 +5,7 @@ import type {
   SliceWalletGenericGrant,
   SliceWalletProviderValue
 } from "./provider"
+import type { SliceWalletSessionConnectInput, SliceWalletCeremonySessionResult } from "./session"
 
 export type SliceWalletProviderChainConfig = {
   bundlerUrl: string
@@ -22,6 +23,13 @@ export type SliceWalletProviderConfig = {
   fetch?: typeof fetch
   idOrigin: string
   requireAdmittedChain?: boolean
+  session?: {
+    audience: string
+    onSession?: (result: SliceWalletCeremonySessionResult | undefined) => void | Promise<void>
+    prepare: NonNullable<SliceWalletSessionConnectInput["prepare"]>
+    scopes?: readonly string[]
+    ttlSeconds?: number
+  }
   storage?: Storage
   window?: Window
 }

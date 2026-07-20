@@ -25,9 +25,20 @@ type ProviderEventListener = (payload: ProviderEventPayload) => void
 type FullProviderRuntime = ReturnType<typeof createSliceWalletProviderRuntime>
 type ProviderRuntime = Omit<
   FullProviderRuntime,
-  "connect" | "getChainRuntime" | "waitForSuccessfulUserOperation"
+  | "connect"
+  | "connectWithSession"
+  | "getChainRuntime"
+  | "switchAccount"
+  | "waitForSuccessfulUserOperation"
 > & {
   connect: () => Promise<{ rootAccount: { address: Address } }>
+  connectWithSession: (
+    session: Parameters<FullProviderRuntime["connectWithSession"]>[0]
+  ) => Promise<{
+    session?: Awaited<ReturnType<FullProviderRuntime["connectWithSession"]>>["session"]
+    wallet: { rootAccount: { address: Address } }
+  }>
+  switchAccount: () => Promise<{ rootAccount: { address: Address } }>
   waitForSuccessfulUserOperation: (
     hash: Hex,
     chainId?: number
@@ -113,7 +124,7 @@ const parseWalletConnect = (
   ) {
     throw invalidProviderRequest("Slice Wallet supports wallet_connect v1.")
   }
-  if (input.capabilities === undefined) return
+  if (input.capabilities === undefined) return {}
   if (
     typeof input.capabilities !== "object" ||
     input.capabilities === null ||
@@ -123,7 +134,77 @@ const parseWalletConnect = (
       "wallet_connect capabilities must be an object."
     )
   }
+  let session: Parameters<SliceWalletProvider["connectWithSession"]>[0] | undefined
   for (const [name, capability] of Object.entries(input.capabilities)) {
+    if (name === "session") {
+      if (
+        typeof capability !== "object" ||
+        capability === null ||
+        Array.isArray(capability)
+      ) {
+        throw invalidProviderRequest("wallet_connect session capability is invalid.")
+      }
+      const sessionCapability = capability as {
+        readonly [key: string]: SliceWalletProviderValue | undefined
+      }
+      if (
+        Object.keys(sessionCapability).some(
+          (key) =>
+            ![
+              "audience",
+              "nonce",
+              "optional",
+              "pendingId",
+              "scopes",
+              "sessionSigner",
+              "ttlSeconds"
+            ].includes(key)
+        ) ||
+        sessionCapability.optional !== true ||
+        typeof sessionCapability.audience !== "string" ||
+        new URL(sessionCapability.audience).origin !== sessionCapability.audience ||
+        typeof sessionCapability.sessionSigner !== "string" ||
+        !isAddress(sessionCapability.sessionSigner) ||
+        (sessionCapability.nonce !== undefined &&
+          (typeof sessionCapability.nonce !== "string" ||
+            !/^[A-Za-z0-9_-]{16,256}$/.test(sessionCapability.nonce))) ||
+        (sessionCapability.pendingId !== undefined &&
+          (typeof sessionCapability.pendingId !== "string" ||
+            !/^[A-Za-z0-9_-]{1,64}$/.test(sessionCapability.pendingId))) ||
+        (sessionCapability.ttlSeconds !== undefined &&
+          (typeof sessionCapability.ttlSeconds !== "number" ||
+            !Number.isInteger(sessionCapability.ttlSeconds) ||
+            sessionCapability.ttlSeconds <= 0 ||
+            sessionCapability.ttlSeconds > 30 * 24 * 60 * 60)) ||
+        (sessionCapability.scopes !== undefined &&
+          (!Array.isArray(sessionCapability.scopes) ||
+            sessionCapability.scopes.length > 16 ||
+            sessionCapability.scopes.some(
+              (scope) =>
+                typeof scope !== "string" ||
+                !/^[a-z0-9][a-z0-9_.:-]{0,63}$/.test(scope)
+            )))
+      ) {
+        throw invalidProviderRequest("wallet_connect session capability is invalid.")
+      }
+      session = {
+        audience: sessionCapability.audience,
+        prepared: {
+          ...(sessionCapability.nonce === undefined ? {} : { nonce: sessionCapability.nonce }),
+          ...(sessionCapability.pendingId === undefined
+            ? {}
+            : { pendingId: sessionCapability.pendingId }),
+          sessionSigner: sessionCapability.sessionSigner
+        },
+        ...(sessionCapability.scopes === undefined
+          ? {}
+          : { scopes: sessionCapability.scopes as readonly string[] }),
+        ...(sessionCapability.ttlSeconds === undefined
+          ? {}
+          : { ttlSeconds: sessionCapability.ttlSeconds })
+      }
+      continue
+    }
     if (
       typeof capability === "object" &&
       capability !== null &&
@@ -137,6 +218,7 @@ const parseWalletConnect = (
       `Unsupported wallet_connect capability: ${name}.`
     )
   }
+  return { ...(session === undefined ? {} : { session }) }
 }
 
 const assertEthAccountsRequest = (
@@ -275,6 +357,35 @@ export const createSliceWalletProviderInternal = (
     await cleanup
   }
 
+  const switchAccount = async () => {
+    const before = await runtime.getAccounts()
+    const wallet = await runtime.switchAccount()
+    const account = wallet.rootAccount.address
+    if (
+      before[0] === undefined ||
+      before[0].toLowerCase() !== account.toLowerCase()
+    ) {
+      emit("accountsChanged", [account])
+    }
+    return account
+  }
+
+  const connectWithSession: SliceWalletProvider["connectWithSession"] = async (
+    session
+  ) => {
+    const before = await runtime.getAccounts()
+    const result = await runtime.connectWithSession(session)
+    const account = result.wallet.rootAccount.address
+    if (before.length === 0) {
+      emit("connect", { chainId: numberToHex(runtime.chainId) })
+      emit("accountsChanged", [account])
+    }
+    return {
+      account,
+      ...(result.session === undefined ? {} : { session: result.session })
+    }
+  }
+
   const request = async ({
     method,
     params
@@ -286,13 +397,20 @@ export const createSliceWalletProviderInternal = (
     if (method === "eth_accounts") return runtime.getAccounts()
     if (method === "eth_requestAccounts") return [await connect()]
     if (method === "wallet_connect") {
-      parseWalletConnect(params)
-      const account = await connect()
+      const parsed = parseWalletConnect(params)
+      const connected =
+        parsed.session === undefined
+          ? { account: await connect() }
+          : await connectWithSession(parsed.session)
+      const account = connected.account
       return {
         accounts: [
           {
             address: account,
-            capabilities: {}
+            capabilities:
+              connected.session === undefined
+                ? {}
+                : { session: connected.session }
           }
         ]
       }
@@ -300,6 +418,10 @@ export const createSliceWalletProviderInternal = (
     if (method === "wallet_disconnect") {
       await disconnect()
       return undefined
+    }
+    if (method === "wallet_switchAccount") {
+      assertNoParams(params, method)
+      return switchAccount()
     }
     if (method === "wallet_requestPermissions") {
       assertEthAccountsRequest(params)
@@ -493,6 +615,7 @@ export const createSliceWalletProviderInternal = (
 
   return {
     cancelPendingCeremony: () => runtime.cancelPendingCeremony(),
+    connectWithSession,
     continueInPopup: () => runtime.continueInPopup(),
     destroy: () => {
       runtime.destroy()
@@ -509,6 +632,7 @@ export const createSliceWalletProviderInternal = (
     get pendingCeremony() {
       return runtime.pendingCeremony
     },
-    request
+    request,
+    switchAccount
   }
 }

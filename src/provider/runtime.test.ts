@@ -76,7 +76,10 @@ const createRuntimeFixture = () => {
     revokeGrantByChain.set(chainConfig.chain.id, revokeGrant)
     return {
       chainId: chainConfig.chain.id,
+      chooseAccount: mock(async () => null as never),
+      commitAccount: mock(() => null as never),
       connect: mock(async () => null as never),
+      connectWithSession: mock(async () => null as never),
       createGrant: mock(async () => null as never),
       destroy: mock(() => undefined),
       forwardRpc: mock(async () => ({ handled: false as const })),
@@ -152,6 +155,7 @@ describe("multichain provider runtime routing", () => {
       })
     writeStoredSliceWalletAccount(storage, {
       accountAddress: account,
+      accountIndex: 0,
       credentialIdHash
     })
 
@@ -164,6 +168,7 @@ describe("multichain provider runtime routing", () => {
     }
     expect(readStoredSliceWalletAccount(storage)).toEqual({
       accountAddress: account,
+      accountIndex: 0,
       credentialIdHash
     })
   })
@@ -173,6 +178,7 @@ describe("multichain provider runtime routing", () => {
     const runtime = createSliceWalletProviderRuntime(config, fixture)
     writeStoredSliceWalletAccount(storage, {
       accountAddress: account,
+      accountIndex: 0,
       credentialIdHash
     })
 

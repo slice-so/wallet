@@ -62,15 +62,37 @@ export const sliceWalletConnector = (parameters: SliceWalletProviderConfig) => {
         )
       },
       async connect({ chainId, withCapabilities } = {}) {
+        let switchPromise: Promise<SliceWalletProviderValue | undefined> | undefined
         if (chainId !== undefined) {
-          await getProvider().request({
+          switchPromise = getProvider().request({
             method: "wallet_switchEthereumChain",
             params: [{ chainId: `0x${chainId.toString(16)}` }]
           })
         }
-        const accounts = parseAccounts(
-          await getProvider().request({ method: "eth_requestAccounts" })
-        )
+        const sessionPromise =
+          parameters.session === undefined
+            ? null
+            : getProvider().connectWithSession({
+                audience: parameters.session.audience,
+                prepare: parameters.session.prepare,
+                ...(parameters.session.scopes === undefined
+                  ? {}
+                  : { scopes: parameters.session.scopes }),
+                ...(parameters.session.ttlSeconds === undefined
+                  ? {}
+                  : { ttlSeconds: parameters.session.ttlSeconds })
+              })
+        await switchPromise
+        const sessionResult = await sessionPromise
+        if (sessionResult !== null) {
+          await parameters.session?.onSession?.(sessionResult.session)
+        }
+        const accounts =
+          sessionResult === null
+            ? parseAccounts(
+                await getProvider().request({ method: "eth_requestAccounts" })
+              )
+            : [sessionResult.account]
         return {
           accounts: (withCapabilities
             ? accounts.map((address) => ({

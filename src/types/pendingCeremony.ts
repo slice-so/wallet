@@ -33,6 +33,7 @@ export type SliceWalletCeremonyContinuationResult =
   | readonly SliceWalletPermissionAuthorization[]
   | {
       account: Address
+      accountIndex: number
       credentialIdHash: Hex
       nonce: Hex
       recovery?: {
@@ -40,7 +41,7 @@ export type SliceWalletCeremonyContinuationResult =
         signerAddress: Address
       }
       type: "slice-wallet:ceremony-account"
-      version: 1
+      version: 2
     }
   | {
       account: Address

@@ -3,8 +3,10 @@ import type { Address, Hex } from "viem"
 import { getSliceWalletP256SignerId } from "../p256"
 import { serializeWalletPolicyDescriptor } from "../policy"
 import {
+  readStoredSliceWalletAccount,
   readStoredSliceWalletCall,
   readStoredSliceWalletGrant,
+  writeStoredSliceWalletAccount,
   writeStoredSliceWalletCall,
   writeStoredSliceWalletGrant
 } from "./storage"
@@ -70,12 +72,30 @@ const createGrant = () => ({
 })
 
 describe("portable wallet provider storage", () => {
+  test("persists indexed accounts as v2 and deletes v1 metadata", () => {
+    const storage = new MemoryStorage()
+    storage.setItem(
+      "slice.wallet.provider.account.v1",
+      JSON.stringify({ accountAddress: account, credentialIdHash: "0x", version: 1 })
+    )
+    writeStoredSliceWalletAccount(storage, {
+      accountAddress: account,
+      accountIndex: 7,
+      credentialIdHash: `0x${"33".repeat(32)}`
+    })
+    expect(readStoredSliceWalletAccount(storage)).toMatchObject({
+      accountAddress: account,
+      accountIndex: 7
+    })
+    expect(storage.getItem("slice.wallet.provider.account.v1")).toBeNull()
+  })
+
   test("persists public grant metadata without private key material", () => {
     const storage = new MemoryStorage()
     writeStoredSliceWalletGrant(storage, createGrant())
     expect([...storage.values.values()][0]).not.toContain("privateKey")
     expect(
-      readStoredSliceWalletGrant(storage, 8453, 1_800_000_001)
+      readStoredSliceWalletGrant(storage, 8453, account, 1_800_000_001)
     ).not.toBeNull()
   })
 
@@ -89,11 +109,13 @@ describe("portable wallet provider storage", () => {
       key,
       JSON.stringify({ ...JSON.parse(raw), privateKey: "0xdeadbeef" })
     )
-    expect(readStoredSliceWalletGrant(storage, 8453, 1_800_000_001)).toBeNull()
+    expect(
+      readStoredSliceWalletGrant(storage, 8453, account, 1_800_000_001)
+    ).toBeNull()
     expect(storage.getItem(key)).toBeNull()
   })
 
-  test("isolates grants by chain and migrates the legacy Base key", () => {
+  test("isolates grants by account and removes legacy keys", () => {
     const storage = new MemoryStorage()
     const grant = createGrant()
     storage.setItem(
@@ -102,13 +124,18 @@ describe("portable wallet provider storage", () => {
     )
 
     expect(
-      readStoredSliceWalletGrant(storage, 8453, 1_800_000_001)
-    ).toMatchObject({ chainId: 8453 })
+      readStoredSliceWalletGrant(storage, 8453, account, 1_800_000_001)
+    ).toBeNull()
     expect(storage.getItem("slice.wallet.provider.generic-grant.v1")).toBeNull()
     expect(
       storage.getItem("slice.wallet.provider.generic-grant.v1:8453")
-    ).not.toBeNull()
-    expect(readStoredSliceWalletGrant(storage, 10, 1_800_000_001)).toBeNull()
+    ).toBeNull()
+    expect(
+      readStoredSliceWalletGrant(storage, 10, account, 1_800_000_001)
+    ).toBeNull()
+    expect(
+      readStoredSliceWalletGrant(storage, 8453, target, 1_800_000_001)
+    ).toBeNull()
   })
 
   test("persists a tracked call by opaque id and expires it after retention", () => {

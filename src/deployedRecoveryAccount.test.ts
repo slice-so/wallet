@@ -21,6 +21,7 @@ describe("deployed recovery permission account", () => {
     })
     const account = await createDeployedRecoveryPermissionAccount({
       address: "0x1111111111111111111111111111111111111111",
+      accountIndex: 0n,
       chainId: base.id,
       client,
       recoveryPrivateKey,

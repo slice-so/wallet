@@ -297,6 +297,7 @@ export const buildDevicePromotionCalls = async ({
 
 export const createSliceWalletDeviceKernelAccount = async ({
   account,
+  accountIndex,
   chainId,
   client,
   rootCredential,
@@ -311,7 +312,7 @@ export const createSliceWalletDeviceKernelAccount = async ({
     accountImplementationAddress: sliceWalletKernelAddresses.implementation,
     entryPoint: sliceWalletEntryPoint,
     factoryAddress: sliceWalletKernelAddresses.factory,
-    index: 0n,
+    index: accountIndex,
     kernelVersion: sliceWalletKernelVersion,
     metaFactoryAddress: sliceWalletKernelAddresses.metaFactory,
     plugins: { regular: deviceValidator, sudo: rootValidator },

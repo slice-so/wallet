@@ -7,6 +7,7 @@ import {
 } from "./registry"
 
 const base = {
+  accountIndex: 0,
   challenge: `0x${"11".repeat(32)}` as Hex,
   chainId: 8453,
   credentialIdHash: `0x${"22".repeat(32)}` as Hex,

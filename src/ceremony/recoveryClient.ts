@@ -22,6 +22,7 @@ import {
 
 export const registerRecoveredSliceWalletCredential = async ({
   account,
+  accountIndex,
   ceremonyBroker,
   ceremonyMode = "popup",
   chainId,
@@ -61,7 +62,7 @@ export const registerRecoveredSliceWalletCredential = async ({
       idOrigin,
       mode,
       nonce,
-      path: `/ceremony/recovery?account=${encodeURIComponent(account)}&chainId=${chainId}`,
+      path: `/ceremony/recovery?account=${encodeURIComponent(account)}&accountIndex=${accountIndex}&chainId=${chainId}`,
       window
     })
     return new Promise<{
@@ -105,6 +106,7 @@ export const registerRecoveredSliceWalletCredential = async ({
               if (
                 request.nonce !== nonce ||
                 request.chainId !== chainId ||
+                request.accountIndex !== accountIndex ||
                 request.account.toLowerCase() !== account.toLowerCase()
               ) {
                 throw new Error(
