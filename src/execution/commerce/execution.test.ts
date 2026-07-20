@@ -1,12 +1,12 @@
 import { describe, expect, it } from "bun:test"
+import type { Address, Hex } from "viem"
+import { getSliceWalletP256SignerId } from "../../p256Server"
+import { getWalletPermissionId } from "../../policy"
+import type { SliceWalletPermissionAuthorization } from "../../types/frame"
 import {
   walletDelegationExecutionScope,
   walletDelegationStoreManagementScope
 } from "./delegationScopes"
-import { getSliceWalletP256SignerId } from "../../p256Server"
-import { getWalletPermissionId } from "../../policy"
-import type { SliceWalletPermissionAuthorization } from "../../types/frame"
-import type { Address, Hex } from "viem"
 import {
   createSliceWalletCheckoutExecutionClient,
   createSliceWalletManagementExecutionClient

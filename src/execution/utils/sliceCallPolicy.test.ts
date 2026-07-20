@@ -12,16 +12,16 @@ import {
   zeroAddress
 } from "viem"
 import { base } from "viem/chains"
+import type {
+  SliceCallsBatchClassified,
+  SliceSmartAccountCall
+} from "../../types/commerce"
 import {
   generatedHookAddressList,
   getFundsModuleAddress,
   getProductsModuleAddress,
   getSliceCoreAddress
 } from "../generated/commerceFacts"
-import type {
-  SliceCallsBatchClassified,
-  SliceSmartAccountCall
-} from "../../types/commerce"
 import { sliceKernelTimelockPolicyAddress } from "./sliceAccountClient"
 import {
   classifySliceSmartAccountCall,

@@ -39,7 +39,11 @@ export const parseSliceWalletCeremonySessionRequestMessage = (
   ) {
     throw new Error("Ceremony session request is invalid.")
   }
-  if (status === "none" || status === "preparing" || status === "preparation_failed") {
+  if (
+    status === "none" ||
+    status === "preparing" ||
+    status === "preparation_failed"
+  ) {
     assertKeys(input, ["status", "type", "version"])
     return { status, type: input.type, version: 1 }
   }
@@ -48,17 +52,32 @@ export const parseSliceWalletCeremonySessionRequestMessage = (
   }
   assertKeys(input, ["request", "status", "type", "version"])
   const request = record(input.request, "Prepared session request")
-  assertKeys(request, ["audience", "sessionSigner"], ["nonce", "pendingId", "scopes", "ttlSeconds"])
+  assertKeys(
+    request,
+    ["audience", "sessionSigner"],
+    ["nonce", "pendingId", "scopes", "ttlSeconds"]
+  )
   const audience = originValue(request.audience, "Session audience")
   const sessionSigner = addressValue(request.sessionSigner, "Session signer")
-  const nonce = request.nonce === undefined ? undefined : stringValue(request.nonce, "Session nonce")
-  const pendingId = request.pendingId === undefined ? undefined : stringValue(request.pendingId, "Pending session id")
-  const ttlSeconds = request.ttlSeconds === undefined ? undefined : integerValue(request.ttlSeconds, "Session TTL")
+  const nonce =
+    request.nonce === undefined
+      ? undefined
+      : stringValue(request.nonce, "Session nonce")
+  const pendingId =
+    request.pendingId === undefined
+      ? undefined
+      : stringValue(request.pendingId, "Pending session id")
+  const ttlSeconds =
+    request.ttlSeconds === undefined
+      ? undefined
+      : integerValue(request.ttlSeconds, "Session TTL")
   if (
     (nonce !== undefined && !/^[A-Za-z0-9_-]{16,256}$/.test(nonce)) ||
     (pendingId !== undefined && !/^[A-Za-z0-9_-]{1,64}$/.test(pendingId)) ||
-    (ttlSeconds !== undefined && (ttlSeconds <= 0 || ttlSeconds > 30 * 24 * 60 * 60)) ||
-    (request.scopes !== undefined && (!Array.isArray(request.scopes) || request.scopes.length > 16))
+    (ttlSeconds !== undefined &&
+      (ttlSeconds <= 0 || ttlSeconds > 30 * 24 * 60 * 60)) ||
+    (request.scopes !== undefined &&
+      (!Array.isArray(request.scopes) || request.scopes.length > 16))
   ) {
     throw new Error("Prepared session request is invalid.")
   }
@@ -448,14 +467,7 @@ export const parseSliceWalletCeremonyAccountMessage = (
   const input = record(value, "Ceremony account response")
   assertKeys(
     input,
-    [
-      "account",
-      "accountIndex",
-      "credentialIdHash",
-      "nonce",
-      "type",
-      "version"
-    ],
+    ["account", "accountIndex", "credentialIdHash", "nonce", "type", "version"],
     ["recovery", "session"]
   )
   if (input.type !== "slice-wallet:ceremony-account" || input.version !== 2) {
@@ -484,13 +496,7 @@ export const parseSliceWalletCeremonyAccountMessage = (
     if (status === "granted") {
       assertKeys(
         sessionInput,
-        [
-          "expiresAt",
-          "grantMessage",
-          "sessionSigner",
-          "signature",
-          "status"
-        ],
+        ["expiresAt", "grantMessage", "sessionSigner", "signature", "status"],
         ["pendingId"]
       )
       const pendingId =

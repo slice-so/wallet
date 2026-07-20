@@ -1,19 +1,8 @@
 import {
-  generatedHookAddressList,
-  getProductsModuleAddress
-} from "../generated/commerceFacts"
-import {
   productsModuleAbi,
   registryProductActionAbi,
   slicerAbi
 } from "@slicekit/abi"
-import {
-  createPositiveAmountRule,
-  getWalletPolicyHash,
-  normalizeWalletPolicyDescriptor,
-  type WalletPolicyCallRule,
-  type WalletPolicyDescriptor
-} from "../../policy"
 import {
   type Abi,
   type AbiFunction,
@@ -24,10 +13,21 @@ import {
   toFunctionSelector,
   toHex
 } from "viem"
+import {
+  createPositiveAmountRule,
+  getWalletPolicyHash,
+  normalizeWalletPolicyDescriptor,
+  type WalletPolicyCallRule,
+  type WalletPolicyDescriptor
+} from "../../policy"
 import type {
   CreateSliceCheckoutPolicyParameters,
   CreateSliceStoreManagementPolicyParameters
 } from "../../types/commerce"
+import {
+  generatedHookAddressList,
+  getProductsModuleAddress
+} from "../generated/commerceFacts"
 
 export const sliceStoreManagementOperations = [
   "addProduct",

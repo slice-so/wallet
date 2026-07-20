@@ -1,13 +1,13 @@
 export * from "./account"
 export {
-  deriveSliceWalletRecoveryBootstrap,
-  predictSliceWalletKernelAccountAddress
-} from "./accountPrediction"
-export {
   assertSliceWalletAccountIndex,
   sliceWalletAccountIndexCap,
   sliceWalletMaxAccountIndex
 } from "./accountIndex"
+export {
+  deriveSliceWalletRecoveryBootstrap,
+  predictSliceWalletKernelAccountAddress
+} from "./accountPrediction"
 export * from "./calls"
 export {
   getSliceWalletChainManifest,

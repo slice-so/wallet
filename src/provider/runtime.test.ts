@@ -18,6 +18,7 @@ type ChainRuntimeFactory = NonNullable<
 type ChainRuntime = ReturnType<ChainRuntimeFactory>
 
 const account = "0x0000000000000000000000000000000000000001" as const
+const secondAccount = "0x0000000000000000000000000000000000000002" as const
 const userOperationHash = `0x${"11".repeat(32)}` as const
 const credentialIdHash = `0x${"22".repeat(32)}` as const
 const storageValues = new Map<string, string>()
@@ -57,13 +58,17 @@ const config = {
 
 beforeEach(() => storageValues.clear())
 
-const createRuntimeFixture = () => {
+const createRuntimeFixture = (
+  override?: (chainId: number, creation: number) => Partial<ChainRuntime>
+) => {
   const brokerByChain = new Map<number, SliceWalletCeremonyBroker>()
   const callsByChain = new Map<number, Set<string>>()
   const sendCallsByChain = new Map<number, ReturnType<typeof mock>>()
   const revokeGrantByChain = new Map<number, ReturnType<typeof mock>>()
   const statusChains: number[] = []
+  let creation = 0
   const createChainRuntime: ChainRuntimeFactory = (chainConfig) => {
+    creation += 1
     brokerByChain.set(chainConfig.chain.id, chainConfig.ceremonyBroker)
     const calls = new Set<string>()
     callsByChain.set(chainConfig.chain.id, calls)
@@ -74,7 +79,7 @@ const createRuntimeFixture = () => {
     sendCallsByChain.set(chainConfig.chain.id, sendCalls)
     const revokeGrant = mock(async () => undefined)
     revokeGrantByChain.set(chainConfig.chain.id, revokeGrant)
-    return {
+    const runtime = {
       chainId: chainConfig.chain.id,
       chooseAccount: mock(async () => null as never),
       commitAccount: mock(() => null as never),
@@ -104,6 +109,7 @@ const createRuntimeFixture = () => {
       signTypedData: mock(async () => userOperationHash),
       waitForSuccessfulUserOperation: mock(async () => null as never)
     } satisfies ChainRuntime
+    return { ...runtime, ...override?.(chainConfig.chain.id, creation) }
   }
   return {
     brokerByChain,
@@ -216,5 +222,214 @@ describe("multichain provider runtime routing", () => {
     })
     runtime.destroy()
     await expect(teardown).rejects.toThrow("cancelled")
+  })
+
+  test("keeps a switch to B when hydration of A resolves afterward", async () => {
+    let resolveHydration = (_wallet: {
+      rootAccount: { address: typeof account }
+    }) => {}
+    const hydration = new Promise<{ rootAccount: { address: typeof account } }>(
+      (resolve) => {
+        resolveHydration = resolve
+      }
+    )
+    const selection = {
+      connected: {
+        accountAddress: secondAccount,
+        accountIndex: 1,
+        credentialIdHash
+      }
+    }
+    const fixture = createRuntimeFixture((_chainId, creation) =>
+      creation === 1
+        ? { connect: mock(() => hydration as never) }
+        : {
+            chooseAccount: mock(async () => selection as never),
+            commitAccount: mock(() => {
+              writeStoredSliceWalletAccount(storage, selection.connected)
+              return { rootAccount: { address: secondAccount } } as never
+            })
+          }
+    )
+    const runtime = createSliceWalletProviderRuntime(config, fixture)
+    writeStoredSliceWalletAccount(storage, {
+      accountAddress: account,
+      accountIndex: 0,
+      credentialIdHash
+    })
+
+    const staleHydration = runtime.connect()
+    const switched = await runtime.switchAccount()
+    resolveHydration({ rootAccount: { address: account } })
+    await staleHydration
+
+    expect(switched.rootAccount.address).toBe(secondAccount)
+    expect(readStoredSliceWalletAccount(storage)?.accountAddress).toBe(
+      secondAccount
+    )
+  })
+
+  test("an old hydration finally cannot clear the current runtime identity", async () => {
+    let resolveHydration = (_wallet: {
+      rootAccount: { address: typeof account }
+    }) => {}
+    const hydration = new Promise<{ rootAccount: { address: typeof account } }>(
+      (resolve) => {
+        resolveHydration = resolve
+      }
+    )
+    const selection = {
+      connected: {
+        accountAddress: secondAccount,
+        accountIndex: 1,
+        credentialIdHash
+      }
+    }
+    const fixture = createRuntimeFixture((_chainId, creation) =>
+      creation === 1
+        ? { connect: mock(() => hydration as never) }
+        : {
+            chooseAccount: mock(async () => selection as never),
+            commitAccount: mock(() => {
+              writeStoredSliceWalletAccount(storage, selection.connected)
+              return { rootAccount: { address: secondAccount } } as never
+            }),
+            connect: mock(
+              async () =>
+                ({
+                  rootAccount: { address: secondAccount }
+                }) as never
+            )
+          }
+    )
+    const runtime = createSliceWalletProviderRuntime(config, fixture)
+    writeStoredSliceWalletAccount(storage, {
+      accountAddress: account,
+      accountIndex: 0,
+      credentialIdHash
+    })
+
+    const staleHydration = runtime.connect()
+    await runtime.switchAccount()
+    resolveHydration({ rootAccount: { address: account } })
+    await staleHydration
+
+    expect((await runtime.connect()).rootAccount.address).toBe(secondAccount)
+  })
+
+  test("cancels an open signer frame before switching to B", async () => {
+    const selection = {
+      connected: {
+        accountAddress: secondAccount,
+        accountIndex: 1,
+        credentialIdHash
+      }
+    }
+    const fixture = createRuntimeFixture(() => ({
+      chooseAccount: mock(async () => selection as never),
+      commitAccount: mock(
+        () =>
+          ({
+            rootAccount: { address: secondAccount }
+          }) as never
+      )
+    }))
+    const runtime = createSliceWalletProviderRuntime(config, fixture)
+    writeStoredSliceWalletAccount(storage, {
+      accountAddress: account,
+      accountIndex: 0,
+      credentialIdHash
+    })
+    runtime.getChainRuntime()
+    const broker = fixture.brokerByChain.get(base.id)
+    if (broker === undefined) throw new Error("Missing runtime broker.")
+    const pending = broker.defer({
+      kind: "root_sign",
+      reason: "popup_blocked",
+      resume: async () => userOperationHash
+    })
+
+    await runtime.switchAccount()
+
+    await expect(pending).rejects.toThrow("cancelled")
+  })
+
+  test("keeps A when the account chooser is cancelled", async () => {
+    const fixture = createRuntimeFixture(() => ({
+      chooseAccount: mock(async () => {
+        throw new Error("chooser cancelled")
+      }),
+      connect: mock(
+        async () => ({ rootAccount: { address: account } }) as never
+      )
+    }))
+    const runtime = createSliceWalletProviderRuntime(config, fixture)
+    writeStoredSliceWalletAccount(storage, {
+      accountAddress: account,
+      accountIndex: 0,
+      credentialIdHash
+    })
+
+    await expect(runtime.switchAccount()).rejects.toThrow("chooser cancelled")
+    expect(readStoredSliceWalletAccount(storage)?.accountAddress).toBe(account)
+  })
+
+  test("keeps A when chooser lookup throws before commit", async () => {
+    const fixture = createRuntimeFixture(() => ({
+      chooseAccount: mock(async () => {
+        throw new Error("registry lookup failed")
+      }),
+      connect: mock(
+        async () => ({ rootAccount: { address: account } }) as never
+      )
+    }))
+    const runtime = createSliceWalletProviderRuntime(config, fixture)
+    writeStoredSliceWalletAccount(storage, {
+      accountAddress: account,
+      accountIndex: 0,
+      credentialIdHash
+    })
+
+    await expect(runtime.switchAccount()).rejects.toThrow(
+      "registry lookup failed"
+    )
+    expect(readStoredSliceWalletAccount(storage)?.accountAddress).toBe(account)
+  })
+
+  test("keeps B active when switching chains after an account switch", async () => {
+    const selection = {
+      connected: {
+        accountAddress: secondAccount,
+        accountIndex: 1,
+        credentialIdHash
+      }
+    }
+    const fixture = createRuntimeFixture(() => ({
+      chooseAccount: mock(async () => selection as never),
+      commitAccount: mock(() => {
+        writeStoredSliceWalletAccount(storage, selection.connected)
+        return { rootAccount: { address: secondAccount } } as never
+      }),
+      connect: mock(
+        async () =>
+          ({
+            rootAccount: {
+              address:
+                readStoredSliceWalletAccount(storage)?.accountAddress ?? account
+            }
+          }) as never
+      )
+    }))
+    const runtime = createSliceWalletProviderRuntime(config, fixture)
+    writeStoredSliceWalletAccount(storage, {
+      accountAddress: account,
+      accountIndex: 0,
+      credentialIdHash
+    })
+
+    await runtime.switchAccount()
+    runtime.switchChain(optimism.id)
+
+    expect((await runtime.connect()).rootAccount.address).toBe(secondAccount)
   })
 })

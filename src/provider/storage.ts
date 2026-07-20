@@ -7,6 +7,7 @@ import {
   keccak256,
   stringToHex
 } from "viem"
+import { assertSliceWalletAccountIndex } from "../accountIndex"
 import {
   parseSerializedWalletPolicyDescriptor,
   serializeWalletPolicyDescriptor
@@ -16,11 +17,8 @@ import type {
   StoredGenericGrant,
   StoredWalletCall
 } from "../types/providerInternal"
-import { assertSliceWalletAccountIndex } from "../accountIndex"
 
 const accountStorageKey = "slice.wallet.provider.account.v2"
-const legacyAccountStorageKey = "slice.wallet.provider.account.v1"
-const legacyGrantStorageKey = "slice.wallet.provider.generic-grant.v1"
 const grantStorageKey = (chainId: number, account: Address) =>
   `slice.wallet.provider.generic-grant.v2:${chainId}:${account.toLowerCase()}`
 const callStoragePrefix = "slice.wallet.provider.call.v1:"
@@ -80,7 +78,6 @@ const remove = (storage: Storage | null, key: string) => {
 export const readStoredSliceWalletAccount = (
   storage: Storage | null
 ): StoredAccount | null => {
-  remove(storage, legacyAccountStorageKey)
   const input = read(storage, accountStorageKey)
   const value = input === null ? null : record(input)
   if (
@@ -126,8 +123,6 @@ export const readStoredSliceWalletGrant = (
   account: Address,
   now = Math.floor(Date.now() / 1000)
 ): StoredGenericGrant | null => {
-  remove(storage, legacyGrantStorageKey)
-  remove(storage, `${legacyGrantStorageKey}:${chainId}`)
   const input = read(storage, grantStorageKey(chainId, account))
   const value = input === null ? null : record(input)
   if (

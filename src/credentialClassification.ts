@@ -70,7 +70,11 @@ export const isSliceWalletDevicePermissionActive = async ({
   client: SliceWalletPublicClient
   credentialIdHash: `0x${string}`
 }) => {
-  const config = await getAction(client, multicall, "multicall")({
+  const config = await getAction(
+    client,
+    multicall,
+    "multicall"
+  )({
     allowFailure: false,
     contracts: [
       {
@@ -119,7 +123,11 @@ export const classifySliceWalletCredentialRows = async ({
     rows.map(async (credential) => {
       try {
         return {
-          code: await getAction(client, getCode, "getCode")({
+          code: await getAction(
+            client,
+            getCode,
+            "getCode"
+          )({
             address: credential.accountAddress
           }),
           status: "available" as const
@@ -175,19 +183,23 @@ export const classifySliceWalletCredentialRows = async ({
 
   if (deployedRootIndexes.length > 0) {
     try {
-      const results = await getAction(client, multicall, "multicall")({
+      const results = await getAction(
+        client,
+        multicall,
+        "multicall"
+      )({
         allowFailure: true,
         contracts: deployedRootIndexes.map((index) => ({
           abi: rootValidatorStorageAbi,
           address: sliceWalletKernelAddresses.webAuthnRootValidator,
-          args: [rows[index]!.accountAddress],
+          args: [rows[index]?.accountAddress],
           functionName: "webAuthnValidatorStorage"
         }))
       })
       results.forEach((result, resultIndex) => {
         const rowIndex = deployedRootIndexes[resultIndex]
         if (rowIndex === undefined || result.status === "failure") return
-        const expected = publicKeyCoordinates(rows[rowIndex]!.publicKey)
+        const expected = publicKeyCoordinates(rows[rowIndex]?.publicKey)
         statuses[rowIndex] =
           expected !== null &&
           result.result[0] === expected.x &&
@@ -204,13 +216,17 @@ export const classifySliceWalletCredentialRows = async ({
     try {
       const expectedSigner =
         getSliceWalletChainPolicy(chainId).contracts.webAuthnSigner.address
-      const results = await getAction(client, multicall, "multicall")({
+      const results = await getAction(
+        client,
+        multicall,
+        "multicall"
+      )({
         allowFailure: true,
         contracts: deployedDeviceIndexes.map((index) => ({
           abi: permissionConfigAbi,
-          address: rows[index]!.accountAddress,
+          address: rows[index]?.accountAddress,
           args: [
-            getSliceWalletDevicePermissionId(rows[index]!.credentialIdHash)
+            getSliceWalletDevicePermissionId(rows[index]?.credentialIdHash)
           ],
           functionName: "permissionConfig"
         }))
@@ -218,7 +234,10 @@ export const classifySliceWalletCredentialRows = async ({
       results.forEach((result, resultIndex) => {
         const rowIndex = deployedDeviceIndexes[resultIndex]
         if (rowIndex === undefined || result.status === "failure") return
-        statuses[rowIndex] = isAddressEqual(result.result.signer, expectedSigner)
+        statuses[rowIndex] = isAddressEqual(
+          result.result.signer,
+          expectedSigner
+        )
           ? "active"
           : "inactive"
       })

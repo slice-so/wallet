@@ -1,15 +1,10 @@
+import { type Address, type Hex, hexToBytes, isAddress, isHex } from "viem"
 import { getSliceWalletP256SignerId } from "../../p256Server"
 import {
   getWalletPermissionId,
   parseSerializedWalletPolicyDescriptor,
   serializeWalletPolicyDescriptor
 } from "../../policy"
-import type {
-  SliceWalletFrameSession,
-  SliceWalletPermissionAuthorization
-} from "../../types/frame"
-import type { SliceWalletCheckoutCoSignerClient } from "../../types/permission"
-import { type Address, type Hex, hexToBytes, isAddress, isHex } from "viem"
 import type {
   CreateSliceWalletCheckoutExecutionClientParameters,
   SliceWalletCheckoutExecutionClient,
@@ -19,6 +14,11 @@ import type {
   SliceWalletManagementExecutionClient,
   SliceWalletManagementExecutionGrantRegistration
 } from "../../types/commerce"
+import type {
+  SliceWalletFrameSession,
+  SliceWalletPermissionAuthorization
+} from "../../types/frame"
+import type { SliceWalletCheckoutCoSignerClient } from "../../types/permission"
 import {
   walletDelegationExecutionScope,
   walletDelegationStoreManagementScope

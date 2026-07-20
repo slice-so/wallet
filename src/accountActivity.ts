@@ -1,7 +1,7 @@
 import {
+  type Address,
   encodeFunctionData,
   erc20Abi,
-  type Address,
   type Hex,
   isHex
 } from "viem"
@@ -22,29 +22,29 @@ const chunks = <Value>(values: readonly Value[], size: number) => {
   return result
 }
 
-export const createSliceWalletAccountActivityBatchFetch = ({
-  fetch: fetchImpl = fetch,
-  url
-}: {
-  fetch?: typeof fetch
-  url: string
-}) => async (requests: readonly SliceWalletAccountActivityBatchRequest[]) => {
-  const response = await fetchImpl(url, {
-    body: JSON.stringify(requests),
-    headers: { "content-type": "application/json" },
-    method: "POST"
-  })
-  if (!response.ok) {
-    throw new Error(`Wallet activity RPC failed with status ${response.status}.`)
+export const createSliceWalletAccountActivityBatchFetch =
+  ({ fetch: fetchImpl = fetch, url }: { fetch?: typeof fetch; url: string }) =>
+  async (requests: readonly SliceWalletAccountActivityBatchRequest[]) => {
+    const response = await fetchImpl(url, {
+      body: JSON.stringify(requests),
+      headers: { "content-type": "application/json" },
+      method: "POST"
+    })
+    if (!response.ok) {
+      throw new Error(
+        `Wallet activity RPC failed with status ${response.status}.`
+      )
+    }
+    const payload = (await response.json()) as
+      | SliceWalletAccountActivityBatchResponse
+      | readonly SliceWalletAccountActivityBatchResponse[]
+    if (!Array.isArray(payload)) {
+      throw new Error(
+        "Wallet activity batch RPC returned a non-array response."
+      )
+    }
+    return payload
   }
-  const payload = (await response.json()) as
-    | SliceWalletAccountActivityBatchResponse
-    | readonly SliceWalletAccountActivityBatchResponse[]
-  if (!Array.isArray(payload)) {
-    throw new Error("Wallet activity batch RPC returned a non-array response.")
-  }
-  return payload
-}
 
 export const loadSliceWalletAccountActivity = async (
   addresses: readonly Address[],

@@ -80,7 +80,8 @@ export const getSliceWalletSourceImportBoundaryViolations = ({
     const reactRoot = resolve(sourceRoot, "react")
     if (
       isExecution &&
-      (resolvedImport === reactRoot || resolvedImport.startsWith(`${reactRoot}${sep}`))
+      (resolvedImport === reactRoot ||
+        resolvedImport.startsWith(`${reactRoot}${sep}`))
     ) {
       violations.push(
         `${relativePath} imports the React layer from the execution layer via "${specifier}"`

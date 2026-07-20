@@ -10,8 +10,6 @@ export * from "./execution/utils/slicePaymasterAbis"
 export * from "./execution/utils/sliceSmartAccountCalls"
 export * from "./execution/utils/sliceUserOperationLimits"
 export * from "./execution/utils/sliceUserOperationPolicy"
-export type * from "./types/commerce"
-export type * from "./types/delegation"
 export type {
   SliceAccountClient,
   SliceAccountClientCall,
@@ -23,3 +21,5 @@ export type {
   SliceAccountClientSendCallsParameters,
   SliceAccountClientTransport
 } from "./types/accountClient"
+export type * from "./types/commerce"
+export type * from "./types/delegation"

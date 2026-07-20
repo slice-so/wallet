@@ -1,8 +1,29 @@
 "use client"
 
 import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react"
+import {
+  type Address,
+  type Chain,
+  createPublicClient,
+  type Hex,
+  http,
+  isAddress,
+  isAddressEqual,
+  isHex
+} from "viem"
+import { anvil } from "viem/chains"
+import {
   createKernelPasskeySliceAccountClient,
   createSliceCheckoutPolicyDescriptor,
+  createSliceKernelPasskeyTransport,
   createSliceStoreManagementPolicyDescriptor,
   getSliceBundlerApiUrl,
   parseSliceWalletExecutionSessionDescriptor,
@@ -11,11 +32,6 @@ import {
   type SliceWalletExecutionSessionDescriptor,
   type SliceWalletManagementExecutionClient
 } from "../execution"
-import {
-  createSliceKernelPasskeyTransport
-} from "../execution"
-import { buildRecoveryCancelCall } from "../recovery"
-import type { SliceAccountClient } from "../types/accountClient"
 import {
   authorizeSliceWalletSession,
   buildRecoveryPermissionInitConfig,
@@ -40,26 +56,8 @@ import {
   type SliceWalletSignerFrameClient,
   serializeWalletPolicyDescriptor
 } from "../index"
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState
-} from "react"
-import {
-  type Address,
-  type Chain,
-  createPublicClient,
-  type Hex,
-  http,
-  isAddress,
-  isAddressEqual,
-  isHex
-} from "viem"
-import { anvil } from "viem/chains"
+import { buildRecoveryCancelCall } from "../recovery"
+import type { SliceAccountClient } from "../types/accountClient"
 import type {
   SliceWalletContextValue,
   SliceWalletCredentialRecord,
@@ -85,7 +83,6 @@ import {
   resumeSliceWalletRegisteredReplacement,
   retrySliceWalletFinalityAction
 } from "./permissionLifecycle"
-import { getSliceWalletAccountVerification } from "./sliceWalletAccountVerification"
 import { useSliceWalletSessionIntegration } from "./sessionIntegration"
 
 const defaultWalletMetadataStorageKey = "slice.passkey-wallet"
@@ -289,10 +286,7 @@ export function SliceWalletProvider({
     [ceremonyBroker]
   )
 
-  useEffect(
-    () => () => ceremonyBroker.cancel(),
-    [accountAddress, ceremonyBroker, walletChain.id]
-  )
+  useEffect(() => () => ceremonyBroker.cancel(), [ceremonyBroker])
 
   const getFrameClient = useCallback(async () => {
     if (frameClientRef.current !== null) return frameClientRef.current
@@ -1065,7 +1059,6 @@ export function SliceWalletProvider({
       throw new Error("Complete recovery enrollment before connecting.")
     }
     const record = toCredentialRecord(connected)
-    await activateCredential(record)
     if (
       record.recoveryPermissionId !== null &&
       (record.recoveryPermissionId.toLowerCase() !==
@@ -1075,6 +1068,7 @@ export function SliceWalletProvider({
     ) {
       throw new Error("Recovery permission does not match its ceremony.")
     }
+    await activateCredential(record)
     storeWalletMetadata(credentialStorageKey, record)
     setHasStoredCredential(true)
     await sessionIntegration.complete(
@@ -1104,6 +1098,25 @@ export function SliceWalletProvider({
     [connectWallet, runWalletAction]
   )
 
+  const switchAccount = useCallback(async () => {
+    setPendingAction("login")
+    setError(null)
+    try {
+      await connectWallet()
+      return true
+    } catch (caughtError) {
+      const message =
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Unable to switch Slice wallet accounts."
+      setError(message)
+      notifications?.error?.(message)
+      return false
+    } finally {
+      setPendingAction(null)
+    }
+  }, [connectWallet, notifications])
+
   const signInWallet = useCallback(async () => {
     const activeWallet = activeWalletRef.current
     if (!activeWallet) throw new Error("Unlock your Slice wallet first.")
@@ -1128,7 +1141,10 @@ export function SliceWalletProvider({
         },
         window
       })
-      await sessionIntegration.complete(result, activeWallet.kernelAccount.address)
+      await sessionIntegration.complete(
+        result,
+        activeWallet.kernelAccount.address
+      )
       return
     }
     if (adapters.signInWithWallet === undefined) {
@@ -1137,9 +1153,6 @@ export function SliceWalletProvider({
 
     try {
       await adapters.signInWithWallet({
-        accountVerification: await getSliceWalletAccountVerification(
-          activeWallet.kernelAccount
-        ),
         address: activeWallet.kernelAccount.address,
         signMessage: (message) =>
           activeWallet.kernelAccount.signMessage({ message })
@@ -1165,8 +1178,8 @@ export function SliceWalletProvider({
     notifications,
     sessionConfig,
     sessionIntegration,
-    storeManagement
-    ,walletChain.id
+    storeManagement,
+    walletChain.id
   ])
 
   const enableExecutionSession = useCallback(
@@ -1496,12 +1509,10 @@ export function SliceWalletProvider({
       ceremonyBroker,
       ceremonyMode,
       checkoutExecution,
-      createReplacementFinalizationProof,
       finalizeRegisteredReplacement,
       getFrameClient,
       normalizedIdOrigin,
       notifications,
-      publicClient,
       sliceAccountClient,
       walletChain.id
     ]
@@ -2107,6 +2118,7 @@ export function SliceWalletProvider({
       refreshRecovery,
       refreshExecutionAllowance,
       signInWallet,
+      switchAccount,
       retrySession: signInWallet,
       session: sessionIntegration.session,
       sessionError: sessionIntegration.sessionError,
@@ -2135,6 +2147,7 @@ export function SliceWalletProvider({
       refreshRecovery,
       refreshExecutionAllowance,
       signInWallet,
+      switchAccount,
       sessionIntegration,
       sliceAccountClient,
       status

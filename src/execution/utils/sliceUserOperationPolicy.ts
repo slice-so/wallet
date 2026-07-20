@@ -1,8 +1,5 @@
 /** ERC-4337 envelope adapter over the decision core in sliceCallPolicy.ts. */
-import {
-  defaultSliceChainId,
-  supportedSliceCheckoutChainIds
-} from "../generated/commerceFacts"
+
 import {
   type Address,
   decodeFunctionData,
@@ -22,6 +19,10 @@ import {
   entryPoint09Address
 } from "viem/account-abstraction"
 import type { SliceCheckoutSpendIntent } from "../../types/commerce"
+import {
+  defaultSliceChainId,
+  supportedSliceCheckoutChainIds
+} from "../generated/commerceFacts"
 import {
   classifySliceSmartAccountCall,
   classifySliceSmartAccountCallsBatch,

@@ -29,7 +29,10 @@ export type SliceUserOperationPolicyFetch = (
   input: RequestInfo | URL,
   init?: RequestInit
 ) => Promise<Response>
-export type SliceSenderAccountSnapshot = { code: Hex; delegates: readonly Address[] }
+export type SliceSenderAccountSnapshot = {
+  code: Hex
+  delegates: readonly Address[]
+}
 export type SliceSenderAccountFetch = (
   chainId: number,
   sender: Address

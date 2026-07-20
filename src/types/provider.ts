@@ -72,7 +72,9 @@ export type SliceWalletParameters = {
   defaultChainId?: number
   session?: {
     audience: string
-    onSession?: (result: SliceWalletCeremonySessionResult | undefined) => void | Promise<void>
+    onSession?: (
+      result: SliceWalletCeremonySessionResult | undefined
+    ) => void | Promise<void>
     prepare: NonNullable<SliceWalletSessionConnectInput["prepare"]>
     scopes?: readonly string[]
     ttlSeconds?: number

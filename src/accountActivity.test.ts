@@ -1,9 +1,9 @@
 import { describe, expect, it, mock } from "bun:test"
+import { loadSliceWalletAccountActivity } from "./accountActivity"
 import type {
   SliceWalletAccountActivityBatchRequest,
   SliceWalletAccountActivityBatchResponse
 } from "./types"
-import { loadSliceWalletAccountActivity } from "./accountActivity"
 
 const addresses = Array.from(
   { length: 32 },
@@ -39,10 +39,7 @@ describe("wallet account activity", () => {
   it("chunks larger code and balance batches at 64 entries", async () => {
     const batchFetch = mock(async (requests) => respond(requests))
     await loadSliceWalletAccountActivity(
-      [
-        ...addresses,
-        "0x0000000000000000000000000000000000000033"
-      ],
+      [...addresses, "0x0000000000000000000000000000000000000033"],
       { batchFetch }
     )
     expect(batchFetch.mock.calls.map(([requests]) => requests.length)).toEqual([

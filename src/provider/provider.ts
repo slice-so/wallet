@@ -35,7 +35,9 @@ type ProviderRuntime = Omit<
   connectWithSession: (
     session: Parameters<FullProviderRuntime["connectWithSession"]>[0]
   ) => Promise<{
-    session?: Awaited<ReturnType<FullProviderRuntime["connectWithSession"]>>["session"]
+    session?: Awaited<
+      ReturnType<FullProviderRuntime["connectWithSession"]>
+    >["session"]
     wallet: { rootAccount: { address: Address } }
   }>
   switchAccount: () => Promise<{ rootAccount: { address: Address } }>
@@ -134,7 +136,9 @@ const parseWalletConnect = (
       "wallet_connect capabilities must be an object."
     )
   }
-  let session: Parameters<SliceWalletProvider["connectWithSession"]>[0] | undefined
+  let session:
+    | Parameters<SliceWalletProvider["connectWithSession"]>[0]
+    | undefined
   for (const [name, capability] of Object.entries(input.capabilities)) {
     if (name === "session") {
       if (
@@ -142,7 +146,9 @@ const parseWalletConnect = (
         capability === null ||
         Array.isArray(capability)
       ) {
-        throw invalidProviderRequest("wallet_connect session capability is invalid.")
+        throw invalidProviderRequest(
+          "wallet_connect session capability is invalid."
+        )
       }
       const sessionCapability = capability as {
         readonly [key: string]: SliceWalletProviderValue | undefined
@@ -162,7 +168,8 @@ const parseWalletConnect = (
         ) ||
         sessionCapability.optional !== true ||
         typeof sessionCapability.audience !== "string" ||
-        new URL(sessionCapability.audience).origin !== sessionCapability.audience ||
+        new URL(sessionCapability.audience).origin !==
+          sessionCapability.audience ||
         typeof sessionCapability.sessionSigner !== "string" ||
         !isAddress(sessionCapability.sessionSigner) ||
         (sessionCapability.nonce !== undefined &&
@@ -185,12 +192,16 @@ const parseWalletConnect = (
                 !/^[a-z0-9][a-z0-9_.:-]{0,63}$/.test(scope)
             )))
       ) {
-        throw invalidProviderRequest("wallet_connect session capability is invalid.")
+        throw invalidProviderRequest(
+          "wallet_connect session capability is invalid."
+        )
       }
       session = {
         audience: sessionCapability.audience,
         prepared: {
-          ...(sessionCapability.nonce === undefined ? {} : { nonce: sessionCapability.nonce }),
+          ...(sessionCapability.nonce === undefined
+            ? {}
+            : { nonce: sessionCapability.nonce }),
           ...(sessionCapability.pendingId === undefined
             ? {}
             : { pendingId: sessionCapability.pendingId }),

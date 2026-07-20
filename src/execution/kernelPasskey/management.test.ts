@@ -28,7 +28,9 @@ describe("store management call policy", () => {
     }
 
     const permissions = policy.policyParams.permissions ?? []
-    const productsModuleAddress = getProductsModuleAddress(base.id).toLowerCase()
+    const productsModuleAddress = getProductsModuleAddress(
+      base.id
+    ).toLowerCase()
     const productsModuleSelectors = permissions
       .filter(
         (permission) =>

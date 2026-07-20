@@ -2,10 +2,10 @@ import { type Hex, hexToBytes, isHex, keccak256, stringToHex } from "viem"
 import { assertSliceWalletAccountIndex } from "./accountIndex"
 import type {
   RegisterSliceWalletCredentialInput,
-  SliceWalletCredentialListAuthorization,
-  SliceWalletCredentialListChallenge,
   SliceWalletCredentialAccountsAssertion,
   SliceWalletCredentialAccountsChallenge,
+  SliceWalletCredentialListAuthorization,
+  SliceWalletCredentialListChallenge,
   SliceWalletCredentialRegistrationKind,
   SliceWalletRegistryChallenge,
   SliceWalletRegistryCredential

@@ -1,4 +1,3 @@
-import { getProductsModuleAddress } from "../generated/commerceFacts"
 import { productsModuleAbi } from "@slicekit/abi"
 import { signerToEcdsaValidator } from "@zerodev/ecdsa-validator"
 import { PolicyFlags, toPermissionValidator } from "@zerodev/permissions"
@@ -39,6 +38,7 @@ import {
 } from "viem/account-abstraction"
 import { privateKeyToAccount } from "viem/accounts"
 import type { SliceAccountClientCall } from "../../types/accountClient"
+import { getProductsModuleAddress } from "../generated/commerceFacts"
 import {
   sliceKernelBaseV33Addresses,
   sliceKernelWebAuthnValidatorAddress

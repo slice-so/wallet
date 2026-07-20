@@ -77,6 +77,7 @@ type TestUserOperationQuantityFields = Partial<
 
 const cdpApiKey = "key_123"
 const paymasterUrl = `https://api.developer.coinbase.com/rpc/v1/base/${cdpApiKey}`
+const policyBaseUrl = "https://api.slice.so"
 const sender = "0x0000000000000000000000000000000000000001"
 const arbitraryTokenAddress = "0x0000000000000000000000000000000000001234"
 const cdpEip7702ProxyAddress =
@@ -94,8 +95,7 @@ const cdpBasePaymasterAddress =
 const indexedSlicerAddress =
   "0x742d35cc6634c0532925a3b844bc9e7d1333d262" satisfies Address
 const generatedHookAddress = generatedHookAddressList[0] as Address
-const USDCAddress =
-  "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as Address
+const USDCAddress = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as Address
 const erc7579BatchDefaultMode =
   "0x0100000000000000000000000000000000000000000000000000000000000000" satisfies Hex
 const erc7579SingleDefaultMode =
@@ -396,6 +396,7 @@ const handleTestPaymasterRequest = (
 ) =>
   handleSlicePaymasterRequest(request, {
     fetchSlicer: unexpectedSlicerValidationFetch(),
+    policyBaseUrl,
     ...options
   })
 
@@ -645,6 +646,29 @@ describe("slice paymaster", () => {
     expect(response.status).toBe(200)
     expect(fetchPaymaster).toHaveBeenCalledTimes(1)
     expect(fetchSlicer).toHaveBeenCalledTimes(1)
+  })
+
+  it("disables indexed slicer lookup when the policy base URL is omitted", async () => {
+    const body = createPaymasterBody(
+      encodeSmartWalletExecute({
+        target: indexedSlicerAddress,
+        data: "0x12345678"
+      })
+    )
+    const fetchPaymaster = mock<typeof fetch>()
+    const fetchSlicer = mock<typeof fetch>()
+
+    const response = await handleSlicePaymasterRequest(
+      new Request("https://shop.test/api/paymaster", {
+        body: JSON.stringify(body),
+        method: "POST"
+      }),
+      { cdpApiKey, fetchPaymaster, fetchSlicer }
+    )
+
+    expect(response.status).toBe(403)
+    expect(fetchPaymaster).not.toHaveBeenCalled()
+    expect(fetchSlicer).not.toHaveBeenCalled()
   })
 
   it("rejects unknown contract calls when the API lookup does not find a slicer", async () => {

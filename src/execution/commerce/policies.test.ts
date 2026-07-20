@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { productsModuleAbi } from "@slicekit/abi"
-import { assertWalletCallsMatchPolicy } from "../../policy"
 import { encodeFunctionData, zeroAddress } from "viem"
+import { assertWalletCallsMatchPolicy } from "../../policy"
 import { getProductsModuleAddress } from "../generated/commerceFacts"
 import {
   assertSliceStoreManagementPolicyDescriptor,

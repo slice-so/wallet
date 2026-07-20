@@ -41,7 +41,9 @@ export const useSliceWalletSessionIntegration = ({
   chainId: number
   warn: (message: string) => void
 }) => {
-  const [session, setSession] = useState<SliceWalletSessionSnapshot | null>(null)
+  const [session, setSession] = useState<SliceWalletSessionSnapshot | null>(
+    null
+  )
   const [sessionError, setSessionError] = useState<string | null>(null)
   const generation = useRef(0)
   const previousIdentity = useRef<string | null>(null)

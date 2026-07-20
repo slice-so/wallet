@@ -62,7 +62,9 @@ export const sliceWalletConnector = (parameters: SliceWalletProviderConfig) => {
         )
       },
       async connect({ chainId, withCapabilities } = {}) {
-        let switchPromise: Promise<SliceWalletProviderValue | undefined> | undefined
+        let switchPromise:
+          | Promise<SliceWalletProviderValue | undefined>
+          | undefined
         if (chainId !== undefined) {
           switchPromise = getProvider().request({
             method: "wallet_switchEthereumChain",
@@ -125,6 +127,9 @@ export const sliceWalletConnector = (parameters: SliceWalletProviderConfig) => {
       },
       async isAuthorized() {
         return (await this.getAccounts()).length > 0
+      },
+      async switchAccount() {
+        return getProvider().switchAccount()
       },
       async switchChain({ chainId }) {
         const chain = config.chains.find(

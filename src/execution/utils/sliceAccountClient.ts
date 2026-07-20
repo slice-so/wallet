@@ -1,7 +1,10 @@
 import type { Address, Hex } from "viem"
 import { entryPoint07Address } from "viem/account-abstraction"
 import { base } from "viem/chains"
-import type { SliceAccountClient, SliceAccountClientTransport } from "../../types/accountClient"
+import type {
+  SliceAccountClient,
+  SliceAccountClientTransport
+} from "../../types/accountClient"
 import {
   sliceKernelBaseV33Addresses,
   sliceKernelPasskeyBackend,

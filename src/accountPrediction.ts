@@ -9,8 +9,8 @@ import {
   toHex,
   zeroAddress
 } from "viem"
-import { sliceWalletKernelAddresses } from "./constants"
 import { assertSliceWalletAccountIndex } from "./accountIndex"
+import { sliceWalletKernelAddresses } from "./constants"
 import { buildRecoveryPermissionInitConfig } from "./recovery"
 import { encodeSliceWalletRootValidatorData } from "./rootValidator"
 import type { PredictSliceWalletKernelAccountAddressParameters } from "./types/recovery"

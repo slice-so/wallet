@@ -1,16 +1,11 @@
+import { productsModuleAbi, registryProductActionAbi } from "@slicekit/abi"
+import { CallPolicyVersion, toCallPolicy } from "@zerodev/permissions/policies"
+import { type Abi, type AbiFunction, toFunctionSelector } from "viem"
+import type { WalletDelegationOperation } from "../../types/delegation"
 import {
   generatedHookAddressList,
   getProductsModuleAddress
 } from "../generated/commerceFacts"
-import { productsModuleAbi, registryProductActionAbi } from "@slicekit/abi"
-import { CallPolicyVersion, toCallPolicy } from "@zerodev/permissions/policies"
-import {
-  type Abi,
-  type AbiFunction,
-  type Address,
-  toFunctionSelector
-} from "viem"
-import type { WalletDelegationOperation } from "../../types/delegation"
 
 export const storeManagementAllowedOperations = [
   "addProduct",

@@ -78,8 +78,13 @@ const runSliceWalletAccountCeremony = async ({
         version: 1
       } satisfies SliceWalletCeremonySessionRequestMessage)
     } else {
-      if ((session.prepare === undefined) === (session.prepared === undefined)) {
-        throw new Error("Session connect requires exactly one preparation mode.")
+      if (
+        (session.prepare === undefined) ===
+        (session.prepared === undefined)
+      ) {
+        throw new Error(
+          "Session connect requires exactly one preparation mode."
+        )
       }
       port.postMessage({
         status: "preparing",

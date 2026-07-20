@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test"
+import type { Hex } from "viem"
 import {
   SliceWalletExecutionRequestError,
   type SliceWalletExecutionSessionProof,
   type SliceWalletReplacementFinalization
 } from "../execution"
-import type { Hex } from "viem"
 import type { StoredSliceWalletPendingReplacement } from "../types/react"
 import {
   getSliceWalletPendingRegistrationAction,

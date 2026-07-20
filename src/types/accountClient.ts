@@ -1,5 +1,6 @@
 import type { ToKernelSmartAccountReturnType } from "permissionless/accounts"
 import type {
+  Address,
   Chain,
   Client,
   Hex,
@@ -8,15 +9,12 @@ import type {
   Transport
 } from "viem"
 import type {
+  P256Credential,
   PaymasterActions,
   SmartAccount,
+  ToWebAuthnAccountParameters,
   UserOperationReceipt
 } from "viem/account-abstraction"
-import type {
-  P256Credential,
-  ToWebAuthnAccountParameters
-} from "viem/account-abstraction"
-import type { Address } from "viem"
 
 export type SliceAccountBackend = "kernel-passkey"
 

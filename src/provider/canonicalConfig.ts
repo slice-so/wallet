@@ -155,8 +155,7 @@ export const resolveCanonicalSliceWalletConfig = (
         (!Array.isArray(session.scopes) ||
           session.scopes.some((scope) => typeof scope !== "string"))) ||
       (session.ttlSeconds !== undefined &&
-        (!Number.isSafeInteger(session.ttlSeconds) ||
-          session.ttlSeconds <= 0)))
+        (!Number.isSafeInteger(session.ttlSeconds) || session.ttlSeconds <= 0)))
   ) {
     throw invalidProviderRequest("Slice Wallet session config is invalid.")
   }

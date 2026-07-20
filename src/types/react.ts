@@ -1,17 +1,18 @@
+import type { ReactNode } from "react"
+import type { Address, Hex } from "viem"
+import type { SliceAccountClient } from "./accountClient"
+import type { SliceWalletCeremonyMode } from "./ceremony"
 import type {
   SliceWalletCheckoutExecutionClient,
   SliceWalletExecutionSessionDescriptor,
   SliceWalletManagementExecutionClient
 } from "./commerce"
-import type { SliceAccountClient } from "./accountClient"
-import type {
-  SliceWalletCeremonyMode
-} from "./ceremony"
 import type { SliceWalletPendingCeremony } from "./pendingCeremony"
 import type { SerializedWalletPolicyDescriptor } from "./policy"
-import type { ReactNode } from "react"
-import type { Address, Hex } from "viem"
-import type { SliceWalletSessionAdapter, SliceWalletSessionSnapshot } from "./session"
+import type {
+  SliceWalletSessionAdapter,
+  SliceWalletSessionSnapshot
+} from "./session"
 
 export type SliceWalletStatus = "error" | "idle" | "loading" | "ready"
 export type SliceWalletPendingAction = "create" | "login" | null
@@ -160,7 +161,6 @@ export type SliceWalletProviderAdapters = {
 }
 
 export type SliceWalletSignInAdapter = (input: {
-  accountVerification?: { factory: Address; factoryData: Hex }
   address: Address
   signMessage: (message: string) => Promise<Hex>
 }) => Promise<void>
@@ -223,6 +223,7 @@ export type SliceWalletContextValue = {
   }) => Promise<void>
   refreshRecovery: () => Promise<void>
   signInWallet: () => Promise<void>
+  switchAccount: () => Promise<boolean>
   retrySession: () => Promise<void>
   session: SliceWalletSessionSnapshot | null
   sessionError: string | null

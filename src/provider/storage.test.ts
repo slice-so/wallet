@@ -72,12 +72,8 @@ const createGrant = () => ({
 })
 
 describe("portable wallet provider storage", () => {
-  test("persists indexed accounts as v2 and deletes v1 metadata", () => {
+  test("persists indexed accounts", () => {
     const storage = new MemoryStorage()
-    storage.setItem(
-      "slice.wallet.provider.account.v1",
-      JSON.stringify({ accountAddress: account, credentialIdHash: "0x", version: 1 })
-    )
     writeStoredSliceWalletAccount(storage, {
       accountAddress: account,
       accountIndex: 7,
@@ -87,7 +83,6 @@ describe("portable wallet provider storage", () => {
       accountAddress: account,
       accountIndex: 7
     })
-    expect(storage.getItem("slice.wallet.provider.account.v1")).toBeNull()
   })
 
   test("persists public grant metadata without private key material", () => {
@@ -115,21 +110,12 @@ describe("portable wallet provider storage", () => {
     expect(storage.getItem(key)).toBeNull()
   })
 
-  test("isolates grants by account and removes legacy keys", () => {
+  test("isolates grants by account", () => {
     const storage = new MemoryStorage()
-    const grant = createGrant()
-    storage.setItem(
-      "slice.wallet.provider.generic-grant.v1",
-      JSON.stringify(grant)
-    )
-
+    writeStoredSliceWalletGrant(storage, createGrant())
     expect(
       readStoredSliceWalletGrant(storage, 8453, account, 1_800_000_001)
-    ).toBeNull()
-    expect(storage.getItem("slice.wallet.provider.generic-grant.v1")).toBeNull()
-    expect(
-      storage.getItem("slice.wallet.provider.generic-grant.v1:8453")
-    ).toBeNull()
+    ).not.toBeNull()
     expect(
       readStoredSliceWalletGrant(storage, 10, account, 1_800_000_001)
     ).toBeNull()

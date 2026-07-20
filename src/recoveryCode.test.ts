@@ -16,6 +16,12 @@ const fixedPayload = {
 
 const fixedCode =
   "SLW1-000221-8H248H-248H24-8H248H-248H24-8H248H-248000-000000-000000-000000-000000-000000-000000-000000-000007-8NMYEY"
+const v2Payload = {
+  ...fixedPayload,
+  accountIndex: 1,
+  credentialIdHash: `0x${"22".repeat(32)}`,
+  credentialPublicKey: `0x04${"33".repeat(64)}`
+} as const
 
 describe("Slice wallet recovery codes", () => {
   it("matches the permanent recovery-code vector", () => {
@@ -37,6 +43,13 @@ describe("Slice wallet recovery codes", () => {
         parseSliceWalletRecoveryCode(encodeSliceWalletRecoveryCode(payload))
       ).toEqual(payload)
     }
+  })
+
+  it("round-trips the SLW2 credential bundle and uses it by default when supplied", () => {
+    const code = encodeSliceWalletRecoveryCode(v2Payload)
+
+    expect(code.startsWith("SLW2-")).toBe(true)
+    expect(parseSliceWalletRecoveryCode(code)).toEqual(v2Payload)
   })
 
   it("normalizes ambiguous body characters after validating the prefix", () => {
@@ -64,7 +77,7 @@ describe("Slice wallet recovery codes", () => {
 
   it("distinguishes unsupported versions, malformed codes, and checksum errors", () => {
     expect(() =>
-      parseSliceWalletRecoveryCode(fixedCode.replace("SLW1", "SLW2"))
+      parseSliceWalletRecoveryCode(fixedCode.replace("SLW1", "SLW3"))
     ).toThrow("newer recovery tool")
     expect(() => parseSliceWalletRecoveryCode(`${fixedCode}0`)).toThrow(
       "length"

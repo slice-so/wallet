@@ -1,10 +1,10 @@
 import type { Address, Hex } from "viem"
+import type { SliceWalletPermissionAuthorization } from "./frame"
+import type { SliceWalletCheckoutCoSignerClient } from "./permission"
 import type {
   SerializedWalletPolicyDescriptor,
   WalletPolicyDescriptor
 } from "./policy"
-import type { SliceWalletPermissionAuthorization } from "./frame"
-import type { SliceWalletCheckoutCoSignerClient } from "./permission"
 
 export type SliceCheckoutApproval = { amount: bigint; currency: Address }
 export type SliceCheckoutPayment = { amount: bigint; currency: Address }
@@ -28,7 +28,11 @@ export type SliceCheckoutSpendIntent = {
   payments: SliceCheckoutPayment[]
   purchases: SliceCheckoutPurchase[]
 }
-export type SliceSmartAccountCall = { target: Address; value: bigint; data: Hex }
+export type SliceSmartAccountCall = {
+  target: Address
+  value: bigint
+  data: Hex
+}
 export type SliceCallsBatchClassification =
   | {
       status: "rejected"

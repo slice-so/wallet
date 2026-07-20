@@ -42,8 +42,7 @@ describe("EIP-6963 discovery", () => {
       pendingCeremony: null,
       removeListener: () => undefined,
       request: async () => undefined,
-      switchAccount: async () =>
-        "0x0000000000000000000000000000000000000001"
+      switchAccount: async () => "0x0000000000000000000000000000000000000001"
     }
 
     const stop = announceSliceWalletProvider({

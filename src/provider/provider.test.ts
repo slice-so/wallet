@@ -200,8 +200,7 @@ describe("Slice Wallet provider dispatch", () => {
 
   test("accepts only closed pre-prepared wallet_connect session scalars", async () => {
     const { provider, runtime } = createProvider()
-    const sessionSigner =
-      "0x0000000000000000000000000000000000000002" as const
+    const sessionSigner = "0x0000000000000000000000000000000000000002" as const
     expect(
       await request(provider, "wallet_connect", [
         {

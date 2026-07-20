@@ -349,12 +349,16 @@ const createSliceWalletChainRuntime = (
     const hydrated = await hydrate()
     if (hydrated !== null) return hydrated
     if (readStoredSliceWalletAccount(storage) !== null) {
-      throw new Error("Slice Wallet account hydration is temporarily unavailable.")
+      throw new Error(
+        "Slice Wallet account hydration is temporarily unavailable."
+      )
     }
     return commitAccount(await chooseAccount())
   }
 
-  const connectWithSession = async (session: SliceWalletSessionConnectInput) => {
+  const connectWithSession = async (
+    session: SliceWalletSessionConnectInput
+  ) => {
     const selection = await chooseAccount(session)
     const wallet = commitAccount(selection)
     return { session: selection.connected.session, wallet }
@@ -785,7 +789,8 @@ export const createSliceWalletProviderRuntime = (
           isAddressEqual(
             selection.connected.accountAddress,
             snapshot.accountAddress
-          ) && selection.connected.accountIndex === snapshot.accountIndex
+          ) &&
+          selection.connected.accountIndex === snapshot.accountIndex
         ) {
           runtime.destroy()
           runtimes.clear()

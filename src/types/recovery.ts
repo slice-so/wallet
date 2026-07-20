@@ -62,11 +62,22 @@ export type PredictSliceWalletKernelAccountAddressParameters = {
   recoverySignerAddress: Address
 }
 
-export type SliceWalletRecoveryCodePayload = {
+export type SliceWalletRecoveryCodeV1Payload = {
   account: Address
   chainId: number
   recoveryPrivateKey: Hex
 }
+
+export type SliceWalletRecoveryCodeV2Payload =
+  SliceWalletRecoveryCodeV1Payload & {
+    accountIndex: number
+    credentialIdHash: Hex
+    credentialPublicKey: Hex
+  }
+
+export type SliceWalletRecoveryCodePayload =
+  | SliceWalletRecoveryCodeV1Payload
+  | SliceWalletRecoveryCodeV2Payload
 
 export type RecoveryUserOperationGas = {
   callGasLimit: bigint

@@ -30,7 +30,9 @@ export const signSessionGrant = async (
     sessionSigner: Address
     ttlSeconds?: number
   }
-): Promise<Extract<SliceWalletCeremonySessionResult, { status: "granted" }>> => {
+): Promise<
+  Extract<SliceWalletCeremonySessionResult, { status: "granted" }>
+> => {
   const issuedAt = Math.floor(Date.now() / 1_000)
   const expiresAt = issuedAt + ttlSeconds
   const grantMessage = createSessionGrantMessage({

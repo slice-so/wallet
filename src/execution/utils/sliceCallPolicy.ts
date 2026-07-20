@@ -8,12 +8,7 @@
  * accepted approval spender, remain policy data and must be reviewed when the
  * executor changes (CDP paymaster today; payer or paymaster-frame later).
  */
-import {
-  getFundsModuleAddress,
-  getProductsModuleAddress,
-  getSliceCoreAddress,
-  isGeneratedHookAddress
-} from "../generated/commerceFacts"
+
 import {
   productsModuleAbi,
   registryProductActionAbi,
@@ -34,6 +29,12 @@ import type {
   SliceCheckoutSpendIntent,
   SliceSmartAccountCall
 } from "../../types/commerce"
+import {
+  getFundsModuleAddress,
+  getProductsModuleAddress,
+  getSliceCoreAddress,
+  isGeneratedHookAddress
+} from "../generated/commerceFacts"
 import { sliceKernelTimelockPolicyAddress } from "./sliceKernelAddresses"
 import {
   kernelTimelockPolicyCancelAbi,
