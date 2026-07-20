@@ -177,7 +177,8 @@
     "@slice/indexer-shared": "workspace:*",
     "@slice/typescript-config": "workspace:*",
     "@types/react": "catalog:",
-    "@wagmi/core": "catalog:"
+    "@wagmi/core": "catalog:",
+    "fake-indexeddb": "^6.2.4"
   },
   "repository": {
     "type": "git",

@@ -18,10 +18,10 @@ import type {
   StoredWalletCall
 } from "../types/providerInternal"
 
-const accountStorageKey = "slice.wallet.provider.account.v2"
+const accountStorageKey = "slice.wallet.provider.account"
 const grantStorageKey = (chainId: number, account: Address) =>
-  `slice.wallet.provider.generic-grant.v2:${chainId}:${account.toLowerCase()}`
-const callStoragePrefix = "slice.wallet.provider.call.v1:"
+  `slice.wallet.provider.generic-grant:${chainId}:${account.toLowerCase()}`
+const callStoragePrefix = "slice.wallet.provider.call:"
 const callRetentionMs = 24 * 60 * 60 * 1000
 
 type StoredAccount = {
@@ -85,10 +85,8 @@ export const readStoredSliceWalletAccount = (
     !hasOnlyKeys(value, [
       "accountAddress",
       "accountIndex",
-      "credentialIdHash",
-      "version"
+      "credentialIdHash"
     ]) ||
-    value.version !== 2 ||
     typeof value.accountAddress !== "string" ||
     !isAddress(value.accountAddress) ||
     typeof value.accountIndex !== "number" ||
@@ -112,7 +110,7 @@ export const readStoredSliceWalletAccount = (
 export const writeStoredSliceWalletAccount = (
   storage: Storage | null,
   account: StoredAccount
-) => write(storage, accountStorageKey, { ...account, version: 2 })
+) => write(storage, accountStorageKey, account)
 
 export const clearStoredSliceWalletAccount = (storage: Storage | null) =>
   remove(storage, accountStorageKey)
@@ -136,10 +134,8 @@ export const readStoredSliceWalletGrant = (
       "permissionId",
       "policy",
       "publicKey",
-      "signerId",
-      "version"
+      "signerId"
     ]) ||
-    value.version !== 1 ||
     typeof value.account !== "string" ||
     !isAddress(value.account) ||
     typeof value.chainId !== "number" ||
@@ -185,8 +181,7 @@ export const readStoredSliceWalletGrant = (
       permissionId: value.permissionId as Hex,
       policy: serializeWalletPolicyDescriptor(policy),
       publicKey: value.publicKey as Hex,
-      signerId: value.signerId,
-      version: 1
+      signerId: value.signerId
     }
   } catch {
     clearStoredSliceWalletGrant(storage, chainId, account)
@@ -217,14 +212,7 @@ export const readStoredSliceWalletCall = (
   const value = input === null ? null : record(input)
   if (
     value === null ||
-    !hasOnlyKeys(value, [
-      "chainId",
-      "createdAt",
-      "id",
-      "userOperationHash",
-      "version"
-    ]) ||
-    value.version !== 1 ||
+    !hasOnlyKeys(value, ["chainId", "createdAt", "id", "userOperationHash"]) ||
     value.id !== id ||
     typeof value.chainId !== "number" ||
     !Number.isSafeInteger(value.chainId) ||
@@ -242,8 +230,7 @@ export const readStoredSliceWalletCall = (
     chainId: value.chainId,
     createdAt: value.createdAt,
     id,
-    userOperationHash: value.userOperationHash,
-    version: 1
+    userOperationHash: value.userOperationHash
   }
 }
 

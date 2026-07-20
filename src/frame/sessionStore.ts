@@ -6,7 +6,6 @@ import type {
 
 const databaseName = "slice-wallet-signer"
 const objectStoreName = "sessions"
-const databaseVersion = 1
 
 const normalizeOrigin = (origin: string) => new URL(origin).origin
 
@@ -57,7 +56,7 @@ const transactionComplete = (transaction: IDBTransaction) =>
   })
 
 const openDatabase = (indexedDb: IDBFactory) => {
-  const request = indexedDb.open(databaseName, databaseVersion)
+  const request = indexedDb.open(databaseName)
   request.addEventListener("upgradeneeded", () => {
     if (!request.result.objectStoreNames.contains(objectStoreName)) {
       request.result.createObjectStore(objectStoreName, { keyPath: "id" })

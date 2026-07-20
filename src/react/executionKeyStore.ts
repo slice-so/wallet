@@ -8,11 +8,10 @@ import type {
 
 const DB_NAME = "slice-wallet"
 const STORE_NAME = "execution-sessions"
-const DB_VERSION = 1
 
 const openDatabase = () =>
   new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION)
+    const request = indexedDB.open(DB_NAME)
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains(STORE_NAME)) {
         request.result.createObjectStore(STORE_NAME)

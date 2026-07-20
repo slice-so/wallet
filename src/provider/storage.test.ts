@@ -67,8 +67,7 @@ const createGrant = () => ({
     version: 1
   }),
   publicKey,
-  signerId: getSliceWalletP256SignerId(publicKey),
-  version: 1 as const
+  signerId: getSliceWalletP256SignerId(publicKey)
 })
 
 describe("portable wallet provider storage", () => {
@@ -94,7 +93,7 @@ describe("portable wallet provider storage", () => {
     ).not.toBeNull()
   })
 
-  test("deletes a legacy record containing private key material", () => {
+  test("rejects a record containing private key material", () => {
     const storage = new MemoryStorage()
     writeStoredSliceWalletGrant(storage, createGrant())
     const [key, raw] = [...storage.values.entries()][0] ?? []
@@ -130,8 +129,7 @@ describe("portable wallet provider storage", () => {
       chainId: 8453,
       createdAt: 1_800_000_000_000,
       id: "checkout-call",
-      userOperationHash: `0x${"22".repeat(32)}` as Hex,
-      version: 1 as const
+      userOperationHash: `0x${"22".repeat(32)}` as Hex
     }
     writeStoredSliceWalletCall(storage, call)
 

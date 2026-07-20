@@ -8,20 +8,13 @@ import {
   sha256,
   stringToBytes
 } from "viem"
-import type {
-  SliceWalletRecoveryCodePayload,
-  SliceWalletRecoveryCodeV1Payload,
-  SliceWalletRecoveryCodeV2Payload
-} from "./types"
+import type { SliceWalletRecoveryCodePayload } from "./types"
 
-const legacyRecoveryCodePrefix = "SLW1"
-const recoveryCodePrefix = "SLW2"
+const recoveryCodePrefix = "SLW"
 const recoveryCodeAlphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
-const recoveryCodeV1BodyBytes = 56
-const recoveryCodeV2BodyBytes = 156
+const recoveryCodeBodyBytes = 156
 const recoveryCodeChecksumBytes = 4
-const recoveryCodeV1EncodedCharacters = 96
-const recoveryCodeV2EncodedCharacters = 256
+const recoveryCodeEncodedCharacters = 256
 const secp256k1Order =
   0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n
 
@@ -79,32 +72,15 @@ const formatEncodedBody = (prefix: string, encoded: string) =>
 
 const parseEncodedBody = (code: string) => {
   const normalized = code.trim().toUpperCase()
-  if (!normalized.startsWith("SLW")) {
+  if (!normalized.startsWith(recoveryCodePrefix)) {
     throw new Error("Recovery code prefix is invalid.")
   }
-  const suffix = normalized.slice(3)
-  const delimitedVersion = /^([0-9]+)-/.exec(suffix)
-  const compactSuffix = suffix.replace(/[-\s]/g, "")
-  if (!/^[0-9]/.test(compactSuffix)) {
-    throw new Error("Recovery code prefix is invalid.")
-  }
-  const version = delimitedVersion?.[1] ?? compactSuffix.slice(0, 1)
-  if (version !== "1" && version !== "2") {
-    throw new Error("This recovery code requires a newer recovery tool.")
-  }
-  const body =
-    delimitedVersion === null
-      ? compactSuffix.slice(1)
-      : suffix.slice(delimitedVersion[0].length)
-  const encoded = body
+  const suffix = normalized.slice(recoveryCodePrefix.length)
+  const encoded = (suffix.startsWith("-") ? suffix.slice(1) : suffix)
     .replace(/[-\s]/g, "")
     .replaceAll("O", "0")
     .replace(/[IL]/g, "1")
-  const encodedCharacters =
-    version === "1"
-      ? recoveryCodeV1EncodedCharacters
-      : recoveryCodeV2EncodedCharacters
-  if (encoded.length !== encodedCharacters) {
+  if (encoded.length !== recoveryCodeEncodedCharacters) {
     throw new Error("Recovery code has an invalid length.")
   }
   if (
@@ -112,18 +88,14 @@ const parseEncodedBody = (code: string) => {
   ) {
     throw new Error("Recovery code contains an invalid character.")
   }
-  return {
-    encoded,
-    prefix: version === "1" ? legacyRecoveryCodePrefix : recoveryCodePrefix,
-    version
-  }
+  return encoded
 }
 
 const validateRecoveryCodeBase = ({
   account,
   chainId,
   recoveryPrivateKey
-}: SliceWalletRecoveryCodeV1Payload) => {
+}: SliceWalletRecoveryCodePayload) => {
   if (!Number.isSafeInteger(chainId) || chainId <= 0 || chainId > 0xffffffff) {
     throw new Error("Recovery chain id must be a non-zero uint32.")
   }
@@ -138,24 +110,9 @@ const validateRecoveryCodeBase = ({
   return privateKey
 }
 
-const encodeLegacyRecoveryCode = (
-  payload: SliceWalletRecoveryCodeV1Payload
-) => {
-  const privateKey = validateRecoveryCodeBase(payload)
-  const body = new Uint8Array(recoveryCodeV1BodyBytes)
-  new DataView(body.buffer).setUint32(0, payload.chainId, false)
-  body.set(hexToBytes(payload.account), 4)
-  body.set(privateKey, 24)
-  return formatEncodedBody(
-    legacyRecoveryCodePrefix,
-    encodeBase32(concatBytes([body, checksum(legacyRecoveryCodePrefix, body)]))
-  )
-}
-
 export const encodeSliceWalletRecoveryCode = (
   payload: SliceWalletRecoveryCodePayload
 ) => {
-  if (!("credentialIdHash" in payload)) return encodeLegacyRecoveryCode(payload)
   const privateKey = validateRecoveryCodeBase(payload)
   if (
     !Number.isInteger(payload.accountIndex) ||
@@ -172,7 +129,7 @@ export const encodeSliceWalletRecoveryCode = (
   if (credentialPublicKey.length !== 65 || credentialPublicKey[0] !== 4) {
     throw new Error("Recovery credential public key is invalid.")
   }
-  const body = new Uint8Array(recoveryCodeV2BodyBytes)
+  const body = new Uint8Array(recoveryCodeBodyBytes)
   new DataView(body.buffer).setUint32(0, payload.chainId, false)
   body.set(hexToBytes(payload.account), 4)
   body.set(privateKey, 24)
@@ -188,18 +145,13 @@ export const encodeSliceWalletRecoveryCode = (
 export const parseSliceWalletRecoveryCode = (
   code: string
 ): SliceWalletRecoveryCodePayload => {
-  const parsedBody = parseEncodedBody(code)
-  const decoded = decodeBase32(parsedBody.encoded)
-  const bodyBytes =
-    parsedBody.version === "1"
-      ? recoveryCodeV1BodyBytes
-      : recoveryCodeV2BodyBytes
-  if (decoded.length !== bodyBytes + recoveryCodeChecksumBytes) {
+  const decoded = decodeBase32(parseEncodedBody(code))
+  if (decoded.length !== recoveryCodeBodyBytes + recoveryCodeChecksumBytes) {
     throw new Error("Recovery code has an invalid length.")
   }
-  const body = decoded.slice(0, bodyBytes)
-  const expectedChecksum = checksum(parsedBody.prefix, body)
-  const actualChecksum = decoded.slice(bodyBytes)
+  const body = decoded.slice(0, recoveryCodeBodyBytes)
+  const expectedChecksum = checksum(recoveryCodePrefix, body)
+  const actualChecksum = decoded.slice(recoveryCodeBodyBytes)
   if (
     !expectedChecksum.every((byte, index) => byte === actualChecksum[index])
   ) {
@@ -216,8 +168,6 @@ export const parseSliceWalletRecoveryCode = (
   if (scalar <= 0n || scalar >= secp256k1Order) {
     throw new Error("Recovery private key is invalid.")
   }
-  const basePayload = { account, chainId, recoveryPrivateKey } as const
-  if (parsedBody.version === "1") return basePayload
   const accountIndex = body[56]
   if (accountIndex === undefined || accountIndex > 31) {
     throw new Error("Recovery account index must be between 0 and 31.")
@@ -231,11 +181,13 @@ export const parseSliceWalletRecoveryCode = (
     throw new Error("Recovery credential public key is invalid.")
   }
   return {
-    ...basePayload,
+    account,
     accountIndex,
+    chainId,
     credentialIdHash,
-    credentialPublicKey
-  } satisfies SliceWalletRecoveryCodeV2Payload
+    credentialPublicKey,
+    recoveryPrivateKey
+  } satisfies SliceWalletRecoveryCodePayload
 }
 
 export const isSliceWalletRecoveryCodeShaped = (code: string) => {

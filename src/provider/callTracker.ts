@@ -132,8 +132,7 @@ export const createSliceWalletCallTracker = ({
           chainId,
           createdAt: Date.now(),
           id,
-          userOperationHash,
-          version: 1 as const
+          userOperationHash
         }
         memoryCalls.set(id, stored)
         writeStoredSliceWalletCall(storage, stored)

@@ -40,8 +40,7 @@ const payload = {
   metaFactory: "0xd703aaE79538628d27099B8c4f621bE4CCd142d5",
   recoveryPermissionId: "0x12345678",
   recoveryPrivateKey: `0x${"33".repeat(32)}`,
-  recoverySignerAddress: "0x3333333333333333333333333333333333333333",
-  runbookVersion: 1
+  recoverySignerAddress: "0x3333333333333333333333333333333333333333"
 } as const satisfies SliceWalletRecoveryBundlePayload
 
 describe("Slice Wallet recovery bundle", () => {
@@ -89,6 +88,6 @@ describe("Slice Wallet recovery bundle", () => {
         ...bundle,
         kdf: { ...bundle.kdf, memoryKiB: 1024 * 1024 }
       })
-    ).toThrow("require a newer version")
+    ).toThrow("unsupported")
   })
 })

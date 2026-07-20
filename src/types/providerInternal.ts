@@ -41,7 +41,6 @@ export type SliceWalletProviderConfig = {
 
 export type StoredGenericGrant = SliceWalletGenericGrant & {
   enableSignature: Hex
-  version: 1
 }
 
 export type StoredWalletCall = {
@@ -49,7 +48,6 @@ export type StoredWalletCall = {
   createdAt: number
   id: string
   userOperationHash: Hex
-  version: 1
 }
 
 export type ParsedSliceWalletSendCalls = {

@@ -607,8 +607,7 @@ const createSliceWalletChainRuntime = (
         permissionId: session.permissionId,
         policy: serializeWalletPolicyDescriptor(session.policy),
         publicKey: session.publicKey,
-        signerId: session.signerId,
-        version: 1
+        signerId: session.signerId
       }
       writeStoredSliceWalletGrant(storage, stored)
       return {
@@ -635,11 +634,7 @@ const createSliceWalletChainRuntime = (
   const getGrants = async (): Promise<readonly SliceWalletGenericGrant[]> => {
     const grant = await hydrateGrant()
     if (grant === null) return []
-    const {
-      enableSignature: _enableSignature,
-      version: _version,
-      ...publicGrant
-    } = grant.stored
+    const { enableSignature: _enableSignature, ...publicGrant } = grant.stored
     return [publicGrant]
   }
 

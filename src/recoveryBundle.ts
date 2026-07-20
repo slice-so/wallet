@@ -31,12 +31,8 @@ const toArrayBuffer = (value: Uint8Array) => {
 const recoveryAad = ({
   account,
   chainId,
-  kdf,
-  version
-}: Pick<
-  SliceWalletRecoveryBundleEnvelope,
-  "account" | "chainId" | "kdf" | "version"
->) =>
+  kdf
+}: Pick<SliceWalletRecoveryBundleEnvelope, "account" | "chainId" | "kdf">) =>
   textEncoder.encode(
     JSON.stringify({
       account: account.toLowerCase(),
@@ -47,8 +43,7 @@ const recoveryAad = ({
         name: kdf.name,
         parallelism: kdf.parallelism,
         salt: kdf.salt.toLowerCase()
-      },
-      version
+      }
     })
   )
 
@@ -155,9 +150,7 @@ export const parseSliceWalletRecoveryBundle = (
       ? (JSON.parse(value) as SliceWalletRecoveryJsonValue)
       : value
   const input = jsonRecord(parsed, "Recovery bundle")
-  exactKeys(input, ["account", "chainId", "cipher", "kdf", "version"])
-  if (input.version !== 1)
-    throw new Error("Unsupported recovery bundle version.")
+  exactKeys(input, ["account", "chainId", "cipher", "kdf"])
   const kdf = jsonRecord(input.kdf ?? null, "Recovery KDF")
   exactKeys(kdf, ["iterations", "memoryKiB", "name", "parallelism", "salt"])
   const cipher = jsonRecord(input.cipher ?? null, "Recovery cipher")
@@ -184,8 +177,7 @@ export const parseSliceWalletRecoveryBundle = (
       name: "argon2id",
       parallelism: integerField(kdf.parallelism, "Recovery KDF parallelism"),
       salt: hexField(kdf.salt, "Recovery KDF salt", 16)
-    },
-    version: 1
+    }
   }
   if (
     envelope.chainId <= 0 ||
@@ -198,7 +190,7 @@ export const parseSliceWalletRecoveryBundle = (
     envelope.kdf.memoryKiB !== sliceWalletRecoveryKdfParameters.memoryKiB ||
     envelope.kdf.parallelism !== sliceWalletRecoveryKdfParameters.parallelism
   ) {
-    throw new Error("Recovery bundle KDF parameters require a newer version.")
+    throw new Error("Recovery bundle KDF parameters are unsupported.")
   }
   return envelope
 }
@@ -216,12 +208,8 @@ const parsePayload = (value: SliceWalletRecoveryJsonValue) => {
     "metaFactory",
     "recoveryPermissionId",
     "recoveryPrivateKey",
-    "recoverySignerAddress",
-    "runbookVersion"
+    "recoverySignerAddress"
   ])
-  if (input.runbookVersion !== 1) {
-    throw new Error("Unsupported recovery runbook version.")
-  }
   const payload: SliceWalletRecoveryBundlePayload = {
     account: addressField(input.account, "Recovery payload account"),
     accountIndex: stringField(input.accountIndex, "Recovery account index"),
@@ -251,8 +239,7 @@ const parsePayload = (value: SliceWalletRecoveryJsonValue) => {
     recoverySignerAddress: addressField(
       input.recoverySignerAddress,
       "Recovery signer address"
-    ),
-    runbookVersion: 1
+    )
   }
   if (
     !/^\d+$/.test(payload.accountIndex) ||
@@ -282,8 +269,7 @@ export const encryptSliceWalletRecoveryBundle = async ({
   const base = {
     account: payload.account,
     chainId: payload.chainId,
-    kdf,
-    version: 1 as const
+    kdf
   }
   const key = await deriveAesKey({ argon2id, envelope: { kdf }, passphrase })
   const ciphertext = await crypto.subtle.encrypt(
