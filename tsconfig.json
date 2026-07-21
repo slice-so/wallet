@@ -1,6 +1,7 @@
 {
   "extends": "@slice/typescript-config/react-library.json",
   "compilerOptions": {
+    "customConditions": ["development"],
     "lib": ["ES2025", "DOM"],
     "outDir": "./dist/esm",
     "rootDir": "./src"
