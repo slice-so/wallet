@@ -21,6 +21,7 @@ type SliceWalletCeremonySurface = {
     targetOrigin: string,
     transfer: Transferable[]
   ) => void
+  reveal: () => void
   source: WindowProxy
 }
 
@@ -123,6 +124,7 @@ const createPopupSurface = ({
     },
     postMessage: (message, targetOrigin, transfer) =>
       popup.postMessage(message, targetOrigin, transfer),
+    reveal: () => undefined,
     source: popup
   }
 }
@@ -172,6 +174,7 @@ const createIframeSurface = ({
     border: "0",
     height: "100%",
     pointerEvents: "auto",
+    visibility: "hidden",
     width: "100%"
   })
   root.appendChild(iframe)
@@ -202,6 +205,9 @@ const createIframeSurface = ({
     },
     postMessage: (message, targetOrigin, transfer) =>
       source.postMessage(message, targetOrigin, transfer),
+    reveal: () => {
+      iframe.style.visibility = "visible"
+    },
     source
   }
 }
@@ -292,6 +298,7 @@ export const openSliceWalletCeremonyChannel = ({
         origin,
         [channel.port2]
       )
+      surface.reveal()
       resolve({ port: channel.port1, surface })
     }
     window.addEventListener("message", onReady)

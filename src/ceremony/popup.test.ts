@@ -22,6 +22,7 @@ const createSurface = () => {
       return closed
     },
     postMessage: mock(() => undefined),
+    reveal: mock(() => undefined),
     source
   }
 
@@ -173,7 +174,11 @@ describe("openSliceWalletCeremonyChannel", () => {
       setAttribute: mock(() => undefined),
       style: {}
     })
-    const appendChild = mock(() => dialog)
+    let iframeVisibilityAtMount: string | undefined
+    const appendChild = mock(() => {
+      iframeVisibilityAtMount = iframe.style.visibility
+      return dialog
+    })
     const document = Object.assign(Object.create(null) as Document, {
       body: { appendChild },
       createElement: ((tagName: string) =>
@@ -237,6 +242,8 @@ describe("openSliceWalletCeremonyChannel", () => {
       "publickey-credentials-create https://id.slice.so; publickey-credentials-get https://id.slice.so"
     )
     expect(iframe.src).toContain("/dialog/grant")
+    expect(iframeVisibilityAtMount).toBe("hidden")
+    expect(iframe.style.visibility).toBe("visible")
     expect(dialog.style.pointerEvents).toBe("auto")
     expect(iframe.style.pointerEvents).toBe("auto")
     expect(dialog.style.zIndex).toBe("2147483647")
