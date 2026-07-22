@@ -198,6 +198,18 @@ export const readStoredPendingReplacementStrict = async (
 export const writeStoredPendingReplacement = async (
   replacement: StoredSliceWalletPendingReplacement
 ) => {
+  if (typeof indexedDB === "undefined") return
+  await withStore("readwrite", (store) =>
+    store.put(
+      replacement,
+      pendingKey(replacement.session.accountAddress, replacement.session.kind)
+    )
+  )
+}
+
+export const writeStoredPendingReplacementStrict = async (
+  replacement: StoredSliceWalletPendingReplacement
+) => {
   if (typeof indexedDB === "undefined") {
     throw new Error("Slice Wallet session storage is unavailable.")
   }

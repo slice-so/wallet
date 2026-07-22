@@ -1,9 +1,14 @@
 import { beforeEach, describe, expect, it } from "bun:test"
 import { IDBFactory } from "fake-indexeddb"
-import type { StoredSliceWalletExecutionSession } from "../types/react"
+import type {
+  StoredSliceWalletExecutionSession,
+  StoredSliceWalletPendingReplacement
+} from "../types/react"
 import {
   readStoredExecutionSession,
-  writeStoredExecutionSession
+  writeStoredExecutionSession,
+  writeStoredPendingReplacement,
+  writeStoredPendingReplacementStrict
 } from "./executionKeyStore"
 
 const accountAddress = "0x1111111111111111111111111111111111111111"
@@ -17,6 +22,20 @@ const session = {
   permissionId: "0x5678",
   signerAddress: "0x3333333333333333333333333333333333333333"
 } as const satisfies StoredSliceWalletExecutionSession
+
+const pendingReplacement = {
+  phase: "registering",
+  previousSessions: [],
+  session: {
+    accountAddress,
+    coSignerAddress: "0x2222222222222222222222222222222222222222",
+    enableSignature: "0x1234",
+    expiresAt: "2099-01-01T00:00:00.000Z",
+    kind: "checkout",
+    permissionId: "0x5678",
+    signerAddress: "0x3333333333333333333333333333333333333333"
+  }
+} as const satisfies StoredSliceWalletPendingReplacement
 
 const createDatabaseAtVersion = (version: number) =>
   new Promise<void>((resolve, reject) => {
@@ -47,5 +66,19 @@ describe("execution key storage", () => {
     expect(
       await readStoredExecutionSession(accountAddress, "checkout")
     ).toEqual(session)
+  })
+
+  it("keeps checkout persistence optional while management can require it", async () => {
+    Object.defineProperty(globalThis, "indexedDB", {
+      configurable: true,
+      value: undefined
+    })
+
+    await expect(
+      writeStoredPendingReplacement(pendingReplacement)
+    ).resolves.toBeUndefined()
+    await expect(
+      writeStoredPendingReplacementStrict(pendingReplacement)
+    ).rejects.toThrow("Slice Wallet session storage is unavailable.")
   })
 })

@@ -30,7 +30,7 @@ import {
   clearStoredPendingReplacement,
   clearStoredPendingReplacementStrict,
   writeStoredExecutionSessionStrict,
-  writeStoredPendingReplacement
+  writeStoredPendingReplacementStrict
 } from "./executionKeyStore"
 import { SliceWalletEnablementError } from "./managementLifecycle"
 import {
@@ -40,6 +40,7 @@ import {
   managementFrameMatchesStored,
   managementSessionTargetsMatch,
   parseManagementFrameSession,
+  rejectRevokedManagementPermission,
   runManagementCommitPhase,
   runManagementRegistrationPhase
 } from "./managementOperations"
@@ -225,7 +226,9 @@ export const useSliceWalletManagementEnablement = ({
                   kernelAccount.address,
                   "store_management"
                 )
-                if (action !== "complete-old-then-continue") return
+                if (action !== "complete-old-then-continue") {
+                  rejectRevokedManagementPermission(notifications?.error)
+                }
                 replacementRevoked = true
               }
             }
@@ -325,7 +328,7 @@ export const useSliceWalletManagementEnablement = ({
               window
             })
             control.assertCurrent()
-            await writeStoredPendingReplacement({
+            await writeStoredPendingReplacementStrict({
               phase: "registering",
               previousSessions: [],
               session: {
@@ -352,7 +355,7 @@ export const useSliceWalletManagementEnablement = ({
                 })
               },
               persistRegistered: async (result) => {
-                await writeStoredPendingReplacement(result.replacement)
+                await writeStoredPendingReplacementStrict(result.replacement)
                 registeredMetadataPersisted = true
               },
               register: async () => {
@@ -454,7 +457,12 @@ export const useSliceWalletManagementEnablement = ({
                   "store_management"
                 )
               ])
-              throw caught
+              throw new SliceWalletEnablementError(
+                caught instanceof Error
+                  ? caught.message
+                  : "Unable to enable 1-tap management.",
+                "hydrate"
+              )
             }
             if (caught instanceof SliceWalletEnablementError) throw caught
             if (registrationCompleted && registeredMetadataPersisted) {

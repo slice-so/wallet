@@ -2,29 +2,14 @@ import { describe, expect, test } from "bun:test"
 import { SliceWalletEnablementError } from "./managementLifecycle"
 import {
   classifyManagementPendingAction,
-  getEnablementRecoveryMode,
   getManagementDisablePreflight,
   getManagementHydrationGuard,
+  rejectRevokedManagementPermission,
   runManagementCommitPhase,
   runManagementRegistrationPhase
 } from "./managementOperations"
 
 describe("management operation policies", () => {
-  test("selects recovery based on durable bookkeeping", () => {
-    expect(
-      getEnablementRecoveryMode({
-        bookkeepingComplete: true,
-        pendingPhase: "registered"
-      })
-    ).toBe("hydrate")
-    expect(
-      getEnablementRecoveryMode({
-        bookkeepingComplete: false,
-        pendingPhase: "registered"
-      })
-    ).toBe("preserve-pending")
-  })
-
   test("keeps registering ambiguous and validates registered targets", () => {
     expect(
       classifyManagementPendingAction({
@@ -121,6 +106,24 @@ describe("management operation policies", () => {
     expect(
       getManagementHydrationGuard({ pendingPhase: null, readable: true })
     ).toBe("hydrate")
+  })
+
+  test("reports revoked resume state and rejects with hydrate recovery", () => {
+    let notified = ""
+    try {
+      rejectRevokedManagementPermission((message) => {
+        notified = message
+      })
+      throw new Error("Expected revoked permission rejection.")
+    } catch (caught) {
+      expect(caught).toBeInstanceOf(SliceWalletEnablementError)
+      if (!(caught instanceof SliceWalletEnablementError)) throw caught
+      expect(caught.message).toBe(
+        "This management permission was revoked from Slice ID. Enable it again to continue."
+      )
+      expect(caught.recoveryMode).toBe("hydrate")
+      expect(notified).toBe(caught.message)
+    }
   })
 })
 

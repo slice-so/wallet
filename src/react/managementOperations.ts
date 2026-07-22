@@ -6,7 +6,6 @@ import type {
   SliceWalletSignerFrameClient
 } from "../types"
 import type {
-  SliceWalletManagementRecoveryMode,
   StoredSliceWalletExecutionSession,
   StoredSliceWalletPendingReplacement,
   StoredSliceWalletRegisteredReplacement
@@ -100,14 +99,14 @@ export const isRegisteredManagementReplacement = (
   replacement?.phase === "registered" &&
   replacement.session.kind === "store_management"
 
-export const getEnablementRecoveryMode = ({
-  bookkeepingComplete,
-  pendingPhase
-}: {
-  bookkeepingComplete: boolean
-  pendingPhase: "registered" | "registering" | null
-}): SliceWalletManagementRecoveryMode =>
-  bookkeepingComplete || pendingPhase === null ? "hydrate" : "preserve-pending"
+export const rejectRevokedManagementPermission = (
+  notify?: (message: string) => void
+): never => {
+  const message =
+    "This management permission was revoked from Slice ID. Enable it again to continue."
+  notify?.(message)
+  throw new SliceWalletEnablementError(message, "hydrate")
+}
 
 type ManagementPendingAction =
   | "ambiguous"
