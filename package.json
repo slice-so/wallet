@@ -140,7 +140,7 @@
     "generate:commerce": "bun --conditions=development scripts/generate-commerce-facts.ts",
     "generate:commerce:check": "bun --conditions=development scripts/generate-commerce-facts.ts --check",
     "test": "bun --conditions=development test",
-    "test:e2e:two-chain": "../../scripts/run-with-test-chain-lock.sh bash ../../scripts/run-wallet-two-chain-e2e.sh",
+    "test:e2e:two-chain": "bash ../../scripts/run-wallet-two-chain-e2e.sh",
     "verify:chains": "bun scripts/verify-chain-deployments.ts",
     "type-check": "bun run generate:chains:check && bun run generate:commerce:check && tsc -p tsconfig.json --noEmit",
     "format": "biome format --write",
