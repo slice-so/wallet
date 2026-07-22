@@ -125,6 +125,25 @@ const createRuntimeFixture = (
 }
 
 describe("multichain provider runtime routing", () => {
+  test("forwards the configured ceremony surface to account connection", async () => {
+    const stopped = new Error("stop after capturing account ceremony input")
+    const connectAccount = mock(async () => {
+      throw stopped
+    })
+    const runtime = createSliceWalletProviderRuntime(
+      { ...config, ceremonyMode: "auto" },
+      { connectAccount }
+    )
+
+    await expect(runtime.connect()).rejects.toBe(stopped)
+    expect(connectAccount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ceremonyMode: "auto",
+        document: config.document
+      })
+    )
+  })
+
   test("routes calls to an inactive configured chain", async () => {
     const fixture = createRuntimeFixture()
     const runtime = createSliceWalletProviderRuntime(config, fixture)

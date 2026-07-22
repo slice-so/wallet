@@ -132,7 +132,10 @@ const toFrameSession = (grant: StoredGenericGrant): SliceWalletFrameSession => {
 }
 
 const createSliceWalletChainRuntime = (
-  config: SliceWalletChainRuntimeConfig
+  config: SliceWalletChainRuntimeConfig,
+  dependencies: {
+    connectAccount?: typeof connectSliceWalletAccount
+  } = {}
 ) => {
   if (config.requireAdmittedChain === true) {
     getSliceWalletChainManifest(config.chain.id)
@@ -320,9 +323,13 @@ const createSliceWalletChainRuntime = (
 
   const chooseAccount = async (session?: SliceWalletSessionConnectInput) => {
     const generation = config.getAccountGeneration()
-    const connected = await connectSliceWalletAccount({
+    const connected = await (
+      dependencies.connectAccount ?? connectSliceWalletAccount
+    )({
       ceremonyBroker: config.ceremonyBroker,
+      ceremonyMode: config.ceremonyMode,
       chainId: config.chain.id,
+      document: browserDocument,
       fetch: fetchImpl,
       idOrigin,
       ...(session === undefined ? {} : { session }),
@@ -378,7 +385,7 @@ const createSliceWalletChainRuntime = (
       ceremonyBroker: config.ceremonyBroker,
       ceremonyMode: config.ceremonyMode,
       chainId: config.chain.id,
-      document: config.document,
+      document: browserDocument,
       fetch: fetchImpl,
       idOrigin,
       session: {
@@ -727,11 +734,16 @@ type SliceWalletChainRuntime = ReturnType<typeof createSliceWalletChainRuntime>
 export const createSliceWalletProviderRuntime = (
   config: SliceWalletProviderConfig,
   dependencies: {
+    connectAccount?: typeof connectSliceWalletAccount
     createChainRuntime?: typeof createSliceWalletChainRuntime
   } = {}
 ) => {
   const createChainRuntime =
-    dependencies.createChainRuntime ?? createSliceWalletChainRuntime
+    dependencies.createChainRuntime ??
+    ((chainConfig: SliceWalletChainRuntimeConfig) =>
+      createSliceWalletChainRuntime(chainConfig, {
+        connectAccount: dependencies.connectAccount
+      }))
   const ceremonyBroker = createSliceWalletCeremonyBroker()
   let accountGeneration = 0
   const chainConfigs = new Map(
