@@ -5,7 +5,6 @@ import type { Chain } from "viem"
 import {
   createKernelPasskeySliceAccountClient,
   createSliceKernelPasskeyTransport,
-  createSliceStoreManagementPolicyDescriptor,
   getSliceBundlerApiUrl,
   type SliceWalletCheckoutExecutionDelegationSnapshot
 } from "../execution"
@@ -34,6 +33,7 @@ import {
   readStoredExecutionSession,
   readStoredPendingReplacementStrict
 } from "./executionKeyStore"
+import { hydrateStoredManagementExecutionSession } from "./managementHydration"
 import { getManagementHydrationGuard } from "./managementOperations"
 
 type RootAccount = Awaited<
@@ -342,112 +342,27 @@ export const useSliceWalletExecutionHydration = ({
         setManagementExecutionSession(null)
         return
       }
-      try {
-        const stored = await readStoredExecutionSession(
-          kernelAccount.address,
-          "store_management"
-        )
-        if (stored?.kind !== "store_management" || !storeManagement) return
-        const frameClient = await getFrameClient()
-        const [frameResult, { delegation }] = await Promise.all([
-          frameClient.request({
-            method: "getSession",
-            params: {
-              account: kernelAccount.address,
-              chainId: walletChain.id,
-              grantKind: "management"
-            }
-          }),
-          storeManagement.fetchDelegation()
-        ])
-        if (
-          frameResult === null ||
-          typeof frameResult !== "object" ||
-          delegation === null ||
-          delegation.signerScheme !== "p256" ||
-          delegation.permissionId === null ||
-          delegation.signerPublicKey === null ||
-          delegation.walletPolicy === null ||
-          delegation.slicerId !== stored.slicerId
-        ) {
-          control.assertCurrent()
-          await clearStoredExecutionSession(
-            kernelAccount.address,
-            "store_management"
-          )
-          await frameClient
-            .request({
-              method: "clearSession",
-              params: {
-                account: kernelAccount.address,
-                chainId: walletChain.id,
-                grantKind: "management"
-              }
-            })
-            .catch(() => undefined)
-          return
-        }
-        const session = parseSliceWalletFrameSession(
-          frameResult as SliceWalletProtocolValue
-        )
-        const apiPolicy = parseSerializedWalletPolicyDescriptor(
-          delegation.walletPolicy
-        )
-        const expectedPolicy = createSliceStoreManagementPolicyDescriptor({
-          account: kernelAccount.address,
-          chainId: walletChain.id,
-          expiresAt: session.expiresAt,
-          slicerAddress: stored.slicerAddress,
-          slicerId: stored.slicerId,
-          startsAt: session.policy.validAfter
-        })
-        if (
-          getWalletPolicyHash(apiPolicy) !==
-            getWalletPolicyHash(session.policy) ||
-          getWalletPolicyHash(expectedPolicy) !==
-            getWalletPolicyHash(session.policy) ||
-          delegation.permissionId.toLowerCase() !==
-            session.permissionId.toLowerCase() ||
-          delegation.signerAddress.toLowerCase() !==
-            session.signerId.toLowerCase() ||
-          delegation.signerPublicKey.toLowerCase() !==
-            session.publicKey.toLowerCase() ||
-          stored.permissionId.toLowerCase() !==
-            session.permissionId.toLowerCase() ||
-          stored.signerAddress.toLowerCase() !== session.signerId.toLowerCase()
-        ) {
-          control.assertCurrent()
-          await clearStoredExecutionSession(
-            kernelAccount.address,
-            "store_management"
-          )
-          await frameClient
-            .request({
-              method: "clearSession",
-              params: {
-                account: kernelAccount.address,
-                chainId: walletChain.id,
-                grantKind: "management"
-              }
-            })
-            .catch(() => undefined)
-          return
-        }
-        await activateManagementExecutionSession({
-          assertCurrent: control.assertCurrent,
-          credential,
-          kernelAccount,
-          session,
-          stored
-        })
-      } catch {
-        try {
-          control.assertCurrent()
-          setManagementExecutionSession(null)
-        } catch {
-          // A newer account or management operation owns the current view.
-        }
+      if (!storeManagement) {
+        setManagementExecutionSession(null)
+        control.markError("transport-unavailable")
+        return
       }
+      await hydrateStoredManagementExecutionSession({
+        account: kernelAccount.address,
+        activate: ({ session, stored }) =>
+          activateManagementExecutionSession({
+            assertCurrent: control.assertCurrent,
+            credential,
+            kernelAccount,
+            session,
+            stored
+          }),
+        chainId: walletChain.id,
+        control,
+        fetchDelegation: storeManagement.fetchDelegation,
+        getFrameClient,
+        setSessionNull: () => setManagementExecutionSession(null)
+      })
     },
     [
       activateManagementExecutionSession,

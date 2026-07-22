@@ -150,6 +150,68 @@ describe("management lifecycle", () => {
     expect(lifecycle.getSnapshot()).toEqual({ error: null, status: "idle" })
   })
 
+  test("settles markNothingToHydrate directly for the active account", () => {
+    const statuses: string[] = []
+    const lifecycle = createManagementLifecycle({
+      chainId: 8453,
+      hydrate: async () => undefined,
+      onIdentityChange: () => undefined
+    })
+    lifecycle.setAccount(account)
+    lifecycle.subscribe(() => statuses.push(lifecycle.getSnapshot().status))
+
+    lifecycle.markNothingToHydrate(account)
+
+    expect(lifecycle.getSnapshot()).toEqual({ error: null, status: "settled" })
+    expect(statuses).toEqual(["pending", "settled"])
+  })
+
+  test("serializes disable work as a management mutation", async () => {
+    const pause = deferred()
+    const events: string[] = []
+    const lifecycle = createManagementLifecycle({
+      chainId: 8453,
+      hydrate: async () => undefined,
+      onIdentityChange: () => undefined
+    })
+    lifecycle.setAccount(account)
+    const hydration = lifecycle.runHydration(account, async () => {
+      events.push("hydrate")
+      await pause.promise
+    })
+    const disable = lifecycle.runMutation({
+      account,
+      task: async () => events.push("disable")
+    })
+
+    await Promise.resolve()
+    expect(events).toEqual(["hydrate"])
+    pause.resolve()
+    await Promise.all([hydration, disable])
+    expect(events).toEqual(["hydrate", "disable"])
+  })
+
+  test("keeps one lifecycle identity for equivalent account updates", async () => {
+    const stableAccount = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd" as const
+    let identityChanges = 0
+    const lifecycle = createManagementLifecycle({
+      chainId: 8453,
+      hydrate: async () => undefined,
+      onIdentityChange: () => {
+        identityChanges += 1
+      }
+    })
+    const sourceId = lifecycle.sourceId
+
+    lifecycle.setAccount(stableAccount)
+    lifecycle.setAccount(getAddress(stableAccount))
+    await lifecycle.runHydration(stableAccount)
+
+    expect(identityChanges).toBe(1)
+    expect(lifecycle.sourceId).toBe(sourceId)
+    expect(lifecycle.getSnapshot().status).toBe("settled")
+  })
+
   test("external same-account mutations invalidate and rehydrate", async () => {
     let hydrations = 0
     let identityChanges = 0

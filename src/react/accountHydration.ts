@@ -316,7 +316,14 @@ export const useSliceWalletAccountHydration = ({
         setSliceAccountClient(null)
         setStatus("idle")
         setRecovery(null)
-        managementLifecycle.markNothingToHydrate(connectedAccount)
+        if (managementEnabled) {
+          managementLifecycle.markHydrationError(
+            connectedAccount,
+            "transport-unavailable"
+          )
+        } else {
+          managementLifecycle.markNothingToHydrate(connectedAccount)
+        }
       }
     })()
     return () => {

@@ -1,5 +1,6 @@
 import { type Address, isAddressEqual } from "viem"
 import type {
+  SliceWalletManagementHydrationError,
   SliceWalletManagementHydrationSnapshot,
   SliceWalletManagementLifecycle,
   SliceWalletManagementLifecycleControl,
@@ -119,32 +120,30 @@ export const createManagementLifecycle = ({
   const createControl = (
     target: Address,
     epoch: number
-  ): SliceWalletManagementLifecycleControl => ({
-    assertCurrent: () => {
-      if (
-        epoch !== identityEpoch ||
-        account === null ||
-        !isAddressEqual(account, target)
-      ) {
-        throw new SliceWalletEnablementError(
-          "The active Slice wallet changed. Try again with the current wallet.",
-          "hydrate"
-        )
-      }
-    },
-    markStorageUnavailable: () => {
-      if (
-        epoch === identityEpoch &&
-        account !== null &&
-        isAddressEqual(account, target)
-      ) {
-        publishSnapshot({
-          error: "storage-unavailable",
-          status: snapshot.status
-        })
+  ): SliceWalletManagementLifecycleControl => {
+    const isCurrent = () =>
+      epoch === identityEpoch &&
+      account !== null &&
+      isAddressEqual(account, target)
+    const markError = (error: SliceWalletManagementHydrationError) => {
+      if (isCurrent()) {
+        publishSnapshot({ error, status: snapshot.status })
       }
     }
-  })
+
+    return {
+      assertCurrent: () => {
+        if (!isCurrent()) {
+          throw new SliceWalletEnablementError(
+            "The active Slice wallet changed. Try again with the current wallet.",
+            "hydrate"
+          )
+        }
+      },
+      markError,
+      markStorageUnavailable: () => markError("storage-unavailable")
+    }
+  }
 
   const runHydration = (
     target: Address,
@@ -197,6 +196,13 @@ export const createManagementLifecycle = ({
         return task(control)
       })
       outcome = "success"
+      if (
+        epoch === identityEpoch &&
+        account !== null &&
+        isAddressEqual(account, target)
+      ) {
+        publishSnapshot({ error: null, status: snapshot.status })
+      }
       return result
     } catch (caught) {
       if (
@@ -218,11 +224,14 @@ export const createManagementLifecycle = ({
     }
   }
 
-  const markNothingToHydrate = (target: Address) => {
+  const settleWithoutHydration = (
+    target: Address,
+    error: SliceWalletManagementHydrationError | null
+  ) => {
     const epoch = identityEpoch
     const requestedMutationSeq = mutationSeq
     const requestedHydrationSeq = ++hydrationSeq
-    publishSnapshot({ error: null, status: "pending" })
+    publishSnapshot({ error, status: "pending" })
     if (
       epoch === identityEpoch &&
       requestedMutationSeq === mutationSeq &&
@@ -233,6 +242,14 @@ export const createManagementLifecycle = ({
     }
     updateSettlement()
   }
+
+  const markNothingToHydrate = (target: Address) =>
+    settleWithoutHydration(target, null)
+
+  const markHydrationError = (
+    target: Address,
+    error: SliceWalletManagementHydrationError
+  ) => settleWithoutHydration(target, error)
 
   const setAccount = (next: Address | null) => {
     if (addressesEqual(account, next)) return
@@ -261,6 +278,7 @@ export const createManagementLifecycle = ({
     getAccount: () => account,
     getSnapshot: () => snapshot,
     handleExternalMutation,
+    markHydrationError,
     markNothingToHydrate,
     retryHydration,
     runHydration,

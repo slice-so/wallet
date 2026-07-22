@@ -35,6 +35,7 @@ import {
 import { SliceWalletEnablementError } from "./managementLifecycle"
 import {
   classifyManagementPendingAction,
+  getEnablementRecoveryMode,
   isRegisteredManagementReplacement,
   loadManagementReplacementState,
   managementFrameMatchesStored,
@@ -461,19 +462,28 @@ export const useSliceWalletManagementEnablement = ({
                 caught instanceof Error
                   ? caught.message
                   : "Unable to enable 1-tap management.",
-                "hydrate"
+                getEnablementRecoveryMode({
+                  bookkeepingComplete: false,
+                  pendingPhase: null
+                })
               )
             }
             if (caught instanceof SliceWalletEnablementError) throw caught
             if (registrationCompleted && registeredMetadataPersisted) {
               throw new SliceWalletEnablementError(
                 "The registered management permission is pending. Retry to continue reconciliation.",
-                "preserve-pending"
+                getEnablementRecoveryMode({
+                  bookkeepingComplete: false,
+                  pendingPhase: "registered"
+                })
               )
             }
             throw new SliceWalletEnablementError(
               "The management registration outcome must be recovered from Slice ID before retrying.",
-              "preserve-pending"
+              getEnablementRecoveryMode({
+                bookkeepingComplete: false,
+                pendingPhase: "registering"
+              })
             )
           }
           notifications?.success?.("1-tap management enabled")

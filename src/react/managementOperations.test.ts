@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { SliceWalletEnablementError } from "./managementLifecycle"
 import {
   classifyManagementPendingAction,
+  getEnablementRecoveryMode,
   getManagementDisablePreflight,
   getManagementHydrationGuard,
   rejectRevokedManagementPermission,
@@ -10,6 +11,33 @@ import {
 } from "./managementOperations"
 
 describe("management operation policies", () => {
+  test("selects recovery from pending and bookkeeping state", () => {
+    expect(
+      getEnablementRecoveryMode({
+        bookkeepingComplete: false,
+        pendingPhase: null
+      })
+    ).toBe("hydrate")
+    expect(
+      getEnablementRecoveryMode({
+        bookkeepingComplete: false,
+        pendingPhase: "registering"
+      })
+    ).toBe("preserve-pending")
+    expect(
+      getEnablementRecoveryMode({
+        bookkeepingComplete: false,
+        pendingPhase: "registered"
+      })
+    ).toBe("preserve-pending")
+    expect(
+      getEnablementRecoveryMode({
+        bookkeepingComplete: true,
+        pendingPhase: "registered"
+      })
+    ).toBe("hydrate")
+  })
+
   test("keeps registering ambiguous and validates registered targets", () => {
     expect(
       classifyManagementPendingAction({

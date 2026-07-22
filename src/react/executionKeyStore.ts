@@ -40,11 +40,16 @@ const withStore = async <T>(
   }
 }
 
-export const readStoredExecutionSession = async (
+export const readStoredExecutionSessionResult = async (
   accountAddress: Address,
   kind: StoredSliceWalletExecutionSession["kind"]
-): Promise<StoredSliceWalletExecutionSession | null> => {
-  if (typeof indexedDB === "undefined") return null
+): Promise<
+  | { status: "found"; value: StoredSliceWalletExecutionSession }
+  | { status: "invalid" }
+  | { status: "missing" }
+  | { status: "unavailable" }
+> => {
+  if (typeof indexedDB === "undefined") return { status: "unavailable" }
 
   try {
     const stored = await withStore("readonly", (store) =>
@@ -53,7 +58,7 @@ export const readStoredExecutionSession = async (
     const session = stored as
       | (StoredSliceWalletExecutionSession & { privateKey?: string })
       | null
-    if (!session) return null
+    if (!session) return { status: "missing" }
     if (
       session.privateKey !== undefined ||
       session.kind !== kind ||
@@ -68,17 +73,25 @@ export const readStoredExecutionSession = async (
           session.slicerId <= 0))
     ) {
       await clearStoredExecutionSession(accountAddress, kind)
-      return null
+      return { status: "invalid" }
     }
     if (new Date(session.expiresAt) <= new Date()) {
       await clearStoredExecutionSession(accountAddress, kind)
-      return null
+      return { status: "invalid" }
     }
 
-    return session
+    return { status: "found", value: session }
   } catch {
-    return null
+    return { status: "unavailable" }
   }
+}
+
+export const readStoredExecutionSession = async (
+  accountAddress: Address,
+  kind: StoredSliceWalletExecutionSession["kind"]
+): Promise<StoredSliceWalletExecutionSession | null> => {
+  const result = await readStoredExecutionSessionResult(accountAddress, kind)
+  return result.status === "found" ? result.value : null
 }
 
 export const writeStoredExecutionSession = async (

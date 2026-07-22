@@ -19,15 +19,21 @@ export type SliceWalletStatus = "error" | "idle" | "loading" | "ready"
 export type SliceWalletPendingAction = "create" | "login" | null
 export type SliceWalletRecoveryPendingAction = "cancel" | null
 
+export type SliceWalletManagementHydrationError =
+  | "session-invalid"
+  | "storage-unavailable"
+  | "transport-unavailable"
+
 export type SliceWalletManagementHydrationSnapshot = {
   status: "idle" | "pending" | "settled"
-  error: "storage-unavailable" | null
+  error: SliceWalletManagementHydrationError | null
 }
 
 export type SliceWalletManagementRecoveryMode = "hydrate" | "preserve-pending"
 
 export type SliceWalletManagementLifecycleControl = {
   assertCurrent: () => void
+  markError: (error: SliceWalletManagementHydrationError) => void
   markStorageUnavailable: () => void
 }
 
@@ -42,6 +48,10 @@ export type SliceWalletManagementLifecycle = {
   getAccount: () => Address | null
   getSnapshot: () => SliceWalletManagementHydrationSnapshot
   handleExternalMutation: (account: Address) => void
+  markHydrationError: (
+    account: Address,
+    error: SliceWalletManagementHydrationError
+  ) => void
   markNothingToHydrate: (account: Address) => void
   retryHydration: (account: Address) => Promise<void>
   runHydration: (

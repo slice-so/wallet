@@ -143,6 +143,17 @@ type ManagementDisablePreflight =
   | "state-changed"
   | "storage-unavailable"
 
+export const getEnablementRecoveryMode = ({
+  bookkeepingComplete,
+  pendingPhase
+}: {
+  bookkeepingComplete: boolean
+  pendingPhase: "registered" | "registering" | null
+}) =>
+  bookkeepingComplete || pendingPhase === null
+    ? ("hydrate" as const)
+    : ("preserve-pending" as const)
+
 export const getManagementHydrationGuard = ({
   pendingPhase,
   readable
