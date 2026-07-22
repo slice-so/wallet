@@ -15,6 +15,7 @@ import type {
 } from "../types"
 import type {
   SliceWalletCredentialRecord,
+  SliceWalletManagementLifecycle,
   SliceWalletNotifications,
   SliceWalletPendingAction
 } from "../types/react"
@@ -92,7 +93,7 @@ export const useSliceWalletCeremonyConnection = (
 
 export const useSliceWalletCeremonyActions = ({
   activeWalletRef,
-  hydrateManagementExecutionSession,
+  managementLifecycle,
   managementEnabled,
   notifications,
   sessionIntegration,
@@ -107,10 +108,7 @@ export const useSliceWalletCeremonyActions = ({
       kernelAccount: RootAccount
     } | null
   }
-  hydrateManagementExecutionSession: (wallet: {
-    credential: SliceWalletCredentialRecord
-    kernelAccount: RootAccount
-  }) => Promise<void>
+  managementLifecycle: SliceWalletManagementLifecycle
   managementEnabled: boolean
   notifications?: SliceWalletNotifications
   sessionIntegration: ReturnType<typeof useSliceWalletSessionIntegration>
@@ -178,8 +176,11 @@ export const useSliceWalletCeremonyActions = ({
     try {
       await (await getSliceProvider()).requestSession()
       await sessionIntegration.refresh()
-      if (managementEnabled)
-        await hydrateManagementExecutionSession(activeWallet)
+      if (managementEnabled) {
+        await managementLifecycle.retryHydration(
+          activeWallet.kernelAccount.address
+        )
+      }
     } catch (caughtError) {
       const message =
         caughtError instanceof Error
@@ -192,8 +193,8 @@ export const useSliceWalletCeremonyActions = ({
   }, [
     activeWalletRef,
     getSliceProvider,
-    hydrateManagementExecutionSession,
     managementEnabled,
+    managementLifecycle,
     notifications,
     sessionIntegration,
     setError

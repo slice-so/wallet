@@ -7,9 +7,16 @@ import {
   useEffect,
   useMemo,
   useRef,
-  useState
+  useState,
+  useSyncExternalStore
 } from "react"
-import { createPublicClient, http } from "viem"
+import {
+  type Address,
+  createPublicClient,
+  http,
+  isAddress,
+  isAddressEqual
+} from "viem"
 import { anvil } from "viem/chains"
 import { useConnection } from "wagmi"
 import {
@@ -24,6 +31,9 @@ import type {
   SliceWalletCredentialRecord,
   SliceWalletExecutionSession,
   SliceWalletManagementExecutionSession,
+  SliceWalletManagementLifecycle,
+  SliceWalletManagementLifecycleControl,
+  SliceWalletManagementMutationBroadcast,
   SliceWalletPendingAction,
   SliceWalletProviderProps,
   SliceWalletRecoveryPendingAction,
@@ -41,6 +51,11 @@ import { useSliceWalletCheckoutEnablement } from "./executionCheckout"
 import { useSliceWalletExecutionHydration } from "./executionHydration"
 import { useSliceWalletExecutionLifecycle } from "./executionLifecycle"
 import { useSliceWalletManagementEnablement } from "./executionManagement"
+import {
+  createManagementLifecycle,
+  IDLE_MANAGEMENT_HYDRATION_SNAPSHOT,
+  shouldHandleManagementMutation
+} from "./managementLifecycle"
 import { useSliceWalletSessionIntegration } from "./sessionIntegration"
 
 export { defaultExecutionAllowanceUsdMicros } from "./executionCheckout"
@@ -141,6 +156,33 @@ export function SliceWalletProvider({
       ReturnType<typeof createSliceWalletCeremonyKernelAccount>
     >
   } | null>(null)
+  const managementHydrationTaskRef = useRef<
+    (
+      account: Address,
+      control: SliceWalletManagementLifecycleControl
+    ) => Promise<void>
+  >(async () => undefined)
+  const broadcastManagementMutationRef = useRef<
+    ((message: SliceWalletManagementMutationBroadcast) => void) | null
+  >(null)
+  const managementLifecycleRef = useRef<SliceWalletManagementLifecycle | null>(
+    null
+  )
+  if (managementLifecycleRef.current === null) {
+    managementLifecycleRef.current = createManagementLifecycle({
+      chainId: walletChain.id,
+      hydrate: (account, control) =>
+        managementHydrationTaskRef.current(account, control),
+      onIdentityChange: () => setManagementExecutionSession(null),
+      onMutation: (message) => broadcastManagementMutationRef.current?.(message)
+    })
+  }
+  const managementLifecycle = managementLifecycleRef.current
+  const managementHydration = useSyncExternalStore(
+    managementLifecycle.subscribe,
+    managementLifecycle.getSnapshot,
+    () => IDLE_MANAGEMENT_HYDRATION_SNAPSHOT
+  )
 
   const {
     createReplacementFinalizationProof,
@@ -167,6 +209,16 @@ export function SliceWalletProvider({
     storeManagement,
     walletChain
   })
+  managementHydrationTaskRef.current = async (account, control) => {
+    const activeWallet = activeWalletRef.current
+    if (
+      activeWallet === null ||
+      !isAddressEqual(activeWallet.kernelAccount.address, account)
+    ) {
+      return
+    }
+    await hydrateManagementExecutionSession({ ...activeWallet, control })
+  }
 
   const { refreshRecovery } = useSliceWalletAccountHydration({
     activeWalletRef,
@@ -177,6 +229,7 @@ export function SliceWalletProvider({
     fetchWalletRecovery,
     hydrateExecutionSession,
     hydrateManagementExecutionSession,
+    managementLifecycle,
     managementEnabled: storeManagement !== undefined,
     normalizedIdOrigin,
     publicClient,
@@ -190,7 +243,7 @@ export function SliceWalletProvider({
   const { createWallet, loginWallet, signInWallet, switchAccount } =
     useSliceWalletCeremonyActions({
       activeWalletRef,
-      hydrateManagementExecutionSession,
+      managementLifecycle,
       managementEnabled: storeManagement !== undefined,
       notifications,
       sessionIntegration,
@@ -222,10 +275,53 @@ export function SliceWalletProvider({
   }, [wagmiConfig.connectors])
 
   useEffect(() => {
+    managementLifecycle.setAccount(connectedSliceAccount)
     if (connectedSliceAccount !== null) return
     setExecutionSession(null)
-    setManagementExecutionSession(null)
-  }, [connectedSliceAccount])
+  }, [connectedSliceAccount, managementLifecycle])
+
+  useEffect(() => {
+    if (
+      storeManagement === undefined ||
+      typeof BroadcastChannel === "undefined"
+    ) {
+      broadcastManagementMutationRef.current = null
+      return
+    }
+    const channel = new BroadcastChannel("slice-wallet-management")
+    broadcastManagementMutationRef.current = (message) =>
+      channel.postMessage(message)
+    const handleMessage = (
+      event: MessageEvent<SliceWalletManagementMutationBroadcast>
+    ) => {
+      const message = event.data
+      const activeAccount = managementLifecycle.getAccount()
+      if (
+        message === null ||
+        typeof message !== "object" ||
+        typeof message.sourceId !== "string" ||
+        typeof message.chainId !== "number" ||
+        (message.outcome !== "error" && message.outcome !== "success") ||
+        typeof message.account !== "string" ||
+        !isAddress(message.account) ||
+        !shouldHandleManagementMutation({
+          activeAccount,
+          chainId: walletChain.id,
+          message,
+          sourceId: managementLifecycle.sourceId
+        })
+      ) {
+        return
+      }
+      managementLifecycle.handleExternalMutation(message.account)
+    }
+    channel.addEventListener("message", handleMessage)
+    return () => {
+      broadcastManagementMutationRef.current = null
+      channel.removeEventListener("message", handleMessage)
+      channel.close()
+    }
+  }, [managementLifecycle, storeManagement, walletChain.id])
 
   const pendingCeremony = featurePendingCeremony ?? connectorPendingCeremony
 
@@ -279,6 +375,7 @@ export function SliceWalletProvider({
     ceremonyMode,
     finalizeRegisteredReplacement,
     getFrameClient,
+    managementLifecycle,
     normalizedIdOrigin,
     notifications,
     sliceAccountClient,
@@ -294,6 +391,7 @@ export function SliceWalletProvider({
       executionSession,
       fetchCheckoutDelegation,
       getFrameClient,
+      managementLifecycle,
       notifications,
       publicClient,
       setExecutionSession,
@@ -302,6 +400,12 @@ export function SliceWalletProvider({
       storeManagement,
       walletChainId: walletChain.id
     })
+
+  const retryManagementHydration = useCallback(async () => {
+    const account = managementLifecycle.getAccount()
+    if (account === null) return
+    await managementLifecycle.retryHydration(account)
+  }, [managementLifecycle])
 
   const runRecoveryAction = useCallback(
     async (
@@ -374,12 +478,14 @@ export function SliceWalletProvider({
       hasStoredCredential,
       loginWallet,
       managementExecutionSession,
+      managementHydration,
       pendingAction,
       pendingCeremony,
       recovery,
       recoveryPendingAction,
       refreshRecovery,
       refreshExecutionAllowance,
+      retryManagementHydration,
       signInWallet,
       switchAccount,
       retrySession: signInWallet,
@@ -401,12 +507,14 @@ export function SliceWalletProvider({
       hasStoredCredential,
       loginWallet,
       managementExecutionSession,
+      managementHydration,
       pendingAction,
       pendingCeremony,
       recovery,
       recoveryPendingAction,
       refreshRecovery,
       refreshExecutionAllowance,
+      retryManagementHydration,
       signInWallet,
       switchAccount,
       sessionIntegration,

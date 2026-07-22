@@ -25,13 +25,16 @@ import type {
   SliceWalletCredentialRecord,
   SliceWalletExecutionSession,
   SliceWalletManagementExecutionSession,
+  SliceWalletManagementLifecycleControl,
   SliceWalletProviderAdapters,
   StoredSliceWalletExecutionSession
 } from "../types/react"
 import {
   clearStoredExecutionSession,
-  readStoredExecutionSession
+  readStoredExecutionSession,
+  readStoredPendingReplacementStrict
 } from "./executionKeyStore"
+import { getManagementHydrationGuard } from "./managementOperations"
 
 type RootAccount = Awaited<
   ReturnType<typeof createSliceWalletCeremonyKernelAccount>
@@ -282,7 +285,8 @@ export const useSliceWalletExecutionHydration = ({
       credential,
       kernelAccount,
       session,
-      stored
+      stored,
+      assertCurrent
     }: {
       credential: SliceWalletCredentialRecord
       kernelAccount: RootAccount
@@ -291,6 +295,7 @@ export const useSliceWalletExecutionHydration = ({
         StoredSliceWalletExecutionSession,
         { kind: "store_management" }
       >
+      assertCurrent?: () => void
     }) => {
       const client = await buildManagementExecutionClient({
         credential,
@@ -298,6 +303,7 @@ export const useSliceWalletExecutionHydration = ({
         session,
         stored
       })
+      assertCurrent?.()
       setManagementExecutionSession({
         expiresAt: new Date(stored.expiresAt),
         slicerAddress: stored.slicerAddress,
@@ -311,11 +317,31 @@ export const useSliceWalletExecutionHydration = ({
   const hydrateManagementExecutionSession = useCallback(
     async ({
       credential,
-      kernelAccount
+      kernelAccount,
+      control
     }: {
       credential: SliceWalletCredentialRecord
       kernelAccount: RootAccount
+      control: SliceWalletManagementLifecycleControl
     }) => {
+      const pending = await readStoredPendingReplacementStrict(
+        kernelAccount.address,
+        "store_management"
+      )
+      control.assertCurrent()
+      const guard = getManagementHydrationGuard({
+        pendingPhase: pending.ok ? (pending.value?.phase ?? null) : null,
+        readable: pending.ok
+      })
+      if (guard === "storage-unavailable") {
+        setManagementExecutionSession(null)
+        control.markStorageUnavailable()
+        return
+      }
+      if (guard === "skip") {
+        setManagementExecutionSession(null)
+        return
+      }
       try {
         const stored = await readStoredExecutionSession(
           kernelAccount.address,
@@ -344,6 +370,7 @@ export const useSliceWalletExecutionHydration = ({
           delegation.walletPolicy === null ||
           delegation.slicerId !== stored.slicerId
         ) {
+          control.assertCurrent()
           await clearStoredExecutionSession(
             kernelAccount.address,
             "store_management"
@@ -389,6 +416,7 @@ export const useSliceWalletExecutionHydration = ({
             session.permissionId.toLowerCase() ||
           stored.signerAddress.toLowerCase() !== session.signerId.toLowerCase()
         ) {
+          control.assertCurrent()
           await clearStoredExecutionSession(
             kernelAccount.address,
             "store_management"
@@ -406,13 +434,19 @@ export const useSliceWalletExecutionHydration = ({
           return
         }
         await activateManagementExecutionSession({
+          assertCurrent: control.assertCurrent,
           credential,
           kernelAccount,
           session,
           stored
         })
       } catch {
-        setManagementExecutionSession(null)
+        try {
+          control.assertCurrent()
+          setManagementExecutionSession(null)
+        } catch {
+          // A newer account or management operation owns the current view.
+        }
       }
     },
     [

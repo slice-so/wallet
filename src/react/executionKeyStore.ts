@@ -98,6 +98,20 @@ export const writeStoredExecutionSession = async (
   }
 }
 
+export const writeStoredExecutionSessionStrict = async (
+  session: StoredSliceWalletExecutionSession
+) => {
+  if (typeof indexedDB === "undefined") {
+    throw new Error("Slice Wallet session storage is unavailable.")
+  }
+  await withStore("readwrite", (store) =>
+    store.put(
+      session,
+      `${session.kind}:${session.accountAddress.toLowerCase()}`
+    )
+  )
+}
+
 export const clearStoredExecutionSession = async (
   accountAddress: Address,
   kind: StoredSliceWalletExecutionSession["kind"]
@@ -116,47 +130,77 @@ const pendingKey = (
   kind: StoredSliceWalletExecutionSession["kind"]
 ) => `pending:${kind}:${accountAddress.toLowerCase()}`
 
+const readStoredPendingReplacementValue = async (
+  accountAddress: Address,
+  kind: StoredSliceWalletExecutionSession["kind"]
+): Promise<StoredSliceWalletPendingReplacement | null> => {
+  const stored = (await withStore("readonly", (store) =>
+    store.get(pendingKey(accountAddress, kind))
+  )) as StoredSliceWalletPendingReplacement | null | undefined
+  if (
+    stored === null ||
+    stored === undefined ||
+    stored.session.kind !== kind ||
+    stored.session.accountAddress.toLowerCase() !==
+      accountAddress.toLowerCase() ||
+    (stored.phase !== "registered" && stored.phase !== "registering") ||
+    !Array.isArray(stored.previousSessions) ||
+    (stored.phase === "registering" &&
+      (stored.previousSessions.length !== 0 ||
+        "delegationId" in stored.session)) ||
+    (stored.phase !== "registering" &&
+      (!("delegationId" in stored.session) ||
+        stored.session.delegationId.length === 0 ||
+        (stored.session.kind === "checkout" &&
+          (stored.allowanceUsdMicros === undefined ||
+            !/^\d+$/.test(stored.allowanceUsdMicros))))) ||
+    new Date(stored.session.expiresAt) <= new Date()
+  ) {
+    await withStore("readwrite", (store) =>
+      store.delete(pendingKey(accountAddress, kind))
+    )
+    return null
+  }
+  return stored
+}
+
 export const readStoredPendingReplacement = async (
   accountAddress: Address,
   kind: StoredSliceWalletExecutionSession["kind"]
 ): Promise<StoredSliceWalletPendingReplacement | null> => {
   if (typeof indexedDB === "undefined") return null
   try {
-    const stored = (await withStore("readonly", (store) =>
-      store.get(pendingKey(accountAddress, kind))
-    )) as StoredSliceWalletPendingReplacement | null | undefined
-    if (
-      stored === null ||
-      stored === undefined ||
-      stored.session.kind !== kind ||
-      stored.session.accountAddress.toLowerCase() !==
-        accountAddress.toLowerCase() ||
-      (stored.phase !== "registered" && stored.phase !== "registering") ||
-      !Array.isArray(stored.previousSessions) ||
-      (stored.phase === "registering" &&
-        (stored.previousSessions.length !== 0 ||
-          "delegationId" in stored.session)) ||
-      (stored.phase !== "registering" &&
-        (!("delegationId" in stored.session) ||
-          stored.session.delegationId.length === 0 ||
-          (stored.session.kind === "checkout" &&
-            (stored.allowanceUsdMicros === undefined ||
-              !/^\d+$/.test(stored.allowanceUsdMicros))))) ||
-      new Date(stored.session.expiresAt) <= new Date()
-    ) {
-      await clearStoredPendingReplacement(accountAddress, kind)
-      return null
-    }
-    return stored
+    return await readStoredPendingReplacementValue(accountAddress, kind)
   } catch {
     return null
+  }
+}
+
+type StoredPendingReplacementReadResult =
+  | { ok: true; value: StoredSliceWalletPendingReplacement | null }
+  | { ok: false }
+
+export const readStoredPendingReplacementStrict = async (
+  accountAddress: Address,
+  kind: StoredSliceWalletExecutionSession["kind"]
+): Promise<StoredPendingReplacementReadResult> => {
+  if (typeof indexedDB === "undefined") return { ok: false }
+  try {
+    return {
+      ok: true,
+      value: await readStoredPendingReplacementValue(accountAddress, kind)
+    }
+  } catch {
+    return { ok: false }
   }
 }
 
 export const writeStoredPendingReplacement = async (
   replacement: StoredSliceWalletPendingReplacement
 ) => {
-  if (typeof indexedDB === "undefined") return
+  if (typeof indexedDB === "undefined") {
+    throw new Error("Slice Wallet session storage is unavailable.")
+  }
   await withStore("readwrite", (store) =>
     store.put(
       replacement,
@@ -175,4 +219,16 @@ export const clearStoredPendingReplacement = async (
       store.delete(pendingKey(accountAddress, kind))
     )
   } catch {}
+}
+
+export const clearStoredPendingReplacementStrict = async (
+  accountAddress: Address,
+  kind: StoredSliceWalletExecutionSession["kind"]
+) => {
+  if (typeof indexedDB === "undefined") {
+    throw new Error("Slice Wallet session storage is unavailable.")
+  }
+  await withStore("readwrite", (store) =>
+    store.delete(pendingKey(accountAddress, kind))
+  )
 }

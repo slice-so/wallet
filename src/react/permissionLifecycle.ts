@@ -75,20 +75,24 @@ export const retrySliceWalletFinalityAction = async ({
 
 export const resumeSliceWalletRegisteredReplacement = async ({
   activate,
+  assertCurrent = () => undefined,
   clear,
   commit,
   discard,
   finalize,
   notifyRevoked,
-  persist
+  persist,
+  probeCommitted
 }: {
   activate: () => Promise<void>
+  assertCurrent?: () => void
   clear: () => Promise<void>
   commit: () => Promise<void>
   discard: () => Promise<void>
   finalize: () => Promise<void>
   notifyRevoked: () => void
   persist: () => Promise<void>
+  probeCommitted?: () => Promise<boolean>
 }): Promise<"resumed" | "revoked"> => {
   try {
     await finalize()
@@ -102,8 +106,16 @@ export const resumeSliceWalletRegisteredReplacement = async ({
     notifyRevoked()
     return "revoked"
   }
-  await commit()
-  await Promise.all([persist(), clear()])
+  assertCurrent()
+  try {
+    await commit()
+  } catch (caught) {
+    if (probeCommitted === undefined || !(await probeCommitted())) throw caught
+  }
+  await persist()
+  await clear()
+  assertCurrent()
   await activate()
+  assertCurrent()
   return "resumed"
 }

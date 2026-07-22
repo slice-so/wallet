@@ -19,6 +19,44 @@ export type SliceWalletStatus = "error" | "idle" | "loading" | "ready"
 export type SliceWalletPendingAction = "create" | "login" | null
 export type SliceWalletRecoveryPendingAction = "cancel" | null
 
+export type SliceWalletManagementHydrationSnapshot = {
+  status: "idle" | "pending" | "settled"
+  error: "storage-unavailable" | null
+}
+
+export type SliceWalletManagementRecoveryMode = "hydrate" | "preserve-pending"
+
+export type SliceWalletManagementLifecycleControl = {
+  assertCurrent: () => void
+  markStorageUnavailable: () => void
+}
+
+export type SliceWalletManagementMutationBroadcast = {
+  account: Address
+  chainId: number
+  outcome: "error" | "success"
+  sourceId: string
+}
+
+export type SliceWalletManagementLifecycle = {
+  getAccount: () => Address | null
+  getSnapshot: () => SliceWalletManagementHydrationSnapshot
+  handleExternalMutation: (account: Address) => void
+  markNothingToHydrate: (account: Address) => void
+  retryHydration: (account: Address) => Promise<void>
+  runHydration: (
+    account: Address,
+    task?: (control: SliceWalletManagementLifecycleControl) => Promise<void>
+  ) => Promise<void>
+  runMutation: <Result>(input: {
+    account: Address
+    task: (control: SliceWalletManagementLifecycleControl) => Promise<Result>
+  }) => Promise<Result>
+  setAccount: (account: Address | null) => void
+  sourceId: string
+  subscribe: (listener: () => void) => () => void
+}
+
 export type SliceWalletCredentialRecord = {
   accountAddress: Address
   accountIndex: number
@@ -204,17 +242,22 @@ export type SliceWalletContextValue = {
   hasStoredCredential: boolean
   loginWallet: () => Promise<boolean>
   managementExecutionSession: SliceWalletManagementExecutionSession | null
+  managementHydration: SliceWalletManagementHydrationSnapshot
   pendingAction: SliceWalletPendingAction
   pendingCeremony: SliceWalletPendingCeremony | null
   recovery: SliceWalletRecoverySnapshot | null
   recoveryPendingAction: SliceWalletRecoveryPendingAction
   refreshExecutionAllowance: () => Promise<void>
-  disableManagementExecutionSession: () => Promise<void>
+  disableManagementExecutionSession: (input: {
+    slicerAddress: Address
+    slicerId: number
+  }) => Promise<void>
   enableManagementExecutionSession: (input: {
     slicerAddress: Address
     slicerId: number
   }) => Promise<void>
   refreshRecovery: () => Promise<void>
+  retryManagementHydration: () => Promise<void>
   signInWallet: () => Promise<void>
   switchAccount: () => Promise<boolean>
   retrySession: () => Promise<void>

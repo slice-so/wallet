@@ -25,6 +25,8 @@ import type { SliceWalletCeremonyMode } from "../types/ceremony"
 import type { SliceWalletCeremonyBroker } from "../types/pendingCeremony"
 import type {
   SliceWalletCredentialRecord,
+  SliceWalletManagementLifecycle,
+  SliceWalletManagementLifecycleControl,
   SliceWalletProviderAdapters,
   SliceWalletRecoverySnapshot,
   SliceWalletStatus
@@ -82,6 +84,19 @@ const fundDevWalletAccount = async (chain: Chain, address: Address) => {
   }
 }
 
+export const shouldCommitActivation = ({
+  active,
+  builtAddress,
+  connectedAccount
+}: {
+  active: boolean
+  builtAddress: Address
+  connectedAccount: Address | null
+}) =>
+  active &&
+  connectedAccount !== null &&
+  isAddressEqual(builtAddress, connectedAccount)
+
 export const useSliceWalletAccountHydration = ({
   activeWalletRef,
   ceremonyBroker,
@@ -91,6 +106,7 @@ export const useSliceWalletAccountHydration = ({
   fetchWalletRecovery,
   hydrateExecutionSession,
   hydrateManagementExecutionSession,
+  managementLifecycle,
   managementEnabled,
   normalizedIdOrigin,
   publicClient,
@@ -118,7 +134,9 @@ export const useSliceWalletAccountHydration = ({
   hydrateManagementExecutionSession: (wallet: {
     credential: SliceWalletCredentialRecord
     kernelAccount: RootAccount
+    control: SliceWalletManagementLifecycleControl
   }) => Promise<void>
+  managementLifecycle: SliceWalletManagementLifecycle
   managementEnabled: boolean
   normalizedIdOrigin: string
   publicClient: Parameters<
@@ -147,7 +165,7 @@ export const useSliceWalletAccountHydration = ({
     }
   }, [activeWalletRef, fetchWalletRecovery, setRecovery])
 
-  const activateCredential = useCallback(
+  const buildCredentialActivation = useCallback(
     async (credential: SliceWalletCredentialRecord) => {
       const recovery =
         credential.recoveryPermissionId === null ||
@@ -193,30 +211,17 @@ export const useSliceWalletAccountHydration = ({
         })
       })
       await fundDevWalletAccount(walletChain, kernelAccount.address)
-      activeWalletRef.current = { credential, kernelAccount }
-      setSliceAccountClient(nextSliceAccountClient)
-      setStatus("ready")
-      if (checkoutEnabled)
-        void hydrateExecutionSession({ credential, kernelAccount })
-      if (managementEnabled)
-        void hydrateManagementExecutionSession({ credential, kernelAccount })
-      if (fetchWalletRecovery) void refreshRecovery()
-      return { kernelAccount, sliceAccountClient: nextSliceAccountClient }
+      return {
+        credential,
+        kernelAccount,
+        sliceAccountClient: nextSliceAccountClient
+      }
     },
     [
-      activeWalletRef,
       ceremonyBroker,
       ceremonyMode,
-      checkoutEnabled,
-      fetchWalletRecovery,
-      hydrateExecutionSession,
-      hydrateManagementExecutionSession,
-      managementEnabled,
       normalizedIdOrigin,
       publicClient,
-      refreshRecovery,
-      setSliceAccountClient,
-      setStatus,
       walletChain
     ]
   )
@@ -246,9 +251,11 @@ export const useSliceWalletAccountHydration = ({
       ) {
         throw new Error("Stored Slice Wallet metadata is no longer valid.")
       }
-      return activateCredential(toSliceWalletCredentialRecord(registered))
+      return buildCredentialActivation(
+        toSliceWalletCredentialRecord(registered)
+      )
     },
-    [activateCredential, normalizedIdOrigin, setHasStoredCredential]
+    [buildCredentialActivation, normalizedIdOrigin, setHasStoredCredential]
   )
 
   useEffect(() => {
@@ -267,13 +274,49 @@ export const useSliceWalletAccountHydration = ({
       }
       setStatus("loading")
       try {
-        if (active) await activateConnectedAccount(connectedAccount)
+        const built = await activateConnectedAccount(connectedAccount)
+        if (
+          !shouldCommitActivation({
+            active,
+            builtAddress: built.kernelAccount.address,
+            connectedAccount
+          })
+        ) {
+          return
+        }
+        activeWalletRef.current = {
+          credential: built.credential,
+          kernelAccount: built.kernelAccount
+        }
+        setSliceAccountClient(built.sliceAccountClient)
+        setStatus("ready")
+        if (checkoutEnabled) {
+          void hydrateExecutionSession({
+            credential: built.credential,
+            kernelAccount: built.kernelAccount
+          })
+        }
+        if (managementEnabled) {
+          void managementLifecycle
+            .runHydration(connectedAccount, (control) =>
+              hydrateManagementExecutionSession({
+                credential: built.credential,
+                control,
+                kernelAccount: built.kernelAccount
+              })
+            )
+            .catch(() => undefined)
+        } else {
+          managementLifecycle.markNothingToHydrate(connectedAccount)
+        }
+        if (fetchWalletRecovery) void refreshRecovery()
       } catch {
         if (!active) return
         activeWalletRef.current = null
         setSliceAccountClient(null)
         setStatus("idle")
         setRecovery(null)
+        managementLifecycle.markNothingToHydrate(connectedAccount)
       }
     })()
     return () => {
@@ -282,7 +325,14 @@ export const useSliceWalletAccountHydration = ({
   }, [
     activateConnectedAccount,
     activeWalletRef,
+    checkoutEnabled,
     connectedAccount,
+    fetchWalletRecovery,
+    hydrateExecutionSession,
+    hydrateManagementExecutionSession,
+    managementEnabled,
+    managementLifecycle,
+    refreshRecovery,
     setHasStoredCredential,
     setRecovery,
     setSliceAccountClient,
