@@ -81,7 +81,13 @@ export type SliceWalletSessionStore = {
     appOrigin: string,
     key: SliceWalletFrameSessionKey
   ) => Promise<SliceWalletStoredSession | null>
+  isAccountUnlocked: (appOrigin: string, account: Address) => Promise<boolean>
   putPending: (record: SliceWalletStoredSession) => Promise<void>
+  setAccountUnlocked: (
+    appOrigin: string,
+    account: Address,
+    unlocked: boolean
+  ) => Promise<void>
 }
 
 export type SliceWalletWindowMessage = {

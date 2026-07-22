@@ -141,7 +141,7 @@ export const unlockSliceWalletSignerFrames = async ({
   appOrigin,
   currentWindow = window,
   selfOrigin = location.origin,
-  timeoutMs = 1_500
+  timeoutMs = 5_000
 }: {
   account: `0x${string}`
   appOrigin: string

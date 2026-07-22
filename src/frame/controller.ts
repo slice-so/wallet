@@ -197,8 +197,6 @@ export const attachSliceWalletSignerFrame = ({
   const normalizedSelfOrigin = new URL(selfOrigin).origin
   let parentOrigin: string | null = null
   let parentPort: MessagePort | null = null
-  const unlockedAccounts = new Set<string>()
-  const accountKey = (account: string) => account.toLowerCase()
 
   const getStoredSession = async (
     key: SliceWalletFrameSessionKey
@@ -208,7 +206,12 @@ export const attachSliceWalletSignerFrame = ({
     if (stored === null) throw new Error("Wallet session is unavailable.")
     if (stored.session.expiresAt <= now())
       throw new Error("Wallet session has expired.")
-    if (!unlockedAccounts.has(accountKey(stored.session.account))) {
+    if (
+      !(await sessionStore.isAccountUnlocked(
+        parentOrigin,
+        stored.session.account
+      ))
+    ) {
       throw new Error("Wallet session is locked. Connect with your passkey.")
     }
     return stored
@@ -270,11 +273,18 @@ export const attachSliceWalletSignerFrame = ({
       return (await consumeAuthorization?.(request.params)) ?? null
     }
     if (request.method === "lockAccount") {
-      unlockedAccounts.delete(accountKey(request.params.account))
+      await sessionStore.setAccountUnlocked(
+        parentOrigin,
+        request.params.account,
+        false
+      )
       return null
     }
     if (request.method === "getAccountLockState") {
-      return unlockedAccounts.has(accountKey(request.params.account))
+      return (await sessionStore.isAccountUnlocked(
+        parentOrigin,
+        request.params.account
+      ))
         ? "unlocked"
         : "locked"
     }
@@ -535,6 +545,8 @@ export const attachSliceWalletSignerFrame = ({
       return
     }
 
+    const bridgedParentOrigin = parentOrigin
+
     if (isBridgeUnlockChallenge(event.data)) {
       const port = event.ports[0]
       const challenge = event.data
@@ -545,25 +557,34 @@ export const attachSliceWalletSignerFrame = ({
         (messageEvent: MessageEvent<SliceWalletProtocolValue>) => {
           if (handled) return
           handled = true
-          try {
-            const request = parseBridgeUnlockRequest(messageEvent.data)
-            if (
-              request.nonce !== challenge.nonce ||
-              request.account.toLowerCase() !== challenge.account.toLowerCase()
-            ) {
-              throw new Error("Bridge unlock does not match its challenge.")
+          void (async () => {
+            try {
+              const request = parseBridgeUnlockRequest(messageEvent.data)
+              if (
+                request.nonce !== challenge.nonce ||
+                request.account.toLowerCase() !==
+                  challenge.account.toLowerCase()
+              ) {
+                throw new Error("Bridge unlock does not match its challenge.")
+              }
+              await sessionStore.setAccountUnlocked(
+                bridgedParentOrigin,
+                request.account,
+                true
+              )
+              port.postMessage({
+                account: request.account,
+                nonce: request.nonce,
+                type: "slice-wallet:bridge-unlocked",
+                version: 1
+              })
+            } catch {
+              // Invalid bridge payloads fail closed without unlocking the account.
+            } finally {
+              clearTimeout(timeout)
+              port.close()
             }
-            unlockedAccounts.add(accountKey(request.account))
-            port.postMessage({
-              account: request.account,
-              nonce: request.nonce,
-              type: "slice-wallet:bridge-unlocked",
-              version: 1
-            })
-          } finally {
-            clearTimeout(timeout)
-            port.close()
-          }
+          })()
         },
         { once: true }
       )
@@ -571,7 +592,7 @@ export const attachSliceWalletSignerFrame = ({
       port.postMessage({
         account: challenge.account,
         nonce: challenge.nonce,
-        origin: parentOrigin,
+        origin: bridgedParentOrigin,
         type: "slice-wallet:bridge-unlock-record",
         version: 1
       })
@@ -580,7 +601,6 @@ export const attachSliceWalletSignerFrame = ({
 
     if (!isBridgeChallenge(event.data)) return
 
-    const bridgedParentOrigin = parentOrigin
     const session = await sessionStore.getPending(
       bridgedParentOrigin,
       event.data

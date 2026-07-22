@@ -72,6 +72,7 @@ const createRuntime = () => {
   })
   const revokePermissions = mock(async () => {
     connected = false
+    return true
   })
   const createGrant = mock(async () => ({
     account,
@@ -476,6 +477,18 @@ describe("Slice Wallet provider dispatch", () => {
       ])
     ).toBeNull()
     expect(revokePermissions).toHaveBeenCalledTimes(2)
+  })
+
+  test("emits revocation events for a stored account that is already locked", async () => {
+    const { provider } = createProvider()
+    await request(provider, "wallet_disconnect")
+    const events: string[] = []
+    provider.on("accountsChanged", () => events.push("accountsChanged"))
+    provider.on("disconnect", () => events.push("disconnect"))
+
+    await request(provider, "wallet_revokePermissions", [{ eth_accounts: {} }])
+
+    expect(events).toEqual(["accountsChanged", "disconnect"])
   })
 
   test("emits local disconnect state before cleanup settles", async () => {

@@ -385,8 +385,7 @@ const createSliceWalletChainRuntime = (
   }
 
   const lockAccount = async (account: `0x${string}`) => {
-    if (framePromise === null) return
-    await (await framePromise).request({
+    await (await getFrame()).request({
       method: "lockAccount",
       params: { account }
     })
@@ -923,11 +922,11 @@ export const createSliceWalletProviderRuntime = (
       const results =
         account === undefined
           ? []
-          : await Promise.allSettled(
-              [...runtimes.values()].map((runtime) =>
-                runtime.lockAccount(account)
+          : await Promise.allSettled([
+              (runtimes.values().next().value ?? getChainRuntime()).lockAccount(
+                account
               )
-            )
+            ])
       destroyChainRuntimes()
       clearStoredSliceWalletAccount(storage)
       const failures = collectFailures(
@@ -961,15 +960,28 @@ export const createSliceWalletProviderRuntime = (
     revokePermissions: async () => {
       ceremonyBroker.cancel()
       const { storage } = getBrowserDependencies(config)
-      const results = await Promise.allSettled(
+      const account = readStoredSliceWalletAccount(storage)?.accountAddress
+      const revocationResults = await Promise.allSettled(
         [...chainConfigs.keys()].map((chainId) =>
           getChainRuntime(chainId).revokeGrant()
         )
       )
-      const failures = collectFailures(
-        results,
-        "Wallet permission revocation failed unexpectedly."
-      )
+      const lockResults =
+        account === undefined
+          ? []
+          : await Promise.allSettled([
+              getChainRuntime(activeChainId).lockAccount(account)
+            ])
+      const failures = [
+        ...collectFailures(
+          revocationResults,
+          "Wallet permission revocation failed unexpectedly."
+        ),
+        ...collectFailures(
+          lockResults,
+          "Wallet session lock failed unexpectedly."
+        )
+      ]
       destroyChainRuntimes()
       if (failures.length > 0) {
         throw new AggregateError(
@@ -978,6 +990,7 @@ export const createSliceWalletProviderRuntime = (
         )
       }
       clearStoredSliceWalletAccount(storage)
+      return account !== undefined
     },
     rotateGrant: (
       ...args: Parameters<SliceWalletChainRuntime["rotateGrant"]>

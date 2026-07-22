@@ -44,6 +44,7 @@ class MockMessageWindow implements SliceWalletMessageWindow {
 class MemorySessionStore implements SliceWalletSessionStore {
   readonly records = new Map<string, SliceWalletStoredSession>()
   readonly pending = new Map<string, SliceWalletStoredSession>()
+  readonly unlockedAccounts = new Set<string>()
 
   private key(
     origin: string,
@@ -78,8 +79,24 @@ class MemorySessionStore implements SliceWalletSessionStore {
     return this.pending.get(this.key(origin, session)) ?? null
   }
 
+  async isAccountUnlocked(origin: string, accountAddress: Address) {
+    return this.unlockedAccounts.has(
+      `${new URL(origin).origin}:${accountAddress.toLowerCase()}`
+    )
+  }
+
   async putPending(record: SliceWalletStoredSession) {
     this.pending.set(this.key(record.appOrigin, record.session), record)
+  }
+
+  async setAccountUnlocked(
+    origin: string,
+    accountAddress: Address,
+    unlocked: boolean
+  ) {
+    const key = `${new URL(origin).origin}:${accountAddress.toLowerCase()}`
+    if (unlocked) this.unlockedAccounts.add(key)
+    else this.unlockedAccounts.delete(key)
   }
 
   async commitPending(
@@ -384,9 +401,137 @@ describe("isolated signer-frame controller", () => {
     } satisfies SliceWalletProtocolValue)
     expect(await restartedState).toMatchObject({
       id: "restarted-state",
-      result: "locked"
+      result: "unlocked"
     })
     detachRestarted()
+  })
+
+  test("propagates an explicit account lock to another frame instance", async () => {
+    const store = new MemorySessionStore()
+    const firstParent = new MessageChannel()
+    const firstWindow = new MockMessageWindow(firstParent.port1)
+    const secondParent = new MessageChannel()
+    const secondWindow = new MockMessageWindow(secondParent.port1)
+    const detachFirst = attachSliceWalletSignerFrame({
+      decodeScopedCalls: () => [],
+      now: () => 100,
+      selfOrigin: "https://id.slice.so",
+      sessionStore: store,
+      validateCheckoutCalls: () => {},
+      window: firstWindow
+    })
+    const detachSecond = attachSliceWalletSignerFrame({
+      decodeScopedCalls: () => [],
+      now: () => 100,
+      selfOrigin: "https://id.slice.so",
+      sessionStore: store,
+      validateCheckoutCalls: () => {},
+      window: secondWindow
+    })
+    const firstConnection = new MessageChannel()
+    const secondConnection = new MessageChannel()
+    const firstConnected = receive(firstConnection.port1)
+    const secondConnected = receive(secondConnection.port1)
+    firstWindow.dispatch({
+      data: { id: "connect-first", method: "connect", version: 1 },
+      origin: "https://app.example",
+      ports: [firstConnection.port2],
+      source: firstParent.port1
+    })
+    secondWindow.dispatch({
+      data: { id: "connect-second", method: "connect", version: 1 },
+      origin: "https://app.example",
+      ports: [secondConnection.port2],
+      source: secondParent.port1
+    })
+    await Promise.all([firstConnected, secondConnected])
+    const policy = {
+      account,
+      calls: [createNativeTransferCallRule({ maximumValue: 1n, recipient })],
+      chainId: 8453,
+      grantKind: "checkout",
+      validAfter: 90,
+      validUntil: 1_000,
+      version: 1
+    } as const
+    const created = receive(secondConnection.port1)
+    secondConnection.port1.postMessage({
+      id: "create-second",
+      method: "createSession",
+      params: {
+        checkout: {
+          allowanceUsdMicros: "100000000",
+          coSignerAddress: recipient
+        },
+        policy
+      },
+      version: 1
+    } satisfies SliceWalletProtocolValue)
+    await created
+    const committed = receive(secondConnection.port1)
+    secondConnection.port1.postMessage({
+      id: "commit-second",
+      method: "commitSession",
+      params: { account, chainId: 8453, grantKind: "checkout" },
+      version: 1
+    } satisfies SliceWalletProtocolValue)
+    await committed
+    await unlockCommittedAccount(firstWindow, firstParent.port1)
+
+    const unlocked = receive(secondConnection.port1)
+    secondConnection.port1.postMessage({
+      id: "second-unlocked",
+      method: "getAccountLockState",
+      params: { account },
+      version: 1
+    } satisfies SliceWalletProtocolValue)
+    expect(await unlocked).toMatchObject({
+      id: "second-unlocked",
+      result: "unlocked"
+    })
+
+    const locked = receive(firstConnection.port1)
+    firstConnection.port1.postMessage({
+      id: "lock-first",
+      method: "lockAccount",
+      params: { account },
+      version: 1
+    } satisfies SliceWalletProtocolValue)
+    await locked
+    const secondState = receive(secondConnection.port1)
+    secondConnection.port1.postMessage({
+      id: "second-locked",
+      method: "getAccountLockState",
+      params: { account },
+      version: 1
+    } satisfies SliceWalletProtocolValue)
+    expect(await secondState).toMatchObject({
+      id: "second-locked",
+      result: "locked"
+    })
+    const refused = receive(secondConnection.port1)
+    secondConnection.port1.postMessage({
+      id: "sign-after-lock",
+      method: "signSessionRequest",
+      params: {
+        action: "status",
+        challenge: nonce,
+        delegationId: "delegation-1",
+        expiresAt: 200,
+        session: { account, chainId: 8453, grantKind: "checkout" }
+      },
+      version: 1
+    } satisfies SliceWalletProtocolValue)
+    expect(await refused).toMatchObject({
+      error: {
+        code: "invalid_request",
+        message: "Wallet session is locked. Connect with your passkey."
+      },
+      id: "sign-after-lock"
+    })
+
+    detachFirst()
+    detachSecond()
   })
 
   test("signs a structured status proof with the committed checkout key", async () => {

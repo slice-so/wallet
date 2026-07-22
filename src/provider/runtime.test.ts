@@ -232,6 +232,23 @@ describe("multichain provider runtime routing", () => {
     expect(fixture.revokeGrantByChain.get(optimism.id)).not.toHaveBeenCalled()
   })
 
+  test("disconnect creates a signer frame when no chain runtime is active", async () => {
+    const fixture = createRuntimeFixture()
+    const runtime = createSliceWalletProviderRuntime(config, fixture)
+    writeStoredSliceWalletAccount(storage, {
+      accountAddress: account,
+      accountIndex: 0,
+      credentialIdHash
+    })
+
+    await runtime.disconnect()
+
+    expect(fixture.lockAccountByChain.get(base.id)).toHaveBeenCalledWith(
+      account
+    )
+    expect(readStoredSliceWalletAccount(storage)).toBeNull()
+  })
+
   test("clears the stored account after every chain revokes successfully", async () => {
     const fixture = createRuntimeFixture()
     const runtime = createSliceWalletProviderRuntime(config, fixture)
@@ -241,7 +258,7 @@ describe("multichain provider runtime routing", () => {
       credentialIdHash
     })
 
-    await runtime.revokePermissions()
+    expect(await runtime.revokePermissions()).toBe(true)
 
     expect(readStoredSliceWalletAccount(storage)).toBeNull()
     const baseRevocation = fixture.revokeGrantByChain.get(base.id)
@@ -251,6 +268,16 @@ describe("multichain provider runtime routing", () => {
     }
     expect(baseRevocation).toHaveBeenCalledTimes(1)
     expect(optimismRevocation).toHaveBeenCalledTimes(1)
+    expect(fixture.lockAccountByChain.get(base.id)).toHaveBeenCalledWith(
+      account
+    )
+  })
+
+  test("reports when permission revocation had no stored account", async () => {
+    const fixture = createRuntimeFixture()
+    const runtime = createSliceWalletProviderRuntime(config, fixture)
+
+    expect(await runtime.revokePermissions()).toBe(false)
   })
 
   test("cancels pending ceremonies on chain changes and teardown", async () => {

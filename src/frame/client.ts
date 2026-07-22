@@ -209,8 +209,14 @@ export const acquireSliceWalletSignerFrame = async ({
   }
 
   const leased = shared
-  const client = await leased.client
   leased.references += 1
+  let client: SliceWalletSignerFrameClient
+  try {
+    client = await leased.client
+  } catch (error) {
+    leased.references -= 1
+    throw error
+  }
   let released = false
   return {
     destroy: () => {

@@ -22,7 +22,11 @@ const getPendingRecordKey = (
   key: SliceWalletFrameSessionKey
 ) => `${getRecordKey(appOrigin, key)}:pending`
 
+const getAccountUnlockKey = (appOrigin: string, account: string) =>
+  `unlock:${normalizeOrigin(appOrigin)}:${account.toLowerCase()}`
+
 type PersistedSession = SliceWalletStoredSession & { id: string }
+type PersistedAccountUnlock = { id: string; unlocked: true }
 
 const requestResult = <T>(request: IDBRequest<T>) =>
   new Promise<T>((resolve, reject) => {
@@ -130,6 +134,18 @@ export const createSliceWalletIndexedDbSessionStore = (
     database.close()
     return (record as PersistedSession | undefined) ?? null
   },
+  isAccountUnlocked: async (appOrigin, account) => {
+    const database = await openDatabase(indexedDb)
+    const transaction = database.transaction(objectStoreName, "readonly")
+    const record = await requestResult(
+      transaction
+        .objectStore(objectStoreName)
+        .get(getAccountUnlockKey(appOrigin, account))
+    )
+    await transactionComplete(transaction)
+    database.close()
+    return (record as PersistedAccountUnlock | undefined)?.unlocked === true
+  },
   putPending: async (record) => {
     const database = await openDatabase(indexedDb)
     const transaction = database.transaction(objectStoreName, "readwrite")
@@ -140,12 +156,26 @@ export const createSliceWalletIndexedDbSessionStore = (
     } satisfies PersistedSession)
     await transactionComplete(transaction)
     database.close()
+  },
+  setAccountUnlocked: async (appOrigin, account, unlocked) => {
+    const database = await openDatabase(indexedDb)
+    const transaction = database.transaction(objectStoreName, "readwrite")
+    const store = transaction.objectStore(objectStoreName)
+    const id = getAccountUnlockKey(appOrigin, account)
+    if (unlocked) {
+      store.put({ id, unlocked: true } satisfies PersistedAccountUnlock)
+    } else {
+      store.delete(id)
+    }
+    await transactionComplete(transaction)
+    database.close()
   }
 })
 
 export const createSliceWalletMemorySessionStore =
   (): SliceWalletSessionStore => {
     const records = new Map<string, SliceWalletStoredSession>()
+    const unlockedAccounts = new Set<string>()
     return {
       commitPending: async (appOrigin, key) => {
         const pendingKey = getPendingRecordKey(appOrigin, key)
@@ -168,11 +198,21 @@ export const createSliceWalletMemorySessionStore =
         records.get(getRecordKey(appOrigin, key)) ?? null,
       getPending: async (appOrigin, key) =>
         records.get(getPendingRecordKey(appOrigin, key)) ?? null,
+      isAccountUnlocked: async (appOrigin, account) =>
+        unlockedAccounts.has(getAccountUnlockKey(appOrigin, account)),
       putPending: async (record) => {
         records.set(
           getPendingRecordKey(record.appOrigin, record.session),
           record
         )
+      },
+      setAccountUnlocked: async (appOrigin, account, unlocked) => {
+        const key = getAccountUnlockKey(appOrigin, account)
+        if (unlocked) {
+          unlockedAccounts.add(key)
+        } else {
+          unlockedAccounts.delete(key)
+        }
       }
     }
   }
