@@ -109,11 +109,8 @@ describe("management operation policies", () => {
   })
 
   test("reports revoked resume state and rejects with hydrate recovery", () => {
-    let notified = ""
     try {
-      rejectRevokedManagementPermission((message) => {
-        notified = message
-      })
+      rejectRevokedManagementPermission()
       throw new Error("Expected revoked permission rejection.")
     } catch (caught) {
       expect(caught).toBeInstanceOf(SliceWalletEnablementError)
@@ -122,7 +119,6 @@ describe("management operation policies", () => {
         "This management permission was revoked from Slice ID. Enable it again to continue."
       )
       expect(caught.recoveryMode).toBe("hydrate")
-      expect(notified).toBe(caught.message)
     }
   })
 })

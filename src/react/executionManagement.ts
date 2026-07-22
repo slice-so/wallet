@@ -227,7 +227,7 @@ export const useSliceWalletManagementEnablement = ({
                   "store_management"
                 )
                 if (action !== "complete-old-then-continue") {
-                  rejectRevokedManagementPermission(notifications?.error)
+                  rejectRevokedManagementPermission()
                 }
                 replacementRevoked = true
               }

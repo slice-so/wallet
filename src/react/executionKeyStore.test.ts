@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { IDBFactory } from "fake-indexeddb"
 import type {
   StoredSliceWalletExecutionSession,
@@ -37,6 +37,11 @@ const pendingReplacement = {
   }
 } as const satisfies StoredSliceWalletPendingReplacement
 
+const existingIndexedDb = Object.getOwnPropertyDescriptor(
+  globalThis,
+  "indexedDB"
+)
+
 const createDatabaseAtVersion = (version: number) =>
   new Promise<void>((resolve, reject) => {
     const request = indexedDB.open("slice-wallet", version)
@@ -55,6 +60,14 @@ beforeEach(() => {
     configurable: true,
     value: new IDBFactory()
   })
+})
+
+afterEach(() => {
+  if (existingIndexedDb === undefined) {
+    Reflect.deleteProperty(globalThis, "indexedDB")
+  } else {
+    Object.defineProperty(globalThis, "indexedDB", existingIndexedDb)
+  }
 })
 
 describe("execution key storage", () => {

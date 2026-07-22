@@ -99,12 +99,9 @@ export const isRegisteredManagementReplacement = (
   replacement?.phase === "registered" &&
   replacement.session.kind === "store_management"
 
-export const rejectRevokedManagementPermission = (
-  notify?: (message: string) => void
-): never => {
+export const rejectRevokedManagementPermission = (): never => {
   const message =
     "This management permission was revoked from Slice ID. Enable it again to continue."
-  notify?.(message)
   throw new SliceWalletEnablementError(message, "hydrate")
 }
 
