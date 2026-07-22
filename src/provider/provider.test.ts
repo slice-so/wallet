@@ -70,6 +70,9 @@ const createRuntime = () => {
   const disconnect = mock(async () => {
     connected = false
   })
+  const revokePermissions = mock(async () => {
+    connected = false
+  })
   const createGrant = mock(async () => ({
     account,
     chainId: base.id,
@@ -114,6 +117,7 @@ const createRuntime = () => {
     paymasterAvailable: mock(() => false),
     pendingCeremony: null,
     revokeGrant,
+    revokePermissions,
     requestSession,
     subscribePendingCeremony: mock(() => () => undefined),
     rotateGrant,
@@ -138,6 +142,7 @@ const createRuntime = () => {
     disconnect,
     getGrants,
     revokeGrant,
+    revokePermissions,
     requestSession,
     rotateGrant,
     sendCalls,
@@ -445,7 +450,7 @@ describe("Slice Wallet provider dispatch", () => {
   })
 
   test("validates the permission being revoked", async () => {
-    const { disconnect, provider } = createProvider()
+    const { provider, revokePermissions } = createProvider()
 
     await expectRpcError(
       request(provider, "wallet_revokePermissions", [
@@ -457,20 +462,20 @@ describe("Slice Wallet provider dispatch", () => {
       request(provider, "wallet_revokePermissions", [{ personal_sign: {} }]),
       -32602
     )
-    expect(disconnect).not.toHaveBeenCalled()
+    expect(revokePermissions).not.toHaveBeenCalled()
     expect(
       await request(provider, "wallet_revokePermissions", [
         { eth_accounts: {} }
       ])
     ).toBeNull()
-    expect(disconnect).toHaveBeenCalledTimes(1)
+    expect(revokePermissions).toHaveBeenCalledTimes(1)
 
     expect(
       await request(provider, "wallet_revokePermissions", [
         { parentCapability: "eth_accounts" }
       ])
     ).toBeNull()
-    expect(disconnect).toHaveBeenCalledTimes(2)
+    expect(revokePermissions).toHaveBeenCalledTimes(2)
   })
 
   test("emits local disconnect state before cleanup settles", async () => {

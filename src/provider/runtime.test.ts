@@ -63,6 +63,7 @@ const createRuntimeFixture = (
 ) => {
   const brokerByChain = new Map<number, SliceWalletCeremonyBroker>()
   const callsByChain = new Map<number, Set<string>>()
+  const lockAccountByChain = new Map<number, ReturnType<typeof mock>>()
   const sendCallsByChain = new Map<number, ReturnType<typeof mock>>()
   const revokeGrantByChain = new Map<number, ReturnType<typeof mock>>()
   const statusChains: number[] = []
@@ -79,6 +80,8 @@ const createRuntimeFixture = (
     sendCallsByChain.set(chainConfig.chain.id, sendCalls)
     const revokeGrant = mock(async () => undefined)
     revokeGrantByChain.set(chainConfig.chain.id, revokeGrant)
+    const lockAccount = mock(async () => undefined)
+    lockAccountByChain.set(chainConfig.chain.id, lockAccount)
     const runtime = {
       chainId: chainConfig.chain.id,
       chooseAccount: mock(async () => null as never),
@@ -101,6 +104,7 @@ const createRuntimeFixture = (
       }),
       getGrants: mock(async () => []),
       hasCall: (id: string) => calls.has(id),
+      lockAccount,
       paymasterAvailable: false,
       revokeGrant,
       requestSession: mock(async () => ({
@@ -118,6 +122,7 @@ const createRuntimeFixture = (
     brokerByChain,
     callsByChain,
     createChainRuntime,
+    lockAccountByChain,
     revokeGrantByChain,
     sendCallsByChain,
     statusChains
@@ -132,7 +137,13 @@ describe("multichain provider runtime routing", () => {
     })
     const runtime = createSliceWalletProviderRuntime(
       { ...config, ceremonyMode: "auto" },
-      { connectAccount }
+      {
+        acquireFrame: async () => ({
+          destroy: () => undefined,
+          request: async () => null
+        }),
+        connectAccount
+      }
     )
 
     await expect(runtime.connect()).rejects.toBe(stopped)
@@ -171,7 +182,7 @@ describe("multichain provider runtime routing", () => {
     expect(fixture.statusChains).toEqual([optimism.id])
   })
 
-  test("keeps the account retryable after a partial disconnect failure", async () => {
+  test("keeps the account retryable after a partial permission revocation failure", async () => {
     const fixture = createRuntimeFixture()
     const runtime = createSliceWalletProviderRuntime(config, fixture)
     runtime.getChainRuntime(optimism.id)
@@ -188,8 +199,8 @@ describe("multichain provider runtime routing", () => {
     })
 
     try {
-      await runtime.disconnect()
-      throw new Error("Expected disconnect cleanup to fail.")
+      await runtime.revokePermissions()
+      throw new Error("Expected permission revocation to fail.")
     } catch (error) {
       expect(error).toBeInstanceOf(AggregateError)
       expect((error as AggregateError).errors).toEqual([failure])
@@ -201,6 +212,26 @@ describe("multichain provider runtime routing", () => {
     })
   })
 
+  test("disconnect locks the account without revoking persistent grants", async () => {
+    const fixture = createRuntimeFixture()
+    const runtime = createSliceWalletProviderRuntime(config, fixture)
+    runtime.getChainRuntime(optimism.id)
+    writeStoredSliceWalletAccount(storage, {
+      accountAddress: account,
+      accountIndex: 0,
+      credentialIdHash
+    })
+
+    await runtime.disconnect()
+
+    expect(readStoredSliceWalletAccount(storage)).toBeNull()
+    expect(fixture.lockAccountByChain.get(optimism.id)).toHaveBeenCalledWith(
+      account
+    )
+    expect(fixture.lockAccountByChain.has(base.id)).toBe(false)
+    expect(fixture.revokeGrantByChain.get(optimism.id)).not.toHaveBeenCalled()
+  })
+
   test("clears the stored account after every chain revokes successfully", async () => {
     const fixture = createRuntimeFixture()
     const runtime = createSliceWalletProviderRuntime(config, fixture)
@@ -210,7 +241,7 @@ describe("multichain provider runtime routing", () => {
       credentialIdHash
     })
 
-    await runtime.disconnect()
+    await runtime.revokePermissions()
 
     expect(readStoredSliceWalletAccount(storage)).toBeNull()
     const baseRevocation = fixture.revokeGrantByChain.get(base.id)

@@ -21,6 +21,8 @@ import type {
   SliceWalletBridgeGrantProofRequest,
   SliceWalletBridgeGrantProofResponse,
   SliceWalletBridgeRecord,
+  SliceWalletBridgeUnlockChallenge,
+  SliceWalletBridgeUnlockRequest,
   SliceWalletFrameConnectRequest,
   SliceWalletFrameRequest,
   SliceWalletFrameResponse,
@@ -74,6 +76,52 @@ const isBridgeChallenge = (
     isHex(input.nonce, { strict: true }) &&
     hexToBytes(input.nonce).length === 32
   )
+}
+
+const isBridgeUnlockChallenge = (
+  value: SliceWalletProtocolValue
+): value is SliceWalletBridgeUnlockChallenge => {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false
+  }
+  const input = value as { readonly [key: string]: SliceWalletProtocolValue }
+  return (
+    Object.keys(input).length === 4 &&
+    input.type === "slice-wallet:bridge-unlock-challenge" &&
+    input.version === 1 &&
+    typeof input.account === "string" &&
+    isAddress(input.account) &&
+    typeof input.nonce === "string" &&
+    isHex(input.nonce, { strict: true }) &&
+    hexToBytes(input.nonce).length === 32
+  )
+}
+
+const parseBridgeUnlockRequest = (
+  value: SliceWalletProtocolValue
+): SliceWalletBridgeUnlockRequest => {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error("Bridge unlock request must be an object.")
+  }
+  const input = value as { readonly [key: string]: SliceWalletProtocolValue }
+  if (
+    Object.keys(input).length !== 4 ||
+    input.type !== "slice-wallet:bridge-unlock" ||
+    input.version !== 1 ||
+    typeof input.account !== "string" ||
+    !isAddress(input.account) ||
+    typeof input.nonce !== "string" ||
+    !isHex(input.nonce, { strict: true }) ||
+    hexToBytes(input.nonce).length !== 32
+  ) {
+    throw new Error("Bridge unlock request is invalid.")
+  }
+  return {
+    account: input.account,
+    nonce: input.nonce,
+    type: "slice-wallet:bridge-unlock",
+    version: 1
+  }
 }
 
 const parseBridgeGrantProofRequest = (
@@ -149,6 +197,8 @@ export const attachSliceWalletSignerFrame = ({
   const normalizedSelfOrigin = new URL(selfOrigin).origin
   let parentOrigin: string | null = null
   let parentPort: MessagePort | null = null
+  const unlockedAccounts = new Set<string>()
+  const accountKey = (account: string) => account.toLowerCase()
 
   const getStoredSession = async (
     key: SliceWalletFrameSessionKey
@@ -158,6 +208,9 @@ export const attachSliceWalletSignerFrame = ({
     if (stored === null) throw new Error("Wallet session is unavailable.")
     if (stored.session.expiresAt <= now())
       throw new Error("Wallet session has expired.")
+    if (!unlockedAccounts.has(accountKey(stored.session.account))) {
+      throw new Error("Wallet session is locked. Connect with your passkey.")
+    }
     return stored
   }
 
@@ -165,14 +218,12 @@ export const attachSliceWalletSignerFrame = ({
     key: SliceWalletFrameSessionKey
   ): Promise<SliceWalletStoredSession> => {
     if (parentOrigin === null) throw new Error("Wallet frame is not connected.")
-    const stored =
-      (await sessionStore.getPending(parentOrigin, key)) ??
-      (await sessionStore.get(parentOrigin, key))
-    if (stored === null) throw new Error("Wallet session is unavailable.")
-    if (stored.session.expiresAt <= now()) {
+    const pending = await sessionStore.getPending(parentOrigin, key)
+    if (pending === null) return getStoredSession(key)
+    if (pending.session.expiresAt <= now()) {
       throw new Error("Wallet session has expired.")
     }
-    return stored
+    return pending
   }
 
   const handleRequest = async (request: SliceWalletFrameRequest) => {
@@ -217,6 +268,15 @@ export const attachSliceWalletSignerFrame = ({
     }
     if (request.method === "consumeAuthorization") {
       return (await consumeAuthorization?.(request.params)) ?? null
+    }
+    if (request.method === "lockAccount") {
+      unlockedAccounts.delete(accountKey(request.params.account))
+      return null
+    }
+    if (request.method === "getAccountLockState") {
+      return unlockedAccounts.has(accountKey(request.params.account))
+        ? "unlocked"
+        : "locked"
     }
     if (request.method === "clearSession") {
       await sessionStore.delete(parentOrigin, request.params)
@@ -470,11 +530,56 @@ export const attachSliceWalletSignerFrame = ({
     if (
       event.origin !== normalizedSelfOrigin ||
       event.ports.length !== 1 ||
-      parentOrigin === null ||
-      !isBridgeChallenge(event.data)
+      parentOrigin === null
     ) {
       return
     }
+
+    if (isBridgeUnlockChallenge(event.data)) {
+      const port = event.ports[0]
+      const challenge = event.data
+      let handled = false
+      const timeout = setTimeout(() => port.close(), 15_000)
+      port.addEventListener(
+        "message",
+        (messageEvent: MessageEvent<SliceWalletProtocolValue>) => {
+          if (handled) return
+          handled = true
+          try {
+            const request = parseBridgeUnlockRequest(messageEvent.data)
+            if (
+              request.nonce !== challenge.nonce ||
+              request.account.toLowerCase() !== challenge.account.toLowerCase()
+            ) {
+              throw new Error("Bridge unlock does not match its challenge.")
+            }
+            unlockedAccounts.add(accountKey(request.account))
+            port.postMessage({
+              account: request.account,
+              nonce: request.nonce,
+              type: "slice-wallet:bridge-unlocked",
+              version: 1
+            })
+          } finally {
+            clearTimeout(timeout)
+            port.close()
+          }
+        },
+        { once: true }
+      )
+      port.start()
+      port.postMessage({
+        account: challenge.account,
+        nonce: challenge.nonce,
+        origin: parentOrigin,
+        type: "slice-wallet:bridge-unlock-record",
+        version: 1
+      })
+      return
+    }
+
+    if (!isBridgeChallenge(event.data)) return
+
     const bridgedParentOrigin = parentOrigin
     const session = await sessionStore.getPending(
       bridgedParentOrigin,

@@ -60,32 +60,35 @@ export const createSliceWalletSessionIntegration = ({
     onChange(state)
   }
 
-  const revoke = async () => {
-    generation += 1
-    updateState({ session: null, sessionError: null })
-    if (config.adapter === undefined) return
+  const endSession = async ({
+    adapter,
+    warn
+  }: Pick<IntegrationConfig, "adapter" | "warn">) => {
+    if (adapter === undefined) return
     try {
-      await config.adapter.end()
+      await adapter.end()
     } catch (error) {
-      config.warn(
+      warn(
         error instanceof Error ? error.message : "Session revocation failed."
       )
     }
   }
 
+  const revoke = async () => {
+    generation += 1
+    updateState({ session: null, sessionError: null })
+    await endSession(config)
+  }
+
   const configure = (nextConfig: IntegrationConfig) => {
-    config = nextConfig
+    const previousConfig = config
     const identity =
-      config.account === null || config.audience === undefined
+      nextConfig.account === null || nextConfig.audience === undefined
         ? null
-        : `${config.account.toLowerCase()}:${config.chainId}:${config.audience}`
-    if (
-      previousIdentity !== null &&
-      previousIdentity !== identity &&
-      state.session !== null
-    ) {
-      void revoke()
-    }
+        : `${nextConfig.account.toLowerCase()}:${nextConfig.chainId}:${nextConfig.audience}`
+    const shouldEndPreviousSession =
+      previousIdentity !== null && previousIdentity !== identity
+    config = nextConfig
     previousIdentity = identity
     if (
       config.account === null ||
@@ -94,12 +97,19 @@ export const createSliceWalletSessionIntegration = ({
     ) {
       generation += 1
       updateState({ session: null, sessionError: null })
+      if (shouldEndPreviousSession) void endSession(previousConfig)
       return
     }
     const capturedGeneration = ++generation
     const { account, adapter, audience, chainId } = config
-    void adapter
-      .fetch()
+    if (shouldEndPreviousSession) {
+      updateState({ session: null, sessionError: null })
+    }
+    void (
+      shouldEndPreviousSession
+        ? endSession(previousConfig).then(() => adapter.fetch())
+        : adapter.fetch()
+    )
       .then((snapshot) => {
         if (capturedGeneration !== generation) return
         updateState({
