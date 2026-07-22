@@ -32,6 +32,21 @@
         "scripts/generate-chains.ts",
         "../contracts/wallet/deployments/addresses.json"
       ]
+    },
+    "test": {
+      "dependsOn": ["test:e2e:two-chain"]
+    },
+    "test:e2e:two-chain": {
+      "cache": false,
+      "dependsOn": ["@slice/contracts#build:wallet"],
+      "env": [
+        "RPC_URL_BASE",
+        "WALLET_E2E_BUNDLER_PORT_A",
+        "WALLET_E2E_BUNDLER_PORT_B",
+        "WALLET_E2E_RPC_PORT_A",
+        "WALLET_E2E_RPC_PORT_B"
+      ],
+      "inputs": ["$TURBO_DEFAULT$", "../../scripts/run-wallet-two-chain-e2e.sh"]
     }
   }
 }
