@@ -210,11 +210,11 @@ const encodeInstallValidations = () =>
     ]
   })
 
-const encodeGrantAccess = () =>
+const encodeGrantAccess = (allow = true) =>
   encodeFunctionData({
     abi: kernelValidationManagementAbi,
     functionName: "grantAccess",
-    args: [recoveryValidationId, "0xe9ae5c53", true]
+    args: [recoveryValidationId, "0xe9ae5c53", allow]
   })
 
 const encodeSmartWalletExecuteBatch = (
@@ -1692,6 +1692,37 @@ describe("slice paymaster", () => {
           result: { paymasterAndData: "0x1234" }
         })
       }
+    )
+    const fetchSenderAccount = mock(async () => kernelSenderAccountSnapshot)
+
+    const response = await handleTestPaymasterRequest(
+      new Request("https://shop.test/api/paymaster", {
+        body: JSON.stringify(body),
+        method: "POST"
+      }),
+      {
+        cdpApiKey,
+        fetchPaymaster,
+        fetchSenderAccount
+      }
+    )
+
+    expect(response.status).toBe(200)
+    expect(fetchPaymaster).toHaveBeenCalledTimes(1)
+    expect(fetchSenderAccount).toHaveBeenCalledTimes(1)
+  })
+
+  it("sponsors Kernel's direct root self-administration call", async () => {
+    const body = createPaymasterBody(encodeGrantAccess(false), {
+      entryPoint: entryPoint07Address,
+      nonce: rootValidationNonce
+    })
+    const fetchPaymaster = mock(async () =>
+      Response.json({
+        jsonrpc: "2.0",
+        id: 1,
+        result: { paymasterAndData: "0x1234" }
+      })
     )
     const fetchSenderAccount = mock(async () => kernelSenderAccountSnapshot)
 

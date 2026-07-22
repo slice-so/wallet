@@ -24,8 +24,7 @@ import type {
 import type { useSliceWalletExecutionAuthority } from "./executionAuthority"
 import {
   clearStoredExecutionSession,
-  readStoredExecutionSession,
-  readStoredPendingReplacement
+  readStoredExecutionSession
 } from "./executionKeyStore"
 import { retrySliceWalletFinalityAction } from "./permissionLifecycle"
 
@@ -40,7 +39,6 @@ export const useSliceWalletExecutionLifecycle = ({
   executionSession,
   fetchCheckoutDelegation,
   getFrameClient,
-  managementExecutionSession,
   notifications,
   publicClient,
   setExecutionSession,
@@ -64,7 +62,6 @@ export const useSliceWalletExecutionLifecycle = ({
     typeof useSliceWalletExecutionAuthority
   >["fetchCheckoutDelegation"]
   getFrameClient: () => Promise<SliceWalletSignerFrameClient>
-  managementExecutionSession: SliceWalletManagementExecutionSession | null
   notifications?: SliceWalletNotifications
   publicClient: Parameters<
     typeof buildSliceWalletPermissionRevocationCalls
@@ -131,63 +128,6 @@ export const useSliceWalletExecutionLifecycle = ({
     fetchCheckoutDelegation,
     getFrameClient,
     setExecutionSession,
-    walletChainId
-  ])
-
-  const clearExecutionSessions = useCallback(async () => {
-    const activeAccount = activeWalletRef.current?.kernelAccount.address
-    if (activeAccount) {
-      const pendingReplacements = await Promise.all([
-        readStoredPendingReplacement(activeAccount, "checkout"),
-        readStoredPendingReplacement(activeAccount, "store_management")
-      ])
-      const hadExecutionPermission =
-        executionSession !== null ||
-        managementExecutionSession !== null ||
-        pendingReplacements.some((replacement) => replacement !== null)
-      await Promise.all([
-        clearStoredExecutionSession(activeAccount, "checkout"),
-        clearStoredExecutionSession(activeAccount, "store_management")
-      ])
-      try {
-        const frameClient = await getFrameClient()
-        await Promise.all([
-          frameClient.request({
-            method: "clearSession",
-            params: {
-              account: activeAccount,
-              chainId: walletChainId,
-              grantKind: "checkout"
-            }
-          }),
-          frameClient.request({
-            method: "clearSession",
-            params: {
-              account: activeAccount,
-              chainId: walletChainId,
-              grantKind: "management"
-            }
-          })
-        ])
-      } catch {
-        // Sign-out still completes if the isolated signer is unavailable.
-      }
-      if (hadExecutionPermission) {
-        notifications?.error?.(
-          "Your onchain wallet permission remains active until you revoke it from Slice ID."
-        )
-      }
-    }
-    setExecutionSession(null)
-    setManagementExecutionSession(null)
-  }, [
-    activeWalletRef,
-    executionSession,
-    getFrameClient,
-    managementExecutionSession,
-    notifications,
-    setExecutionSession,
-    setManagementExecutionSession,
     walletChainId
   ])
 
@@ -310,7 +250,6 @@ export const useSliceWalletExecutionLifecycle = ({
   ])
 
   return {
-    clearExecutionSessions,
     disableManagementExecutionSession,
     refreshExecutionAllowance
   }

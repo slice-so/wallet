@@ -286,26 +286,22 @@ export function SliceWalletProvider({
     walletChainId: walletChain.id
   })
 
-  const {
-    clearExecutionSessions,
-    disableManagementExecutionSession,
-    refreshExecutionAllowance
-  } = useSliceWalletExecutionLifecycle({
-    activeWalletRef,
-    checkoutExecution,
-    createReplacementFinalizationProof,
-    executionSession,
-    fetchCheckoutDelegation,
-    getFrameClient,
-    managementExecutionSession,
-    notifications,
-    publicClient,
-    setExecutionSession,
-    setManagementExecutionSession,
-    sliceAccountClient,
-    storeManagement,
-    walletChainId: walletChain.id
-  })
+  const { disableManagementExecutionSession, refreshExecutionAllowance } =
+    useSliceWalletExecutionLifecycle({
+      activeWalletRef,
+      checkoutExecution,
+      createReplacementFinalizationProof,
+      executionSession,
+      fetchCheckoutDelegation,
+      getFrameClient,
+      notifications,
+      publicClient,
+      setExecutionSession,
+      setManagementExecutionSession,
+      sliceAccountClient,
+      storeManagement,
+      walletChainId: walletChain.id
+    })
 
   const runRecoveryAction = useCallback(
     async (
@@ -368,7 +364,6 @@ export function SliceWalletProvider({
     () => ({
       cancelPendingCeremony,
       cancelRecoveryProposal,
-      clearExecutionSessions,
       continueInPopup,
       createWallet,
       disableManagementExecutionSession,
@@ -396,7 +391,6 @@ export function SliceWalletProvider({
     [
       cancelPendingCeremony,
       cancelRecoveryProposal,
-      clearExecutionSessions,
       continueInPopup,
       createWallet,
       disableManagementExecutionSession,

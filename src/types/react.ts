@@ -192,7 +192,6 @@ export type SliceWalletProviderProps = {
 export type SliceWalletContextValue = {
   cancelPendingCeremony: () => void
   cancelRecoveryProposal: () => Promise<void>
-  clearExecutionSessions: () => Promise<void>
   continueInPopup: () => Promise<object | string | null | undefined>
   createWallet: () => Promise<boolean>
   enableExecutionSession: (input?: {

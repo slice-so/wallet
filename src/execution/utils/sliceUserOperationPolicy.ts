@@ -663,6 +663,29 @@ export const isSupportedSliceEntryPointRequest = ({
   )
 }
 
+const getSliceUserOperationCalls = ({
+  allowDirectAccountAdministration,
+  userOperation
+}: {
+  allowDirectAccountAdministration: boolean
+  userOperation: SliceUserOperation
+}) => {
+  const decoded = getSliceSmartAccountCalls(userOperation.callData)
+  if (decoded !== null) return decoded
+
+  // Kernel executes a single root-authorized self-call directly instead of
+  // wrapping it in ERC-7579 execute(bytes32,bytes).
+  return allowDirectAccountAdministration
+    ? [
+        {
+          data: userOperation.callData,
+          target: userOperation.sender,
+          value: 0n
+        }
+      ]
+    : null
+}
+
 export const isAcceptedSliceUserOperation = async ({
   acceptedSenderCode = defaultAcceptedSenderCode,
   acceptedChainIds = [defaultSliceChainId],
@@ -710,12 +733,16 @@ export const isAcceptedSliceUserOperation = async ({
     return false
   }
 
-  const calls = getSliceSmartAccountCalls(userOperation.callData)
-  if (calls === null) return false
   const nonce = parseUserOperationNonce(userOperation.nonce)
   if (nonce === null) return false
+  const isRootValidation = isKernelRootValidationNonce(nonce)
+  const calls = getSliceUserOperationCalls({
+    allowDirectAccountAdministration: isRootValidation,
+    userOperation
+  })
+  if (calls === null) return false
   const batch = classifySliceSmartAccountCallsBatch(calls, {
-    allowAccountAdministration: isKernelRootValidationNonce(nonce),
+    allowAccountAdministration: isRootValidation,
     chainId: parsedChainId,
     sender: userOperation.sender
   })
@@ -824,8 +851,12 @@ export const isAcceptedSliceIdSecurityOperationUserOperation = ({
   }
   const parsedChainId = parseSliceChainId(chainId)
   if (parsedChainId === null) return false
-  if (parseUserOperationNonce(userOperation.nonce) === null) return false
-  const calls = getSliceSmartAccountCalls(userOperation.callData)
+  const nonce = parseUserOperationNonce(userOperation.nonce)
+  if (nonce === null) return false
+  const calls = getSliceUserOperationCalls({
+    allowDirectAccountAdministration: isKernelRootValidationNonce(nonce),
+    userOperation
+  })
   if (!calls?.length || calls.length > maxAcceptedSliceCallsPerBatch) {
     return false
   }

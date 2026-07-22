@@ -172,11 +172,11 @@ const encodeInstallValidations = () =>
     ]
   })
 
-const encodeGrantAccess = () =>
+const encodeGrantAccess = (allow = true) =>
   encodeFunctionData({
     abi: kernelValidationManagementAbi,
     functionName: "grantAccess",
-    args: [recoveryValidationId, "0xe9ae5c53", true]
+    args: [recoveryValidationId, "0xe9ae5c53", allow]
   })
 
 const encodeUninstallValidation = () =>
@@ -830,6 +830,40 @@ describe("slice bundler", () => {
     expect(fetchSenderAccount).toHaveBeenCalledTimes(1)
   })
 
+  it("forwards Kernel's direct root self-administration call", async () => {
+    const body = createBundlerBody(
+      "eth_sendUserOperation",
+      encodeGrantAccess(false),
+      { nonce: rootValidationNonce }
+    )
+    const fetchBundler = mock(async () =>
+      Response.json({
+        jsonrpc: "2.0",
+        id: 1,
+        result: userOperationHash
+      })
+    )
+    const fetchSenderAccount = createSenderAccountFetch(
+      kernelSenderAccountSnapshot
+    )
+
+    const response = await handleTestBundlerRequest(
+      new Request("https://shop.test/api/bundler", {
+        body: JSON.stringify(body),
+        method: "POST"
+      }),
+      {
+        cdpApiKey,
+        fetchBundler,
+        fetchSenderAccount
+      }
+    )
+
+    expect(response.status).toBe(200)
+    expect(fetchBundler).toHaveBeenCalledTimes(1)
+    expect(fetchSenderAccount).toHaveBeenCalledTimes(1)
+  })
+
   it("forwards root-signed recovery timelock cancellations for the sender", async () => {
     const body = createBundlerBody(
       "eth_sendUserOperation",
@@ -1227,6 +1261,13 @@ describe("Slice ID security-operation policy", () => {
         ])
       )
     ).toBe(true)
+  })
+
+  it("accepts direct self-administration only for root validation", () => {
+    expect(accepts(encodeGrantAccess(false), rootValidationNonce)).toBe(true)
+    expect(accepts(encodeGrantAccess(false), permissionValidationNonce)).toBe(
+      false
+    )
   })
 
   it("rejects sponsored administration targeting another account", () => {
