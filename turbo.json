@@ -12,25 +12,20 @@
       ]
     },
     "build": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "@slice/contracts#wallet-deployments:inputs"],
       "envMode": "loose",
       "inputs": [
         "src/**/*.ts",
         "build.ts",
         "config/chains.policy.json",
-        "scripts/generate-chains.ts",
-        "../contracts/wallet/deployments/addresses.json"
+        "scripts/generate-chains.ts"
       ],
       "outputs": ["dist/**"]
     },
     "type-check": {
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "tsconfig.json",
-        "src/**/*.ts",
-        "config/chains.policy.json",
-        "scripts/generate-chains.ts",
-        "../contracts/wallet/deployments/addresses.json"
+      "dependsOn": [
+        "type-check:inputs",
+        "@slice/contracts#wallet-deployments:inputs"
       ]
     },
     "test:e2e:two-chain": {
