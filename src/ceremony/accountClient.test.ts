@@ -13,7 +13,8 @@ const publicKey = `0x04${"33".repeat(64)}` as const
 const createWindow = (
   respond: (
     message: SliceWalletProtocolValue,
-    reply: (session: SliceWalletCeremonySessionResult) => void
+    reply: (session: SliceWalletCeremonySessionResult) => void,
+    reject: () => void
   ) => void
 ) => {
   let onWindowMessage:
@@ -47,10 +48,18 @@ const createWindow = (
           type: "slice-wallet:ceremony-account",
           version: 2
         })
+      const reject = () =>
+        port.postMessage({
+          code: "authorization_failed",
+          message: "User rejected the request",
+          nonce,
+          type: "slice-wallet:ceremony-error",
+          version: 1
+        })
       port.addEventListener(
         "message",
         (event: MessageEvent<SliceWalletProtocolValue>) =>
-          respond(event.data, reply)
+          respond(event.data, reply, reject)
       )
       port.start()
     }
@@ -113,6 +122,33 @@ const registryFetch = Object.assign(
 ) satisfies typeof fetch
 
 describe("Slice wallet account session coordination", () => {
+  it("rejects cancellation without waiting for session preparation", async () => {
+    const window = createWindow((message, _reply, reject) => {
+      if (
+        typeof message === "object" &&
+        message !== null &&
+        !Array.isArray(message) &&
+        (message as { status?: string }).status === "preparing"
+      ) {
+        reject()
+      }
+    })
+
+    const connection = connectSliceWalletAccount({
+      chainId: 8453,
+      fetch: registryFetch,
+      idOrigin: "https://id.slice.so",
+      session: {
+        audience: "https://api.slice.test",
+        prepare: () => new Promise(() => undefined)
+      },
+      timeoutMs: 100,
+      window
+    })
+
+    await expect(connection).rejects.toThrow("User rejected the request")
+  })
+
   it("returns preparation_failed when preparation rejects", async () => {
     const window = createWindow((message, reply) => {
       if (

@@ -1,4 +1,5 @@
 import type { Address, Hex } from "viem"
+import type { SliceWalletCeremonyMode } from "./ceremony"
 import type {
   SliceWalletCeremonyContinuationResult,
   SliceWalletPendingCeremony
@@ -72,6 +73,7 @@ export type SliceWalletTransportOverrides = {
 
 export type SliceWalletParameters = {
   announce?: boolean
+  ceremonyMode?: SliceWalletCeremonyMode
   chainIds?: readonly number[]
   defaultChainId?: number
   idOrigin?: string

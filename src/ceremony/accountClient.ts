@@ -110,13 +110,27 @@ const runSliceWalletAccountCeremony = async ({
         type: "slice-wallet:ceremony-session-request",
         version: 1
       } satisfies SliceWalletCeremonySessionRequestMessage)
-      const preparation = await (async () => {
+      const preparationPromise = (async () => {
         try {
           return session.prepared ?? (await session.prepare?.())
         } catch {
           return undefined
         }
       })()
+      const terminalResultPromise = resultPromise.then((result) =>
+        result.session !== undefined && result.session.status !== "granted"
+          ? { result, type: "result" as const }
+          : new Promise<never>(() => undefined)
+      )
+      const first = await Promise.race([
+        preparationPromise.then((preparation) => ({
+          preparation,
+          type: "preparation" as const
+        })),
+        terminalResultPromise
+      ])
+      if (first.type === "result") return first.result
+      const preparation = first.preparation
       if (preparation === undefined || session.signal?.aborted === true) {
         port.postMessage({
           status: "preparation_failed",

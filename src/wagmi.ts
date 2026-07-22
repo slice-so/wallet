@@ -4,5 +4,7 @@ import type { SliceWalletParameters } from "./types"
 
 export const sliceWalletConnectorId = "slice-wallet"
 
-export const sliceWallet = (parameters?: SliceWalletParameters) =>
-  sliceWalletConnector(resolveCanonicalSliceWalletConfig(parameters))
+export const sliceWallet = (parameters: SliceWalletParameters = {}) =>
+  sliceWalletConnector(
+    resolveCanonicalSliceWalletConfig({ announce: false, ...parameters })
+  )

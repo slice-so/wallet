@@ -40,7 +40,9 @@ export const sliceWalletConnector = (parameters: SliceWalletProviderConfig) => {
       id: "slice-wallet",
       name: "Slice Wallet",
       rdns: "so.slice.wallet",
-      type: "slice-wallet",
+      // Embedded wallets report as injected so wallet-list UIs invoke connect()
+      // instead of treating them as unavailable browser extensions.
+      type: "injected",
       async setup() {
         const walletProvider = getProvider()
         if (parameters.announce === true && stopAnnouncement === null) {

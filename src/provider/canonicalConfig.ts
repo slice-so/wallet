@@ -60,6 +60,7 @@ export const resolveCanonicalSliceWalletConfig = (
 ): SliceWalletProviderConfig => {
   const allowedParameterKeys = new Set([
     "announce",
+    "ceremonyMode",
     "chainIds",
     "defaultChainId",
     "idOrigin",
@@ -76,6 +77,12 @@ export const resolveCanonicalSliceWalletConfig = (
     typeof parameters.announce !== "boolean"
   ) {
     throw invalidProviderRequest("Slice Wallet announce must be boolean.")
+  }
+  if (
+    parameters.ceremonyMode !== undefined &&
+    !["auto", "iframe", "popup"].includes(parameters.ceremonyMode)
+  ) {
+    throw invalidProviderRequest("Slice Wallet ceremonyMode is invalid.")
   }
 
   const chainIds = parameters.chainIds ?? [
@@ -216,6 +223,7 @@ export const resolveCanonicalSliceWalletConfig = (
   }
   return {
     announce: parameters.announce ?? true,
+    ceremonyMode: parameters.ceremonyMode ?? "auto",
     chains,
     defaultChainId,
     idOrigin,

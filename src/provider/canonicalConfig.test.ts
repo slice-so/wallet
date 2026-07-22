@@ -11,6 +11,7 @@ describe("canonical Slice Wallet config", () => {
       8453, 1, 10, 42161
     ])
     expect(config.requireAdmittedChain).toBe(true)
+    expect(config.ceremonyMode).toBe("auto")
   })
 
   test("rejects unsupported chains and security-metadata overrides", () => {
@@ -34,6 +35,17 @@ describe("canonical Slice Wallet config", () => {
     const config = resolveCanonicalSliceWalletConfig({ chainIds: [10, 1] })
 
     expect(config.defaultChainId).toBe(10)
+  })
+
+  test("accepts only supported ceremony modes", () => {
+    expect(
+      resolveCanonicalSliceWalletConfig({ ceremonyMode: "iframe" }).ceremonyMode
+    ).toBe("iframe")
+    const invalidConfig: SliceWalletParameters = {}
+    Reflect.set(invalidConfig, "ceremonyMode", "embedded")
+    expect(() => resolveCanonicalSliceWalletConfig(invalidConfig)).toThrow(
+      "ceremonyMode is invalid"
+    )
   })
 
   test("applies only valid transport URL overrides", () => {
