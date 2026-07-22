@@ -36,7 +36,7 @@ describe("Slice Wallet Wagmi connector", () => {
 
     expect(config.connectors[0]).toMatchObject({
       id: "slice-wallet",
-      name: "Slice Wallet",
+      name: "Slice ID",
       type: "injected"
     })
   })

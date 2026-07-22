@@ -38,7 +38,7 @@ export const sliceWalletConnector = (parameters: SliceWalletProviderConfig) => {
     return {
       icon: sliceWalletProviderIcon,
       id: "slice-wallet",
-      name: "Slice Wallet",
+      name: "Slice ID",
       rdns: "so.slice.wallet",
       // Embedded wallets report as injected so wallet-list UIs invoke connect()
       // instead of treating them as unavailable browser extensions.
