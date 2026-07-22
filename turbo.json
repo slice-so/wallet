@@ -34,15 +34,14 @@
       ]
     },
     "test:e2e:two-chain": {
-      "cache": false,
+      "dependsOn": ["test:inputs", "@slice/contracts#test:inputs"],
       "env": [
         "RPC_URL_BASE",
         "WALLET_E2E_BUNDLER_PORT_A",
         "WALLET_E2E_BUNDLER_PORT_B",
         "WALLET_E2E_RPC_PORT_A",
         "WALLET_E2E_RPC_PORT_B"
-      ],
-      "inputs": ["$TURBO_DEFAULT$", "../../scripts/run-wallet-two-chain-e2e.sh"]
+      ]
     }
   }
 }
