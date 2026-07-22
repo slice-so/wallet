@@ -33,12 +33,8 @@
         "../contracts/wallet/deployments/addresses.json"
       ]
     },
-    "test": {
-      "dependsOn": ["test:e2e:two-chain"]
-    },
     "test:e2e:two-chain": {
       "cache": false,
-      "dependsOn": ["@slice/contracts#build:wallet"],
       "env": [
         "RPC_URL_BASE",
         "WALLET_E2E_BUNDLER_PORT_A",
