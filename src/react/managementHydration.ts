@@ -77,7 +77,19 @@ export const hydrateStoredManagementExecutionSession = async ({
     return
   }
   if (storedResult.status === "missing") {
+    let activeDelegationExists = false
+    try {
+      const { delegation } = await fetchDelegation()
+      activeDelegationExists =
+        delegation !== null &&
+        delegation.signerScheme === "p256" &&
+        delegation.permissionId !== null
+    } catch {
+      // Missing local state is normal when management was never enabled.
+    }
+    control.assertCurrent()
     setSessionNull()
+    if (activeDelegationExists) control.markError("session-invalid")
     return
   }
 

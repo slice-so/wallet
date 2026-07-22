@@ -50,6 +50,122 @@ const createControl = () => {
 }
 
 describe("management execution hydration", () => {
+  test("marks a missing local session invalid when its p256 delegation is active", async () => {
+    let cleared = 0
+    let frameClients = 0
+    let sessionClears = 0
+    const lifecycle = createControl()
+
+    await lifecycle.runHydration(account, (control) =>
+      hydrateStoredManagementExecutionSession({
+        account,
+        activate: async () => undefined,
+        chainId: 8453,
+        clearStoredSession: async () => {
+          cleared += 1
+        },
+        control,
+        fetchDelegation: async () => ({
+          delegation: {
+            appOrigin: "https://example.com",
+            delegationId: "delegation",
+            expiresAt: "2099-01-01T00:00:00.000Z",
+            permissionId: stored.permissionId,
+            signerAddress: stored.signerAddress,
+            signerPublicKey: null,
+            signerScheme: "p256",
+            slicerId: 7,
+            walletPolicy: null
+          }
+        }),
+        getFrameClient: async () => {
+          frameClients += 1
+          throw new Error("not expected")
+        },
+        readStoredSession: async () => ({ status: "missing" }),
+        setSessionNull: () => {
+          sessionClears += 1
+        }
+      })
+    )
+
+    expect(cleared).toBe(0)
+    expect(frameClients).toBe(0)
+    expect(sessionClears).toBe(1)
+    expect(lifecycle.getSnapshot()).toEqual({
+      error: "session-invalid",
+      status: "settled"
+    })
+  })
+
+  test("settles a missing local session cleanly without a delegation", async () => {
+    let cleared = 0
+    let sessionClears = 0
+    const lifecycle = createControl()
+
+    await lifecycle.runHydration(account, (control) =>
+      hydrateStoredManagementExecutionSession({
+        account,
+        activate: async () => undefined,
+        chainId: 8453,
+        clearStoredSession: async () => {
+          cleared += 1
+        },
+        control,
+        fetchDelegation: async () => ({ delegation: null }),
+        getFrameClient: async () => {
+          throw new Error("not expected")
+        },
+        readStoredSession: async () => ({ status: "missing" }),
+        setSessionNull: () => {
+          sessionClears += 1
+        }
+      })
+    )
+
+    expect(cleared).toBe(0)
+    expect(sessionClears).toBe(1)
+    expect(lifecycle.getSnapshot()).toEqual({
+      error: null,
+      status: "settled"
+    })
+  })
+
+  test("settles a missing local session cleanly when delegation lookup fails", async () => {
+    let cleared = 0
+    let sessionClears = 0
+    const lifecycle = createControl()
+
+    await lifecycle.runHydration(account, (control) =>
+      hydrateStoredManagementExecutionSession({
+        account,
+        activate: async () => undefined,
+        chainId: 8453,
+        clearStoredSession: async () => {
+          cleared += 1
+        },
+        control,
+        fetchDelegation: async () => {
+          throw new Error("offline")
+        },
+        getFrameClient: async () => {
+          throw new Error("not expected")
+        },
+        readStoredSession: async () => ({ status: "missing" }),
+        setSessionNull: () => {
+          sessionClears += 1
+        }
+      })
+    )
+
+    expect(cleared).toBe(0)
+    expect(sessionClears).toBe(1)
+    expect(lifecycle.getSnapshot()).toEqual({
+      error: null,
+      status: "settled"
+    })
+  })
+
   test("keeps stored state and exposes a retryable delegation-fetch failure", async () => {
     let cleared = 0
     let frameRequests = 0
