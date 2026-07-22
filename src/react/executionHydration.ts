@@ -160,6 +160,11 @@ export const useSliceWalletExecutionHydration = ({
         )
         if (stored?.kind !== "checkout" || !checkoutExecution) return
         const frameClient = await getFrameClient()
+        const lockState = await frameClient.request({
+          method: "getAccountLockState",
+          params: { account: kernelAccount.address }
+        })
+        if (lockState !== "unlocked") return
         const frameResult = await frameClient.request({
           method: "getSession",
           params: {
@@ -323,6 +328,11 @@ export const useSliceWalletExecutionHydration = ({
         )
         if (stored?.kind !== "store_management" || !storeManagement) return
         const frameClient = await getFrameClient()
+        const lockState = await frameClient.request({
+          method: "getAccountLockState",
+          params: { account: kernelAccount.address }
+        })
+        if (lockState !== "unlocked") return
         const [frameResult, { delegation }] = await Promise.all([
           frameClient.request({
             method: "getSession",

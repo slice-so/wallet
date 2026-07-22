@@ -9,7 +9,7 @@ import {
   useRef,
   useState
 } from "react"
-import { createPublicClient, http } from "viem"
+import { createPublicClient, http, isAddressEqual } from "viem"
 import { anvil } from "viem/chains"
 import { useConnection } from "wagmi"
 import {
@@ -141,6 +141,7 @@ export function SliceWalletProvider({
       ReturnType<typeof createSliceWalletCeremonyKernelAccount>
     >
   } | null>(null)
+  const previousSliceAccountRef = useRef(connectedSliceAccount)
 
   const {
     createReplacementFinalizationProof,
@@ -222,10 +223,27 @@ export function SliceWalletProvider({
   }, [wagmiConfig.connectors])
 
   useEffect(() => {
-    if (connectedSliceAccount !== null) return
-    setExecutionSession(null)
-    setManagementExecutionSession(null)
-  }, [connectedSliceAccount])
+    const previousAccount = previousSliceAccountRef.current
+    previousSliceAccountRef.current = connectedSliceAccount
+    if (
+      previousAccount !== null &&
+      (connectedSliceAccount === null ||
+        !isAddressEqual(previousAccount, connectedSliceAccount))
+    ) {
+      void getFrameClient()
+        .then((frameClient) =>
+          frameClient.request({
+            method: "lockAccount",
+            params: { account: previousAccount }
+          })
+        )
+        .catch(() => undefined)
+    }
+    if (connectedSliceAccount === null) {
+      setExecutionSession(null)
+      setManagementExecutionSession(null)
+    }
+  }, [connectedSliceAccount, getFrameClient])
 
   const pendingCeremony = featurePendingCeremony ?? connectorPendingCeremony
 

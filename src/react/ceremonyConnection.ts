@@ -4,7 +4,7 @@ import { type Config, connect } from "@wagmi/core"
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { Chain } from "viem"
 import {
-  connectSliceWalletSignerFrame,
+  acquireSliceWalletSignerFrame,
   createSliceWalletCeremonyBroker,
   type createSliceWalletCeremonyKernelAccount
 } from "../index"
@@ -51,7 +51,7 @@ export const useSliceWalletCeremonyConnection = (
     if (frameClientRef.current !== null) return frameClientRef.current
     const pending =
       frameClientPromiseRef.current ??
-      connectSliceWalletSignerFrame({
+      acquireSliceWalletSignerFrame({
         document,
         frameUrl: new URL("/frame", normalizedIdOrigin).href,
         window

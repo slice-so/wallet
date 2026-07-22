@@ -109,6 +109,43 @@ const receive = (port: MessagePort, timeoutMs = 100) =>
     port.start()
   })
 
+const unlockCommittedAccount = async (
+  window: MockMessageWindow,
+  parent: MessageEventSource
+) => {
+  const channel = new MessageChannel()
+  const record = receive(channel.port1)
+  window.dispatch({
+    data: {
+      account,
+      nonce,
+      type: "slice-wallet:bridge-unlock-challenge",
+      version: 1
+    },
+    origin: "https://id.slice.so",
+    ports: [channel.port2],
+    source: parent
+  })
+  expect(await record).toMatchObject({
+    account,
+    nonce,
+    origin: "https://app.example",
+    type: "slice-wallet:bridge-unlock-record"
+  })
+  const response = receive(channel.port1)
+  channel.port1.postMessage({
+    account,
+    nonce,
+    type: "slice-wallet:bridge-unlock",
+    version: 1
+  } satisfies SliceWalletProtocolValue)
+  expect(await response).toMatchObject({
+    account,
+    nonce,
+    type: "slice-wallet:bridge-unlocked"
+  })
+}
+
 describe("isolated signer-frame controller", () => {
   test("binds the first parent origin and rejects substitute connections", async () => {
     const parent = new MessageChannel()
@@ -167,7 +204,7 @@ describe("isolated signer-frame controller", () => {
     detach()
   })
 
-  test("answers bridge challenges only from the pinned id origin", async () => {
+  test("unlocks a committed session only through the pinned id bridge", async () => {
     const parent = new MessageChannel()
     const window = new MockMessageWindow(parent.port1)
     const store = new MemorySessionStore()
@@ -236,7 +273,120 @@ describe("isolated signer-frame controller", () => {
       origin: "https://app.example",
       type: "slice-wallet:bridge-record"
     })
+
+    const committed = receive(connection.port1)
+    connection.port1.postMessage({
+      id: "commit",
+      method: "commitSession",
+      params: { account, chainId: 8453, grantKind: "generic" },
+      version: 1
+    } satisfies SliceWalletProtocolValue)
+    await committed
+    const locked = receive(connection.port1)
+    connection.port1.postMessage({
+      id: "lock",
+      method: "lockAccount",
+      params: { account },
+      version: 1
+    } satisfies SliceWalletProtocolValue)
+    await locked
+    const lockedState = receive(connection.port1)
+    connection.port1.postMessage({
+      id: "locked-state",
+      method: "getAccountLockState",
+      params: { account },
+      version: 1
+    } satisfies SliceWalletProtocolValue)
+    expect(await lockedState).toMatchObject({
+      id: "locked-state",
+      result: "locked"
+    })
+
+    const unlockChallenge = {
+      account,
+      nonce,
+      type: "slice-wallet:bridge-unlock-challenge",
+      version: 1
+    } as const
+    const untrustedUnlock = new MessageChannel()
+    const untrustedUnlockResponse = receive(untrustedUnlock.port1, 25)
+    window.dispatch({
+      data: unlockChallenge,
+      origin: "https://app.example",
+      ports: [untrustedUnlock.port2],
+      source: parent.port1
+    })
+    expect(await untrustedUnlockResponse).toBeNull()
+
+    const trustedUnlock = new MessageChannel()
+    const unlockRecord = receive(trustedUnlock.port1)
+    window.dispatch({
+      data: unlockChallenge,
+      origin: "https://id.slice.so",
+      ports: [trustedUnlock.port2],
+      source: parent.port1
+    })
+    expect(await unlockRecord).toMatchObject({
+      account,
+      nonce,
+      origin: "https://app.example",
+      type: "slice-wallet:bridge-unlock-record"
+    })
+    const unlockResponse = receive(trustedUnlock.port1)
+    trustedUnlock.port1.postMessage({
+      account,
+      nonce,
+      type: "slice-wallet:bridge-unlock",
+      version: 1
+    } satisfies SliceWalletProtocolValue)
+    expect(await unlockResponse).toMatchObject({
+      account,
+      nonce,
+      type: "slice-wallet:bridge-unlocked"
+    })
+    const unlockedState = receive(connection.port1)
+    connection.port1.postMessage({
+      id: "unlocked-state",
+      method: "getAccountLockState",
+      params: { account },
+      version: 1
+    } satisfies SliceWalletProtocolValue)
+    expect(await unlockedState).toMatchObject({
+      id: "unlocked-state",
+      result: "unlocked"
+    })
     detach()
+
+    const restartedParent = new MessageChannel()
+    const restartedWindow = new MockMessageWindow(restartedParent.port1)
+    const detachRestarted = attachSliceWalletSignerFrame({
+      decodeScopedCalls: () => [],
+      selfOrigin: "https://id.slice.so",
+      sessionStore: store,
+      validateCheckoutCalls: () => {},
+      window: restartedWindow
+    })
+    const restartedConnection = new MessageChannel()
+    const restarted = receive(restartedConnection.port1)
+    restartedWindow.dispatch({
+      data: { id: "reconnect", method: "connect", version: 1 },
+      origin: "https://app.example",
+      ports: [restartedConnection.port2],
+      source: restartedParent.port1
+    })
+    await restarted
+    const restartedState = receive(restartedConnection.port1)
+    restartedConnection.port1.postMessage({
+      id: "restarted-state",
+      method: "getAccountLockState",
+      params: { account },
+      version: 1
+    } satisfies SliceWalletProtocolValue)
+    expect(await restartedState).toMatchObject({
+      id: "restarted-state",
+      result: "locked"
+    })
+    detachRestarted()
   })
 
   test("signs a structured status proof with the committed checkout key", async () => {
@@ -293,6 +443,7 @@ describe("isolated signer-frame controller", () => {
       version: 1
     } satisfies SliceWalletProtocolValue)
     await committed
+    await unlockCommittedAccount(window, parent.port1)
 
     const signed = receive(connection.port1)
     connection.port1.postMessage({
@@ -491,6 +642,7 @@ describe("isolated signer-frame controller", () => {
       version: 1
     } satisfies SliceWalletProtocolValue)
     await committed
+    await unlockCommittedAccount(window, parent.port1)
     const revoked = receive(connection.port1)
     connection.port1.postMessage({
       id: "revoke",
@@ -564,6 +716,7 @@ describe("isolated signer-frame controller", () => {
       version: 1
     } satisfies SliceWalletProtocolValue)
     await committed
+    await unlockCommittedAccount(window, parent.port1)
 
     const refused = receive(connection.port1)
     connection.port1.postMessage({
@@ -644,6 +797,7 @@ describe("isolated signer-frame controller", () => {
       version: 1
     } satisfies SliceWalletProtocolValue)
     await committed
+    await unlockCommittedAccount(window, parent.port1)
 
     const refused = receive(connection.port1)
     connection.port1.postMessage({

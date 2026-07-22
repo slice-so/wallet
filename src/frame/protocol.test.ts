@@ -74,6 +74,29 @@ describe("signer-frame protocol parser", () => {
     ).toThrow("unknown field")
   })
 
+  it("accepts only an account for lock-state requests", () => {
+    const lockRequest = {
+      id: "lock-1",
+      method: "lockAccount",
+      params: { account },
+      version: 1
+    } as const satisfies SliceWalletProtocolValue
+    expect(parseSliceWalletFrameRequest(lockRequest)).toEqual(lockRequest)
+    expect(
+      parseSliceWalletFrameRequest({
+        ...lockRequest,
+        id: "state-1",
+        method: "getAccountLockState"
+      })
+    ).toMatchObject({ method: "getAccountLockState", params: { account } })
+    expect(() =>
+      parseSliceWalletFrameRequest({
+        ...lockRequest,
+        params: { account, unlocked: true }
+      })
+    ).toThrow("unknown field")
+  })
+
   it("accepts only the session key in signing requests", () => {
     const signingRequest = {
       id: "request-2",
