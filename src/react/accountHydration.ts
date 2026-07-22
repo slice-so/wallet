@@ -4,7 +4,6 @@ import { useCallback, useEffect } from "react"
 import {
   type Address,
   type Chain,
-  type Hex,
   isAddress,
   isAddressEqual,
   isHex
@@ -20,6 +19,7 @@ import {
   createSliceWalletCeremonyKernelAccount,
   createSliceWalletRegistryClient
 } from "../index"
+import { readStoredSliceWalletAccount } from "../provider/storage"
 import type { SliceAccountClient } from "../types/accountClient"
 import type { SliceWalletCeremonyMode } from "../types/ceremony"
 import type { SliceWalletCeremonyBroker } from "../types/pendingCeremony"
@@ -35,7 +35,7 @@ type RootAccount = Awaited<
   ReturnType<typeof createSliceWalletCeremonyKernelAccount>
 >
 
-export const getSliceWalletCredentialStorage = () =>
+const getSliceWalletCredentialStorage = () =>
   typeof window === "undefined" ? null : window.localStorage
 
 export const toSliceWalletCredentialRecord = (
@@ -58,47 +58,6 @@ export const toSliceWalletCredentialRecord = (
     recoveryPermissionId: value.recoveryPermissionId,
     recoverySignerAddress: value.recoverySignerAddress
   }
-}
-
-export const readStoredSliceWalletMetadata = (storageKey: string) => {
-  const value = getSliceWalletCredentialStorage()?.getItem(storageKey)
-  if (value === null || value === undefined) return null
-  try {
-    const parsed = JSON.parse(value) as {
-      accountAddress?: string
-      accountIndex?: number
-      credentialIdHash?: string
-    }
-    if (
-      !isAddress(parsed.accountAddress ?? "") ||
-      !isHex(parsed.credentialIdHash ?? "", { strict: true }) ||
-      !Number.isSafeInteger(parsed.accountIndex) ||
-      (parsed.accountIndex ?? -1) < 0
-    ) {
-      return null
-    }
-    return {
-      accountAddress: parsed.accountAddress as Address,
-      accountIndex: parsed.accountIndex as number,
-      credentialIdHash: parsed.credentialIdHash as Hex
-    }
-  } catch {
-    return null
-  }
-}
-
-export const storeSliceWalletMetadata = (
-  storageKey: string,
-  credential: SliceWalletCredentialRecord
-) => {
-  getSliceWalletCredentialStorage()?.setItem(
-    storageKey,
-    JSON.stringify({
-      accountAddress: credential.accountAddress,
-      accountIndex: credential.accountIndex,
-      credentialIdHash: credential.credentialIdHash
-    })
-  )
 }
 
 const devFundBalanceHex = `0x${(10n * 10n ** 18n).toString(16)}`
@@ -128,14 +87,13 @@ export const useSliceWalletAccountHydration = ({
   ceremonyBroker,
   ceremonyMode,
   checkoutEnabled,
-  credentialStorageKey,
+  connectedAccount,
   fetchWalletRecovery,
   hydrateExecutionSession,
   hydrateManagementExecutionSession,
   managementEnabled,
   normalizedIdOrigin,
   publicClient,
-  setAccountAddress,
   setHasStoredCredential,
   setRecovery,
   setSliceAccountClient,
@@ -151,7 +109,7 @@ export const useSliceWalletAccountHydration = ({
   ceremonyBroker: SliceWalletCeremonyBroker
   ceremonyMode: SliceWalletCeremonyMode
   checkoutEnabled: boolean
-  credentialStorageKey: string
+  connectedAccount: Address | null
   fetchWalletRecovery: SliceWalletProviderAdapters["fetchWalletRecovery"]
   hydrateExecutionSession: (wallet: {
     credential: SliceWalletCredentialRecord
@@ -166,7 +124,6 @@ export const useSliceWalletAccountHydration = ({
   publicClient: Parameters<
     typeof createSliceWalletCeremonyKernelAccount
   >[0]["client"]
-  setAccountAddress: (address: Address | null) => void
   setHasStoredCredential: (stored: boolean) => void
   setRecovery: (snapshot: SliceWalletRecoverySnapshot | null) => void
   setSliceAccountClient: (client: SliceAccountClient | null) => void
@@ -237,7 +194,6 @@ export const useSliceWalletAccountHydration = ({
       })
       await fundDevWalletAccount(walletChain, kernelAccount.address)
       activeWalletRef.current = { credential, kernelAccount }
-      setAccountAddress(kernelAccount.address)
       setSliceAccountClient(nextSliceAccountClient)
       setStatus("ready")
       if (checkoutEnabled)
@@ -259,39 +215,63 @@ export const useSliceWalletAccountHydration = ({
       normalizedIdOrigin,
       publicClient,
       refreshRecovery,
-      setAccountAddress,
       setSliceAccountClient,
       setStatus,
       walletChain
     ]
   )
 
+  const activateConnectedAccount = useCallback(
+    async (account: Address) => {
+      const metadata = readStoredSliceWalletAccount(
+        getSliceWalletCredentialStorage()
+      )
+      setHasStoredCredential(metadata !== null)
+      if (
+        metadata === null ||
+        !isAddressEqual(metadata.accountAddress, account)
+      ) {
+        throw new Error("The connected Slice Wallet account is not stored.")
+      }
+      const registered = await createSliceWalletRegistryClient({
+        baseUrl: normalizedIdOrigin
+      }).lookupCredential({
+        accountAddress: metadata.accountAddress,
+        credentialIdHash: metadata.credentialIdHash
+      })
+      if (
+        registered === null ||
+        !isAddressEqual(registered.accountAddress, account) ||
+        registered.accountIndex !== metadata.accountIndex
+      ) {
+        throw new Error("Stored Slice Wallet metadata is no longer valid.")
+      }
+      return activateCredential(toSliceWalletCredentialRecord(registered))
+    },
+    [activateCredential, normalizedIdOrigin, setHasStoredCredential]
+  )
+
   useEffect(() => {
     let active = true
     void (async () => {
-      const metadata = readStoredSliceWalletMetadata(credentialStorageKey)
+      const metadata = readStoredSliceWalletAccount(
+        getSliceWalletCredentialStorage()
+      )
       setHasStoredCredential(metadata !== null)
-      if (metadata === null) {
+      if (connectedAccount === null) {
+        activeWalletRef.current = null
+        setSliceAccountClient(null)
+        setRecovery(null)
         setStatus("idle")
         return
       }
+      setStatus("loading")
       try {
-        const registered = await createSliceWalletRegistryClient({
-          baseUrl: normalizedIdOrigin
-        }).lookupCredential({
-          accountAddress: metadata.accountAddress,
-          credentialIdHash: metadata.credentialIdHash
-        })
-        if (
-          registered === null ||
-          !isAddressEqual(registered.accountAddress, metadata.accountAddress)
-        ) {
-          throw new Error("Stored Slice Wallet metadata is no longer valid.")
-        }
-        if (active)
-          await activateCredential(toSliceWalletCredentialRecord(registered))
+        if (active) await activateConnectedAccount(connectedAccount)
       } catch {
         if (!active) return
+        activeWalletRef.current = null
+        setSliceAccountClient(null)
         setStatus("idle")
         setRecovery(null)
       }
@@ -300,13 +280,14 @@ export const useSliceWalletAccountHydration = ({
       active = false
     }
   }, [
-    activateCredential,
-    credentialStorageKey,
-    normalizedIdOrigin,
+    activateConnectedAccount,
+    activeWalletRef,
+    connectedAccount,
     setHasStoredCredential,
     setRecovery,
+    setSliceAccountClient,
     setStatus
   ])
 
-  return { activateCredential, refreshRecovery }
+  return { refreshRecovery }
 }

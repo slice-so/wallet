@@ -39,6 +39,7 @@ import type {
   SliceWalletFrameSession,
   SliceWalletGenericGrant,
   SliceWalletGenericPermission,
+  SliceWalletPendingCeremony,
   SliceWalletProviderValue,
   SliceWalletRegistryCredential,
   SliceWalletSessionConnectInput,
@@ -897,6 +898,9 @@ export const createSliceWalletProviderRuntime = (
     get pendingCeremony() {
       return ceremonyBroker.getPending()
     },
+    subscribePendingCeremony: (
+      listener: (pending: SliceWalletPendingCeremony | null) => void
+    ) => ceremonyBroker.subscribe(listener),
     revokeGrant: (
       ...args: Parameters<SliceWalletChainRuntime["revokeGrant"]>
     ) => getChainRuntime().revokeGrant(...args),

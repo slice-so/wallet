@@ -1,3 +1,4 @@
+import { anvil } from "viem/chains"
 import {
   getSliceWalletChainManifest,
   sliceWalletSupportedChainIds
@@ -8,6 +9,19 @@ import { invalidProviderRequest } from "./errors"
 
 const sliceIdOrigin = "https://id.slice.so"
 const defaultSliceWalletChainId = 8453
+
+const isLoopbackOrigin = (value: string) => {
+  try {
+    const url = new URL(value)
+    return (
+      url.origin === value &&
+      url.protocol === "http:" &&
+      (url.hostname === "localhost" || url.hostname === "127.0.0.1")
+    )
+  } catch {
+    return false
+  }
+}
 
 const isOrigin = (value: string) => {
   try {
@@ -48,6 +62,7 @@ export const resolveCanonicalSliceWalletConfig = (
     "announce",
     "chainIds",
     "defaultChainId",
+    "idOrigin",
     "session",
     "transports"
   ])
@@ -79,6 +94,11 @@ export const resolveCanonicalSliceWalletConfig = (
       "Slice Wallet requires unique supported chains."
     )
   }
+  if (chainIds.includes(anvil.id) && chainIds.length !== 1) {
+    throw invalidProviderRequest(
+      "The Anvil Slice Wallet chain cannot be mixed with production chains."
+    )
+  }
   const defaultChainId =
     parameters.defaultChainId ??
     (chainIds.includes(defaultSliceWalletChainId)
@@ -91,6 +111,12 @@ export const resolveCanonicalSliceWalletConfig = (
   }
 
   const transports = parameters.transports ?? {}
+  const idOrigin = parameters.idOrigin ?? sliceIdOrigin
+  if (idOrigin !== sliceIdOrigin && !isLoopbackOrigin(idOrigin)) {
+    throw invalidProviderRequest(
+      "Slice Wallet idOrigin must use id.slice.so or a loopback development origin."
+    )
+  }
   if (
     typeof transports !== "object" ||
     transports === null ||
@@ -116,6 +142,35 @@ export const resolveCanonicalSliceWalletConfig = (
       throw invalidProviderRequest(
         "Transport overrides may contain only rpcUrl and bundlerUrl."
       )
+    }
+    if (chainId === anvil.id) {
+      if (idOrigin === sliceIdOrigin) {
+        throw invalidProviderRequest(
+          "The Anvil Slice Wallet chain requires a loopback idOrigin."
+        )
+      }
+      if (
+        overrides.bundlerUrl === undefined ||
+        overrides.rpcUrl === undefined
+      ) {
+        throw invalidProviderRequest(
+          "The Anvil Slice Wallet chain requires explicit loopback transports."
+        )
+      }
+      const bundlerUrl = normalizeTransportUrl(
+        overrides.bundlerUrl,
+        "Bundler URL"
+      )
+      const rpcUrl = normalizeTransportUrl(overrides.rpcUrl, "RPC URL")
+      if (
+        !isLoopbackOrigin(new URL(bundlerUrl).origin) ||
+        !isLoopbackOrigin(new URL(rpcUrl).origin)
+      ) {
+        throw invalidProviderRequest(
+          "The Anvil Slice Wallet chain requires loopback transports."
+        )
+      }
+      return { bundlerUrl, chain: anvil, rpcUrl }
     }
     const manifest = getSliceWalletChainManifest(chainId)
     return {
@@ -163,8 +218,8 @@ export const resolveCanonicalSliceWalletConfig = (
     announce: parameters.announce ?? true,
     chains,
     defaultChainId,
-    idOrigin: sliceIdOrigin,
-    requireAdmittedChain: true,
+    idOrigin,
+    requireAdmittedChain: !chainIds.includes(anvil.id),
     ...(session === undefined ? {} : { session })
   }
 }

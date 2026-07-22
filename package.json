@@ -163,13 +163,17 @@
   },
   "peerDependencies": {
     "@wagmi/core": "catalog:",
-    "react": ">=18"
+    "react": ">=18",
+    "wagmi": "catalog:"
   },
   "peerDependenciesMeta": {
     "@wagmi/core": {
       "optional": true
     },
     "react": {
+      "optional": true
+    },
+    "wagmi": {
       "optional": true
     }
   },
@@ -178,7 +182,8 @@
     "@slice/typescript-config": "workspace:*",
     "@types/react": "catalog:",
     "@wagmi/core": "catalog:",
-    "fake-indexeddb": "^6.2.4"
+    "fake-indexeddb": "^6.2.4",
+    "wagmi": "catalog:"
   },
   "repository": {
     "type": "git",

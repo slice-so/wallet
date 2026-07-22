@@ -59,6 +59,9 @@ export type SliceWalletProvider = {
     request: SliceWalletProviderRequestArguments
   ) => Promise<SliceWalletProviderValue | undefined>
   requestSession: () => Promise<SliceWalletCeremonySessionResult>
+  subscribePendingCeremony: (
+    listener: (pending: SliceWalletPendingCeremony | null) => void
+  ) => () => void
   switchAccount: () => Promise<Address>
 }
 
@@ -71,6 +74,7 @@ export type SliceWalletParameters = {
   announce?: boolean
   chainIds?: readonly number[]
   defaultChainId?: number
+  idOrigin?: string
   session?: {
     audience: string
     onSession?: (

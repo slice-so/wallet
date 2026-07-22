@@ -1,3 +1,4 @@
+import type { Config } from "@wagmi/core"
 import type { ReactNode } from "react"
 import type { Address, Hex } from "viem"
 import type { SliceAccountClient } from "./accountClient"
@@ -155,15 +156,9 @@ export type SliceWalletProviderAdapters = {
   fetchWalletRecovery?: (input: {
     address: Address
   }) => Promise<SliceWalletRecoverySnapshot>
-  signInWithWallet?: SliceWalletSignInAdapter
   checkoutExecution?: SliceWalletCheckoutExecutionAdapters
   storeManagement?: SliceWalletManagementExecutionAdapters
 }
-
-export type SliceWalletSignInAdapter = (input: {
-  address: Address
-  signMessage: (message: string) => Promise<Hex>
-}) => Promise<void>
 
 export type SliceWalletCapabilities = {
   checkoutExecution?: boolean
@@ -182,10 +177,10 @@ export type SliceWalletProviderProps = {
   capabilities?: SliceWalletCapabilities
   ceremonyMode?: SliceWalletCeremonyMode
   children: ReactNode
-  credentialStorageKey?: string
   idOrigin: string
   notifications?: SliceWalletNotifications
   preferredChainId: number
+  wagmiConfig: Config
   session?: {
     adapter: SliceWalletSessionAdapter
     audience: string
@@ -195,7 +190,6 @@ export type SliceWalletProviderProps = {
 }
 
 export type SliceWalletContextValue = {
-  accountAddress: Address | null
   cancelPendingCeremony: () => void
   cancelRecoveryProposal: () => Promise<void>
   clearExecutionSessions: () => Promise<void>
@@ -228,6 +222,5 @@ export type SliceWalletContextValue = {
   session: SliceWalletSessionSnapshot | null
   sessionError: string | null
   signOutSession: () => Promise<void>
-  sliceAccountClient: SliceAccountClient | null
   status: SliceWalletStatus
 }

@@ -402,6 +402,9 @@ export const createSliceWalletProviderInternal = (
   const requestSession: SliceWalletProvider["requestSession"] = () =>
     runtime.requestSession()
 
+  const subscribePendingCeremony: SliceWalletProvider["subscribePendingCeremony"] =
+    (listener) => runtime.subscribePendingCeremony(listener)
+
   const request = async ({
     method,
     params
@@ -655,6 +658,7 @@ export const createSliceWalletProviderInternal = (
     },
     request,
     requestSession,
+    subscribePendingCeremony,
     switchAccount
   }
 }

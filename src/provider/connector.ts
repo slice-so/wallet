@@ -61,7 +61,7 @@ export const sliceWalletConnector = (parameters: SliceWalletProviderConfig) => {
           this.onDisconnect(new Error(error.message))
         )
       },
-      async connect({ chainId, withCapabilities } = {}) {
+      async connect({ chainId, isReconnecting, withCapabilities } = {}) {
         let switchPromise:
           | Promise<SliceWalletProviderValue | undefined>
           | undefined
@@ -72,7 +72,7 @@ export const sliceWalletConnector = (parameters: SliceWalletProviderConfig) => {
           })
         }
         const sessionPromise =
-          parameters.session === undefined
+          parameters.session === undefined || isReconnecting === true
             ? null
             : getProvider().connectWithSession({
                 audience: parameters.session.audience,
@@ -92,9 +92,17 @@ export const sliceWalletConnector = (parameters: SliceWalletProviderConfig) => {
         const accounts =
           sessionResult === null
             ? parseAccounts(
-                await getProvider().request({ method: "eth_requestAccounts" })
+                await getProvider().request({
+                  method:
+                    isReconnecting === true
+                      ? "eth_accounts"
+                      : "eth_requestAccounts"
+                })
               )
             : [sessionResult.account]
+        if (accounts.length === 0) {
+          throw new Error("Slice Wallet is not connected.")
+        }
         return {
           accounts: (withCapabilities
             ? accounts.map((address) => ({

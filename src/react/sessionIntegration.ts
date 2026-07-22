@@ -158,7 +158,38 @@ export const createSliceWalletSessionIntegration = ({
     }
   }
 
-  return { complete, configure, getState: () => state, revoke }
+  const refresh = async () => {
+    if (
+      config.account === null ||
+      config.adapter === undefined ||
+      config.audience === undefined
+    ) {
+      updateState({ session: null, sessionError: null })
+      return
+    }
+    const capturedGeneration = ++generation
+    const { account, adapter, audience, chainId } = config
+    try {
+      const snapshot = await adapter.fetch()
+      if (capturedGeneration !== generation) return
+      updateState({
+        session:
+          snapshot === null
+            ? null
+            : validateSnapshot({ account, audience, chainId, snapshot }),
+        sessionError: null
+      })
+    } catch (error) {
+      if (capturedGeneration !== generation) return
+      updateState({
+        session: null,
+        sessionError:
+          error instanceof Error ? error.message : "Session refresh failed."
+      })
+    }
+  }
+
+  return { complete, configure, getState: () => state, refresh, revoke }
 }
 
 export const useSliceWalletSessionIntegration = (config: IntegrationConfig) => {
@@ -186,6 +217,7 @@ export const useSliceWalletSessionIntegration = (config: IntegrationConfig) => {
     [integration]
   )
   const revoke = useCallback(() => integration.revoke(), [integration])
+  const refresh = useCallback(() => integration.refresh(), [integration])
 
-  return { complete, revoke, ...state }
+  return { complete, refresh, revoke, ...state }
 }

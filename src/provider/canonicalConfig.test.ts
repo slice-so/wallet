@@ -27,7 +27,7 @@ describe("canonical Slice Wallet config", () => {
       resolveCanonicalSliceWalletConfig({
         idOrigin: "https://evil.example"
       } as SliceWalletParameters)
-    ).toThrow("unknown field")
+    ).toThrow("idOrigin must use id.slice.so")
   })
 
   test("uses the first configured chain when Base is omitted", () => {
@@ -64,5 +64,34 @@ describe("canonical Slice Wallet config", () => {
         transports: { 8453: { rpcUrl: "javascript:alert(1)" } }
       })
     ).toThrow("RPC URL is not permitted")
+  })
+
+  test("allows Anvil only with explicit loopback identity and transports", () => {
+    const config = resolveCanonicalSliceWalletConfig({
+      chainIds: [31_337],
+      defaultChainId: 31_337,
+      idOrigin: "http://localhost:3003",
+      transports: {
+        31337: {
+          bundlerUrl: "http://localhost:3001/api/bundler",
+          rpcUrl: "http://127.0.0.1:8545"
+        }
+      }
+    })
+
+    expect(config.requireAdmittedChain).toBe(false)
+    expect(config.chains[0]?.chain.id).toBe(31_337)
+    expect(() =>
+      resolveCanonicalSliceWalletConfig({
+        chainIds: [31_337, 8453],
+        idOrigin: "http://localhost:3003",
+        transports: {
+          31337: {
+            bundlerUrl: "http://localhost:3001/api/bundler",
+            rpcUrl: "http://localhost:8545"
+          }
+        }
+      })
+    ).toThrow("cannot be mixed")
   })
 })

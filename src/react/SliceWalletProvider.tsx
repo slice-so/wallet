@@ -4,18 +4,21 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState
 } from "react"
-import { type Address, createPublicClient, http } from "viem"
+import { createPublicClient, http } from "viem"
 import { anvil } from "viem/chains"
+import { useConnection } from "wagmi"
 import {
   type createSliceWalletCeremonyKernelAccount,
   getSliceWalletChainManifest
 } from "../index"
 import { buildRecoveryCancelCall } from "../recovery"
 import type { SliceAccountClient } from "../types/accountClient"
+import type { SliceWalletProvider as SliceWalletEip1193Provider } from "../types/provider"
 import type {
   SliceWalletContextValue,
   SliceWalletCredentialRecord,
@@ -27,6 +30,7 @@ import type {
   SliceWalletRecoverySnapshot,
   SliceWalletStatus
 } from "../types/react"
+import { sliceWalletConnectorId } from "../wagmi"
 import { useSliceWalletAccountHydration } from "./accountHydration"
 import {
   useSliceWalletCeremonyActions,
@@ -39,8 +43,6 @@ import { useSliceWalletExecutionLifecycle } from "./executionLifecycle"
 import { useSliceWalletManagementEnablement } from "./executionManagement"
 import { useSliceWalletSessionIntegration } from "./sessionIntegration"
 
-const defaultWalletMetadataStorageKey = "slice.passkey-wallet"
-
 export { defaultExecutionAllowanceUsdMicros } from "./executionCheckout"
 
 const SliceWalletContext = createContext<SliceWalletContextValue | null>(null)
@@ -51,11 +53,11 @@ export function SliceWalletProvider({
   capabilities,
   ceremonyMode = "popup",
   children,
-  credentialStorageKey = defaultWalletMetadataStorageKey,
   idOrigin,
   notifications,
   preferredChainId,
-  session: sessionConfig
+  session: sessionConfig,
+  wagmiConfig
 }: SliceWalletProviderProps) {
   const checkoutExecution = capabilities?.checkoutExecution
     ? adapters.checkoutExecution
@@ -87,10 +89,15 @@ export function SliceWalletProvider({
     [alchemyId, walletChain]
   )
   const [status, setStatus] = useState<SliceWalletStatus>("loading")
+  const connection = useConnection({ config: wagmiConfig })
+  const connectedSliceAccount =
+    connection.status === "connected" &&
+    connection.connector.id === sliceWalletConnectorId
+      ? connection.address
+      : null
   const [pendingAction, setPendingAction] =
     useState<SliceWalletPendingAction>(null)
   const [error, setError] = useState<string | null>(null)
-  const [accountAddress, setAccountAddress] = useState<Address | null>(null)
   const [sliceAccountClient, setSliceAccountClient] =
     useState<SliceAccountClient | null>(null)
   const [hasStoredCredential, setHasStoredCredential] = useState(false)
@@ -109,7 +116,7 @@ export function SliceWalletProvider({
     [notifications]
   )
   const sessionIntegration = useSliceWalletSessionIntegration({
-    account: accountAddress,
+    account: connectedSliceAccount,
     ...(sessionConfig === undefined
       ? {}
       : {
@@ -121,8 +128,13 @@ export function SliceWalletProvider({
   })
   const [recoveryPendingAction, setRecoveryPendingAction] =
     useState<SliceWalletRecoveryPendingAction>(null)
-  const { ceremonyBroker, getFrameClient, pendingCeremony } =
-    useSliceWalletCeremonyConnection(normalizedIdOrigin)
+  const {
+    ceremonyBroker,
+    getFrameClient,
+    pendingCeremony: featurePendingCeremony
+  } = useSliceWalletCeremonyConnection(normalizedIdOrigin)
+  const [connectorPendingCeremony, setConnectorPendingCeremony] =
+    useState<SliceWalletEip1193Provider["pendingCeremony"]>(null)
   const activeWalletRef = useRef<{
     credential: SliceWalletCredentialRecord
     kernelAccount: Awaited<
@@ -156,51 +168,95 @@ export function SliceWalletProvider({
     walletChain
   })
 
-  const { activateCredential, refreshRecovery } =
-    useSliceWalletAccountHydration({
-      activeWalletRef,
-      ceremonyBroker,
-      ceremonyMode,
-      checkoutEnabled: checkoutExecution !== undefined,
-      credentialStorageKey,
-      fetchWalletRecovery,
-      hydrateExecutionSession,
-      hydrateManagementExecutionSession,
-      managementEnabled: storeManagement !== undefined,
-      normalizedIdOrigin,
-      publicClient,
-      setAccountAddress,
-      setHasStoredCredential,
-      setRecovery,
-      setSliceAccountClient,
-      setStatus,
-      walletChain
-    })
+  const { refreshRecovery } = useSliceWalletAccountHydration({
+    activeWalletRef,
+    ceremonyBroker,
+    ceremonyMode,
+    checkoutEnabled: checkoutExecution !== undefined,
+    connectedAccount: connectedSliceAccount,
+    fetchWalletRecovery,
+    hydrateExecutionSession,
+    hydrateManagementExecutionSession,
+    managementEnabled: storeManagement !== undefined,
+    normalizedIdOrigin,
+    publicClient,
+    setHasStoredCredential,
+    setRecovery,
+    setSliceAccountClient,
+    setStatus,
+    walletChain
+  })
 
   const { createWallet, loginWallet, signInWallet, switchAccount } =
     useSliceWalletCeremonyActions({
       activeWalletRef,
-      activateCredential,
-      adapters,
-      ceremonyBroker,
-      ceremonyMode,
-      credentialStorageKey,
       hydrateManagementExecutionSession,
       managementEnabled: storeManagement !== undefined,
-      normalizedIdOrigin,
       notifications,
-      sessionConfig,
       sessionIntegration,
-      setAccountAddress,
       setError,
-      setExecutionSession,
-      setHasStoredCredential,
-      setManagementExecutionSession,
       setPendingAction,
-      setSliceAccountClient,
-      setStatus,
+      wagmiConfig,
       walletChain
     })
+
+  useEffect(() => {
+    let active = true
+    let unsubscribe: (() => void) | undefined
+    const connector = wagmiConfig.connectors.find(
+      (candidate) => candidate.id === sliceWalletConnectorId
+    )
+    if (connector === undefined) return
+    void connector.getProvider().then((provider) => {
+      if (!active || provider === undefined) return
+      const sliceProvider = provider as SliceWalletEip1193Provider
+      setConnectorPendingCeremony(sliceProvider.pendingCeremony)
+      unsubscribe = sliceProvider.subscribePendingCeremony(
+        setConnectorPendingCeremony
+      )
+    })
+    return () => {
+      active = false
+      unsubscribe?.()
+    }
+  }, [wagmiConfig.connectors])
+
+  useEffect(() => {
+    if (connectedSliceAccount !== null) return
+    setExecutionSession(null)
+    setManagementExecutionSession(null)
+  }, [connectedSliceAccount])
+
+  const pendingCeremony = featurePendingCeremony ?? connectorPendingCeremony
+
+  const getConnectorProvider = useCallback(async () => {
+    const connector = wagmiConfig.connectors.find(
+      (candidate) => candidate.id === sliceWalletConnectorId
+    )
+    const provider = await connector?.getProvider()
+    if (provider === undefined) {
+      throw new Error("Slice Wallet provider is unavailable.")
+    }
+    return provider as SliceWalletEip1193Provider
+  }, [wagmiConfig.connectors])
+
+  const continueInPopup = useCallback(
+    () =>
+      featurePendingCeremony !== null
+        ? ceremonyBroker.continueInPopup()
+        : getConnectorProvider().then((provider) => provider.continueInPopup()),
+    [ceremonyBroker, featurePendingCeremony, getConnectorProvider]
+  )
+
+  const cancelPendingCeremony = useCallback(() => {
+    if (featurePendingCeremony !== null) {
+      ceremonyBroker.cancel()
+      return
+    }
+    void getConnectorProvider().then((provider) =>
+      provider.cancelPendingCeremony()
+    )
+  }, [ceremonyBroker, featurePendingCeremony, getConnectorProvider])
 
   const enableExecutionSession = useSliceWalletCheckoutEnablement({
     activeWalletRef,
@@ -310,12 +366,11 @@ export function SliceWalletProvider({
 
   const value = useMemo(
     () => ({
-      accountAddress,
+      cancelPendingCeremony,
       cancelRecoveryProposal,
       clearExecutionSessions,
-      continueInPopup: ceremonyBroker.continueInPopup,
+      continueInPopup,
       createWallet,
-      cancelPendingCeremony: ceremonyBroker.cancel,
       disableManagementExecutionSession,
       enableExecutionSession,
       enableManagementExecutionSession,
@@ -336,14 +391,13 @@ export function SliceWalletProvider({
       session: sessionIntegration.session,
       sessionError: sessionIntegration.sessionError,
       signOutSession: sessionIntegration.revoke,
-      sliceAccountClient,
       status
     }),
     [
-      accountAddress,
+      cancelPendingCeremony,
       cancelRecoveryProposal,
       clearExecutionSessions,
-      ceremonyBroker,
+      continueInPopup,
       createWallet,
       disableManagementExecutionSession,
       enableExecutionSession,
@@ -362,7 +416,6 @@ export function SliceWalletProvider({
       signInWallet,
       switchAccount,
       sessionIntegration,
-      sliceAccountClient,
       status
     ]
   )

@@ -115,6 +115,7 @@ const createRuntime = () => {
     pendingCeremony: null,
     revokeGrant,
     requestSession,
+    subscribePendingCeremony: mock(() => () => undefined),
     rotateGrant,
     sendCalls,
     signMessage: mock(async () => userOperationHash),

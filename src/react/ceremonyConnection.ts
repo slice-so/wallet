@@ -1,33 +1,24 @@
 "use client"
 
+import { type Config, connect } from "@wagmi/core"
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { Chain } from "viem"
 import {
-  connectSliceWalletAccount,
   connectSliceWalletSignerFrame,
   createSliceWalletCeremonyBroker,
-  type createSliceWalletCeremonyKernelAccount,
-  requestSliceWalletSession
+  type createSliceWalletCeremonyKernelAccount
 } from "../index"
 import type {
   SliceWalletCeremonyBroker,
+  SliceWalletProvider,
   SliceWalletSignerFrameClient
 } from "../types"
-import type { SliceWalletCeremonyMode } from "../types/ceremony"
 import type {
   SliceWalletCredentialRecord,
-  SliceWalletExecutionSession,
-  SliceWalletManagementExecutionSession,
   SliceWalletNotifications,
-  SliceWalletPendingAction,
-  SliceWalletProviderAdapters,
-  SliceWalletProviderProps,
-  SliceWalletStatus
+  SliceWalletPendingAction
 } from "../types/react"
-import {
-  storeSliceWalletMetadata,
-  toSliceWalletCredentialRecord
-} from "./accountHydration"
+import { sliceWalletConnectorId } from "../wagmi"
 import type { useSliceWalletSessionIntegration } from "./sessionIntegration"
 
 type RootAccount = Awaited<
@@ -101,25 +92,13 @@ export const useSliceWalletCeremonyConnection = (
 
 export const useSliceWalletCeremonyActions = ({
   activeWalletRef,
-  activateCredential,
-  adapters,
-  ceremonyBroker,
-  ceremonyMode,
-  credentialStorageKey,
   hydrateManagementExecutionSession,
   managementEnabled,
-  normalizedIdOrigin,
   notifications,
-  sessionConfig,
   sessionIntegration,
-  setAccountAddress,
   setError,
-  setExecutionSession,
-  setHasStoredCredential,
-  setManagementExecutionSession,
   setPendingAction,
-  setSliceAccountClient,
-  setStatus,
+  wagmiConfig,
   walletChain
 }: {
   activeWalletRef: {
@@ -128,32 +107,16 @@ export const useSliceWalletCeremonyActions = ({
       kernelAccount: RootAccount
     } | null
   }
-  activateCredential: (
-    credential: SliceWalletCredentialRecord
-  ) => Promise<{ kernelAccount: RootAccount }>
-  adapters: SliceWalletProviderAdapters
-  ceremonyBroker: SliceWalletCeremonyBroker
-  ceremonyMode: SliceWalletCeremonyMode
-  credentialStorageKey: string
   hydrateManagementExecutionSession: (wallet: {
     credential: SliceWalletCredentialRecord
     kernelAccount: RootAccount
   }) => Promise<void>
   managementEnabled: boolean
-  normalizedIdOrigin: string
   notifications?: SliceWalletNotifications
-  sessionConfig: SliceWalletProviderProps["session"]
   sessionIntegration: ReturnType<typeof useSliceWalletSessionIntegration>
-  setAccountAddress: (value: null) => void
   setError: (value: string | null) => void
-  setExecutionSession: (value: SliceWalletExecutionSession | null) => void
-  setHasStoredCredential: (value: boolean) => void
-  setManagementExecutionSession: (
-    value: SliceWalletManagementExecutionSession | null
-  ) => void
   setPendingAction: (value: SliceWalletPendingAction) => void
-  setSliceAccountClient: (value: null) => void
-  setStatus: (value: SliceWalletStatus) => void
+  wagmiConfig: Config
   walletChain: Chain
 }) => {
   const runWalletAction = useCallback(
@@ -171,146 +134,50 @@ export const useSliceWalletCeremonyActions = ({
           caughtError instanceof Error
             ? caughtError.message
             : "Unable to use Slice wallet."
-        activeWalletRef.current = null
-        setAccountAddress(null)
-        setExecutionSession(null)
-        setManagementExecutionSession(null)
-        setSliceAccountClient(null)
         setError(message)
-        setStatus("error")
         notifications?.error?.(message)
         return false
       } finally {
         setPendingAction(null)
       }
     },
-    [
-      activeWalletRef,
-      notifications,
-      setAccountAddress,
-      setError,
-      setExecutionSession,
-      setManagementExecutionSession,
-      setPendingAction,
-      setSliceAccountClient,
-      setStatus
-    ]
+    [notifications, setError, setPendingAction]
   )
 
-  const connectWallet = useCallback(async () => {
-    const connected = await connectSliceWalletAccount({
-      ceremonyBroker,
-      ceremonyMode,
-      chainId: walletChain.id,
-      document,
-      idOrigin: normalizedIdOrigin,
-      ...(sessionConfig === undefined
-        ? {}
-        : {
-            session: {
-              audience: sessionConfig.audience,
-              prepare: sessionConfig.adapter.prepare,
-              ...(sessionConfig.scopes === undefined
-                ? {}
-                : { scopes: sessionConfig.scopes }),
-              ...(sessionConfig.ttlSeconds === undefined
-                ? {}
-                : { ttlSeconds: sessionConfig.ttlSeconds })
-            }
-          }),
-      window
-    })
-    if (connected.recovery === undefined) {
-      throw new Error("Complete recovery enrollment before connecting.")
-    }
-    const record = toSliceWalletCredentialRecord(connected)
-    if (
-      record.recoveryPermissionId !== null &&
-      (record.recoveryPermissionId.toLowerCase() !==
-        connected.recovery.permissionId.toLowerCase() ||
-        record.recoverySignerAddress?.toLowerCase() !==
-          connected.recovery.signerAddress.toLowerCase())
-    ) {
-      throw new Error("Recovery permission does not match its ceremony.")
-    }
-    await activateCredential(record)
-    storeSliceWalletMetadata(credentialStorageKey, record)
-    setHasStoredCredential(true)
-    await sessionIntegration.complete(
-      connected.session,
-      connected.accountAddress
+  const getSliceConnector = useCallback(() => {
+    const connector = wagmiConfig.connectors.find(
+      (candidate) => candidate.id === sliceWalletConnectorId
     )
-    notifications?.success?.("Slice wallet ready")
-  }, [
-    activateCredential,
-    ceremonyBroker,
-    ceremonyMode,
-    credentialStorageKey,
-    normalizedIdOrigin,
-    notifications,
-    sessionConfig,
-    sessionIntegration,
-    setHasStoredCredential,
-    walletChain.id
-  ])
-
-  const switchAccount = useCallback(async () => {
-    setPendingAction("login")
-    setError(null)
-    try {
-      await connectWallet()
-      return true
-    } catch (caughtError) {
-      const message =
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Unable to switch Slice wallet accounts."
-      setError(message)
-      notifications?.error?.(message)
-      return false
-    } finally {
-      setPendingAction(null)
+    if (connector === undefined) {
+      throw new Error("Slice Wallet connector is not configured.")
     }
-  }, [connectWallet, notifications, setError, setPendingAction])
+    return connector
+  }, [wagmiConfig.connectors])
+
+  const getSliceProvider = useCallback(async () => {
+    const provider = await getSliceConnector().getProvider()
+    if (provider === undefined) {
+      throw new Error("Slice Wallet provider is unavailable.")
+    }
+    return provider as SliceWalletProvider
+  }, [getSliceConnector])
+
+  const connectWallet = useCallback(async () => {
+    const result = await connect(wagmiConfig, {
+      chainId: walletChain.id,
+      connector: getSliceConnector()
+    })
+    const account = result.accounts[0]
+    if (account === undefined) throw new Error("Slice Wallet did not connect.")
+    notifications?.success?.("Slice wallet ready")
+  }, [getSliceConnector, notifications, wagmiConfig, walletChain.id])
 
   const signInWallet = useCallback(async () => {
     const activeWallet = activeWalletRef.current
     if (!activeWallet) throw new Error("Unlock your Slice wallet first.")
-    if (sessionConfig !== undefined) {
-      const result = await requestSliceWalletSession({
-        account: activeWallet.kernelAccount.address,
-        ceremonyBroker,
-        ceremonyMode,
-        chainId: walletChain.id,
-        document,
-        idOrigin: normalizedIdOrigin,
-        session: {
-          audience: sessionConfig.audience,
-          prepare: sessionConfig.adapter.prepare,
-          ...(sessionConfig.scopes === undefined
-            ? {}
-            : { scopes: sessionConfig.scopes }),
-          ...(sessionConfig.ttlSeconds === undefined
-            ? {}
-            : { ttlSeconds: sessionConfig.ttlSeconds })
-        },
-        window
-      })
-      await sessionIntegration.complete(
-        result,
-        activeWallet.kernelAccount.address
-      )
-      return
-    }
-    if (adapters.signInWithWallet === undefined) {
-      throw new Error("Wallet sign-in is not configured.")
-    }
     try {
-      await adapters.signInWithWallet({
-        address: activeWallet.kernelAccount.address,
-        signMessage: (message) =>
-          activeWallet.kernelAccount.signMessage({ message })
-      })
+      await (await getSliceProvider()).requestSession()
+      await sessionIntegration.refresh()
       if (managementEnabled)
         await hydrateManagementExecutionSession(activeWallet)
     } catch (caughtError) {
@@ -324,18 +191,32 @@ export const useSliceWalletCeremonyActions = ({
     }
   }, [
     activeWalletRef,
-    adapters,
-    ceremonyBroker,
-    ceremonyMode,
+    getSliceProvider,
     hydrateManagementExecutionSession,
     managementEnabled,
-    normalizedIdOrigin,
     notifications,
-    sessionConfig,
     sessionIntegration,
-    setError,
-    walletChain.id
+    setError
   ])
+
+  const switchAccount = useCallback(async () => {
+    setPendingAction("login")
+    setError(null)
+    try {
+      await (await getSliceProvider()).switchAccount()
+      return true
+    } catch (caughtError) {
+      const message =
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Unable to switch Slice wallet accounts."
+      setError(message)
+      notifications?.error?.(message)
+      return false
+    } finally {
+      setPendingAction(null)
+    }
+  }, [getSliceProvider, notifications, setError, setPendingAction])
 
   return {
     createWallet: () => runWalletAction("create", connectWallet),
