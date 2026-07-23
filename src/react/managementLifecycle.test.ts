@@ -34,6 +34,7 @@ describe("management lifecycle", () => {
     })
     const mutation = lifecycle.runMutation({
       account,
+      slicerId: 7,
       task: async () => events.push("mutation")
     })
     await Promise.resolve()
@@ -57,6 +58,7 @@ describe("management lifecycle", () => {
     const h1 = lifecycle.runHydration(account, () => h1Pause.promise)
     const mutation = lifecycle.runMutation({
       account,
+      slicerId: 7,
       task: async () => undefined
     })
     const h2 = lifecycle.runHydration(account, () => h2Pause.promise)
@@ -83,6 +85,7 @@ describe("management lifecycle", () => {
     lifecycle.setAccount(account)
     const mutation = lifecycle.runMutation({
       account,
+      slicerId: 7,
       task: async (control) => {
         await pause.promise
         control.assertCurrent()
@@ -108,6 +111,7 @@ describe("management lifecycle", () => {
     await expect(
       lifecycle.runMutation({
         account,
+        slicerId: 7,
         task: async () => {
           throw new SliceWalletEnablementError("activate", "hydrate")
         }
@@ -118,6 +122,7 @@ describe("management lifecycle", () => {
     await expect(
       lifecycle.runMutation({
         account,
+        slicerId: 7,
         task: async () => {
           throw new SliceWalletEnablementError("pending", "preserve-pending")
         }
@@ -181,6 +186,7 @@ describe("management lifecycle", () => {
     })
     const disable = lifecycle.runMutation({
       account,
+      slicerId: 7,
       task: async () => events.push("disable")
     })
 
@@ -214,23 +220,48 @@ describe("management lifecycle", () => {
 
   test("external same-account mutations invalidate and rehydrate", async () => {
     let hydrations = 0
-    let identityChanges = 0
+    const identityChanges: (number | undefined)[] = []
     const lifecycle = createManagementLifecycle({
       chainId: 8453,
       hydrate: async () => {
         hydrations += 1
       },
-      onIdentityChange: () => {
-        identityChanges += 1
-      }
+      onIdentityChange: (slicerId) => identityChanges.push(slicerId)
     })
     lifecycle.setAccount(account)
-    lifecycle.handleExternalMutation(otherAccount)
+    lifecycle.handleExternalMutation(otherAccount, 7)
     expect(hydrations).toBe(0)
-    lifecycle.handleExternalMutation(account)
+    lifecycle.handleExternalMutation(account, 7)
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(hydrations).toBe(1)
-    expect(identityChanges).toBe(2)
+    expect(identityChanges).toEqual([undefined, 7])
+  })
+
+  test("broadcasts the mutated slicer identity", async () => {
+    const messages: object[] = []
+    const lifecycle = createManagementLifecycle({
+      chainId: 8453,
+      hydrate: async () => undefined,
+      onIdentityChange: () => undefined,
+      onMutation: (message) => messages.push(message)
+    })
+    lifecycle.setAccount(account)
+
+    await lifecycle.runMutation({
+      account,
+      slicerId: 9,
+      task: async () => undefined
+    })
+
+    expect(messages).toEqual([
+      {
+        account,
+        chainId: 8453,
+        outcome: "success",
+        slicerId: 9,
+        sourceId: lifecycle.sourceId
+      }
+    ])
   })
 
   test("serializes coordinators through the shared document lock", async () => {
@@ -267,6 +298,7 @@ describe("management lifecycle", () => {
       second.setAccount(account)
       const firstMutation = first.runMutation({
         account,
+        slicerId: 7,
         task: async () => {
           events.push("first-start")
           await pause.promise
@@ -275,6 +307,7 @@ describe("management lifecycle", () => {
       })
       const secondMutation = second.runMutation({
         account,
+        slicerId: 9,
         task: async () => events.push("second")
       })
       await Promise.resolve()
@@ -299,6 +332,7 @@ describe("management lifecycle", () => {
       account: lowercasedAccount,
       chainId: 8453,
       outcome: "success",
+      slicerId: 7,
       sourceId: "other"
     } as const
     expect(

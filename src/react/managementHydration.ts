@@ -28,16 +28,18 @@ type StoredManagementSession = Extract<
 const clearManagementFrameSession = async ({
   account,
   chainId,
-  frameClient
+  frameClient,
+  slicerId
 }: {
   account: Address
   chainId: number
   frameClient: SliceWalletSignerFrameClient
+  slicerId: number
 }) => {
   await frameClient
     .request({
       method: "clearSession",
-      params: { account, chainId, grantKind: "management" }
+      params: { account, chainId, grantKind: "management", slicerId }
     })
     .catch(() => undefined)
 }
@@ -51,7 +53,8 @@ export const hydrateStoredManagementExecutionSession = async ({
   fetchDelegation,
   getFrameClient,
   readStoredSession = readStoredExecutionSessionResult,
-  setSessionNull
+  setSessionNull,
+  slicerId
 }: {
   account: Address
   activate: (input: {
@@ -67,8 +70,13 @@ export const hydrateStoredManagementExecutionSession = async ({
   getFrameClient: () => Promise<SliceWalletSignerFrameClient>
   readStoredSession?: typeof readStoredExecutionSessionResult
   setSessionNull: () => void
+  slicerId: number
 }) => {
-  const storedResult = await readStoredSession(account, "store_management")
+  const storedResult = await readStoredSession(
+    account,
+    "store_management",
+    slicerId
+  )
   control.assertCurrent()
 
   if (storedResult.status === "unavailable") {
@@ -79,13 +87,14 @@ export const hydrateStoredManagementExecutionSession = async ({
   if (storedResult.status === "missing") {
     let activeDelegationExists = false
     try {
-      const { delegation } = await fetchDelegation()
+      const { delegation } = await fetchDelegation(slicerId)
       activeDelegationExists =
         delegation !== null &&
         delegation.signerScheme === "p256" &&
         delegation.permissionId !== null
     } catch {
-      // Missing local state is normal when management was never enabled.
+      // Without store-keyed local evidence, an outage is indistinguishable
+      // from a never-enabled store, which must remain eligible for root routing.
     }
     control.assertCurrent()
     setSessionNull()
@@ -99,16 +108,22 @@ export const hydrateStoredManagementExecutionSession = async ({
     control.assertCurrent()
     setSessionNull()
     if (storedResult.status === "found") {
-      await clearStoredSession(account, "store_management")
+      await clearStoredSession(account, "store_management", slicerId)
     }
     if (frameClient !== undefined) {
-      await clearManagementFrameSession({ account, chainId, frameClient })
+      await clearManagementFrameSession({
+        account,
+        chainId,
+        frameClient,
+        slicerId
+      })
     } else {
       try {
         await clearManagementFrameSession({
           account,
           chainId,
-          frameClient: await getFrameClient()
+          frameClient: await getFrameClient(),
+          slicerId
         })
       } catch {
         // The invalid local record is already gone; repair can replace the frame.
@@ -135,9 +150,9 @@ export const hydrateStoredManagementExecutionSession = async ({
     const results = await Promise.all([
       frameClient.request({
         method: "getSession",
-        params: { account, chainId, grantKind: "management" }
+        params: { account, chainId, grantKind: "management", slicerId }
       }),
-      fetchDelegation()
+      fetchDelegation(slicerId)
     ])
     frameResult = results[0]
     delegation = results[1].delegation

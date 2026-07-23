@@ -21,22 +21,24 @@ export const parseManagementFrameSession = (value: object | null) =>
 export const loadManagementReplacementState = async ({
   account,
   chainId,
-  frameClient
+  frameClient,
+  slicerId
 }: {
   account: Address
   chainId: number
   frameClient: SliceWalletSignerFrameClient
+  slicerId: number
 }) => {
   const [pendingValue, committedValue, replacementRead] = await Promise.all([
     frameClient.request({
       method: "getPendingSession",
-      params: { account, chainId, grantKind: "management" }
+      params: { account, chainId, grantKind: "management", slicerId }
     }),
     frameClient.request({
       method: "getSession",
-      params: { account, chainId, grantKind: "management" }
+      params: { account, chainId, grantKind: "management", slicerId }
     }),
-    readStoredPendingReplacementStrict(account, "store_management")
+    readStoredPendingReplacementStrict(account, "store_management", slicerId)
   ])
   if (!replacementRead.ok) {
     throw new SliceWalletEnablementError(
@@ -70,6 +72,7 @@ export const managementFrameMatchesStored = (
   frame !== null &&
   frame.chainId === chainId &&
   frame.grantKind === "management" &&
+  frame.slicerId === stored.slicerId &&
   frame.account.toLowerCase() === stored.accountAddress.toLowerCase() &&
   frame.permissionId.toLowerCase() === stored.permissionId.toLowerCase() &&
   frame.signerId.toLowerCase() === stored.signerAddress.toLowerCase() &&
@@ -108,7 +111,6 @@ export const rejectRevokedManagementPermission = (): never => {
 type ManagementPendingAction =
   | "ambiguous"
   | "complete-bookkeeping"
-  | "complete-old-then-continue"
   | "discard-orphan"
   | "none"
   | "resume"
@@ -117,14 +119,12 @@ export const classifyManagementPendingAction = ({
   hasMatchingCommittedFrame,
   hasPendingFrame,
   pendingPhase,
-  pendingMatchesRegistered,
-  targetMatches
+  pendingMatchesRegistered
 }: {
   hasMatchingCommittedFrame: boolean
   hasPendingFrame: boolean
   pendingPhase: "registered" | "registering" | null
   pendingMatchesRegistered: boolean
-  targetMatches: boolean
 }): ManagementPendingAction => {
   if (pendingPhase === "registering") return "ambiguous"
   if (pendingPhase === null) {
@@ -132,7 +132,6 @@ export const classifyManagementPendingAction = ({
   }
   if (hasPendingFrame && !pendingMatchesRegistered) return "ambiguous"
   if (!hasPendingFrame && !hasMatchingCommittedFrame) return "ambiguous"
-  if (!targetMatches) return "complete-old-then-continue"
   return hasPendingFrame ? "resume" : "complete-bookkeeping"
 }
 

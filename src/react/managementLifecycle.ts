@@ -61,7 +61,7 @@ export const createManagementLifecycle = ({
     account: Address,
     control: SliceWalletManagementLifecycleControl
   ) => Promise<void>
-  onIdentityChange: () => void
+  onIdentityChange: (slicerId?: number) => void
   onMutation?: (message: SliceWalletManagementMutationBroadcast) => void
 }): SliceWalletManagementLifecycle => {
   const sourceId = createSourceId()
@@ -178,9 +178,11 @@ export const createManagementLifecycle = ({
 
   const runMutation = async <Result>({
     account: target,
+    slicerId,
     task
   }: {
     account: Address
+    slicerId: number
     task: (control: SliceWalletManagementLifecycleControl) => Promise<Result>
   }) => {
     const epoch = identityEpoch
@@ -219,7 +221,7 @@ export const createManagementLifecycle = ({
           completedHydrationSeq = hydrationSeq
         }
       }
-      onMutation?.({ account: target, chainId, outcome, sourceId })
+      onMutation?.({ account: target, chainId, outcome, slicerId, sourceId })
       updateSettlement()
     }
   }
@@ -263,14 +265,14 @@ export const createManagementLifecycle = ({
     publishSnapshot(IDLE_MANAGEMENT_HYDRATION_SNAPSHOT)
   }
 
-  const handleExternalMutation = (target: Address) => {
+  const handleExternalMutation = (target: Address, slicerId: number) => {
     if (account === null || !isAddressEqual(account, target)) return
     identityEpoch += 1
     mutationSeq = 0
     completedMutationSeq = 0
     hydrationSeq = 0
     completedHydrationSeq = 0
-    onIdentityChange()
+    onIdentityChange(slicerId)
     void retryHydration(target).catch(() => undefined)
   }
 

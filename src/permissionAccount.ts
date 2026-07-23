@@ -297,7 +297,8 @@ export const createSliceWalletPermissionAccount = async (
   const frameSessionKey = {
     account: session.account,
     chainId: session.chainId,
-    grantKind: session.grantKind
+    grantKind: session.grantKind,
+    ...(session.slicerId === undefined ? {} : { slicerId: session.slicerId })
   } satisfies SliceWalletFrameSessionKey
   const { account, permissionValidator } =
     await createPermissionKernelAccount(parameters)

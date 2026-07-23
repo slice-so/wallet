@@ -24,6 +24,7 @@ export type SliceWalletFrameSession = {
   policy: WalletPolicyDescriptor
   publicKey: Hex
   signerId: Address
+  slicerId?: number
 }
 
 export type SliceWalletCheckoutGrant = {
@@ -34,7 +35,7 @@ export type SliceWalletCheckoutGrant = {
 
 export type SliceWalletFrameSessionKey = Pick<
   SliceWalletFrameSession,
-  "account" | "chainId" | "grantKind"
+  "account" | "chainId" | "grantKind" | "slicerId"
 >
 
 export type SliceWalletPermissionAuthorization = {
@@ -162,6 +163,7 @@ export type SliceWalletFrameRequest =
       params: {
         checkout?: SliceWalletCheckoutGrant
         policy: WalletPolicyDescriptor
+        slicerId?: number
       }
       version: 1
     }

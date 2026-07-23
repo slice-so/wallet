@@ -458,7 +458,8 @@ describe("isolated signer-frame controller", () => {
           validAfter: 90,
           validUntil: 1_000,
           version: 1
-        }
+        },
+        slicerId: 7
       },
       version: 1
     } satisfies SliceWalletProtocolValue)
@@ -473,7 +474,12 @@ describe("isolated signer-frame controller", () => {
         challenge: nonce,
         delegationId: "management-delegation",
         expiresAt: 200,
-        session: { account, chainId: 8453, grantKind: "management" }
+        session: {
+          account,
+          chainId: 8453,
+          grantKind: "management",
+          slicerId: 7
+        }
       },
       version: 1
     } satisfies SliceWalletProtocolValue)
@@ -487,7 +493,12 @@ describe("isolated signer-frame controller", () => {
     connection.port1.postMessage({
       id: "commit",
       method: "commitSession",
-      params: { account, chainId: 8453, grantKind: "management" },
+      params: {
+        account,
+        chainId: 8453,
+        grantKind: "management",
+        slicerId: 7
+      },
       version: 1
     } satisfies SliceWalletProtocolValue)
     await committed
@@ -500,7 +511,12 @@ describe("isolated signer-frame controller", () => {
         challenge: nonce,
         delegationId: "management-delegation",
         expiresAt: 200,
-        session: { account, chainId: 8453, grantKind: "management" }
+        session: {
+          account,
+          chainId: 8453,
+          grantKind: "management",
+          slicerId: 7
+        }
       },
       version: 1
     } satisfies SliceWalletProtocolValue)

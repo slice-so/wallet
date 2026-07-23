@@ -57,7 +57,10 @@ export const useSliceWalletExecutionAuthority = ({
           session: {
             account: session.account,
             chainId: session.chainId,
-            grantKind: session.grantKind
+            grantKind: session.grantKind,
+            ...(session.slicerId === undefined
+              ? {}
+              : { slicerId: session.slicerId })
           }
         }
       })
@@ -97,7 +100,10 @@ export const useSliceWalletExecutionAuthority = ({
           session: {
             account: session.account,
             chainId: session.chainId,
-            grantKind: session.grantKind
+            grantKind: session.grantKind,
+            ...(session.slicerId === undefined
+              ? {}
+              : { slicerId: session.slicerId })
           }
         }
       })

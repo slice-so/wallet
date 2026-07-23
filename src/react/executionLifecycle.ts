@@ -83,7 +83,7 @@ export const useSliceWalletExecutionLifecycle = ({
     SetStateAction<SliceWalletExecutionSession | null>
   >
   setManagementExecutionSession: Dispatch<
-    SetStateAction<SliceWalletManagementExecutionSession | null>
+    SetStateAction<Map<number, SliceWalletManagementExecutionSession>>
   >
   sliceAccountClient: SliceAccountClient | null
   storeManagement: SliceWalletProviderAdapters["storeManagement"]
@@ -145,8 +145,8 @@ export const useSliceWalletExecutionLifecycle = ({
   ])
 
   const clearManagementExecutionSession = useCallback(
-    async (account: `0x${string}`) => {
-      await clearStoredExecutionSession(account, "store_management")
+    async (account: `0x${string}`, slicerId: number) => {
+      await clearStoredExecutionSession(account, "store_management", slicerId)
       try {
         const frameClient = await getFrameClient()
         await frameClient.request({
@@ -154,13 +154,18 @@ export const useSliceWalletExecutionLifecycle = ({
           params: {
             account,
             chainId: walletChainId,
-            grantKind: "management"
+            grantKind: "management",
+            slicerId
           }
         })
       } catch {
         // Parent metadata is still cleared; iframe state can clear later.
       }
-      setManagementExecutionSession(null)
+      setManagementExecutionSession((current) => {
+        const next = new Map(current)
+        next.delete(slicerId)
+        return next
+      })
     },
     [getFrameClient, setManagementExecutionSession, walletChainId]
   )
@@ -182,17 +187,19 @@ export const useSliceWalletExecutionLifecycle = ({
       }
       await managementLifecycle.runMutation({
         account: activeWallet.kernelAccount.address,
+        slicerId,
         task: async (control) => {
           const frameClient = await getFrameClient()
           const [{ delegation }, frameResult, pendingFrameResult, pendingRead] =
             await Promise.all([
-              storeManagement.fetchDelegation(),
+              storeManagement.fetchDelegation(slicerId),
               frameClient.request({
                 method: "getSession",
                 params: {
                   account: activeWallet.kernelAccount.address,
                   chainId: walletChainId,
-                  grantKind: "management"
+                  grantKind: "management",
+                  slicerId
                 }
               }),
               frameClient.request({
@@ -200,12 +207,14 @@ export const useSliceWalletExecutionLifecycle = ({
                 params: {
                   account: activeWallet.kernelAccount.address,
                   chainId: walletChainId,
-                  grantKind: "management"
+                  grantKind: "management",
+                  slicerId
                 }
               }),
               readStoredPendingReplacementStrict(
                 activeWallet.kernelAccount.address,
-                "store_management"
+                "store_management",
+                slicerId
               )
             ])
           if (!pendingRead.ok) {
@@ -268,7 +277,8 @@ export const useSliceWalletExecutionLifecycle = ({
               await writeStoredExecutionSessionStrict(registeredPending.session)
               await clearStoredPendingReplacementStrict(
                 activeWallet.kernelAccount.address,
-                "store_management"
+                "store_management",
+                slicerId
               )
             } catch {
               throw new SliceWalletEnablementError(
@@ -363,7 +373,8 @@ export const useSliceWalletExecutionLifecycle = ({
             }
           })
           await clearManagementExecutionSession(
-            activeWallet.kernelAccount.address
+            activeWallet.kernelAccount.address,
+            slicerId
           )
           control.assertCurrent()
           notifications?.success?.("1-tap management disabled")

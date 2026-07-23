@@ -251,7 +251,7 @@ export const parseSliceWalletFrameSession = (
       "publicKey",
       "signerId"
     ],
-    ["checkout"]
+    ["checkout", "slicerId"]
   )
   const account = addressValue(input.account, "Session account")
   const chainId = integerValue(input.chainId, "Session chain id")
@@ -268,8 +268,20 @@ export const parseSliceWalletFrameSession = (
     input.checkout === undefined
       ? undefined
       : parseCheckoutGrant(input.checkout)
+  const slicerId =
+    input.slicerId === undefined
+      ? undefined
+      : integerValue(input.slicerId, "Session slicer id")
   if ((grantKind === "checkout") !== (checkout !== undefined)) {
     throw new Error("Checkout session metadata does not match its grant kind.")
+  }
+  if (
+    (grantKind === "management" && (slicerId === undefined || slicerId <= 0)) ||
+    (grantKind !== "management" && slicerId !== undefined)
+  ) {
+    throw new Error(
+      "Management session metadata requires a positive slicer id."
+    )
   }
   if (
     policy.account.toLowerCase() !== account.toLowerCase() ||
@@ -292,7 +304,8 @@ export const parseSliceWalletFrameSession = (
     permissionId,
     policy,
     publicKey,
-    signerId
+    signerId,
+    ...(slicerId === undefined ? {} : { slicerId })
   }
 }
 

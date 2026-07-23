@@ -106,13 +106,15 @@ export const useSliceWalletManagementEnablement = ({
 
       await managementLifecycle.runMutation({
         account: kernelAccount.address,
+        slicerId,
         task: async (control) => {
           const frameClient = await getFrameClient()
           let { committed, pending, replacement } =
             await loadManagementReplacementState({
               account: kernelAccount.address,
               chainId: walletChainId,
-              frameClient
+              frameClient,
+              slicerId
             })
           if (pending !== null && pending.expiresAt <= Date.now() / 1_000) {
             await frameClient.request({
@@ -120,12 +122,14 @@ export const useSliceWalletManagementEnablement = ({
               params: {
                 account: kernelAccount.address,
                 chainId: walletChainId,
-                grantKind: "management"
+                grantKind: "management",
+                slicerId
               }
             })
             await clearStoredPendingReplacementStrict(
               kernelAccount.address,
-              "store_management"
+              "store_management",
+              slicerId
             )
             pending = null
             replacement = null
@@ -141,6 +145,12 @@ export const useSliceWalletManagementEnablement = ({
               slicerId,
               slicerAddress
             )
+          if (registered !== null && !targetMatches) {
+            throw new SliceWalletEnablementError(
+              "Invalid pending management replacement state.",
+              "preserve-pending"
+            )
+          }
           const pendingMatchesRegistered =
             registered !== null &&
             managementFrameMatchesStored(
@@ -158,8 +168,7 @@ export const useSliceWalletManagementEnablement = ({
               ),
             hasPendingFrame: pending !== null,
             pendingPhase: replacement?.phase ?? null,
-            pendingMatchesRegistered,
-            targetMatches
+            pendingMatchesRegistered
           })
 
           if (action === "discard-orphan") {
@@ -168,7 +177,8 @@ export const useSliceWalletManagementEnablement = ({
               params: {
                 account: kernelAccount.address,
                 chainId: walletChainId,
-                grantKind: "management"
+                grantKind: "management",
+                slicerId
               }
             })
             pending = null
@@ -179,11 +189,7 @@ export const useSliceWalletManagementEnablement = ({
             )
           }
 
-          if (
-            action === "resume" ||
-            action === "complete-bookkeeping" ||
-            action === "complete-old-then-continue"
-          ) {
+          if (action === "resume" || action === "complete-bookkeeping") {
             if (registered === null) {
               throw new SliceWalletEnablementError(
                 "Invalid pending management replacement state.",
@@ -197,7 +203,6 @@ export const useSliceWalletManagementEnablement = ({
                 "preserve-pending"
               )
             }
-            let replacementRevoked = false
             if (pending !== null) {
               try {
                 await finalizeRegisteredReplacement({
@@ -219,79 +224,74 @@ export const useSliceWalletManagementEnablement = ({
                     params: {
                       account: kernelAccount.address,
                       chainId: walletChainId,
-                      grantKind: "management"
+                      grantKind: "management",
+                      slicerId
                     }
                   })
                   .catch(() => undefined)
                 await clearStoredPendingReplacementStrict(
                   kernelAccount.address,
-                  "store_management"
+                  "store_management",
+                  slicerId
                 )
-                if (action !== "complete-old-then-continue") {
-                  rejectRevokedManagementPermission()
-                }
-                replacementRevoked = true
+                rejectRevokedManagementPermission()
               }
             }
-            const shouldActivate = action !== "complete-old-then-continue"
-            if (!replacementRevoked) {
-              await runManagementCommitPhase({
-                activate: shouldActivate
-                  ? () =>
-                      activateManagementExecutionSession({
-                        assertCurrent: control.assertCurrent,
-                        credential,
-                        kernelAccount,
-                        session: resumeSession,
-                        stored: registered.session
+            await runManagementCommitPhase({
+              activate: () =>
+                activateManagementExecutionSession({
+                  assertCurrent: control.assertCurrent,
+                  credential,
+                  kernelAccount,
+                  session: resumeSession,
+                  stored: registered.session
+                }),
+              assertCurrent: control.assertCurrent,
+              clearPending: () =>
+                clearStoredPendingReplacementStrict(
+                  kernelAccount.address,
+                  "store_management",
+                  slicerId
+                ),
+              commit:
+                pending === null
+                  ? async () => undefined
+                  : async () => {
+                      await frameClient.request({
+                        method: "commitSession",
+                        params: {
+                          account: resumeSession.account,
+                          chainId: resumeSession.chainId,
+                          grantKind: resumeSession.grantKind,
+                          slicerId
+                        }
                       })
-                  : async () => undefined,
-                assertCurrent: control.assertCurrent,
-                clearPending: () =>
-                  clearStoredPendingReplacementStrict(
-                    kernelAccount.address,
-                    "store_management"
+                    },
+              persist: () =>
+                writeStoredExecutionSessionStrict(registered.session),
+              probeCommitted: async () => {
+                const result = await frameClient.request({
+                  method: "getSession",
+                  params: {
+                    account: kernelAccount.address,
+                    chainId: walletChainId,
+                    grantKind: "management",
+                    slicerId
+                  }
+                })
+                return managementFrameMatchesStored(
+                  parseManagementFrameSession(
+                    result !== null && typeof result === "object"
+                      ? result
+                      : null
                   ),
-                commit:
-                  pending === null
-                    ? async () => undefined
-                    : async () => {
-                        await frameClient.request({
-                          method: "commitSession",
-                          params: {
-                            account: resumeSession.account,
-                            chainId: resumeSession.chainId,
-                            grantKind: resumeSession.grantKind
-                          }
-                        })
-                      },
-                persist: () =>
-                  writeStoredExecutionSessionStrict(registered.session),
-                probeCommitted: async () => {
-                  const result = await frameClient.request({
-                    method: "getSession",
-                    params: {
-                      account: kernelAccount.address,
-                      chainId: walletChainId,
-                      grantKind: "management"
-                    }
-                  })
-                  return managementFrameMatchesStored(
-                    parseManagementFrameSession(
-                      result !== null && typeof result === "object"
-                        ? result
-                        : null
-                    ),
-                    registered.session,
-                    walletChainId
-                  )
-                }
-              })
-              if (shouldActivate) {
-                notifications?.success?.("1-tap management enabled")
-                return
+                  registered.session,
+                  walletChainId
+                )
               }
-            }
+            })
+            notifications?.success?.("1-tap management enabled")
+            return
           }
 
           control.assertCurrent()
@@ -305,7 +305,7 @@ export const useSliceWalletManagementEnablement = ({
           })
           const created = await frameClient.request({
             method: "createSession",
-            params: { policy }
+            params: { policy, slicerId }
           })
           if (created === null || typeof created !== "object") {
             throw new Error(
@@ -406,7 +406,8 @@ export const useSliceWalletManagementEnablement = ({
               clearPending: () =>
                 clearStoredPendingReplacementStrict(
                   kernelAccount.address,
-                  "store_management"
+                  "store_management",
+                  slicerId
                 ),
               commit: async () => {
                 await frameClient.request({
@@ -414,7 +415,8 @@ export const useSliceWalletManagementEnablement = ({
                   params: {
                     account: session.account,
                     chainId: session.chainId,
-                    grantKind: session.grantKind
+                    grantKind: session.grantKind,
+                    slicerId
                   }
                 })
               },
@@ -426,7 +428,8 @@ export const useSliceWalletManagementEnablement = ({
                   params: {
                     account: kernelAccount.address,
                     chainId: walletChainId,
-                    grantKind: "management"
+                    grantKind: "management",
+                    slicerId
                   }
                 })
                 return managementFrameMatchesStored(
@@ -449,13 +452,15 @@ export const useSliceWalletManagementEnablement = ({
                     params: {
                       account: session.account,
                       chainId: session.chainId,
-                      grantKind: "management"
+                      grantKind: "management",
+                      slicerId
                     }
                   })
                   .catch(() => undefined),
                 clearStoredPendingReplacement(
                   kernelAccount.address,
-                  "store_management"
+                  "store_management",
+                  slicerId
                 )
               ])
               throw new SliceWalletEnablementError(

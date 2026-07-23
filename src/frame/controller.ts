@@ -194,7 +194,10 @@ export const attachSliceWalletSignerFrame = ({
         permissionId: getWalletPermissionId(policy, keyPair.signerId),
         policy,
         publicKey: keyPair.publicKeyHex,
-        signerId: keyPair.signerId
+        signerId: keyPair.signerId,
+        ...(request.params.slicerId === undefined
+          ? {}
+          : { slicerId: request.params.slicerId })
       }
       await sessionStore.putPending({
         appOrigin: parentOrigin,

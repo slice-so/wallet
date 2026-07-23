@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback } from "react"
+import { type SetStateAction, useCallback } from "react"
 import type { Chain } from "viem"
 import {
   createKernelPasskeySliceAccountClient,
@@ -31,6 +31,7 @@ import type {
 import {
   clearStoredExecutionSession,
   readStoredExecutionSession,
+  readStoredManagementExecutionSessions,
   readStoredPendingReplacementStrict
 } from "./executionKeyStore"
 import { hydrateStoredManagementExecutionSession } from "./managementHydration"
@@ -64,7 +65,7 @@ export const useSliceWalletExecutionHydration = ({
   >[0]["client"]
   setExecutionSession: (session: SliceWalletExecutionSession | null) => void
   setManagementExecutionSession: (
-    session: SliceWalletManagementExecutionSession | null
+    session: SetStateAction<Map<number, SliceWalletManagementExecutionSession>>
   ) => void
   storeManagement: SliceWalletProviderAdapters["storeManagement"]
   walletChain: Chain
@@ -304,11 +305,15 @@ export const useSliceWalletExecutionHydration = ({
         stored
       })
       assertCurrent?.()
-      setManagementExecutionSession({
-        expiresAt: new Date(stored.expiresAt),
-        slicerAddress: stored.slicerAddress,
-        slicerId: stored.slicerId,
-        sliceAccountClient: client
+      setManagementExecutionSession((current) => {
+        const next = new Map(current)
+        next.set(stored.slicerId, {
+          expiresAt: new Date(stored.expiresAt),
+          slicerAddress: stored.slicerAddress,
+          slicerId: stored.slicerId,
+          sliceAccountClient: client
+        })
+        return next
       })
     },
     [buildManagementExecutionClient, setManagementExecutionSession]
@@ -324,45 +329,83 @@ export const useSliceWalletExecutionHydration = ({
       kernelAccount: RootAccount
       control: SliceWalletManagementLifecycleControl
     }) => {
-      const pending = await readStoredPendingReplacementStrict(
-        kernelAccount.address,
-        "store_management"
+      const storedSessions = await readStoredManagementExecutionSessions(
+        kernelAccount.address
       )
       control.assertCurrent()
-      const guard = getManagementHydrationGuard({
-        pendingPhase: pending.ok ? (pending.value?.phase ?? null) : null,
-        readable: pending.ok
-      })
-      if (guard === "storage-unavailable") {
-        setManagementExecutionSession(null)
+      if (storedSessions.status === "unavailable") {
+        setManagementExecutionSession(new Map())
         control.markStorageUnavailable()
         return
       }
-      if (guard === "skip") {
-        setManagementExecutionSession(null)
-        return
-      }
       if (!storeManagement) {
-        setManagementExecutionSession(null)
+        setManagementExecutionSession(new Map())
         control.markError("transport-unavailable")
         return
       }
-      await hydrateStoredManagementExecutionSession({
-        account: kernelAccount.address,
-        activate: ({ session, stored }) =>
-          activateManagementExecutionSession({
-            assertCurrent: control.assertCurrent,
-            credential,
-            kernelAccount,
-            session,
-            stored
-          }),
-        chainId: walletChain.id,
-        control,
-        fetchDelegation: storeManagement.fetchDelegation,
-        getFrameClient,
-        setSessionNull: () => setManagementExecutionSession(null)
-      })
+      const storedSlicerIds = new Set(
+        storedSessions.values.map((stored) => stored.slicerId)
+      )
+      setManagementExecutionSession(
+        (current) =>
+          new Map(
+            [...current].filter(([slicerId]) => storedSlicerIds.has(slicerId))
+          )
+      )
+      const pendingStates = await Promise.all(
+        storedSessions.values.map(async (stored) => ({
+          pending: await readStoredPendingReplacementStrict(
+            kernelAccount.address,
+            "store_management",
+            stored.slicerId
+          ),
+          stored
+        }))
+      )
+      control.assertCurrent()
+      if (pendingStates.some(({ pending }) => !pending.ok)) {
+        setManagementExecutionSession(new Map())
+        control.markStorageUnavailable()
+        return
+      }
+      await Promise.all(
+        pendingStates.map(async ({ pending, stored: storedSession }) => {
+          const guard = getManagementHydrationGuard({
+            pendingPhase: pending.ok ? (pending.value?.phase ?? null) : null,
+            readable: true
+          })
+          if (guard === "skip") {
+            setManagementExecutionSession((current) => {
+              const next = new Map(current)
+              next.delete(storedSession.slicerId)
+              return next
+            })
+            return
+          }
+          await hydrateStoredManagementExecutionSession({
+            account: kernelAccount.address,
+            activate: ({ session, stored }) =>
+              activateManagementExecutionSession({
+                assertCurrent: control.assertCurrent,
+                credential,
+                kernelAccount,
+                session,
+                stored
+              }),
+            chainId: walletChain.id,
+            control,
+            fetchDelegation: storeManagement.fetchDelegation,
+            getFrameClient,
+            setSessionNull: () =>
+              setManagementExecutionSession((current) => {
+                const next = new Map(current)
+                next.delete(storedSession.slicerId)
+                return next
+              }),
+            slicerId: storedSession.slicerId
+          })
+        })
+      )
     },
     [
       activateManagementExecutionSession,

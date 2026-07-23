@@ -38,14 +38,13 @@ describe("management operation policies", () => {
     ).toBe("hydrate")
   })
 
-  test("keeps registering ambiguous and validates registered targets", () => {
+  test("keeps registering ambiguous and resumes only the scoped pending record", () => {
     expect(
       classifyManagementPendingAction({
         hasMatchingCommittedFrame: false,
         hasPendingFrame: true,
         pendingPhase: "registering",
-        pendingMatchesRegistered: false,
-        targetMatches: true
+        pendingMatchesRegistered: false
       })
     ).toBe("ambiguous")
     expect(
@@ -53,8 +52,7 @@ describe("management operation policies", () => {
         hasMatchingCommittedFrame: false,
         hasPendingFrame: true,
         pendingMatchesRegistered: false,
-        pendingPhase: "registered",
-        targetMatches: true
+        pendingPhase: "registered"
       })
     ).toBe("ambiguous")
     expect(
@@ -62,17 +60,15 @@ describe("management operation policies", () => {
         hasMatchingCommittedFrame: false,
         hasPendingFrame: true,
         pendingPhase: "registered",
-        pendingMatchesRegistered: true,
-        targetMatches: false
+        pendingMatchesRegistered: true
       })
-    ).toBe("complete-old-then-continue")
+    ).toBe("resume")
     expect(
       classifyManagementPendingAction({
         hasMatchingCommittedFrame: true,
         hasPendingFrame: false,
         pendingPhase: "registered",
-        pendingMatchesRegistered: false,
-        targetMatches: true
+        pendingMatchesRegistered: false
       })
     ).toBe("complete-bookkeeping")
     expect(
@@ -80,8 +76,7 @@ describe("management operation policies", () => {
         hasMatchingCommittedFrame: false,
         hasPendingFrame: false,
         pendingPhase: "registered",
-        pendingMatchesRegistered: false,
-        targetMatches: true
+        pendingMatchesRegistered: false
       })
     ).toBe("ambiguous")
   })

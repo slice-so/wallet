@@ -71,7 +71,8 @@ const managementSession = {
   permissionId: getWalletPermissionId(managementPolicy, signerId),
   policy: managementPolicy,
   publicKey: session.publicKey,
-  signerId: session.signerId
+  signerId: session.signerId,
+  slicerId: 7
 } as const
 const managementAuthorization = {
   ...authorization,

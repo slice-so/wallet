@@ -9,6 +9,11 @@ import type {
 const DB_NAME = "slice-wallet"
 const STORE_NAME = "execution-sessions"
 
+type StoredManagementSession = Extract<
+  StoredSliceWalletExecutionSession,
+  { kind: "store_management" }
+>
+
 const openDatabase = () =>
   new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(DB_NAME)
@@ -40,9 +45,67 @@ const withStore = async <T>(
   }
 }
 
-export const readStoredExecutionSessionResult = async (
+const legacyExecutionSessionKey = (
   accountAddress: Address,
   kind: StoredSliceWalletExecutionSession["kind"]
+) => `${kind}:${accountAddress.toLowerCase()}`
+
+const executionSessionKey = (
+  accountAddress: Address,
+  kind: StoredSliceWalletExecutionSession["kind"],
+  slicerId?: number
+) => {
+  const legacyKey = legacyExecutionSessionKey(accountAddress, kind)
+  if (kind !== "store_management") return legacyKey
+  if (
+    slicerId === undefined ||
+    !Number.isSafeInteger(slicerId) ||
+    slicerId <= 0
+  ) {
+    throw new Error("Management session keys require a positive slicer id.")
+  }
+  return `${legacyKey}:${slicerId}`
+}
+
+const pendingKey = (
+  accountAddress: Address,
+  kind: StoredSliceWalletExecutionSession["kind"],
+  slicerId?: number
+) => `pending:${executionSessionKey(accountAddress, kind, slicerId)}`
+
+const migrateLegacyValue = async <Value>({
+  getSlicerId,
+  kind,
+  legacyKey,
+  slicerId,
+  targetKey
+}: {
+  getSlicerId: (value: Value) => number | null
+  kind: StoredSliceWalletExecutionSession["kind"]
+  legacyKey: string
+  slicerId?: number
+  targetKey: string
+}): Promise<Value | null> => {
+  if (kind !== "store_management" || slicerId === undefined) return null
+  const legacy = (await withStore("readonly", (store) =>
+    store.get(legacyKey)
+  )) as Value | null | undefined
+  if (
+    legacy === null ||
+    legacy === undefined ||
+    getSlicerId(legacy) !== slicerId
+  ) {
+    return null
+  }
+  await withStore("readwrite", (store) => store.put(legacy, targetKey))
+  await withStore("readwrite", (store) => store.delete(legacyKey))
+  return legacy
+}
+
+export const readStoredExecutionSessionResult = async (
+  accountAddress: Address,
+  kind: StoredSliceWalletExecutionSession["kind"],
+  slicerId?: number
 ): Promise<
   | { status: "found"; value: StoredSliceWalletExecutionSession }
   | { status: "invalid" }
@@ -52,9 +115,20 @@ export const readStoredExecutionSessionResult = async (
   if (typeof indexedDB === "undefined") return { status: "unavailable" }
 
   try {
-    const stored = await withStore("readonly", (store) =>
-      store.get(`${kind}:${accountAddress.toLowerCase()}`)
-    )
+    const targetKey = executionSessionKey(accountAddress, kind, slicerId)
+    const direct = await withStore("readonly", (store) => store.get(targetKey))
+    const stored =
+      direct ??
+      (await migrateLegacyValue<
+        StoredSliceWalletExecutionSession & { privateKey?: string }
+      >({
+        getSlicerId: (value) =>
+          value.kind === "store_management" ? value.slicerId : null,
+        kind,
+        legacyKey: legacyExecutionSessionKey(accountAddress, kind),
+        slicerId,
+        targetKey
+      }))
     const session = stored as
       | (StoredSliceWalletExecutionSession & { privateKey?: string })
       | null
@@ -72,11 +146,11 @@ export const readStoredExecutionSessionResult = async (
           !Number.isSafeInteger(session.slicerId) ||
           session.slicerId <= 0))
     ) {
-      await clearStoredExecutionSession(accountAddress, kind)
+      await clearStoredExecutionSession(accountAddress, kind, slicerId)
       return { status: "invalid" }
     }
     if (new Date(session.expiresAt) <= new Date()) {
-      await clearStoredExecutionSession(accountAddress, kind)
+      await clearStoredExecutionSession(accountAddress, kind, slicerId)
       return { status: "invalid" }
     }
 
@@ -88,9 +162,14 @@ export const readStoredExecutionSessionResult = async (
 
 export const readStoredExecutionSession = async (
   accountAddress: Address,
-  kind: StoredSliceWalletExecutionSession["kind"]
+  kind: StoredSliceWalletExecutionSession["kind"],
+  slicerId?: number
 ): Promise<StoredSliceWalletExecutionSession | null> => {
-  const result = await readStoredExecutionSessionResult(accountAddress, kind)
+  const result = await readStoredExecutionSessionResult(
+    accountAddress,
+    kind,
+    slicerId
+  )
   return result.status === "found" ? result.value : null
 }
 
@@ -103,7 +182,11 @@ export const writeStoredExecutionSession = async (
     await withStore("readwrite", (store) =>
       store.put(
         session,
-        `${session.kind}:${session.accountAddress.toLowerCase()}`
+        executionSessionKey(
+          session.accountAddress,
+          session.kind,
+          session.kind === "store_management" ? session.slicerId : undefined
+        )
       )
     )
   } catch {
@@ -120,36 +203,50 @@ export const writeStoredExecutionSessionStrict = async (
   await withStore("readwrite", (store) =>
     store.put(
       session,
-      `${session.kind}:${session.accountAddress.toLowerCase()}`
+      executionSessionKey(
+        session.accountAddress,
+        session.kind,
+        session.kind === "store_management" ? session.slicerId : undefined
+      )
     )
   )
 }
 
 export const clearStoredExecutionSession = async (
   accountAddress: Address,
-  kind: StoredSliceWalletExecutionSession["kind"]
+  kind: StoredSliceWalletExecutionSession["kind"],
+  slicerId?: number
 ) => {
   if (typeof indexedDB === "undefined") return
 
   try {
     await withStore("readwrite", (store) =>
-      store.delete(`${kind}:${accountAddress.toLowerCase()}`)
+      store.delete(executionSessionKey(accountAddress, kind, slicerId))
     )
   } catch {}
 }
 
-const pendingKey = (
-  accountAddress: Address,
-  kind: StoredSliceWalletExecutionSession["kind"]
-) => `pending:${kind}:${accountAddress.toLowerCase()}`
-
 const readStoredPendingReplacementValue = async (
   accountAddress: Address,
-  kind: StoredSliceWalletExecutionSession["kind"]
+  kind: StoredSliceWalletExecutionSession["kind"],
+  slicerId?: number
 ): Promise<StoredSliceWalletPendingReplacement | null> => {
-  const stored = (await withStore("readonly", (store) =>
-    store.get(pendingKey(accountAddress, kind))
+  const targetKey = pendingKey(accountAddress, kind, slicerId)
+  const direct = (await withStore("readonly", (store) =>
+    store.get(targetKey)
   )) as StoredSliceWalletPendingReplacement | null | undefined
+  const stored =
+    direct ??
+    (await migrateLegacyValue<StoredSliceWalletPendingReplacement>({
+      getSlicerId: (value) =>
+        value.session.kind === "store_management"
+          ? value.session.slicerId
+          : null,
+      kind,
+      legacyKey: `pending:${legacyExecutionSessionKey(accountAddress, kind)}`,
+      slicerId,
+      targetKey
+    }))
   if (
     stored === null ||
     stored === undefined ||
@@ -169,9 +266,7 @@ const readStoredPendingReplacementValue = async (
             !/^\d+$/.test(stored.allowanceUsdMicros))))) ||
     new Date(stored.session.expiresAt) <= new Date()
   ) {
-    await withStore("readwrite", (store) =>
-      store.delete(pendingKey(accountAddress, kind))
-    )
+    await withStore("readwrite", (store) => store.delete(targetKey))
     return null
   }
   return stored
@@ -179,11 +274,16 @@ const readStoredPendingReplacementValue = async (
 
 export const readStoredPendingReplacement = async (
   accountAddress: Address,
-  kind: StoredSliceWalletExecutionSession["kind"]
+  kind: StoredSliceWalletExecutionSession["kind"],
+  slicerId?: number
 ): Promise<StoredSliceWalletPendingReplacement | null> => {
   if (typeof indexedDB === "undefined") return null
   try {
-    return await readStoredPendingReplacementValue(accountAddress, kind)
+    return await readStoredPendingReplacementValue(
+      accountAddress,
+      kind,
+      slicerId
+    )
   } catch {
     return null
   }
@@ -195,13 +295,18 @@ type StoredPendingReplacementReadResult =
 
 export const readStoredPendingReplacementStrict = async (
   accountAddress: Address,
-  kind: StoredSliceWalletExecutionSession["kind"]
+  kind: StoredSliceWalletExecutionSession["kind"],
+  slicerId?: number
 ): Promise<StoredPendingReplacementReadResult> => {
   if (typeof indexedDB === "undefined") return { ok: false }
   try {
     return {
       ok: true,
-      value: await readStoredPendingReplacementValue(accountAddress, kind)
+      value: await readStoredPendingReplacementValue(
+        accountAddress,
+        kind,
+        slicerId
+      )
     }
   } catch {
     return { ok: false }
@@ -215,7 +320,13 @@ export const writeStoredPendingReplacement = async (
   await withStore("readwrite", (store) =>
     store.put(
       replacement,
-      pendingKey(replacement.session.accountAddress, replacement.session.kind)
+      pendingKey(
+        replacement.session.accountAddress,
+        replacement.session.kind,
+        replacement.session.kind === "store_management"
+          ? replacement.session.slicerId
+          : undefined
+      )
     )
   )
 }
@@ -229,31 +340,89 @@ export const writeStoredPendingReplacementStrict = async (
   await withStore("readwrite", (store) =>
     store.put(
       replacement,
-      pendingKey(replacement.session.accountAddress, replacement.session.kind)
+      pendingKey(
+        replacement.session.accountAddress,
+        replacement.session.kind,
+        replacement.session.kind === "store_management"
+          ? replacement.session.slicerId
+          : undefined
+      )
     )
   )
 }
 
 export const clearStoredPendingReplacement = async (
   accountAddress: Address,
-  kind: StoredSliceWalletExecutionSession["kind"]
+  kind: StoredSliceWalletExecutionSession["kind"],
+  slicerId?: number
 ) => {
   if (typeof indexedDB === "undefined") return
   try {
     await withStore("readwrite", (store) =>
-      store.delete(pendingKey(accountAddress, kind))
+      store.delete(pendingKey(accountAddress, kind, slicerId))
     )
   } catch {}
 }
 
 export const clearStoredPendingReplacementStrict = async (
   accountAddress: Address,
-  kind: StoredSliceWalletExecutionSession["kind"]
+  kind: StoredSliceWalletExecutionSession["kind"],
+  slicerId?: number
 ) => {
   if (typeof indexedDB === "undefined") {
     throw new Error("Slice Wallet session storage is unavailable.")
   }
   await withStore("readwrite", (store) =>
-    store.delete(pendingKey(accountAddress, kind))
+    store.delete(pendingKey(accountAddress, kind, slicerId))
   )
+}
+
+export const readStoredManagementExecutionSessions = async (
+  accountAddress: Address
+): Promise<
+  | { status: "available"; values: readonly StoredManagementSession[] }
+  | { status: "unavailable" }
+> => {
+  if (typeof indexedDB === "undefined") return { status: "unavailable" }
+  try {
+    const values = (await withStore("readonly", (store) =>
+      store.getAll()
+    )) as readonly (
+      | StoredSliceWalletExecutionSession
+      | StoredSliceWalletPendingReplacement
+    )[]
+    const slicerIds = [
+      ...new Set(
+        values.flatMap((value) =>
+          "kind" in value &&
+          value.kind === "store_management" &&
+          value.accountAddress.toLowerCase() === accountAddress.toLowerCase()
+            ? [value.slicerId]
+            : []
+        )
+      )
+    ]
+    const results = await Promise.all(
+      slicerIds.map((slicerId) =>
+        readStoredExecutionSessionResult(
+          accountAddress,
+          "store_management",
+          slicerId
+        )
+      )
+    )
+    if (results.some((result) => result.status === "unavailable")) {
+      return { status: "unavailable" }
+    }
+    return {
+      status: "available",
+      values: results.flatMap((result) =>
+        result.status === "found" && result.value.kind === "store_management"
+          ? [result.value]
+          : []
+      )
+    }
+  } catch {
+    return { status: "unavailable" }
+  }
 }

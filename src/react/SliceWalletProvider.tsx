@@ -118,8 +118,9 @@ export function SliceWalletProvider({
   const [hasStoredCredential, setHasStoredCredential] = useState(false)
   const [executionSession, setExecutionSession] =
     useState<SliceWalletExecutionSession | null>(null)
-  const [managementExecutionSession, setManagementExecutionSession] =
-    useState<SliceWalletManagementExecutionSession | null>(null)
+  const [managementExecutionSessions, setManagementExecutionSession] = useState<
+    Map<number, SliceWalletManagementExecutionSession>
+  >(() => new Map())
   const [recovery, setRecovery] = useState<SliceWalletRecoverySnapshot | null>(
     null
   )
@@ -173,7 +174,13 @@ export function SliceWalletProvider({
       chainId: walletChain.id,
       hydrate: (account, control) =>
         managementHydrationTaskRef.current(account, control),
-      onIdentityChange: () => setManagementExecutionSession(null),
+      onIdentityChange: (slicerId) =>
+        setManagementExecutionSession((current) => {
+          if (slicerId === undefined) return new Map()
+          const next = new Map(current)
+          next.delete(slicerId)
+          return next
+        }),
       onMutation: (message) => broadcastManagementMutationRef.current?.(message)
     })
   }
@@ -301,6 +308,8 @@ export function SliceWalletProvider({
         typeof message !== "object" ||
         typeof message.sourceId !== "string" ||
         typeof message.chainId !== "number" ||
+        !Number.isSafeInteger(message.slicerId) ||
+        message.slicerId <= 0 ||
         (message.outcome !== "error" && message.outcome !== "success") ||
         typeof message.account !== "string" ||
         !isAddress(message.account) ||
@@ -313,7 +322,10 @@ export function SliceWalletProvider({
       ) {
         return
       }
-      managementLifecycle.handleExternalMutation(message.account)
+      managementLifecycle.handleExternalMutation(
+        message.account,
+        message.slicerId
+      )
     }
     channel.addEventListener("message", handleMessage)
     return () => {
@@ -324,6 +336,11 @@ export function SliceWalletProvider({
   }, [managementLifecycle, storeManagement, walletChain.id])
 
   const pendingCeremony = featurePendingCeremony ?? connectorPendingCeremony
+
+  const getManagementExecutionSession = useCallback(
+    (slicerId: number) => managementExecutionSessions.get(slicerId) ?? null,
+    [managementExecutionSessions]
+  )
 
   const getConnectorProvider = useCallback(async () => {
     const connector = wagmiConfig.connectors.find(
@@ -477,7 +494,7 @@ export function SliceWalletProvider({
       executionSession,
       hasStoredCredential,
       loginWallet,
-      managementExecutionSession,
+      getManagementExecutionSession,
       managementHydration,
       pendingAction,
       pendingCeremony,
@@ -506,7 +523,7 @@ export function SliceWalletProvider({
       executionSession,
       hasStoredCredential,
       loginWallet,
-      managementExecutionSession,
+      getManagementExecutionSession,
       managementHydration,
       pendingAction,
       pendingCeremony,
