@@ -330,6 +330,15 @@ export const parseSliceWalletFrameRequest = (
   ) {
     return { id, method, params: parseSessionKey(params), version: 1 }
   }
+  if (method === "lockAccount" || method === "getAccountLockState") {
+    assertKeys(params, ["account"])
+    return {
+      id,
+      method,
+      params: { account: addressValue(params.account, "Wallet account") },
+      version: 1
+    }
+  }
   if (method === "signCheckoutProposal") {
     assertKeys(params, ["callData", "nonce", "sender", "session"])
     return {

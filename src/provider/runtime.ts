@@ -18,7 +18,7 @@ import { authorizeSliceWalletSessions } from "../ceremony/client"
 import { parseSliceWalletFrameSession } from "../ceremony/protocol"
 import { createSliceWalletCeremonyKernelAccount } from "../ceremony/rootAccountClient"
 import { getSliceWalletChainManifest } from "../chains"
-import { connectSliceWalletSignerFrame } from "../frame/client"
+import { acquireSliceWalletSignerFrame } from "../frame/client"
 import { getSliceWalletP256SignerId } from "../p256Server"
 import {
   buildSliceWalletPermissionUninstallCalls,
@@ -134,6 +134,7 @@ const toFrameSession = (grant: StoredGenericGrant): SliceWalletFrameSession => {
 const createSliceWalletChainRuntime = (
   config: SliceWalletChainRuntimeConfig,
   dependencies: {
+    acquireFrame?: typeof acquireSliceWalletSignerFrame
     connectAccount?: typeof connectSliceWalletAccount
   } = {}
 ) => {
@@ -260,7 +261,7 @@ const createSliceWalletChainRuntime = (
     if (framePromise !== null) return framePromise
     const generation = config.getAccountGeneration()
     let pending!: Promise<SliceWalletSignerFrameClient>
-    pending = connectSliceWalletSignerFrame({
+    pending = (dependencies.acquireFrame ?? acquireSliceWalletSignerFrame)({
       document: browserDocument,
       frameUrl: new URL("/frame", idOrigin).href,
       window: browserWindow
@@ -323,6 +324,7 @@ const createSliceWalletChainRuntime = (
 
   const chooseAccount = async (session?: SliceWalletSessionConnectInput) => {
     const generation = config.getAccountGeneration()
+    await getFrame()
     const connected = await (
       dependencies.connectAccount ?? connectSliceWalletAccount
     )({
@@ -358,7 +360,14 @@ const createSliceWalletChainRuntime = (
 
   const connect = async () => {
     const hydrated = await hydrate()
-    if (hydrated !== null) return hydrated
+    if (hydrated !== null) {
+      const lockState = await (await getFrame()).request({
+        method: "getAccountLockState",
+        params: { account: hydrated.rootAccount.address }
+      })
+      if (lockState === "unlocked") return hydrated
+      return commitAccount(await chooseAccount())
+    }
     if (readStoredSliceWalletAccount(storage) !== null) {
       throw new Error(
         "Slice Wallet account hydration is temporarily unavailable."
@@ -373,6 +382,13 @@ const createSliceWalletChainRuntime = (
     const selection = await chooseAccount(session)
     const wallet = commitAccount(selection)
     return { session: selection.connected.session, wallet }
+  }
+
+  const lockAccount = async (account: `0x${string}`) => {
+    await (await getFrame()).request({
+      method: "lockAccount",
+      params: { account }
+    })
   }
 
   const requestSession = async () => {
@@ -713,11 +729,21 @@ const createSliceWalletChainRuntime = (
       }),
     getAccounts: async () => {
       const wallet = await hydrate()
-      return wallet === null ? [] : [wallet.rootAccount.address]
+      if (wallet === null) return []
+      try {
+        const lockState = await (await getFrame()).request({
+          method: "getAccountLockState",
+          params: { account: wallet.rootAccount.address }
+        })
+        return lockState === "unlocked" ? [wallet.rootAccount.address] : []
+      } catch {
+        return []
+      }
     },
     hasCall: callTracker.hasCall,
     getCallsStatus: callTracker.getCallsStatus,
     getGrants,
+    lockAccount,
     paymasterAvailable: config.paymasterUrl !== undefined,
     revokeGrant,
     requestSession,
@@ -734,6 +760,7 @@ type SliceWalletChainRuntime = ReturnType<typeof createSliceWalletChainRuntime>
 export const createSliceWalletProviderRuntime = (
   config: SliceWalletProviderConfig,
   dependencies: {
+    acquireFrame?: typeof acquireSliceWalletSignerFrame
     connectAccount?: typeof connectSliceWalletAccount
     createChainRuntime?: typeof createSliceWalletChainRuntime
   } = {}
@@ -742,6 +769,7 @@ export const createSliceWalletProviderRuntime = (
     dependencies.createChainRuntime ??
     ((chainConfig: SliceWalletChainRuntimeConfig) =>
       createSliceWalletChainRuntime(chainConfig, {
+        acquireFrame: dependencies.acquireFrame,
         connectAccount: dependencies.connectAccount
       }))
   const ceremonyBroker = createSliceWalletCeremonyBroker()
@@ -810,6 +838,22 @@ export const createSliceWalletProviderRuntime = (
     runtimes.clear()
   }
 
+  const collectFailures = (
+    results: readonly PromiseSettledResult<void>[],
+    fallbackMessage: string
+  ) => {
+    const failures: Error[] = []
+    for (const result of results) {
+      if (result.status !== "rejected") continue
+      failures.push(
+        result.reason instanceof Error
+          ? result.reason
+          : new Error(fallbackMessage)
+      )
+    }
+    return failures
+  }
+
   const switchAccount = () =>
     withSwitchMutex(async () => {
       accountGeneration += 1
@@ -833,9 +877,7 @@ export const createSliceWalletProviderRuntime = (
           ) &&
           selection.connected.accountIndex === snapshot.accountIndex
         ) {
-          runtime.destroy()
-          runtimes.clear()
-          return getChainRuntime().connect()
+          return runtime.commitAccount(selection)
         }
         for (const chainId of chainConfigs.keys()) {
           clearStoredSliceWalletGrant(storage, chainId, snapshot.accountAddress)
@@ -876,28 +918,27 @@ export const createSliceWalletProviderRuntime = (
     disconnect: async () => {
       ceremonyBroker.cancel()
       const { storage } = getBrowserDependencies(config)
-      const revocations = [...chainConfigs.keys()].map((chainId) =>
-        getChainRuntime(chainId).revokeGrant()
+      const account = readStoredSliceWalletAccount(storage)?.accountAddress
+      const results =
+        account === undefined
+          ? []
+          : await Promise.allSettled([
+              (runtimes.values().next().value ?? getChainRuntime()).lockAccount(
+                account
+              )
+            ])
+      destroyChainRuntimes()
+      clearStoredSliceWalletAccount(storage)
+      const failures = collectFailures(
+        results,
+        "Wallet session lock failed unexpectedly."
       )
-      const results = await Promise.allSettled(revocations)
-      for (const runtime of runtimes.values()) runtime.destroy()
-      runtimes.clear()
-      const failures: Error[] = []
-      for (const result of results) {
-        if (result.status !== "rejected") continue
-        failures.push(
-          result.reason instanceof Error
-            ? result.reason
-            : new Error("Wallet permission revocation failed unexpectedly.")
-        )
-      }
       if (failures.length > 0) {
         throw new AggregateError(
           failures,
-          `${failures.length} wallet permission revocation${failures.length === 1 ? "" : "s"} failed during disconnect.`
+          `${failures.length} wallet session lock${failures.length === 1 ? "" : "s"} failed during disconnect.`
         )
       }
-      clearStoredSliceWalletAccount(storage)
     },
     forwardRpc: (...args: Parameters<SliceWalletChainRuntime["forwardRpc"]>) =>
       getChainRuntime().forwardRpc(...args),
@@ -916,6 +957,41 @@ export const createSliceWalletProviderRuntime = (
     revokeGrant: (
       ...args: Parameters<SliceWalletChainRuntime["revokeGrant"]>
     ) => getChainRuntime().revokeGrant(...args),
+    revokePermissions: async () => {
+      ceremonyBroker.cancel()
+      const { storage } = getBrowserDependencies(config)
+      const account = readStoredSliceWalletAccount(storage)?.accountAddress
+      const revocationResults = await Promise.allSettled(
+        [...chainConfigs.keys()].map((chainId) =>
+          getChainRuntime(chainId).revokeGrant()
+        )
+      )
+      const lockResults =
+        account === undefined
+          ? []
+          : await Promise.allSettled([
+              getChainRuntime(activeChainId).lockAccount(account)
+            ])
+      const failures = [
+        ...collectFailures(
+          revocationResults,
+          "Wallet permission revocation failed unexpectedly."
+        ),
+        ...collectFailures(
+          lockResults,
+          "Wallet session lock failed unexpectedly."
+        )
+      ]
+      destroyChainRuntimes()
+      if (failures.length > 0) {
+        throw new AggregateError(
+          failures,
+          `${failures.length} wallet permission revocation${failures.length === 1 ? "" : "s"} failed.`
+        )
+      }
+      clearStoredSliceWalletAccount(storage)
+      return account !== undefined
+    },
     rotateGrant: (
       ...args: Parameters<SliceWalletChainRuntime["rotateGrant"]>
     ) => getChainRuntime().rotateGrant(...args),

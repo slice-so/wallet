@@ -190,6 +190,7 @@ export function SliceWalletProvider({
     managementLifecycle.getSnapshot,
     () => IDLE_MANAGEMENT_HYDRATION_SNAPSHOT
   )
+  const previousSliceAccountRef = useRef(connectedSliceAccount)
 
   const {
     createReplacementFinalizationProof,
@@ -282,10 +283,27 @@ export function SliceWalletProvider({
   }, [wagmiConfig.connectors])
 
   useEffect(() => {
+    const previousAccount = previousSliceAccountRef.current
+    previousSliceAccountRef.current = connectedSliceAccount
     managementLifecycle.setAccount(connectedSliceAccount)
+    if (
+      previousAccount !== null &&
+      (connectedSliceAccount === null ||
+        !isAddressEqual(previousAccount, connectedSliceAccount))
+    ) {
+      void getFrameClient()
+        .then((frameClient) =>
+          frameClient.request({
+            method: "lockAccount",
+            params: { account: previousAccount }
+          })
+        )
+        .catch(() => undefined)
+    }
     if (connectedSliceAccount !== null) return
     setExecutionSession(null)
-  }, [connectedSliceAccount, managementLifecycle])
+    setManagementExecutionSession(new Map())
+  }, [connectedSliceAccount, getFrameClient, managementLifecycle])
 
   useEffect(() => {
     if (

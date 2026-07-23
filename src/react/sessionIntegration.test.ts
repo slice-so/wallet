@@ -90,6 +90,29 @@ describe("Slice Wallet session integration", () => {
     expect(end).toHaveBeenCalledTimes(1)
   })
 
+  it("ends a disconnected API session while hydration is still pending", async () => {
+    let resolveFetch!: (value: SliceWalletSessionSnapshot | null) => void
+    const end = mock(async () => undefined)
+    const harness = createHarness({
+      complete: async () => snapshot(),
+      end,
+      fetch: () =>
+        new Promise<SliceWalletSessionSnapshot | null>((resolve) => {
+          resolveFetch = resolve
+        }),
+      prepare: async () => ({ sessionSigner: snapshot().sessionSigner })
+    })
+
+    harness.configure(accountA)
+    harness.configure(null)
+    await settle()
+
+    expect(end).toHaveBeenCalledTimes(1)
+    resolveFetch(snapshot())
+    await settle()
+    expect(harness.integration.getState().session).toBeNull()
+  })
+
   it("hydrates a valid session from fetch on reload", async () => {
     const hydrated = snapshot()
     const fetch = mock(async () => hydrated)

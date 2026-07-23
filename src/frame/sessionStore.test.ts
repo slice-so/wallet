@@ -232,4 +232,24 @@ describe("signer-frame session store", () => {
       })
     ).resolves.toMatchObject({ session: { slicerId: 0 } })
   })
+
+  it("persists connection state by app origin until explicit lock", async () => {
+    const store = createSliceWalletMemorySessionStore()
+
+    expect(await store.isAccountUnlocked("https://shop.example", account)).toBe(
+      false
+    )
+    await store.setAccountUnlocked("https://shop.example/path", account, true)
+    expect(await store.isAccountUnlocked("https://shop.example", account)).toBe(
+      true
+    )
+    expect(
+      await store.isAccountUnlocked("https://other.example", account)
+    ).toBe(false)
+
+    await store.setAccountUnlocked("https://shop.example", account, false)
+    expect(await store.isAccountUnlocked("https://shop.example", account)).toBe(
+      false
+    )
+  })
 })

@@ -19,6 +19,16 @@ const isFrameReadyMessage = (value: SliceWalletProtocolValue) => {
   )
 }
 
+type SharedSignerFrame = {
+  client: Promise<SliceWalletSignerFrameClient>
+  references: number
+}
+
+const sharedSignerFrames = new WeakMap<
+  Document,
+  Map<string, SharedSignerFrame>
+>()
+
 export const connectSliceWalletSignerFrame = async ({
   document,
   frameUrl,
@@ -155,5 +165,72 @@ export const connectSliceWalletSignerFrame = async ({
         id: window.crypto.randomUUID(),
         version: 1
       } as SliceWalletFrameRequest)
+  }
+}
+
+/**
+ * Shares one isolated signer frame across provider and React integrations in
+ * the same document. Each caller owns a lease and must destroy it on teardown.
+ */
+export const acquireSliceWalletSignerFrame = async ({
+  document,
+  frameUrl,
+  timeoutMs,
+  window
+}: {
+  document: Document
+  frameUrl: string
+  timeoutMs?: number
+  window: Window
+}): Promise<SliceWalletSignerFrameClient> => {
+  const normalizedFrameUrl = new URL(frameUrl).href
+  let documentFrames = sharedSignerFrames.get(document)
+  if (documentFrames === undefined) {
+    documentFrames = new Map()
+    sharedSignerFrames.set(document, documentFrames)
+  }
+  let shared = documentFrames.get(normalizedFrameUrl)
+  if (shared === undefined) {
+    let created!: SharedSignerFrame
+    const client = connectSliceWalletSignerFrame({
+      document,
+      frameUrl: normalizedFrameUrl,
+      ...(timeoutMs === undefined ? {} : { timeoutMs }),
+      window
+    }).catch((error) => {
+      if (documentFrames.get(normalizedFrameUrl) === created) {
+        documentFrames.delete(normalizedFrameUrl)
+      }
+      throw error
+    })
+    created = { client, references: 0 }
+    shared = created
+    documentFrames.set(normalizedFrameUrl, shared)
+  }
+
+  const leased = shared
+  leased.references += 1
+  let client: SliceWalletSignerFrameClient
+  try {
+    client = await leased.client
+  } catch (error) {
+    leased.references -= 1
+    throw error
+  }
+  let released = false
+  return {
+    destroy: () => {
+      if (released) return
+      released = true
+      leased.references -= 1
+      if (
+        leased.references === 0 &&
+        documentFrames.get(normalizedFrameUrl) === leased
+      ) {
+        documentFrames.delete(normalizedFrameUrl)
+        client.destroy()
+      }
+    },
+    request: (request) => client.request(request)
   }
 }

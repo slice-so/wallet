@@ -459,7 +459,15 @@ export const createSliceWalletProviderInternal = (
     }
     if (method === "wallet_revokePermissions") {
       assertEthAccountsRevocation(params)
-      await disconnect()
+      const before = await runtime.getAccounts()
+      const revokedStoredAccount = await runtime.revokePermissions()
+      if (before.length > 0 || revokedStoredAccount) {
+        emit("accountsChanged", [])
+        emit("disconnect", {
+          code: 4900,
+          message: "Slice Wallet permissions revoked."
+        })
+      }
       return null
     }
     if (method === "wallet_switchEthereumChain") {

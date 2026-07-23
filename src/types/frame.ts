@@ -82,7 +82,13 @@ export type SliceWalletSessionStore = {
     appOrigin: string,
     key: SliceWalletFrameSessionKey
   ) => Promise<SliceWalletStoredSession | null>
+  isAccountUnlocked: (appOrigin: string, account: Address) => Promise<boolean>
   putPending: (record: SliceWalletStoredSession) => Promise<void>
+  setAccountUnlocked: (
+    appOrigin: string,
+    account: Address,
+    unlocked: boolean
+  ) => Promise<void>
 }
 
 export type SliceWalletWindowMessage = {
@@ -133,6 +139,18 @@ export type SliceWalletFrameConnectRequest = {
 }
 
 export type SliceWalletFrameRequest =
+  | {
+      id: string
+      method: "lockAccount"
+      params: { account: Address }
+      version: 1
+    }
+  | {
+      id: string
+      method: "getAccountLockState"
+      params: { account: Address }
+      version: 1
+    }
   | {
       id: string
       method: "clearSession"
@@ -269,6 +287,8 @@ export type SliceWalletFrameResponse =
       id: string
       result:
         | Hex
+        | "locked"
+        | "unlocked"
         | SliceWalletPermissionAuthorization
         | SliceWalletFrameSession
         | {
@@ -342,3 +362,32 @@ export type SliceWalletBridgeGrantProofResponse =
       type: "slice-wallet:bridge-error"
       version: 1
     }
+
+export type SliceWalletBridgeUnlockChallenge = {
+  account: Address
+  nonce: Hex
+  type: "slice-wallet:bridge-unlock-challenge"
+  version: 1
+}
+
+export type SliceWalletBridgeUnlockRecord = {
+  account: Address
+  nonce: Hex
+  origin: string
+  type: "slice-wallet:bridge-unlock-record"
+  version: 1
+}
+
+export type SliceWalletBridgeUnlockRequest = {
+  account: Address
+  nonce: Hex
+  type: "slice-wallet:bridge-unlock"
+  version: 1
+}
+
+export type SliceWalletBridgeUnlockResponse = {
+  account: Address
+  nonce: Hex
+  type: "slice-wallet:bridge-unlocked"
+  version: 1
+}

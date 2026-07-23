@@ -164,6 +164,11 @@ export const useSliceWalletExecutionHydration = ({
         )
         if (stored?.kind !== "checkout" || !checkoutExecution) return
         const frameClient = await getFrameClient()
+        const lockState = await frameClient.request({
+          method: "getAccountLockState",
+          params: { account: kernelAccount.address }
+        })
+        if (lockState !== "unlocked") return
         const frameResult = await frameClient.request({
           method: "getSession",
           params: {
@@ -352,6 +357,25 @@ export const useSliceWalletExecutionHydration = ({
             [...current].filter(([slicerId]) => storedSlicerIds.has(slicerId))
           )
       )
+      if (storedSessions.values.length > 0) {
+        try {
+          const frameClient = await getFrameClient()
+          const lockState = await frameClient.request({
+            method: "getAccountLockState",
+            params: { account: kernelAccount.address }
+          })
+          control.assertCurrent()
+          if (lockState !== "unlocked") {
+            setManagementExecutionSession(new Map())
+            return
+          }
+        } catch {
+          control.assertCurrent()
+          setManagementExecutionSession(new Map())
+          control.markError("transport-unavailable")
+          return
+        }
+      }
       const pendingStates = await Promise.all(
         storedSessions.values.map(async (stored) => ({
           pending: await readStoredPendingReplacementStrict(
