@@ -201,7 +201,7 @@ describe("Slice management execution client", () => {
       chainId: 8453,
       expiresAt: now + 3_600,
       slicerAddress,
-      slicerId: 2913,
+      slicerId: 0,
       startsAt: now - 1
     })
     const managementPermissionId = getWalletPermissionId(
@@ -227,7 +227,8 @@ describe("Slice management execution client", () => {
         permissionId: managementPermissionId,
         policy: managementPolicy,
         publicKey,
-        signerId: signer
+        signerId: signer,
+        slicerId: 0
       }
     } satisfies SliceWalletPermissionAuthorization
     let requestBody = ""
@@ -245,14 +246,14 @@ describe("Slice management execution client", () => {
           requiresFinalization: false,
           signerAddress: signer,
           slicerAddress,
-          slicerId: 2913
+          slicerId: 0
         })
       }
     })
     await client.registerAuthorization({
       authorization: managementAuthorization,
       slicerAddress,
-      slicerId: 2913
+      slicerId: 0
     })
     const body = JSON.parse(requestBody) as {
       accountIndex: number
@@ -271,7 +272,7 @@ describe("Slice management execution client", () => {
       rootCredentialIdHash: rootCredential.credentialIdHash,
       rootPublicKey: rootCredential.publicKey,
       signerScheme: "p256",
-      slicerId: 2913
+      slicerId: 0
     })
     expect(body.privateKey).toBeUndefined()
   })

@@ -173,7 +173,7 @@ describe("signer-frame session store", () => {
                 condition: "equal",
                 offset: 0,
                 params: [
-                  "0x0000000000000000000000000000000000000000000000000000000000000007"
+                  "0x0000000000000000000000000000000000000000000000000000000000000000"
                 ]
               }
             ],
@@ -228,8 +228,8 @@ describe("signer-frame session store", () => {
         account,
         chainId: 8453,
         grantKind: "management",
-        slicerId: 7
+        slicerId: 0
       })
-    ).resolves.toMatchObject({ session: { slicerId: 7 } })
+    ).resolves.toMatchObject({ session: { slicerId: 0 } })
   })
 })

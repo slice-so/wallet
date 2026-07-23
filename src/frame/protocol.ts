@@ -123,10 +123,10 @@ const parseSessionKey = (
       ? undefined
       : integerValue(input.slicerId, "Session slicer id")
   if (
-    (grantKind === "management" && (slicerId === undefined || slicerId <= 0)) ||
+    (grantKind === "management" && (slicerId === undefined || slicerId < 0)) ||
     (grantKind !== "management" && slicerId !== undefined)
   ) {
-    throw new Error("Management session keys require a positive slicer id.")
+    throw new Error("Management session keys require a non-negative slicer id.")
   }
   return {
     account: addressValue(input.account, "Session account"),
@@ -304,10 +304,10 @@ export const parseSliceWalletFrameRequest = (
     }
     if (
       (policy.grantKind === "management" &&
-        (slicerId === undefined || slicerId <= 0)) ||
+        (slicerId === undefined || slicerId < 0)) ||
       (policy.grantKind !== "management" && slicerId !== undefined)
     ) {
-      throw new Error("Management sessions require a positive slicer id.")
+      throw new Error("Management sessions require a non-negative slicer id.")
     }
     return {
       id,

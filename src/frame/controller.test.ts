@@ -279,7 +279,7 @@ describe("isolated signer-frame controller", () => {
       validUntil: 2_000_000_000,
       version: 1
     } as const
-    for (const slicerId of [7, 9]) {
+    for (const slicerId of [0, 9]) {
       const created = receive(connection.port1)
       connection.port1.postMessage({
         id: `create-${slicerId}`,
@@ -298,7 +298,7 @@ describe("isolated signer-frame controller", () => {
         chainId: 8453,
         grantKind: "management",
         nonce,
-        slicerId: 9,
+        slicerId: 0,
         type: "slice-wallet:bridge-challenge",
         version: 1
       },
@@ -307,7 +307,7 @@ describe("isolated signer-frame controller", () => {
       source: parent.port1
     })
     expect(await trustedResponse).toMatchObject({
-      session: { slicerId: 9 },
+      session: { slicerId: 0 },
       type: "slice-wallet:bridge-record"
     })
 

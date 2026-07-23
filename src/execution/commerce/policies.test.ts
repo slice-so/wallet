@@ -23,6 +23,22 @@ const policy = createSliceStoreManagementPolicyDescriptor({
 })
 
 describe("Slice store-management wallet policy", () => {
+  test("accepts slicer zero as a valid policy scope", () => {
+    const zeroPolicy = createSliceStoreManagementPolicyDescriptor({
+      account,
+      chainId: 8453,
+      expiresAt: 2_000_000_000,
+      slicerAddress,
+      slicerId: 0,
+      startsAt: 1_900_000_000
+    })
+
+    expect(deriveSliceStoreManagementPolicyScope(zeroPolicy)).toEqual({
+      slicerAddress,
+      slicerId: 0
+    })
+  })
+
   test("accepts an allowlisted zero-value call for the bound slicer", () => {
     expect(() =>
       assertWalletCallsMatchPolicy(

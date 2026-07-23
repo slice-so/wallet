@@ -515,8 +515,10 @@ export const createSliceWalletManagementExecutionClient = ({
       )
     ),
   registerAuthorization: async ({ authorization, slicerAddress, slicerId }) => {
-    if (!Number.isSafeInteger(slicerId) || slicerId <= 0) {
-      throw new Error("Slice management grant requires a positive slicer id.")
+    if (!Number.isSafeInteger(slicerId) || slicerId < 0) {
+      throw new Error(
+        "Slice management grant requires a non-negative slicer id."
+      )
     }
     const { executionGrant, session } =
       assertManagementAuthorization(authorization)
@@ -566,7 +568,7 @@ export const createSliceWalletManagementExecutionClient = ({
       !isAddress(registration.signerAddress) ||
       !isAddress(registration.slicerAddress) ||
       !Number.isSafeInteger(registration.slicerId) ||
-      registration.slicerId <= 0 ||
+      registration.slicerId < 0 ||
       registration.permissionId.toLowerCase() !==
         session.permissionId.toLowerCase() ||
       registration.signerAddress.toLowerCase() !==

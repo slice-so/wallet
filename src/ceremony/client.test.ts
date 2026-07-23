@@ -70,7 +70,7 @@ const managementSession = {
   policy: managementPolicy,
   publicKey,
   signerId,
-  slicerId: 7
+  slicerId: 0
 } as const
 const managementAuthorization = {
   ...authorization,
@@ -201,7 +201,7 @@ describe("authorizeSliceWalletSession", () => {
 
     await expect(resultPromise).resolves.toEqual(managementAuthorization)
     const ceremonyUrl = new URL(String(harness.open.mock.calls[0]?.[0]))
-    expect(ceremonyUrl.searchParams.get("slicerId")).toBe("7")
+    expect(ceremonyUrl.searchParams.get("slicerId")).toBe("0")
   })
 
   it("keeps the consent timeout separate from popup readiness", async () => {

@@ -309,7 +309,7 @@ export function SliceWalletProvider({
         typeof message.sourceId !== "string" ||
         typeof message.chainId !== "number" ||
         !Number.isSafeInteger(message.slicerId) ||
-        message.slicerId <= 0 ||
+        message.slicerId < 0 ||
         (message.outcome !== "error" && message.outcome !== "success") ||
         typeof message.account !== "string" ||
         !isAddress(message.account) ||

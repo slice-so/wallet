@@ -26,9 +26,9 @@ const getRecordKey = (appOrigin: string, key: SliceWalletFrameSessionKey) => {
   if (
     key.slicerId === undefined ||
     !Number.isSafeInteger(key.slicerId) ||
-    key.slicerId <= 0
+    key.slicerId < 0
   ) {
-    throw new Error("Management session keys require a positive slicer id.")
+    throw new Error("Management session keys require a non-negative slicer id.")
   }
   return `${base}:${key.slicerId}`
 }
@@ -44,7 +44,7 @@ const getStoredManagementSlicerId = (record: SliceWalletStoredSession) => {
   if (
     record.session.slicerId !== undefined &&
     Number.isSafeInteger(record.session.slicerId) &&
-    record.session.slicerId > 0
+    record.session.slicerId >= 0
   ) {
     return record.session.slicerId
   }
@@ -63,7 +63,7 @@ const getStoredManagementSlicerId = (record: SliceWalletStoredSession) => {
   const [value] = values
   if (value === undefined) return null
   const slicerId = Number(BigInt(value))
-  return Number.isSafeInteger(slicerId) && slicerId > 0 ? slicerId : null
+  return Number.isSafeInteger(slicerId) && slicerId >= 0 ? slicerId : null
 }
 
 const readPersistedSession = async ({

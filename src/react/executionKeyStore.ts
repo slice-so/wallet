@@ -60,9 +60,9 @@ const executionSessionKey = (
   if (
     slicerId === undefined ||
     !Number.isSafeInteger(slicerId) ||
-    slicerId <= 0
+    slicerId < 0
   ) {
-    throw new Error("Management session keys require a positive slicer id.")
+    throw new Error("Management session keys require a non-negative slicer id.")
   }
   return `${legacyKey}:${slicerId}`
 }
@@ -144,7 +144,7 @@ export const readStoredExecutionSessionResult = async (
       (session.kind === "store_management" &&
         (!isAddress(session.slicerAddress) ||
           !Number.isSafeInteger(session.slicerId) ||
-          session.slicerId <= 0))
+          session.slicerId < 0))
     ) {
       await clearStoredExecutionSession(accountAddress, kind, slicerId)
       return { status: "invalid" }

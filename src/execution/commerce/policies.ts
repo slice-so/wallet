@@ -174,8 +174,10 @@ export const createSliceStoreManagementPolicyDescriptor = ({
   slicerId,
   startsAt = getWalletPermissionValidAfter()
 }: CreateSliceStoreManagementPolicyParameters): WalletPolicyDescriptor => {
-  if (!Number.isSafeInteger(slicerId) || slicerId <= 0) {
-    throw new Error("Store management policies require a positive slicer id.")
+  if (!Number.isSafeInteger(slicerId) || slicerId < 0) {
+    throw new Error(
+      "Store management policies require a non-negative slicer id."
+    )
   }
   const productsModuleAddress = getProductsModuleAddress(chainId)
   const slicerIdRule = {
@@ -272,7 +274,7 @@ export const deriveSliceStoreManagementPolicyScope = (
     throw new Error("Store-management policy scope is invalid.")
   }
   const slicerId = Number(hexToBigInt(slicerIdValue))
-  if (!Number.isSafeInteger(slicerId) || slicerId <= 0) {
+  if (!Number.isSafeInteger(slicerId) || slicerId < 0) {
     throw new Error("Store-management policy slicer id is invalid.")
   }
   assertSliceStoreManagementPolicyDescriptor(normalized, {

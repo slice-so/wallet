@@ -50,7 +50,7 @@ const managementSession = {
   permissionId: "0x5678",
   signerAddress: "0x3333333333333333333333333333333333333333",
   slicerAddress: "0x4444444444444444444444444444444444444444",
-  slicerId: 7
+  slicerId: 0
 } as const satisfies StoredSliceWalletExecutionSession
 
 const managementPending = {
@@ -64,7 +64,7 @@ const managementPending = {
     permissionId: "0x5678",
     signerAddress: "0x3333333333333333333333333333333333333333",
     slicerAddress: "0x4444444444444444444444444444444444444444",
-    slicerId: 7
+    slicerId: 0
   }
 } as const satisfies StoredSliceWalletPendingReplacement
 
@@ -164,13 +164,13 @@ describe("execution key storage", () => {
     ])
 
     await expect(
-      readStoredExecutionSession(accountAddress, "store_management", 7)
+      readStoredExecutionSession(accountAddress, "store_management", 0)
     ).resolves.toEqual(managementSession)
     await expect(
       readStoredExecutionSession(accountAddress, "store_management", 9)
     ).resolves.toEqual(secondSession)
     await expect(
-      readStoredPendingReplacement(accountAddress, "store_management", 7)
+      readStoredPendingReplacement(accountAddress, "store_management", 0)
     ).resolves.toEqual(managementPending)
     await expect(
       readStoredPendingReplacement(accountAddress, "store_management", 9)
@@ -182,8 +182,8 @@ describe("execution key storage", () => {
       values: expect.arrayContaining([managementSession, secondSession])
     })
     await Promise.all([
-      clearStoredExecutionSession(accountAddress, "store_management", 7),
-      clearStoredPendingReplacementStrict(accountAddress, "store_management", 7)
+      clearStoredExecutionSession(accountAddress, "store_management", 0),
+      clearStoredPendingReplacementStrict(accountAddress, "store_management", 0)
     ])
     await expect(
       readStoredExecutionSession(accountAddress, "store_management", 9)
@@ -213,10 +213,10 @@ describe("execution key storage", () => {
       readStoredExecutionSession(accountAddress, "store_management", 9)
     ).resolves.toBeNull()
     await expect(
-      readStoredExecutionSession(accountAddress, "store_management", 7)
+      readStoredExecutionSession(accountAddress, "store_management", 0)
     ).resolves.toEqual(managementSession)
     await expect(
-      readStoredPendingReplacement(accountAddress, "store_management", 7)
+      readStoredPendingReplacement(accountAddress, "store_management", 0)
     ).resolves.toBeNull()
     await expect(
       readStoredPendingReplacement(accountAddress, "store_management", 9)

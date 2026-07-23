@@ -65,7 +65,7 @@ const isBridgeChallenge = (
       ? Object.keys(input).length === 7 &&
         typeof slicerId === "number" &&
         Number.isSafeInteger(slicerId) &&
-        slicerId > 0
+        slicerId >= 0
       : Object.keys(input).length === 6 && slicerId === undefined
   return (
     managementKeyValid &&

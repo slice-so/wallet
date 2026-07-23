@@ -276,11 +276,11 @@ export const parseSliceWalletFrameSession = (
     throw new Error("Checkout session metadata does not match its grant kind.")
   }
   if (
-    (grantKind === "management" && (slicerId === undefined || slicerId <= 0)) ||
+    (grantKind === "management" && (slicerId === undefined || slicerId < 0)) ||
     (grantKind !== "management" && slicerId !== undefined)
   ) {
     throw new Error(
-      "Management session metadata requires a positive slicer id."
+      "Management session metadata requires a non-negative slicer id."
     )
   }
   if (

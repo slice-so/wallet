@@ -249,7 +249,7 @@ describe("management lifecycle", () => {
 
     await lifecycle.runMutation({
       account,
-      slicerId: 9,
+      slicerId: 0,
       task: async () => undefined
     })
 
@@ -258,7 +258,7 @@ describe("management lifecycle", () => {
         account,
         chainId: 8453,
         outcome: "success",
-        slicerId: 9,
+        slicerId: 0,
         sourceId: lifecycle.sourceId
       }
     ])

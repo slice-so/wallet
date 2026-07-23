@@ -72,7 +72,7 @@ const managementSession = {
   policy: managementPolicy,
   publicKey: session.publicKey,
   signerId: session.signerId,
-  slicerId: 7
+  slicerId: 0
 } as const
 const managementAuthorization = {
   ...authorization,
@@ -251,7 +251,7 @@ describe("wallet ceremony protocol parser", () => {
       chainId: 8453,
       grantKind: "management",
       nonce,
-      slicerId: 7,
+      slicerId: 0,
       type: "slice-wallet:bridge-challenge",
       version: 1
     } as const
@@ -265,7 +265,7 @@ describe("wallet ceremony protocol parser", () => {
 
     expect(
       parseSliceWalletBridgeRecord(record, challenge).session.slicerId
-    ).toBe(7)
+    ).toBe(0)
     expect(() =>
       parseSliceWalletBridgeRecord(record, { ...challenge, slicerId: 8 })
     ).toThrow("does not match the ceremony request")
