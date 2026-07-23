@@ -298,7 +298,10 @@ export const useSliceWalletExecutionLifecycle = ({
               "The management delegation is unavailable; revoke it from Slice ID."
             )
           }
-          if (delegation.slicerId !== slicerId) {
+          if (
+            delegation.slicerId !== null &&
+            delegation.slicerId !== slicerId
+          ) {
             throw new SliceWalletEnablementError(
               "The active management permission belongs to another store. Refresh and try again.",
               "hydrate"
