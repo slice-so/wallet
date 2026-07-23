@@ -697,7 +697,8 @@ describe("isolated signer-frame controller", () => {
     expect(await refused).toMatchObject({
       error: {
         code: "invalid_request",
-        message: "Wallet operation exceeds the gas safety envelope."
+        message:
+          "Wallet operation exceeds the gas safety envelope: callGasLimit=3000001 exceeds 3000000."
       },
       id: "co-sign"
     })
@@ -774,7 +775,8 @@ describe("isolated signer-frame controller", () => {
     expect(await refused).toMatchObject({
       error: {
         code: "invalid_request",
-        message: "Wallet operation exceeds the gas safety envelope."
+        message:
+          "Wallet operation exceeds the gas safety envelope: callGasLimit=3000001 exceeds 3000000."
       },
       id: "scoped-sign"
     })

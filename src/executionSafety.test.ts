@@ -46,7 +46,9 @@ describe("Slice Wallet execution safety", () => {
         chainId: 8453,
         userOperation: { ...validUserOperation, [field]: value }
       })
-    ).toThrow("Wallet operation exceeds the gas safety envelope.")
+    ).toThrow(
+      `Wallet operation exceeds the gas safety envelope: ${field}=${value} exceeds`
+    )
   })
 
   test("rejects priority fees above the operation max fee", () => {
@@ -59,7 +61,9 @@ describe("Slice Wallet execution safety", () => {
           maxPriorityFeePerGas: 101n
         }
       })
-    ).toThrow("Wallet operation exceeds the gas safety envelope.")
+    ).toThrow(
+      "Wallet operation exceeds the gas safety envelope: maxPriorityFeePerGas=101 exceeds maxFeePerGas=100."
+    )
   })
 
   test("rejects aggregate native cost even when each field is within its cap", () => {
@@ -74,7 +78,9 @@ describe("Slice Wallet execution safety", () => {
           verificationGasLimit: 5_000_000n
         }
       })
-    ).toThrow("Wallet operation exceeds the gas cost safety envelope.")
+    ).toThrow(
+      "Wallet operation exceeds the gas cost safety envelope: maxNativeCostWei=17000000000000000 exceeds 10000000000000000."
+    )
   })
 
   test("includes paymaster gas in prefund but not account-native exposure", () => {
@@ -90,13 +96,47 @@ describe("Slice Wallet execution safety", () => {
     })
   })
 
-  test("uses the Base envelope for local wallet fork chains", () => {
-    expect(getSliceWalletExecutionSafetyEnvelope(31_337)).toBe(
-      getSliceWalletExecutionSafetyEnvelope(8453)
+  test("uses an Alto-sized envelope only for local wallet fork chains", () => {
+    const baseEnvelope = getSliceWalletExecutionSafetyEnvelope(8453)
+    const localEnvelope = getSliceWalletExecutionSafetyEnvelope(31_337)
+
+    expect(baseEnvelope.maxCallGasLimit).toBe(3_000_000n)
+    expect(baseEnvelope.maxVerificationGasLimit).toBe(5_000_000n)
+    expect(localEnvelope).toMatchObject({
+      maxCallGasLimit: 10_000_000n,
+      maxNativeCostWei: 470_000_000_000_000_000n,
+      maxPaymasterPostOpGasLimit: 2_400_000n,
+      maxPaymasterVerificationGasLimit: 6_500_000n,
+      maxPrefundWei: 648_000_000_000_000_000n,
+      maxVerificationGasLimit: 13_000_000n
+    })
+    expect(getSliceWalletExecutionSafetyEnvelope(31_338)).toBe(localEnvelope)
+  })
+
+  test("accepts a local lazy-permission estimate without widening Base", () => {
+    const lazyPermissionOperation = {
+      ...validUserOperation,
+      callGasLimit: 4_000_000n,
+      verificationGasLimit: 8_000_000n
+    }
+
+    expect(() =>
+      assertSliceWalletExecutionSafety({
+        chainId: 8453,
+        userOperation: lazyPermissionOperation
+      })
+    ).toThrow(
+      "Wallet operation exceeds the gas safety envelope: callGasLimit=4000000 exceeds 3000000."
     )
-    expect(getSliceWalletExecutionSafetyEnvelope(31_338)).toBe(
-      getSliceWalletExecutionSafetyEnvelope(8453)
-    )
+    expect(
+      assertSliceWalletExecutionSafety({
+        chainId: 31_337,
+        userOperation: lazyPermissionOperation
+      })
+    ).toEqual({
+      maxNativeCostWei: 12_100_000_000_000_000n,
+      maxPrefundWei: 12_300_000_000_000_000n
+    })
   })
 
   test("rejects unknown chains instead of accepting parent-supplied policy", () => {
