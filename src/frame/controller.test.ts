@@ -47,9 +47,20 @@ class MemorySessionStore implements SliceWalletSessionStore {
 
   private key(
     origin: string,
-    session: { account: Address; chainId: number; grantKind: string }
+    session: {
+      account: Address
+      chainId: number
+      grantKind: string
+      slicerId?: number
+    }
   ) {
-    return `${origin}:${session.account}:${session.chainId}:${session.grantKind}`
+    return [
+      origin,
+      session.account,
+      session.chainId,
+      session.grantKind,
+      session.slicerId ?? ""
+    ].join(":")
   }
 
   async delete(
@@ -236,6 +247,86 @@ describe("isolated signer-frame controller", () => {
       origin: "https://app.example",
       type: "slice-wallet:bridge-record"
     })
+    detach()
+  })
+
+  test("answers a management bridge challenge with only that store session", async () => {
+    const parent = new MessageChannel()
+    const window = new MockMessageWindow(parent.port1)
+    const store = new MemorySessionStore()
+    const detach = attachSliceWalletSignerFrame({
+      decodeScopedCalls: () => [],
+      selfOrigin: "https://id.slice.so",
+      sessionStore: store,
+      validateCheckoutCalls: () => {},
+      window
+    })
+    const connection = new MessageChannel()
+    const connected = receive(connection.port1)
+    window.dispatch({
+      data: { id: "connect", method: "connect", version: 1 },
+      origin: "https://app.example",
+      ports: [connection.port2],
+      source: parent.port1
+    })
+    await connected
+    const policy = {
+      account,
+      calls: [createNativeTransferCallRule({ maximumValue: 0n, recipient })],
+      chainId: 8453,
+      grantKind: "management",
+      validAfter: 100,
+      validUntil: 2_000_000_000,
+      version: 1
+    } as const
+    for (const slicerId of [7, 9]) {
+      const created = receive(connection.port1)
+      connection.port1.postMessage({
+        id: `create-${slicerId}`,
+        method: "createSession",
+        params: { policy, slicerId },
+        version: 1
+      } satisfies SliceWalletProtocolValue)
+      await created
+    }
+
+    const trusted = new MessageChannel()
+    const trustedResponse = receive(trusted.port1)
+    window.dispatch({
+      data: {
+        account,
+        chainId: 8453,
+        grantKind: "management",
+        nonce,
+        slicerId: 9,
+        type: "slice-wallet:bridge-challenge",
+        version: 1
+      },
+      origin: "https://id.slice.so",
+      ports: [trusted.port2],
+      source: parent.port1
+    })
+    expect(await trustedResponse).toMatchObject({
+      session: { slicerId: 9 },
+      type: "slice-wallet:bridge-record"
+    })
+
+    const missingStore = new MessageChannel()
+    const missingStoreResponse = receive(missingStore.port1, 25)
+    window.dispatch({
+      data: {
+        account,
+        chainId: 8453,
+        grantKind: "management",
+        nonce,
+        type: "slice-wallet:bridge-challenge",
+        version: 1
+      },
+      origin: "https://id.slice.so",
+      ports: [missingStore.port2],
+      source: parent.port1
+    })
+    expect(await missingStoreResponse).toBeNull()
     detach()
   })
 

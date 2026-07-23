@@ -57,6 +57,29 @@ const authorization = {
   },
   session
 } as const satisfies SliceWalletPermissionAuthorization
+const managementPolicy = {
+  ...policy,
+  grantKind: "management"
+} as const
+const managementSession = {
+  account,
+  chainId: 8453,
+  expiresAt: 200,
+  grantKind: "management",
+  permissionId: getWalletPermissionId(managementPolicy, signerId),
+  policy: managementPolicy,
+  publicKey,
+  signerId,
+  slicerId: 7
+} as const
+const managementAuthorization = {
+  ...authorization,
+  executionGrant: {
+    ...authorization.executionGrant,
+    scopes: ["store_management"]
+  },
+  session: managementSession
+} as const satisfies SliceWalletPermissionAuthorization
 
 const createPopupWindow = ({
   responseForAttempt = () => ({
@@ -113,6 +136,9 @@ const createPopupWindow = ({
       )
     }) as Window["postMessage"]
   })
+  const open = mock(
+    (_url?: string | URL, _target?: string, _features?: string) => popup
+  )
   let onMessage:
     | ((event: MessageEvent<SliceWalletProtocolValue>) => void)
     | null = null
@@ -131,12 +157,12 @@ const createPopupWindow = ({
       userActivation: { isActive: true },
       userAgent: "Mozilla/5.0 Chrome/140.0 Safari/537.36"
     },
-    open: mock(() => popup),
+    open,
     removeEventListener: (_type: "message", listener: typeof onMessage) => {
       if (onMessage === listener) onMessage = null
     }
   })
-  return { close, popup, ready: () => onMessage, window }
+  return { close, open, popup, ready: () => onMessage, window }
 }
 
 const waitForPendingCeremony = async (
@@ -150,6 +176,34 @@ const waitForPendingCeremony = async (
 }
 
 describe("authorizeSliceWalletSession", () => {
+  it("addresses management ceremonies with the session store id", async () => {
+    const harness = createPopupWindow({
+      responseForAttempt: () => ({
+        authorization: managementAuthorization,
+        type: "slice-wallet:ceremony-authorization"
+      })
+    })
+    const resultPromise = authorizeSliceWalletSession({
+      idOrigin: "https://id.slice.so",
+      session: managementSession,
+      timeoutMs: 100,
+      window: harness.window
+    })
+    queueMicrotask(() => {
+      harness.ready()?.(
+        new MessageEvent("message", {
+          data: { type: "slice-wallet:ceremony-ready", version: 1 },
+          origin: "https://id.slice.so",
+          source: harness.popup
+        })
+      )
+    })
+
+    await expect(resultPromise).resolves.toEqual(managementAuthorization)
+    const ceremonyUrl = new URL(String(harness.open.mock.calls[0]?.[0]))
+    expect(ceremonyUrl.searchParams.get("slicerId")).toBe("7")
+  })
+
   it("keeps the consent timeout separate from popup readiness", async () => {
     const harness = createPopupWindow()
     const resultPromise = authorizeSliceWalletSession({

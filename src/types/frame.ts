@@ -309,6 +309,7 @@ export type SliceWalletBridgeChallenge = {
   chainId: number
   grantKind: WalletGrantKind
   nonce: Hex
+  slicerId?: number
   type: "slice-wallet:bridge-challenge"
   version: 1
 }

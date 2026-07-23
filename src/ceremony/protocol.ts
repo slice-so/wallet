@@ -774,7 +774,8 @@ export const parseSliceWalletBridgeRecord = (
   if (
     session.account.toLowerCase() !== challenge.account.toLowerCase() ||
     session.chainId !== challenge.chainId ||
-    session.grantKind !== challenge.grantKind
+    session.grantKind !== challenge.grantKind ||
+    session.slicerId !== challenge.slicerId
   ) {
     throw new Error("Signer bridge record does not match the ceremony request.")
   }

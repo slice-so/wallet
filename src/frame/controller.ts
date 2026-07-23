@@ -58,8 +58,17 @@ const isBridgeChallenge = (
   if (typeof value !== "object" || value === null || Array.isArray(value))
     return false
   const input = value as { readonly [key: string]: SliceWalletProtocolValue }
+  const grantKind = input.grantKind
+  const slicerId = input.slicerId
+  const managementKeyValid =
+    grantKind === "management"
+      ? Object.keys(input).length === 7 &&
+        typeof slicerId === "number" &&
+        Number.isSafeInteger(slicerId) &&
+        slicerId > 0
+      : Object.keys(input).length === 6 && slicerId === undefined
   return (
-    Object.keys(input).length === 6 &&
+    managementKeyValid &&
     input.type === "slice-wallet:bridge-challenge" &&
     input.version === 1 &&
     typeof input.account === "string" &&
@@ -67,9 +76,9 @@ const isBridgeChallenge = (
     typeof input.chainId === "number" &&
     Number.isSafeInteger(input.chainId) &&
     input.chainId > 0 &&
-    (input.grantKind === "checkout" ||
-      input.grantKind === "generic" ||
-      input.grantKind === "management") &&
+    (grantKind === "checkout" ||
+      grantKind === "generic" ||
+      grantKind === "management") &&
     typeof input.nonce === "string" &&
     isHex(input.nonce, { strict: true }) &&
     hexToBytes(input.nonce).length === 32

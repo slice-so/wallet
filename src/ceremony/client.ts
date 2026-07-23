@@ -68,6 +68,9 @@ const getCeremonyUrl = ({
   url.searchParams.set("chainId", String(session.chainId))
   url.searchParams.set("grantKind", session.grantKind)
   url.searchParams.set("nonce", nonce)
+  if (session.slicerId !== undefined) {
+    url.searchParams.set("slicerId", String(session.slicerId))
+  }
   return url
 }
 
@@ -84,6 +87,7 @@ export const assertSliceWalletBatchSessions = (
     if (
       session.account.toLowerCase() !== first.account.toLowerCase() ||
       session.grantKind !== first.grantKind ||
+      session.slicerId !== first.slicerId ||
       session.policy.account.toLowerCase() !== session.account.toLowerCase() ||
       session.policy.chainId !== session.chainId ||
       session.policy.grantKind !== session.grantKind ||
@@ -121,6 +125,9 @@ const getBatchCeremonyUrl = ({
   )
   url.searchParams.set("grantKind", first.grantKind)
   url.searchParams.set("nonce", nonce)
+  if (first.slicerId !== undefined) {
+    url.searchParams.set("slicerId", String(first.slicerId))
+  }
   return url
 }
 
@@ -152,6 +159,7 @@ const isMatchingAuthorization = (
     session.account.toLowerCase() === expected.account.toLowerCase() &&
     session.chainId === expected.chainId &&
     session.grantKind === expected.grantKind &&
+    session.slicerId === expected.slicerId &&
     session.expiresAt === expected.expiresAt &&
     session.permissionId.toLowerCase() ===
       expected.permissionId.toLowerCase() &&

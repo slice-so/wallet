@@ -245,6 +245,32 @@ describe("wallet ceremony protocol parser", () => {
     ).toThrow("normalized origin")
   })
 
+  it("binds management bridge records to the challenged store", () => {
+    const challenge = {
+      account,
+      chainId: 8453,
+      grantKind: "management",
+      nonce,
+      slicerId: 7,
+      type: "slice-wallet:bridge-challenge",
+      version: 1
+    } as const
+    const record = {
+      nonce,
+      origin: "https://shop.example",
+      session: managementSession,
+      type: "slice-wallet:bridge-record",
+      version: 1
+    } as const
+
+    expect(
+      parseSliceWalletBridgeRecord(record, challenge).session.slicerId
+    ).toBe(7)
+    expect(() =>
+      parseSliceWalletBridgeRecord(record, { ...challenge, slicerId: 8 })
+    ).toThrow("does not match the ceremony request")
+  })
+
   it("accepts complete root requests and rejects parent-provided digests", () => {
     const request = {
       account,
