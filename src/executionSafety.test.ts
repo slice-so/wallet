@@ -46,9 +46,7 @@ describe("Slice Wallet execution safety", () => {
         chainId: 8453,
         userOperation: { ...validUserOperation, [field]: value }
       })
-    ).toThrow(
-      `Wallet operation exceeds the gas safety envelope: ${field}=${value} exceeds`
-    )
+    ).toThrow("Wallet operation exceeds the gas safety envelope.")
   })
 
   test("rejects priority fees above the operation max fee", () => {
@@ -61,9 +59,7 @@ describe("Slice Wallet execution safety", () => {
           maxPriorityFeePerGas: 101n
         }
       })
-    ).toThrow(
-      "Wallet operation exceeds the gas safety envelope: maxPriorityFeePerGas=101 exceeds maxFeePerGas=100."
-    )
+    ).toThrow("Wallet operation exceeds the gas safety envelope.")
   })
 
   test("rejects aggregate native cost even when each field is within its cap", () => {
@@ -78,9 +74,7 @@ describe("Slice Wallet execution safety", () => {
           verificationGasLimit: 5_000_000n
         }
       })
-    ).toThrow(
-      "Wallet operation exceeds the gas cost safety envelope: maxNativeCostWei=17000000000000000 exceeds 10000000000000000."
-    )
+    ).toThrow("Wallet operation exceeds the gas cost safety envelope.")
   })
 
   test("includes paymaster gas in prefund but not account-native exposure", () => {
@@ -125,9 +119,7 @@ describe("Slice Wallet execution safety", () => {
         chainId: 8453,
         userOperation: lazyPermissionOperation
       })
-    ).toThrow(
-      "Wallet operation exceeds the gas safety envelope: callGasLimit=4000000 exceeds 3000000."
-    )
+    ).toThrow("Wallet operation exceeds the gas safety envelope.")
     expect(
       assertSliceWalletExecutionSafety({
         chainId: 31_337,

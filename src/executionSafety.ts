@@ -53,58 +53,25 @@ export const assertSliceWalletExecutionSafety = ({
     userOperation.paymasterVerificationGasLimit ?? 0n
   const paymasterPostOpGasLimit = userOperation.paymasterPostOpGasLimit ?? 0n
 
-  const cappedFields = [
-    ["callGasLimit", userOperation.callGasLimit, envelope.maxCallGasLimit],
-    [
-      "verificationGasLimit",
-      userOperation.verificationGasLimit,
-      envelope.maxVerificationGasLimit
-    ],
-    [
-      "preVerificationGas",
-      userOperation.preVerificationGas,
-      envelope.maxPreVerificationGas
-    ],
-    [
-      "paymasterVerificationGasLimit",
-      paymasterVerificationGasLimit,
-      envelope.maxPaymasterVerificationGasLimit
-    ],
-    [
-      "paymasterPostOpGasLimit",
-      paymasterPostOpGasLimit,
-      envelope.maxPaymasterPostOpGasLimit
-    ],
-    ["maxFeePerGas", userOperation.maxFeePerGas, envelope.maxFeePerGas],
-    [
-      "maxPriorityFeePerGas",
-      userOperation.maxPriorityFeePerGas,
-      envelope.maxPriorityFeePerGas
-    ]
-  ] as const
-  const exceededField = cappedFields.find(([, value, cap]) => value > cap)
-  if (exceededField !== undefined) {
-    const [field, value, cap] = exceededField
-    throw new Error(
-      `Wallet operation exceeds the gas safety envelope: ${field}=${value} exceeds ${cap}.`
-    )
-  }
-  if (userOperation.maxPriorityFeePerGas > userOperation.maxFeePerGas) {
-    throw new Error(
-      `Wallet operation exceeds the gas safety envelope: maxPriorityFeePerGas=${userOperation.maxPriorityFeePerGas} exceeds maxFeePerGas=${userOperation.maxFeePerGas}.`
-    )
+  if (
+    userOperation.callGasLimit > envelope.maxCallGasLimit ||
+    userOperation.verificationGasLimit > envelope.maxVerificationGasLimit ||
+    userOperation.preVerificationGas > envelope.maxPreVerificationGas ||
+    paymasterVerificationGasLimit > envelope.maxPaymasterVerificationGasLimit ||
+    paymasterPostOpGasLimit > envelope.maxPaymasterPostOpGasLimit ||
+    userOperation.maxFeePerGas > envelope.maxFeePerGas ||
+    userOperation.maxPriorityFeePerGas > envelope.maxPriorityFeePerGas ||
+    userOperation.maxPriorityFeePerGas > userOperation.maxFeePerGas
+  ) {
+    throw new Error("Wallet operation exceeds the gas safety envelope.")
   }
 
   const exposure = getSliceWalletUserOperationGasExposure(userOperation)
-  if (exposure.maxPrefundWei > envelope.maxPrefundWei) {
-    throw new Error(
-      `Wallet operation exceeds the gas cost safety envelope: maxPrefundWei=${exposure.maxPrefundWei} exceeds ${envelope.maxPrefundWei}.`
-    )
-  }
-  if (exposure.maxNativeCostWei > envelope.maxNativeCostWei) {
-    throw new Error(
-      `Wallet operation exceeds the gas cost safety envelope: maxNativeCostWei=${exposure.maxNativeCostWei} exceeds ${envelope.maxNativeCostWei}.`
-    )
+  if (
+    exposure.maxPrefundWei > envelope.maxPrefundWei ||
+    exposure.maxNativeCostWei > envelope.maxNativeCostWei
+  ) {
+    throw new Error("Wallet operation exceeds the gas cost safety envelope.")
   }
   return exposure
 }
