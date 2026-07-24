@@ -24,7 +24,8 @@ import {
   deriveSliceWalletRegistryAccountAddress,
   executeSliceWalletGenericGrantReplacement,
   getSliceWalletGenericGrantInstallationAction,
-  resumeSliceWalletGenericGrantReplacement
+  resumeSliceWalletGenericGrantReplacement,
+  submitSliceWalletGenericGrantInstallation
 } from "./runtime"
 import {
   readStoredSliceWalletAccount,
@@ -143,13 +144,62 @@ const createRotationGrant = (publicKey: Hex): StoredGenericGrant => {
 }
 
 const createRotation = (
-  phase: StoredGenericGrantRotation["phase"] = "prepared"
+  phase: Exclude<
+    StoredGenericGrantRotation["phase"],
+    "submitted" | "transport-pending"
+  > = "prepared"
 ): StoredGenericGrantRotation => ({
   phase,
   predecessor: createRotationGrant(`0x04${"55".repeat(64)}`),
   replacement: createRotationGrant(`0x04${"66".repeat(64)}`),
-  version: 1
+  version: 2
 })
+
+const installation = {
+  callDataHash: `0x${"77".repeat(32)}` as Hex,
+  entryPoint: secondAccount,
+  nonce: "0x1" as Hex,
+  sender: account,
+  userOperationHash
+}
+
+const createSubmittedRotation = (
+  phase: "submitted" | "transport-pending" = "submitted"
+): StoredGenericGrantRotation => ({
+  ...createRotation(),
+  phase,
+  installation
+})
+
+const updateRotationPhase = (
+  rotation: StoredGenericGrantRotation,
+  phase: StoredGenericGrantRotation["phase"],
+  nextInstallation:
+    | StoredGenericGrantRotation["installation"]
+    | null
+    | undefined = rotation.installation
+): StoredGenericGrantRotation => {
+  const { installation: _installation, ...rest } = rotation
+  const base = {
+    predecessor: rest.predecessor,
+    replacement: rest.replacement,
+    version: 2 as const
+  }
+  if (phase === "prepared") return { ...base, phase }
+  if (phase === "submitted" || phase === "transport-pending") {
+    if (nextInstallation === null || nextInstallation === undefined) {
+      throw new Error("Test transport phase requires installation identity.")
+    }
+    return { ...base, installation: nextInstallation, phase }
+  }
+  return {
+    ...base,
+    ...(nextInstallation === null || nextInstallation === undefined
+      ? {}
+      : { installation: nextInstallation }),
+    phase
+  }
+}
 
 describe("generic grant replacement ordering", () => {
   test("installs and verifies before disabling, then commits last", async () => {
@@ -266,64 +316,269 @@ describe("generic grant replacement ordering", () => {
     expect(events).toEqual(["authorize", "persist", "discard"])
   })
 
-  test("preserves an accepted replacement when the submission response is lost", async () => {
-    const events: string[] = []
-    const failure = new Error("response lost")
-
-    await expect(
-      executeSliceWalletGenericGrantReplacement({
-        authorize: async () => {
-          events.push("authorize")
-          return "authorization"
+  test("retries once after root passkey signing is cancelled before transport", async () => {
+    const cancellation = new Error("passkey cancelled")
+    let journal = createRotation()
+    let prepareCount = 0
+    let signCount = 0
+    let transportCount = 0
+    const submit = () =>
+      submitSliceWalletGenericGrantInstallation({
+        initialRotation: journal,
+        isDefiniteTransportRejection: () => false,
+        prepare: async () => {
+          prepareCount += 1
+          return "prepared"
         },
-        commit: async () => {
-          events.push("commit")
+        setPhase: async (rotation, phase, nextInstallation) => {
+          journal = updateRotationPhase(rotation, phase, nextInstallation)
+          return journal
         },
-        disablePredecessor: async () => {
-          events.push("disable")
+        sign: async () => {
+          signCount += 1
+          if (signCount === 1) throw cancellation
+          return { installation, request: "signed" }
         },
-        discardPending: async () => {
-          events.push("discard")
-        },
-        installReplacement: async () => {
-          events.push("submit")
-          throw failure
-        },
-        persistPrepared: async () => {
-          events.push("persist")
-        },
-        verifyReplacement: async () => {
-          events.push("verify")
+        transport: async () => {
+          transportCount += 1
+          return userOperationHash
         }
       })
-    ).rejects.toBe(failure)
-    expect(events).toEqual(["authorize", "persist", "submit"])
 
+    await expect(submit()).rejects.toBe(cancellation)
+    expect(journal.phase).toBe("prepared")
+    expect({ prepareCount, signCount, transportCount }).toEqual({
+      prepareCount: 1,
+      signCount: 1,
+      transportCount: 0
+    })
+
+    await expect(submit()).resolves.toMatchObject({
+      rotation: { phase: "submitted" }
+    })
+    expect({ prepareCount, signCount, transportCount }).toEqual({
+      prepareCount: 2,
+      signCount: 2,
+      transportCount: 1
+    })
+  })
+
+  test("retries once after preparation or estimation fails before signing", async () => {
+    const estimationFailure = new Error("gas estimation failed")
+    let journal = createRotation()
+    let prepareCount = 0
+    let signCount = 0
+    let transportCount = 0
+    const submit = () =>
+      submitSliceWalletGenericGrantInstallation({
+        initialRotation: journal,
+        isDefiniteTransportRejection: () => false,
+        prepare: async () => {
+          prepareCount += 1
+          if (prepareCount === 1) throw estimationFailure
+          return "prepared"
+        },
+        setPhase: async (rotation, phase, nextInstallation) => {
+          journal = updateRotationPhase(rotation, phase, nextInstallation)
+          return journal
+        },
+        sign: async () => {
+          signCount += 1
+          return { installation, request: "signed" }
+        },
+        transport: async () => {
+          transportCount += 1
+          return userOperationHash
+        }
+      })
+
+    await expect(submit()).rejects.toBe(estimationFailure)
+    expect(journal.phase).toBe("prepared")
+    expect({ prepareCount, signCount, transportCount }).toEqual({
+      prepareCount: 1,
+      signCount: 0,
+      transportCount: 0
+    })
+
+    await expect(submit()).resolves.toMatchObject({
+      rotation: { phase: "submitted" }
+    })
+    expect({ prepareCount, signCount, transportCount }).toEqual({
+      prepareCount: 2,
+      signCount: 1,
+      transportCount: 1
+    })
+  })
+
+  test("retries once after the pre-transport journal write is rejected", async () => {
+    const persistenceRejection = new Error("journal write rejected")
+    let journal = createRotation()
+    let journalWriteCount = 0
+    let transportCount = 0
+    const submit = () =>
+      submitSliceWalletGenericGrantInstallation({
+        initialRotation: journal,
+        isDefiniteTransportRejection: () => false,
+        prepare: async () => "prepared",
+        setPhase: async (rotation, phase, nextInstallation) => {
+          journalWriteCount += 1
+          if (journalWriteCount === 1) throw persistenceRejection
+          journal = updateRotationPhase(rotation, phase, nextInstallation)
+          return journal
+        },
+        sign: async () => ({ installation, request: "signed" }),
+        transport: async () => {
+          transportCount += 1
+          return userOperationHash
+        }
+      })
+
+    await expect(submit()).rejects.toBe(persistenceRejection)
+    expect(journal.phase).toBe("prepared")
+    expect(transportCount).toBe(0)
+
+    await expect(submit()).resolves.toMatchObject({
+      rotation: { phase: "submitted" }
+    })
+    expect(journalWriteCount).toBe(4)
+    expect(transportCount).toBe(1)
+  })
+
+  test("restores prepared state after a definite bundler rejection", async () => {
+    const rejection = new Error("bundler rejected operation")
+    let journal = createRotation()
+    let transportCount = 0
+    const submit = () =>
+      submitSliceWalletGenericGrantInstallation({
+        initialRotation: journal,
+        isDefiniteTransportRejection: (error) => error === rejection,
+        prepare: async () => "prepared",
+        setPhase: async (rotation, phase, nextInstallation) => {
+          journal = updateRotationPhase(rotation, phase, nextInstallation)
+          return journal
+        },
+        sign: async () => ({ installation, request: "signed" }),
+        transport: async () => {
+          transportCount += 1
+          if (transportCount === 1) throw rejection
+          return userOperationHash
+        }
+      })
+
+    await expect(submit()).rejects.toBe(rejection)
+    expect(journal).toMatchObject({ phase: "prepared" })
+    expect(journal.installation).toBeUndefined()
+    expect(transportCount).toBe(1)
+
+    await expect(submit()).resolves.toMatchObject({
+      rotation: { phase: "submitted" }
+    })
+    expect(transportCount).toBe(2)
+  })
+
+  test("records the hash before transport and never duplicates an ambiguous submission", async () => {
+    const events: string[] = []
+    const responseLoss = new Error("response lost")
+    let journal = createRotation()
+    let transportCount = 0
+
+    await expect(
+      submitSliceWalletGenericGrantInstallation({
+        initialRotation: journal,
+        isDefiniteTransportRejection: () => false,
+        prepare: async () => {
+          events.push("prepare")
+          return "prepared"
+        },
+        setPhase: async (rotation, phase, nextInstallation) => {
+          journal = updateRotationPhase(rotation, phase, nextInstallation)
+          events.push(`phase:${phase}`)
+          return journal
+        },
+        sign: async () => {
+          events.push("sign")
+          return { installation, request: "signed" }
+        },
+        transport: async () => {
+          transportCount += 1
+          events.push("transport")
+          throw responseLoss
+        }
+      })
+    ).rejects.toBe(responseLoss)
+
+    expect(events).toEqual([
+      "prepare",
+      "sign",
+      "phase:transport-pending",
+      "transport"
+    ])
+    expect(journal).toMatchObject({
+      installation: { userOperationHash },
+      phase: "transport-pending"
+    })
     expect(
       getSliceWalletGenericGrantInstallationAction({
         finalizedBlockNumber: null,
         installed: false,
         receipt: null,
-        rotation: createRotation("submitting")
+        rotation: journal
       })
     ).toBe("wait")
-    expect(
-      getSliceWalletGenericGrantInstallationAction({
-        finalizedBlockNumber: null,
-        installed: true,
-        receipt: null,
-        rotation: createRotation("submitting")
-      })
-    ).toBe("installed")
+    expect(transportCount).toBe(1)
+
+    const finalized = await resumeSliceWalletGenericGrantReplacement({
+      clearJournal: async () => {
+        events.push("clear")
+      },
+      disablePredecessor: async () => {
+        events.push("disable")
+      },
+      ensureFrameCommitted: async () => {
+        events.push("frame")
+      },
+      ensureInstalled: async (rotation) => {
+        expect(
+          getSliceWalletGenericGrantInstallationAction({
+            finalizedBlockNumber: null,
+            installed: true,
+            receipt: null,
+            rotation
+          })
+        ).toBe("installed")
+        return updateRotationPhase(rotation, "installed")
+      },
+      initialRotation: journal,
+      persistActiveGrant: async () => {
+        events.push("active")
+      },
+      setPhase: async (rotation, phase) => {
+        journal = updateRotationPhase(rotation, phase)
+        events.push(`phase:${phase}`)
+        return journal
+      },
+      verifyFinalized: async () => {
+        events.push("verify")
+      }
+    })
+    expect(finalized.phase).toBe("active-grant-committed")
+    expect(transportCount).toBe(1)
+    expect(events.slice(4)).toEqual([
+      "disable",
+      "phase:predecessor-disabled",
+      "frame",
+      "phase:frame-committed",
+      "active",
+      "phase:active-grant-committed",
+      "verify",
+      "clear"
+    ])
   })
 
   test("retries only after a reverted installation is definitive", async () => {
     const events: string[] = []
     const receiptFailure = new Error("installation reverted")
-    const submitted = {
-      ...createRotation("submitted"),
-      installationUserOperationHash: userOperationHash
-    }
+    const submitted = createSubmittedRotation()
     let attempt = 0
     expect(
       getSliceWalletGenericGrantInstallationAction({
@@ -356,7 +611,7 @@ describe("generic grant replacement ordering", () => {
           attempt += 1
           events.push(`install:${attempt}`)
           if (attempt === 1) throw receiptFailure
-          return { ...rotation, phase: "installed" }
+          return updateRotationPhase(rotation, "installed")
         },
         initialRotation: submitted,
         persistActiveGrant: async () => {
@@ -364,7 +619,7 @@ describe("generic grant replacement ordering", () => {
         },
         setPhase: async (rotation, phase) => {
           events.push(`phase:${phase}`)
-          return { ...rotation, phase }
+          return updateRotationPhase(rotation, phase)
         },
         verifyFinalized: async () => {
           events.push("verify")
@@ -414,7 +669,7 @@ describe("generic grant replacement ordering", () => {
           if (activeAttempts === 1) throw storageFailure
         },
         setPhase: async (rotation, phase) => {
-          journal = { ...rotation, phase }
+          journal = updateRotationPhase(rotation, phase)
           events.push(`phase:${phase}`)
           return journal
         },

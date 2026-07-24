@@ -159,11 +159,17 @@ describe("portable wallet provider storage", () => {
   test("strictly persists and parses a recoverable rotation journal", () => {
     const storage = new MemoryStorage()
     const rotation = {
-      installationUserOperationHash: `0x${"33".repeat(32)}` as Hex,
+      installation: {
+        callDataHash: `0x${"33".repeat(32)}` as Hex,
+        entryPoint: target,
+        nonce: "0x1" as Hex,
+        sender: account,
+        userOperationHash: `0x${"44".repeat(32)}` as Hex
+      },
       phase: "submitted" as const,
       predecessor: createGrant(),
       replacement: createGrant(replacementPublicKey),
-      version: 1 as const
+      version: 2 as const
     }
 
     expect(writeStoredSliceWalletGrantRotation(storage, rotation)).toBe(true)
@@ -182,9 +188,31 @@ describe("portable wallet provider storage", () => {
       ) ?? []
     if (key === undefined || raw === undefined)
       throw new Error("Missing rotation fixture.")
+    const hashless = JSON.parse(raw)
+    delete hashless.installation
     storage.setItem(
       key,
-      JSON.stringify({ ...JSON.parse(raw), untrustedPhaseData: true })
+      JSON.stringify({ ...hashless, phase: "transport-pending" })
+    )
+    expect(
+      readStoredSliceWalletGrantRotation(
+        storage,
+        rotation.replacement.chainId,
+        rotation.replacement.account,
+        1_800_000_001
+      )
+    ).toBeNull()
+    expect(storage.getItem(key)).toBeNull()
+
+    expect(writeStoredSliceWalletGrantRotation(storage, rotation)).toBe(true)
+    const rewritten = storage.getItem(key)
+    if (rewritten === null) throw new Error("Missing rewritten fixture.")
+    storage.setItem(
+      key,
+      JSON.stringify({
+        ...JSON.parse(rewritten),
+        untrustedPhaseData: true
+      })
     )
     expect(
       readStoredSliceWalletGrantRotation(
@@ -209,7 +237,7 @@ describe("portable wallet provider storage", () => {
         phase: "prepared",
         predecessor,
         replacement: createGrant(replacementPublicKey),
-        version: 1
+        version: 2
       })
     ).toBe(false)
   })

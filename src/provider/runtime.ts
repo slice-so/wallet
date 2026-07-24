@@ -1,13 +1,20 @@
 import {
+  BaseError,
   createPublicClient,
   type Hex,
   http,
   isAddressEqual,
-  type SignableMessage
+  keccak256,
+  RpcRequestError,
+  type SignableMessage,
+  toHex
 } from "viem"
 import {
   createBundlerClient,
-  type SmartAccount
+  formatUserOperationRequest,
+  getUserOperationHash,
+  type SmartAccount,
+  type UserOperation
 } from "viem/account-abstraction"
 import { predictSliceWalletKernelAccountAddressFromInitConfig } from "../accountPrediction"
 import {
@@ -64,6 +71,7 @@ import type {
   SliceWalletProviderConfig,
   SliceWalletRequestPaymasterService,
   StoredGenericGrant,
+  StoredGenericGrantInstallation,
   StoredGenericGrantRotation
 } from "../types/providerInternal"
 import { createSliceWalletAccountBundler } from "./accountBundler"
@@ -188,13 +196,17 @@ const genericGrantRotationPhaseOrder: Record<
   number
 > = {
   prepared: 0,
-  submitting: 1,
+  "transport-pending": 1,
   submitted: 2,
   installed: 3,
   "predecessor-disabled": 4,
   "frame-committed": 5,
   "active-grant-committed": 6
 }
+
+const isExplicitBundlerRpcRejection = (error: Error) =>
+  error instanceof BaseError &&
+  error.walk((cause) => cause instanceof RpcRequestError) !== null
 
 export const getSliceWalletGenericGrantInstallationAction = ({
   finalizedBlockNumber,
@@ -208,15 +220,92 @@ export const getSliceWalletGenericGrantInstallationAction = ({
   rotation: StoredGenericGrantRotation
 }): "installed" | "retry" | "submit" | "wait" => {
   if (installed) return "installed"
-  if (rotation.installationUserOperationHash === undefined) {
-    if (rotation.phase === "prepared") return "submit"
-    return rotation.phase === "submitting" ? "wait" : "retry"
+  if (rotation.installation === undefined) {
+    return rotation.phase === "prepared" ? "submit" : "retry"
   }
   if (receipt === null || receipt.success) return "wait"
   return finalizedBlockNumber !== null &&
     receipt.blockNumber <= finalizedBlockNumber
     ? "retry"
     : "wait"
+}
+
+export const submitSliceWalletGenericGrantInstallation = async <
+  Prepared,
+  Request
+>({
+  initialRotation,
+  isDefiniteTransportRejection,
+  prepare,
+  setPhase,
+  sign,
+  transport
+}: {
+  initialRotation: StoredGenericGrantRotation
+  isDefiniteTransportRejection: (error: Error) => boolean
+  prepare: () => Promise<Prepared>
+  sign: (prepared: Prepared) => Promise<{
+    installation: StoredGenericGrantInstallation
+    request: Request
+  }>
+  setPhase: (
+    rotation: StoredGenericGrantRotation,
+    phase: StoredGenericGrantRotation["phase"],
+    installation?: StoredGenericGrantInstallation | null
+  ) => Promise<StoredGenericGrantRotation> | StoredGenericGrantRotation
+  transport: (request: Request) => Promise<Hex>
+}) => {
+  const prepared = await sign(await prepare())
+  let transportPending: StoredGenericGrantRotation
+  try {
+    transportPending = await setPhase(
+      initialRotation,
+      "transport-pending",
+      prepared.installation
+    )
+  } catch (error) {
+    try {
+      await setPhase(initialRotation, "prepared", null)
+    } catch (resetError) {
+      throw new AggregateError(
+        [error, resetError],
+        "Wallet permission pre-transport state could not be reset."
+      )
+    }
+    throw error
+  }
+  let transportedHash: Hex
+  try {
+    transportedHash = await transport(prepared.request)
+  } catch (error) {
+    if (error instanceof Error && isDefiniteTransportRejection(error)) {
+      try {
+        await setPhase(transportPending, "prepared", null)
+      } catch (persistenceError) {
+        throw new AggregateError(
+          [error, persistenceError],
+          "Rejected wallet permission submission could not be reset."
+        )
+      }
+    }
+    throw error
+  }
+  if (
+    transportedHash.toLowerCase() !==
+    prepared.installation.userOperationHash.toLowerCase()
+  ) {
+    throw new Error(
+      "Bundler returned a mismatched wallet permission installation hash."
+    )
+  }
+  return {
+    request: prepared.request,
+    rotation: await setPhase(
+      transportPending,
+      "submitted",
+      prepared.installation
+    )
+  }
 }
 
 export const resumeSliceWalletGenericGrantReplacement = async ({
@@ -905,8 +994,16 @@ const createSliceWalletChainRuntime = (
   ) =>
     left.version === right.version &&
     left.phase === right.phase &&
-    left.installationUserOperationHash?.toLowerCase() ===
-      right.installationUserOperationHash?.toLowerCase() &&
+    left.installation?.callDataHash.toLowerCase() ===
+      right.installation?.callDataHash.toLowerCase() &&
+    left.installation?.entryPoint.toLowerCase() ===
+      right.installation?.entryPoint.toLowerCase() &&
+    left.installation?.nonce.toLowerCase() ===
+      right.installation?.nonce.toLowerCase() &&
+    left.installation?.sender.toLowerCase() ===
+      right.installation?.sender.toLowerCase() &&
+    left.installation?.userOperationHash.toLowerCase() ===
+      right.installation?.userOperationHash.toLowerCase() &&
     storedSliceWalletGrantsMatch(left.predecessor, right.predecessor) &&
     storedSliceWalletGrantsMatch(left.replacement, right.replacement)
 
@@ -930,21 +1027,35 @@ const createSliceWalletChainRuntime = (
   const setRotationPhase = (
     rotation: StoredGenericGrantRotation,
     phase: StoredGenericGrantRotation["phase"],
-    installationUserOperationHash:
-      | Hex
+    installation:
+      | StoredGenericGrantInstallation
       | null
-      | undefined = rotation.installationUserOperationHash
-  ) =>
-    persistRotation({
-      ...(installationUserOperationHash === null ||
-      installationUserOperationHash === undefined
-        ? {}
-        : { installationUserOperationHash }),
-      phase,
+      | undefined = rotation.installation
+  ) => {
+    const base = {
       predecessor: rotation.predecessor,
       replacement: rotation.replacement,
-      version: 1
+      version: 2 as const
+    }
+    if (phase === "prepared") {
+      return persistRotation({ ...base, phase })
+    }
+    if (phase === "submitted" || phase === "transport-pending") {
+      if (installation === null || installation === undefined) {
+        throw new Error(
+          "Transport-pending wallet permission state requires installation identity."
+        )
+      }
+      return persistRotation({ ...base, installation, phase })
+    }
+    return persistRotation({
+      ...base,
+      ...(installation === null || installation === undefined
+        ? {}
+        : { installation }),
+      phase
     })
+  }
 
   const installPermission = async (
     session: SliceWalletFrameSession,
@@ -954,44 +1065,77 @@ const createSliceWalletChainRuntime = (
     if (installation.calls.length === 0) {
       return setRotationPhase(rotation, "installed")
     }
-    const submitting = setRotationPhase(rotation, "submitting", null)
-    let hash: Hex
-    try {
-      hash = await createAccountBundler(
-        (await requireActiveWallet()).rootAccount
-      ).sendUserOperation({ calls: installation.calls })
-    } catch (error) {
-      throw new AggregateError(
-        [error],
-        "Wallet permission installation submission is ambiguous."
+    const wallet = await requireActiveWallet()
+    if (wallet.rootAccount.entryPoint.version !== "0.7") {
+      throw new Error(
+        "Generic permission installation requires EntryPoint 0.7."
       )
     }
-    let submitted: StoredGenericGrantRotation
-    try {
-      submitted = setRotationPhase(submitting, "submitted", hash)
-    } catch (persistenceError) {
-      try {
-        await waitForSuccessfulUserOperation(hash)
-        await assertPermissionInstalled(session)
-        return setRotationPhase(submitting, "installed", hash)
-      } catch (installationError) {
-        try {
-          setRotationPhase(submitting, "submitted", hash)
-        } catch (retryError) {
-          throw new AggregateError(
-            [persistenceError, installationError, retryError],
-            "Wallet permission submission could not be durably recorded."
+    const bundler = createAccountBundler(wallet.rootAccount)
+    const submitted = await submitSliceWalletGenericGrantInstallation({
+      initialRotation: rotation,
+      isDefiniteTransportRejection: isExplicitBundlerRpcRejection,
+      prepare: () =>
+        bundler.prepareUserOperation({
+          calls: installation.calls
+        }) as Promise<UserOperation<"0.7">>,
+      setPhase: setRotationPhase,
+      sign: async (prepared) => {
+        const expectedCallData = await wallet.rootAccount.encodeCalls(
+          installation.calls
+        )
+        if (
+          !isAddressEqual(prepared.sender, wallet.rootAccount.address) ||
+          prepared.callData.toLowerCase() !== expectedCallData.toLowerCase()
+        ) {
+          throw new Error(
+            "Prepared wallet permission installation identity is invalid."
           )
         }
-        throw new AggregateError(
-          [persistenceError, installationError],
-          "Wallet permission submission was recorded after a persistence interruption."
+        const request: UserOperation<"0.7"> = {
+          ...prepared,
+          signature: await wallet.rootAccount.signUserOperation(prepared)
+        }
+        const userOperationHash = getUserOperationHash({
+          chainId: config.chain.id,
+          entryPointAddress: wallet.rootAccount.entryPoint.address,
+          entryPointVersion: "0.7",
+          userOperation: request
+        })
+        return {
+          installation: {
+            callDataHash: keccak256(request.callData),
+            entryPoint: wallet.rootAccount.entryPoint.address,
+            nonce: toHex(request.nonce),
+            sender: request.sender,
+            userOperationHash
+          },
+          request
+        }
+      },
+      transport: (request) =>
+        bundler.request(
+          {
+            method: "eth_sendUserOperation",
+            params: [
+              formatUserOperationRequest(request),
+              wallet.rootAccount.entryPoint.address
+            ]
+          },
+          { retryCount: 0 }
         )
-      }
+    })
+    const submittedInstallation = submitted.rotation.installation
+    if (submittedInstallation === undefined) {
+      throw new Error(
+        "Submitted wallet permission installation identity is missing."
+      )
     }
-    await waitForSuccessfulUserOperation(hash)
+    await waitForSuccessfulUserOperation(
+      submittedInstallation.userOperationHash
+    )
     await assertPermissionInstalled(session)
-    return setRotationPhase(submitted, "installed")
+    return setRotationPhase(submitted.rotation, "installed")
   }
 
   const toStoredGrant = ({
@@ -1127,17 +1271,61 @@ const createSliceWalletChainRuntime = (
     const installation = await getPermissionInstallCalls(session)
     let receipt: { blockNumber: bigint; success: boolean } | null = null
     let finalizedBlockNumber: bigint | null = null
-    if (rotation.installationUserOperationHash !== undefined) {
+    if (rotation.installation !== undefined) {
+      const wallet = await requireActiveWallet()
+      if (
+        !isAddressEqual(
+          rotation.installation.sender,
+          wallet.rootAccount.address
+        ) ||
+        !isAddressEqual(
+          rotation.installation.entryPoint,
+          wallet.rootAccount.entryPoint.address
+        )
+      ) {
+        throw new Error(
+          "Wallet permission installation identity does not match the root account."
+        )
+      }
+      if (installation.calls.length > 0) {
+        const callData = await wallet.rootAccount.encodeCalls(
+          installation.calls
+        )
+        if (
+          keccak256(callData).toLowerCase() !==
+          rotation.installation.callDataHash.toLowerCase()
+        ) {
+          throw new Error(
+            "Wallet permission installation calldata does not match its journal."
+          )
+        }
+      }
+      let result: Awaited<
+        ReturnType<typeof receiptClient.getUserOperationReceipt>
+      > | null = null
       try {
-        const result = await receiptClient.getUserOperationReceipt({
-          hash: rotation.installationUserOperationHash
+        result = await receiptClient.getUserOperationReceipt({
+          hash: rotation.installation.userOperationHash
         })
+      } catch {
+        // A missing or unavailable receipt cannot prove that submission failed.
+      }
+      if (result !== null) {
+        if (
+          result.userOpHash.toLowerCase() !==
+            rotation.installation.userOperationHash.toLowerCase() ||
+          !isAddressEqual(result.sender, rotation.installation.sender) ||
+          toHex(result.nonce).toLowerCase() !==
+            rotation.installation.nonce.toLowerCase()
+        ) {
+          throw new Error(
+            "Wallet permission installation receipt identity is invalid."
+          )
+        }
         receipt = {
           blockNumber: result.receipt.blockNumber,
           success: result.success
         }
-      } catch {
-        // A missing or unavailable receipt cannot prove that submission failed.
       }
       if (receipt !== null && !receipt.success) {
         try {
@@ -1163,8 +1351,8 @@ const createSliceWalletChainRuntime = (
     }
     if (action === "wait") {
       if (
-        rotation.phase === "submitting" &&
-        rotation.installationUserOperationHash === undefined
+        rotation.phase === "transport-pending" &&
+        rotation.installation === undefined
       ) {
         throw new Error(
           "Wallet permission installation is still ambiguous; retry after inclusion."
@@ -1465,7 +1653,7 @@ const createSliceWalletChainRuntime = (
               permissions,
               session
             }),
-            version: 1
+            version: 2
           } satisfies StoredGenericGrantRotation
           try {
             rotation = persistRotation(prepared)

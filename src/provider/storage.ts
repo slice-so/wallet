@@ -1,11 +1,14 @@
 import {
   type Address,
   type Hex,
+  hexToBigInt,
   hexToBytes,
   isAddress,
   isHex,
   keccak256,
-  stringToHex
+  stringToHex,
+  toHex,
+  zeroAddress
 } from "viem"
 import { assertSliceWalletAccountIndex } from "../accountIndex"
 import { maximumBrowserGenericGrantTtlSec } from "../constants"
@@ -24,6 +27,7 @@ import type {
 } from "../types"
 import type {
   StoredGenericGrant,
+  StoredGenericGrantInstallation,
   StoredGenericGrantRotation,
   StoredGenericGrantRotationPhase,
   StoredWalletCall
@@ -300,13 +304,58 @@ export const clearStoredSliceWalletGrant = (
 
 const grantRotationPhases = new Set<StoredGenericGrantRotationPhase>([
   "prepared",
-  "submitting",
+  "transport-pending",
   "submitted",
   "installed",
   "predecessor-disabled",
   "frame-committed",
   "active-grant-committed"
 ])
+
+const parseStoredGrantInstallation = (
+  input: SliceWalletProviderValue | undefined
+): StoredGenericGrantInstallation | null => {
+  const value = input === undefined ? null : record(input)
+  if (
+    value === null ||
+    !hasOnlyKeys(value, [
+      "callDataHash",
+      "entryPoint",
+      "nonce",
+      "sender",
+      "userOperationHash"
+    ]) ||
+    typeof value.callDataHash !== "string" ||
+    !isHex(value.callDataHash, { strict: true }) ||
+    hexToBytes(value.callDataHash).length !== 32 ||
+    typeof value.entryPoint !== "string" ||
+    !isAddress(value.entryPoint) ||
+    value.entryPoint.toLowerCase() === zeroAddress ||
+    typeof value.nonce !== "string" ||
+    !isHex(value.nonce, { strict: true }) ||
+    typeof value.sender !== "string" ||
+    !isAddress(value.sender) ||
+    typeof value.userOperationHash !== "string" ||
+    !isHex(value.userOperationHash, { strict: true }) ||
+    hexToBytes(value.userOperationHash).length !== 32
+  ) {
+    return null
+  }
+  try {
+    if (toHex(hexToBigInt(value.nonce)) !== value.nonce.toLowerCase()) {
+      return null
+    }
+  } catch {
+    return null
+  }
+  return {
+    callDataHash: value.callDataHash,
+    entryPoint: value.entryPoint,
+    nonce: value.nonce,
+    sender: value.sender,
+    userOperationHash: value.userOperationHash
+  }
+}
 
 const grantsMatch = (left: StoredGenericGrant, right: StoredGenericGrant) =>
   left.account.toLowerCase() === right.account.toLowerCase() &&
@@ -337,13 +386,13 @@ export const readStoredSliceWalletGrantRotation = (
   if (
     value === null ||
     !hasOnlyKeys(value, [
-      "installationUserOperationHash",
+      "installation",
       "phase",
       "predecessor",
       "replacement",
       "version"
     ]) ||
-    value.version !== 1 ||
+    value.version !== 2 ||
     typeof value.phase !== "string" ||
     !grantRotationPhases.has(value.phase as StoredGenericGrantRotationPhase) ||
     typeof value.predecessor !== "object" ||
@@ -352,15 +401,19 @@ export const readStoredSliceWalletGrantRotation = (
     typeof value.replacement !== "object" ||
     value.replacement === null ||
     Array.isArray(value.replacement) ||
-    (value.installationUserOperationHash !== undefined &&
-      (typeof value.installationUserOperationHash !== "string" ||
-        !isHex(value.installationUserOperationHash, { strict: true }) ||
-        hexToBytes(value.installationUserOperationHash).length !== 32))
+    (value.installation !== undefined &&
+      (typeof value.installation !== "object" ||
+        value.installation === null ||
+        Array.isArray(value.installation)))
   ) {
     return invalid()
   }
   const predecessor = parseStoredSliceWalletGrant(value.predecessor, now)
   const replacement = parseStoredSliceWalletGrant(value.replacement, now)
+  const installation =
+    value.installation === undefined
+      ? null
+      : parseStoredGrantInstallation(value.installation)
   if (
     predecessor === null ||
     replacement === null ||
@@ -373,24 +426,33 @@ export const readStoredSliceWalletGrantRotation = (
     JSON.stringify(predecessor.policy) !== JSON.stringify(replacement.policy) ||
     JSON.stringify(predecessor.permissions) !==
       JSON.stringify(replacement.permissions) ||
-    (value.phase === "submitted" &&
-      value.installationUserOperationHash === undefined) ||
-    ((value.phase === "prepared" || value.phase === "submitting") &&
-      value.installationUserOperationHash !== undefined)
+    (value.installation !== undefined && installation === null) ||
+    (installation !== null &&
+      installation.sender.toLowerCase() !==
+        replacement.account.toLowerCase()) ||
+    ((value.phase === "transport-pending" || value.phase === "submitted") &&
+      installation === null) ||
+    (value.phase === "prepared" && installation !== null)
   ) {
     return invalid()
   }
-  return {
-    ...(value.installationUserOperationHash === undefined
-      ? {}
-      : {
-          installationUserOperationHash:
-            value.installationUserOperationHash as Hex
-        }),
-    phase: value.phase as StoredGenericGrantRotationPhase,
+  const base = {
     predecessor,
     replacement,
-    version: 1
+    version: 2 as const
+  }
+  if (value.phase === "prepared") return { ...base, phase: value.phase }
+  if (value.phase === "transport-pending" || value.phase === "submitted") {
+    if (installation === null) return invalid()
+    return { ...base, installation, phase: value.phase }
+  }
+  return {
+    ...base,
+    ...(installation === null ? {} : { installation }),
+    phase: value.phase as Exclude<
+      StoredGenericGrantRotationPhase,
+      "prepared" | "submitted" | "transport-pending"
+    >
   }
 }
 
