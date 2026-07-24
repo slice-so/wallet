@@ -12,6 +12,7 @@ import {
   parseEventLogs,
   zeroAddress
 } from "viem"
+import coreDeployments from "../../contracts/core/deployments/addresses.json"
 import deployments from "../../contracts/wallet/deployments/addresses.json"
 import policy from "../config/chains.policy.json"
 
@@ -150,6 +151,57 @@ for (const [name, contract] of Object.entries(deployment.contracts)) {
   )
 }
 
+const coreDeployment =
+  coreDeployments.chains[chainKey as keyof typeof coreDeployments.chains]
+if (coreDeployment !== undefined) {
+  for (const [name, library] of Object.entries(
+    coreDeployment.linkedLibraries
+  )) {
+    const code = await client.getCode({ address: getAddress(library.address) })
+    const observedHash =
+      code === undefined || code === "0x" ? null : keccak256(code)
+    assert(observedHash !== null, `${name} has no runtime code.`)
+    assert(
+      observedHash === library.expectedRuntimeCodeHash,
+      `${name} runtime hash is ${observedHash ?? "missing"}; expected ${library.expectedRuntimeCodeHash}.`
+    )
+    assert(
+      observedHash === library.deployedRuntimeCodeHash,
+      `${name} deployment facts do not record the observed runtime hash.`
+    )
+  }
+  const productsModule = coreDeployment.productsModule
+  const implementationSlot = await client.getStorageAt({
+    address: getAddress(productsModule.proxyAddress),
+    slot: kernelImplementationSlot
+  })
+  const implementationAddress =
+    implementationSlot === undefined
+      ? null
+      : getAddress(`0x${implementationSlot.slice(-40)}`)
+  const implementationCode =
+    implementationAddress === null
+      ? undefined
+      : await client.getCode({ address: implementationAddress })
+  const implementationHash =
+    implementationCode === undefined || implementationCode === "0x"
+      ? null
+      : keccak256(implementationCode)
+  assert(
+    implementationAddress?.toLowerCase() ===
+      productsModule.deployedImplementationAddress?.toLowerCase(),
+    `ProductsModule implementation is ${implementationAddress ?? "missing"}; deployment facts record ${productsModule.deployedImplementationAddress ?? "missing"}.`
+  )
+  assert(
+    implementationHash === productsModule.deployedRuntimeCodeHash,
+    `ProductsModule runtime hash is ${implementationHash ?? "missing"}; deployment facts record ${productsModule.deployedRuntimeCodeHash ?? "missing"}.`
+  )
+  assert(
+    implementationHash === productsModule.expectedRuntimeCodeHash,
+    `ProductsModule runtime hash is ${implementationHash ?? "missing"}; expected ${productsModule.expectedRuntimeCodeHash}.`
+  )
+}
+
 assert(
   deployment.contracts.entryPoint.version === "0.7",
   "The admitted EntryPoint version must be 0.7."
@@ -239,53 +291,67 @@ assert(
 )
 
 if (userOperationCanary !== null) {
-  const receipt = await client.getTransactionReceipt({
-    hash: userOperationCanary.transactionHash
-  })
-  const transaction = await client.getTransaction({
-    hash: userOperationCanary.transactionHash
-  })
-  assert(receipt.status === "success", "The canary transaction reverted.")
-  assert(
-    transaction.to?.toLowerCase() ===
-      deployment.contracts.entryPoint.address.toLowerCase(),
-    "The canary transaction was not submitted through the pinned EntryPoint."
-  )
+  const [receipt, transaction] = await Promise.all([
+    client
+      .getTransactionReceipt({
+        hash: userOperationCanary.transactionHash
+      })
+      .catch(() => null),
+    client
+      .getTransaction({
+        hash: userOperationCanary.transactionHash
+      })
+      .catch(() => null)
+  ])
+  assert(receipt !== null, "The canary transaction receipt is unavailable.")
+  assert(transaction !== null, "The canary transaction is unavailable.")
 
-  const events = parseEventLogs({
-    abi: userOperationEventAbi,
-    eventName: "UserOperationEvent",
-    logs: receipt.logs,
-    strict: true
-  })
-  const canaryEvent = events.find(
-    (event) =>
-      event.args.userOpHash.toLowerCase() ===
-        userOperationCanary.userOperationHash.toLowerCase() &&
-      event.args.sender.toLowerCase() ===
-        userOperationCanary.accountAddress.toLowerCase()
-  )
-  assert(canaryEvent !== undefined, "The canary UserOperationEvent is missing.")
-  assert(
-    canaryEvent?.args.success === true,
-    "The canary user operation failed."
-  )
-  if (canaryEvent !== undefined) {
-    const executionSafety = chainPolicy.executionSafety
-    const maximumEnvelopeGas =
-      BigInt(executionSafety.maxCallGasLimit) +
-      BigInt(executionSafety.maxVerificationGasLimit) +
-      BigInt(executionSafety.maxPreVerificationGas) +
-      BigInt(executionSafety.maxPaymasterVerificationGasLimit) +
-      BigInt(executionSafety.maxPaymasterPostOpGasLimit)
+  if (receipt !== null && transaction !== null) {
+    assert(receipt.status === "success", "The canary transaction reverted.")
     assert(
-      canaryEvent.args.actualGasUsed <= maximumEnvelopeGas,
-      "The execution-safety gas envelope is below the admitted canary usage."
+      transaction.to?.toLowerCase() ===
+        deployment.contracts.entryPoint.address.toLowerCase(),
+      "The canary transaction was not submitted through the pinned EntryPoint."
+    )
+
+    const events = parseEventLogs({
+      abi: userOperationEventAbi,
+      eventName: "UserOperationEvent",
+      logs: receipt.logs,
+      strict: true
+    })
+    const canaryEvent = events.find(
+      (event) =>
+        event.args.userOpHash.toLowerCase() ===
+          userOperationCanary.userOperationHash.toLowerCase() &&
+        event.args.sender.toLowerCase() ===
+          userOperationCanary.accountAddress.toLowerCase()
     )
     assert(
-      canaryEvent.args.actualGasCost <= BigInt(executionSafety.maxPrefundWei),
-      "The execution-safety prefund cap is below the admitted canary cost."
+      canaryEvent !== undefined,
+      "The canary UserOperationEvent is missing."
     )
+    assert(
+      canaryEvent?.args.success === true,
+      "The canary user operation failed."
+    )
+    if (canaryEvent !== undefined) {
+      const executionSafety = chainPolicy.executionSafety
+      const maximumEnvelopeGas =
+        BigInt(executionSafety.maxCallGasLimit) +
+        BigInt(executionSafety.maxVerificationGasLimit) +
+        BigInt(executionSafety.maxPreVerificationGas) +
+        BigInt(executionSafety.maxPaymasterVerificationGasLimit) +
+        BigInt(executionSafety.maxPaymasterPostOpGasLimit)
+      assert(
+        canaryEvent.args.actualGasUsed <= maximumEnvelopeGas,
+        "The execution-safety gas envelope is below the admitted canary usage."
+      )
+      assert(
+        canaryEvent.args.actualGasCost <= BigInt(executionSafety.maxPrefundWei),
+        "The execution-safety prefund cap is below the admitted canary cost."
+      )
+    }
   }
 
   const accountCode = await client.getCode({

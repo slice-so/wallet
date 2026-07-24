@@ -1,9 +1,20 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test"
-import { numberToHex } from "viem"
+import { createPublicClient, custom, numberToHex } from "viem"
 import { base, optimism } from "viem/chains"
-import type { SliceWalletCeremonyBroker } from "../types"
+import { buildRecoveryPermissionInitConfig } from "../recovery"
+import { parseSliceWalletUncompressedPublicKey } from "../rootValidator"
+import type {
+  SliceWalletCeremonyBroker,
+  SliceWalletRegistryCredential
+} from "../types"
 import type { SliceWalletProviderConfig } from "../types/providerInternal"
-import { createSliceWalletProviderRuntime } from "./runtime"
+import {
+  assertSliceWalletDeployedRootIdentity,
+  assertSliceWalletRegistryAccountIdentity,
+  createSliceWalletProviderRuntime,
+  deriveSliceWalletRegistryAccountAddress,
+  executeSliceWalletGenericGrantReplacement
+} from "./runtime"
 import {
   readStoredSliceWalletAccount,
   writeStoredSliceWalletAccount
@@ -71,6 +82,222 @@ const config = {
 } satisfies SliceWalletProviderConfig
 
 beforeEach(() => storageValues.clear())
+
+describe("generic grant replacement ordering", () => {
+  test("installs and verifies before disabling, then commits last", async () => {
+    const events: string[] = []
+
+    const result = await executeSliceWalletGenericGrantReplacement({
+      authorize: async () => {
+        events.push("authorize")
+        return "authorization"
+      },
+      commit: async (authorization) => {
+        events.push(`commit:${authorization}`)
+        return "complete"
+      },
+      disablePredecessor: async () => {
+        events.push("disable")
+      },
+      discardPending: async () => {
+        events.push("discard")
+      },
+      installReplacement: async (onSubmitted) => {
+        events.push("install")
+        onSubmitted()
+      },
+      verifyReplacement: async () => {
+        events.push("verify")
+      }
+    })
+
+    expect(result).toBe("complete")
+    expect(events).toEqual([
+      "authorize",
+      "install",
+      "verify",
+      "disable",
+      "commit:authorization"
+    ])
+  })
+
+  test("keeps both validations and the replacement key retryable when predecessor disablement fails", async () => {
+    const events: string[] = []
+    const failure = new Error("predecessor disablement failed")
+
+    await expect(
+      executeSliceWalletGenericGrantReplacement({
+        authorize: async () => {
+          events.push("authorize")
+          return "authorization"
+        },
+        commit: async () => {
+          events.push("commit")
+        },
+        disablePredecessor: async () => {
+          events.push("disable")
+          throw failure
+        },
+        discardPending: async () => {
+          events.push("discard")
+        },
+        installReplacement: async (onSubmitted) => {
+          events.push("install")
+          onSubmitted()
+        },
+        verifyReplacement: async () => {
+          events.push("verify")
+        }
+      })
+    ).rejects.toBe(failure)
+    expect(events).toEqual(["authorize", "install", "verify", "disable"])
+  })
+
+  test("discards an unsubmitted replacement and leaves the predecessor untouched", async () => {
+    const events: string[] = []
+    const failure = new Error("replacement installation failed")
+
+    await expect(
+      executeSliceWalletGenericGrantReplacement({
+        authorize: async () => {
+          events.push("authorize")
+          return "authorization"
+        },
+        commit: async () => {
+          events.push("commit")
+        },
+        disablePredecessor: async () => {
+          events.push("disable")
+        },
+        discardPending: async () => {
+          events.push("discard")
+        },
+        installReplacement: async () => {
+          events.push("install")
+          throw failure
+        },
+        verifyReplacement: async () => {
+          events.push("verify")
+        }
+      })
+    ).rejects.toBe(failure)
+    expect(events).toEqual(["authorize", "install", "discard"])
+  })
+})
+
+describe("registry-outage account identity", () => {
+  const offlineClient = createPublicClient({
+    chain: base,
+    transport: custom({
+      async request({ method }) {
+        throw new Error(`Unexpected identity-derivation RPC: ${method}`)
+      }
+    })
+  })
+  const alternateRootPublicKey = `0x04${"44".repeat(64)}` as const
+
+  const createCredential = async (
+    overrides: Partial<SliceWalletRegistryCredential> = {}
+  ): Promise<SliceWalletRegistryCredential> => {
+    const seed = {
+      accountAddress: account,
+      accountIndex: 0,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      credentialIdHash,
+      factoryVersion: "1",
+      publicKey: rootPublicKey,
+      recoveryPermissionId: null,
+      recoverySignerAddress: null,
+      registrationKind: "initial" as const,
+      ...overrides
+    }
+    const derived = await deriveSliceWalletRegistryAccountAddress({
+      client: offlineClient,
+      credential: seed
+    })
+    return { ...seed, accountAddress: derived.address }
+  }
+
+  test("accepts valid undeployed and deployed local snapshots", async () => {
+    const credential = await createCredential()
+    await expect(
+      assertSliceWalletRegistryAccountIdentity({
+        client: offlineClient,
+        credential
+      })
+    ).resolves.toMatchObject({ address: credential.accountAddress })
+
+    const coordinates = parseSliceWalletUncompressedPublicKey(
+      credential.publicKey
+    )
+    expect(() =>
+      assertSliceWalletDeployedRootIdentity({
+        credential,
+        currentRoot: coordinates
+      })
+    ).not.toThrow()
+  })
+
+  test("rejects tampered address, index, root, and recovery metadata", async () => {
+    const credential = await createCredential()
+    const tamperedSnapshots = [
+      { ...credential, accountAddress: secondAccount },
+      { ...credential, accountIndex: 1 },
+      { ...credential, publicKey: alternateRootPublicKey }
+    ] satisfies readonly SliceWalletRegistryCredential[]
+
+    for (const tampered of tamperedSnapshots) {
+      await expect(
+        assertSliceWalletRegistryAccountIdentity({
+          client: offlineClient,
+          credential: tampered
+        })
+      ).rejects.toThrow("does not match its root")
+    }
+
+    const recoverySignerAddress =
+      "0x0000000000000000000000000000000000000011" as const
+    const recovery = await buildRecoveryPermissionInitConfig({
+      client: offlineClient,
+      recoverySignerAddress
+    })
+    const recovered = await createCredential({
+      recoveryPermissionId: recovery.permissionId,
+      recoverySignerAddress
+    })
+    await expect(
+      assertSliceWalletRegistryAccountIdentity({
+        client: offlineClient,
+        credential: {
+          ...recovered,
+          recoverySignerAddress: "0x0000000000000000000000000000000000000012"
+        }
+      })
+    ).rejects.toThrow("recovery metadata is inconsistent")
+    await expect(
+      assertSliceWalletRegistryAccountIdentity({
+        client: offlineClient,
+        credential: {
+          ...recovered,
+          recoveryPermissionId: "0x01020304"
+        }
+      })
+    ).rejects.toThrow("recovery metadata is inconsistent")
+  })
+
+  test("rejects a deployed account whose root coordinates were changed", async () => {
+    const credential = await createCredential()
+    const tamperedCoordinates = parseSliceWalletUncompressedPublicKey(
+      alternateRootPublicKey
+    )
+    expect(() =>
+      assertSliceWalletDeployedRootIdentity({
+        credential,
+        currentRoot: tamperedCoordinates
+      })
+    ).toThrow("does not match local metadata")
+  })
+})
 
 const createRuntimeFixture = (
   override?: (chainId: number, creation: number) => Partial<ChainRuntime>

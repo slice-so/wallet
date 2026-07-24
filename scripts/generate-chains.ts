@@ -3,14 +3,24 @@
 import { spawnSync } from "node:child_process"
 import { readFileSync, writeFileSync } from "node:fs"
 import { resolve } from "node:path"
+import { getProductsModuleAddress } from "@slice/indexer-shared"
+import coreDeployments from "../../contracts/core/deployments/addresses.json"
 import deployments from "../../contracts/wallet/deployments/addresses.json"
 import policy from "../config/chains.policy.json"
-import { hasCompleteSliceWalletAdmissionEvidence } from "./lib/chainAdmission"
+import {
+  hasCompleteSliceWalletAdmissionEvidence,
+  hasVerifiedCheckoutAuthorityDeployment,
+  hasVerifiedGenericAuthorityDeployment
+} from "./lib/chainAdmission"
 
 const outputPath = resolve(import.meta.dir, "../src/chains.ts")
 const checkOnly = process.argv.includes("--check")
 
-if (deployments.version !== 1 || policy.version !== 1) {
+if (
+  coreDeployments.version !== 1 ||
+  deployments.version !== 1 ||
+  policy.version !== 1
+) {
   throw new Error("Unsupported Slice wallet chain input version.")
 }
 
@@ -24,16 +34,19 @@ const pinnedAddressContractNames = [
   "callPolicy",
   "ecdsaSigner",
   "entryPoint",
+  "erc20AllowanceGuard",
   "kernelFactory",
   "kernelImplementation",
   "kernelMetaFactory",
   "p256Verifier",
+  "singleCallPolicy",
   "sudoPolicy",
   "timelockPolicy",
   "webAuthnRootValidator",
   "webAuthnSigner",
   "weightedEcdsaSigner",
-  "weightedP256Signer"
+  "weightedP256Signer",
+  "weightedP256SignerV2"
 ] as const
 const canonicalDeployment = deployments.chains["8453"]
 
@@ -77,9 +90,31 @@ const entries = chainIds.map((chainId) => {
     ])
   )
   const admitted = hasCompleteSliceWalletAdmissionEvidence(deployment)
+  const coreDeployment =
+    coreDeployments.chains[chainId as keyof typeof coreDeployments.chains]
+  const productsModule = coreDeployment?.productsModule
+  if (
+    productsModule !== undefined &&
+    productsModule.proxyAddress.toLowerCase() !==
+      getProductsModuleAddress(Number(chainId)).toLowerCase()
+  ) {
+    throw new Error(
+      `ProductsModule deployment facts for chain ${chainId} do not reference the canonical proxy.`
+    )
+  }
+  const genericAuthorityAdmitted =
+    hasVerifiedGenericAuthorityDeployment(deployment)
+  const checkoutAuthorityAdmitted = hasVerifiedCheckoutAuthorityDeployment({
+    core: coreDeployment,
+    wallet: deployment
+  })
 
   return {
     admitted,
+    authorityAdmission: {
+      checkout: checkoutAuthorityAdmitted,
+      generic: genericAuthorityAdmitted
+    },
     chain: {
       blockExplorers: {
         default: {
@@ -94,6 +129,10 @@ const entries = chainIds.map((chainId) => {
         default: { http: [policyChain.defaultTransports.rpcUrl] }
       }
     },
+    commerce: {
+      linkedLibraries: coreDeployment?.linkedLibraries ?? null,
+      productsModule: productsModule ?? null
+    },
     contracts,
     defaultTransports: policyChain.defaultTransports,
     executionSafety: policyChain.executionSafety,
@@ -105,7 +144,10 @@ const entries = chainIds.map((chainId) => {
 const generated = `// Auto-generated from contracts deployment facts and wallet chain policy.
 // Run: bun run generate:chains
 
-import type { SliceWalletChainManifest } from "./types/chains"
+import type {
+  SliceWalletAuthorityKind,
+  SliceWalletChainManifest
+} from "./types/chains"
 
 const parseBigIntFields = (manifest: Omit<SliceWalletChainManifest, "executionSafety"> & {
   executionSafety: { readonly [Key in keyof SliceWalletChainManifest["executionSafety"]]: string }
@@ -125,6 +167,7 @@ const parseBigIntFields = (manifest: Omit<SliceWalletChainManifest, "executionSa
 })
 
 const freezeManifest = (manifest: SliceWalletChainManifest) => {
+  Object.freeze(manifest.authorityAdmission)
   Object.freeze(manifest.chain.nativeCurrency)
   Object.freeze(manifest.chain.rpcUrls.default.http)
   Object.freeze(manifest.chain.rpcUrls.default)
@@ -134,6 +177,16 @@ const freezeManifest = (manifest: SliceWalletChainManifest) => {
     Object.freeze(manifest.chain.blockExplorers)
   }
   Object.freeze(manifest.chain)
+  if (manifest.commerce.productsModule !== null) {
+    Object.freeze(manifest.commerce.productsModule)
+  }
+  if (manifest.commerce.linkedLibraries !== null) {
+    for (const library of Object.values(manifest.commerce.linkedLibraries)) {
+      Object.freeze(library)
+    }
+    Object.freeze(manifest.commerce.linkedLibraries)
+  }
+  Object.freeze(manifest.commerce)
   for (const contract of Object.values(manifest.contracts)) {
     Object.freeze(contract)
   }
@@ -171,6 +224,22 @@ export const getSliceWalletChainPolicy = (chainId: number) => {
   const manifest = sliceWalletChainManifests[chainId]
   if (manifest === undefined) {
     throw new Error(\`Slice Wallet chain \${chainId} is unsupported.\`)
+  }
+  return manifest
+}
+
+export const assertSliceWalletAuthorityDeployment = ({
+  authority,
+  chainId
+}: {
+  authority: SliceWalletAuthorityKind
+  chainId: number
+}) => {
+  const manifest = getSliceWalletChainManifest(chainId)
+  if (!manifest.authorityAdmission[authority]) {
+    throw new Error(
+      \`Slice Wallet \${authority} authority is not verified on chain \${chainId}.\`
+    )
   }
   return manifest
 }

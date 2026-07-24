@@ -990,11 +990,10 @@ describe("isolated signer-frame controller", () => {
       method: "signCoSignRequest",
       params: {
         challenge: nonce,
+        challengeExpiresAt: 200,
         challengeIssuedAt: 100,
         delegationId: "delegation-1",
-        expiresAt: 200,
         session: { account, chainId: 8453, grantKind: "checkout" },
-        spendWindowId: "lifetime",
         userOperation: {
           callData: "0x",
           callGasLimit: 3_000_001n,
@@ -1007,6 +1006,7 @@ describe("isolated signer-frame controller", () => {
         },
         validUntil: 200,
         windowEndExclusive: 2_000_000_001,
+        windowId: "lifetime",
         windowStart: 0
       },
       version: 1

@@ -60,6 +60,42 @@ const getKernelProxyInitCode = () =>
     "0x60095155f3363d3d373d3d363d7f360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc545af43d6000803e6038573d6000fd5b3d6000f3"
   ])
 
+export const predictSliceWalletKernelAccountAddressFromInitConfig = ({
+  credential,
+  index = 0n,
+  initConfig = []
+}: {
+  credential: PredictSliceWalletKernelAccountAddressParameters["credential"]
+  index?: bigint
+  initConfig?: readonly `0x${string}`[]
+}) => {
+  assertSliceWalletAccountIndex(Number(index))
+  const initializationData = encodeFunctionData({
+    abi: kernelV33InitializeAbi,
+    args: [
+      concatHex(["0x01", sliceWalletKernelAddresses.webAuthnRootValidator]),
+      zeroAddress,
+      encodeSliceWalletRootValidatorData(credential),
+      "0x",
+      [...initConfig]
+    ],
+    functionName: "initialize"
+  })
+  const initCodeHash = keccak256(getKernelProxyInitCode())
+  if (initCodeHash !== sliceWalletKernelProxyInitCodeHash) {
+    throw new Error("Pinned Kernel proxy initcode hash does not match.")
+  }
+  const salt = keccak256(
+    concatHex([initializationData, toHex(index, { size: 32 })])
+  )
+  return getContractAddress({
+    bytecodeHash: initCodeHash,
+    from: sliceWalletKernelAddresses.factory,
+    opcode: "CREATE2",
+    salt
+  })
+}
+
 export const deriveSliceWalletRecoveryBootstrap = async ({
   chainId,
   credential,
@@ -72,30 +108,11 @@ export const deriveSliceWalletRecoveryBootstrap = async ({
     client,
     recoverySignerAddress
   })
-  const initializationData = encodeFunctionData({
-    abi: kernelV33InitializeAbi,
-    args: [
-      concatHex(["0x01", sliceWalletKernelAddresses.webAuthnRootValidator]),
-      zeroAddress,
-      encodeSliceWalletRootValidatorData(credential),
-      "0x",
-      recovery.initConfig
-    ],
-    functionName: "initialize"
-  })
-  const initCodeHash = keccak256(getKernelProxyInitCode())
-  if (initCodeHash !== sliceWalletKernelProxyInitCodeHash) {
-    throw new Error("Pinned Kernel proxy initcode hash does not match.")
-  }
-  const salt = keccak256(
-    concatHex([initializationData, toHex(index, { size: 32 })])
-  )
   return {
-    account: getContractAddress({
-      bytecodeHash: initCodeHash,
-      from: sliceWalletKernelAddresses.factory,
-      opcode: "CREATE2",
-      salt
+    account: predictSliceWalletKernelAccountAddressFromInitConfig({
+      credential,
+      index,
+      initConfig: recovery.initConfig
     }),
     permissionId: recovery.permissionId
   }

@@ -15,7 +15,12 @@ export type SliceCheckoutAllowanceTotal = {
   amount: bigint
   currency: Address
 }
-export type SliceCheckoutPayment = { amount: bigint; currency: Address }
+export type SliceCheckoutPayment = {
+  amount: bigint
+  currency: Address
+  recipient: Address
+  slicerId: bigint
+}
 export type SliceCheckoutProductLineItem = {
   productId: number
   quantity: number

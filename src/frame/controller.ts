@@ -439,10 +439,11 @@ export const attachSliceWalletSignerFrame = ({
       }
       if (
         request.params.challengeIssuedAt > now() ||
-        request.params.expiresAt <= now() ||
-        request.params.expiresAt > request.params.challengeIssuedAt + 120 ||
+        request.params.challengeExpiresAt <= now() ||
+        request.params.challengeExpiresAt >
+          request.params.challengeIssuedAt + 120 ||
         request.params.validUntil <= now() ||
-        request.params.validUntil > request.params.expiresAt ||
+        request.params.validUntil > request.params.challengeExpiresAt ||
         request.params.validUntil > stored.session.expiresAt ||
         request.params.windowStart > request.params.challengeIssuedAt ||
         request.params.windowEndExclusive <= request.params.challengeIssuedAt ||
@@ -489,15 +490,15 @@ export const attachSliceWalletSignerFrame = ({
         accountNonce: request.params.userOperation.nonce,
         appOrigin: parentOrigin,
         challenge: request.params.challenge,
+        challengeExpiresAt: request.params.challengeExpiresAt,
         challengeIssuedAt: request.params.challengeIssuedAt,
         delegationId: request.params.delegationId,
-        expiresAt: request.params.expiresAt,
         proposalHash,
         session: stored.session,
-        spendWindowId: request.params.spendWindowId,
         userOperationHash,
         validUntil: request.params.validUntil,
         windowEndExclusive: request.params.windowEndExclusive,
+        windowId: request.params.windowId,
         windowStart: request.params.windowStart
       })
       const [proofSignature, signature] = await Promise.all([

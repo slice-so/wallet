@@ -213,14 +213,14 @@ export type SliceWalletFrameRequest =
       method: "signCoSignRequest"
       params: {
         challenge: Hex
+        challengeExpiresAt: number
         challengeIssuedAt: number
         delegationId: string
-        expiresAt: number
         session: SliceWalletFrameSessionKey
-        spendWindowId: string
         userOperation: SliceWalletUnsignedUserOperation
         validUntil: number
         windowEndExclusive: number
+        windowId: string
         windowStart: number
       }
       version: 1

@@ -135,11 +135,11 @@ describe("Slice checkout execution client", () => {
       if (url.endsWith("/challenge")) {
         return Response.json({
           challenge: `0x${"55".repeat(32)}`,
+          challengeExpiresAt: now + 120,
           challengeIssuedAt: now,
-          expiresAt: now + 120,
-          spendWindowId: "lifetime",
           validUntil: now + 120,
           windowEndExclusive: now + 86_400,
+          windowId: "lifetime",
           windowStart: now - 100
         })
       }
@@ -174,9 +174,13 @@ describe("Slice checkout execution client", () => {
     })
 
     const body = JSON.parse(bodies[0] ?? "") as {
+      challengeExpiresAt: number
       userOperation: { nonce: string }
+      windowId: string
     }
+    expect(body.challengeExpiresAt).toBe(now + 120)
     expect(body.userOperation.nonce).toBe("0x3")
+    expect(body.windowId).toBe("lifetime")
   })
 
   it("surfaces a non-final replacement so the caller can renew its proof", async () => {

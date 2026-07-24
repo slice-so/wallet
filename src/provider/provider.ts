@@ -1,4 +1,5 @@
 import { type Address, type Hex, isAddress, isHex, numberToHex } from "viem"
+import { getSliceWalletChainPolicy } from "../chains"
 import type {
   SliceWalletProvider,
   SliceWalletProviderEventMap,
@@ -101,6 +102,14 @@ const getConnectedAccount = async (
   const account = accounts[0]
   if (account === undefined) throw unauthorizedProviderRequest()
   return account
+}
+
+const hasGenericAuthorityDeployment = (chainId: number) => {
+  try {
+    return getSliceWalletChainPolicy(chainId).authorityAdmission.generic
+  } catch {
+    return false
+  }
 }
 
 const accountPermission = (origin: string) => ({
@@ -598,16 +607,20 @@ export const createSliceWalletProviderInternal = (
           {
             atomic: { status: "supported" },
             paymasterService: { supported: true },
-            slicePermissions: {
-              maximumCallsPerOperation: 1,
-              supportedTemplates: [
-                "native-transfer",
-                "erc20-transfer",
-                "erc20-approve",
-                "erc20-transfer-from"
-              ],
-              version: "1"
-            }
+            ...(hasGenericAuthorityDeployment(chainId)
+              ? {
+                  slicePermissions: {
+                    maximumCallsPerOperation: 1,
+                    supportedTemplates: [
+                      "native-transfer",
+                      "erc20-transfer",
+                      "erc20-approve",
+                      "erc20-transfer-from"
+                    ],
+                    version: "1"
+                  }
+                }
+              : {})
           }
         ])
       )

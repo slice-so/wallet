@@ -111,29 +111,29 @@ export const hashSliceWalletCoSignRequest = ({
   accountNonce,
   appOrigin,
   challenge,
+  challengeExpiresAt,
   challengeIssuedAt,
   delegationId,
-  expiresAt,
   proposalHash,
   session,
-  spendWindowId,
   userOperationHash,
   validUntil,
   windowEndExclusive,
+  windowId,
   windowStart
 }: {
   accountNonce: bigint
   appOrigin: string
   challenge: Hex
+  challengeExpiresAt: number
   challengeIssuedAt: number
   delegationId: string
-  expiresAt: number
   proposalHash: Hex
   session: SliceWalletFrameSession
-  spendWindowId: string
   userOperationHash: Hex
   validUntil: number
   windowEndExclusive: number
+  windowId: string
   windowStart: number
 }) =>
   keccak256(
@@ -151,7 +151,7 @@ export const hashSliceWalletCoSignRequest = ({
         { name: "challenge", type: "bytes32" },
         { name: "challengeIssuedAt", type: "uint48" },
         { name: "challengeExpiresAt", type: "uint48" },
-        { name: "spendWindowId", type: "string" },
+        { name: "windowId", type: "string" },
         { name: "windowStart", type: "uint48" },
         { name: "windowEndExclusive", type: "uint48" },
         { name: "validUntil", type: "uint48" },
@@ -169,8 +169,8 @@ export const hashSliceWalletCoSignRequest = ({
         proposalHash,
         challenge,
         challengeIssuedAt,
-        expiresAt,
-        spendWindowId,
+        challengeExpiresAt,
+        windowId,
         windowStart,
         windowEndExclusive,
         validUntil,

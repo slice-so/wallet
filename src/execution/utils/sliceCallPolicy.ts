@@ -468,7 +468,9 @@ export const getSliceCheckoutSpendIntentFromCalls = (
   for (const payment of paymentParams) {
     intent.payments.push({
       amount: payment.amount,
-      currency: payment.currency
+      currency: payment.currency,
+      recipient: payment.recipient,
+      slicerId: payment.slicerId
     })
     if (!isAddressEqual(payment.currency, zeroAddress)) {
       usedCurrencies.add(payment.currency.toLowerCase())

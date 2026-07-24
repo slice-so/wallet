@@ -1,4 +1,4 @@
-import type { Policy } from "@zerodev/permissions"
+import { type Policy, PolicyFlags } from "@zerodev/permissions"
 import {
   CallPolicyVersion,
   CallType,
@@ -566,6 +566,20 @@ export const toWalletPermissionPolicies = (
     )
   }
   return policies
+}
+
+export const getWalletPermissionInstallConfiguration = (
+  descriptor: WalletPolicyDescriptor
+) => {
+  const policies = toWalletPermissionPolicies(descriptor)
+  return {
+    permissionFlag: PolicyFlags.NOT_FOR_VALIDATE_SIG,
+    policies: policies.map((policy) => ({
+      configuration: policy.getPolicyData(),
+      identity: policy.getPolicyInfoInBytes(),
+      type: policy.policyParams.type
+    }))
+  }
 }
 
 const equalAddressRule = (offset: number, address: Address) => ({

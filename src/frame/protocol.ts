@@ -372,13 +372,13 @@ export const parseSliceWalletFrameRequest = (
   if (method === "signCoSignRequest") {
     assertKeys(params, [
       "challenge",
+      "challengeExpiresAt",
       "challengeIssuedAt",
       "delegationId",
-      "expiresAt",
       "session",
-      "spendWindowId",
       "validUntil",
       "windowEndExclusive",
+      "windowId",
       "windowStart",
       "userOperation"
     ])
@@ -387,17 +387,16 @@ export const parseSliceWalletFrameRequest = (
       method,
       params: {
         challenge: hexValue(params.challenge, "Co-sign challenge"),
+        challengeExpiresAt: integerValue(
+          params.challengeExpiresAt,
+          "Co-sign challenge expiration"
+        ),
         challengeIssuedAt: integerValue(
           params.challengeIssuedAt,
           "Co-sign challenge issuance"
         ),
         delegationId: stringValue(params.delegationId, "Delegation id"),
-        expiresAt: integerValue(params.expiresAt, "Co-sign expiration"),
         session: parseSessionKey(params.session),
-        spendWindowId: stringValue(
-          params.spendWindowId,
-          "Co-sign spend window id"
-        ),
         userOperation: parseSliceWalletUnsignedUserOperation(
           params.userOperation
         ),
@@ -406,6 +405,7 @@ export const parseSliceWalletFrameRequest = (
           params.windowEndExclusive,
           "Co-sign window end"
         ),
+        windowId: stringValue(params.windowId, "Co-sign spend window id"),
         windowStart: integerValue(params.windowStart, "Co-sign window start")
       },
       version: 1

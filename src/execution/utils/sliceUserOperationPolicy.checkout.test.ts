@@ -71,7 +71,14 @@ describe("getSliceUserOperationCheckoutSpendIntent", () => {
         allowanceAssertions: [{ amount: 20n, currency: token }],
         approvals: [{ amount: 20n, currency: token }],
         nativeValue: 11n,
-        payments: [{ amount: 5n, currency: token }],
+        payments: [
+          {
+            amount: 5n,
+            currency: token,
+            recipient: zeroAddress,
+            slicerId: 9n
+          }
+        ],
         purchases: [
           {
             buyer,

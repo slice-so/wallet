@@ -14,16 +14,81 @@ type AdmissionEvidence = {
   }
 }
 
+type ProductsModuleAdmissionEvidence = AdmissionContractEvidence & {
+  deployedImplementationAddress: string | null
+  proxyAddress: string
+  upgradeTransactionHash: string | null
+  verifiedAtBlock: number | null
+}
+
+type CoreAdmissionEvidence = {
+  linkedLibraries: {
+    productManagementLib: AdmissionContractEvidence
+    productPaymentLib: AdmissionContractEvidence
+  }
+  productsModule: ProductsModuleAdmissionEvidence
+}
+
+const baseWalletContractNames = [
+  "callPolicy",
+  "ecdsaSigner",
+  "entryPoint",
+  "kernelFactory",
+  "kernelImplementation",
+  "kernelMetaFactory",
+  "p256Verifier",
+  "soladyP256Verifier",
+  "sudoPolicy",
+  "timelockPolicy",
+  "webAuthnRootValidator",
+  "webAuthnSigner",
+  "weightedEcdsaSigner",
+  "weightedP256Signer"
+] as const
+
+const hasExactRuntime = (contract: AdmissionContractEvidence | undefined) =>
+  contract !== undefined &&
+  contract.deployedRuntimeCodeHash !== null &&
+  contract.deployedRuntimeCodeHash === contract.expectedRuntimeCodeHash
+
 export const hasCompleteSliceWalletAdmissionEvidence = (
   deployment: AdmissionEvidence
 ) =>
   deployment.status === "admitted" &&
-  Object.values(deployment.contracts).every(
-    (contract) =>
-      contract.deployedRuntimeCodeHash !== null &&
-      contract.deployedRuntimeCodeHash === contract.expectedRuntimeCodeHash
+  baseWalletContractNames.every((name) =>
+    hasExactRuntime(deployment.contracts[name])
   ) &&
   deployment.verification.factoryStakerApproved &&
   deployment.verification.p256CanaryPassed &&
   deployment.verification.userOperationCanary !== null &&
   deployment.verification.verifiedAtBlock !== null
+
+export const hasVerifiedGenericAuthorityDeployment = (
+  deployment: AdmissionEvidence
+) =>
+  hasCompleteSliceWalletAdmissionEvidence(deployment) &&
+  hasExactRuntime(deployment.contracts.singleCallPolicy)
+
+export const hasVerifiedProductsModuleDeployment = (
+  deployment: CoreAdmissionEvidence | undefined
+) =>
+  deployment !== undefined &&
+  deployment.productsModule.proxyAddress.length > 0 &&
+  deployment.productsModule.deployedImplementationAddress !== null &&
+  deployment.productsModule.upgradeTransactionHash !== null &&
+  deployment.productsModule.verifiedAtBlock !== null &&
+  hasExactRuntime(deployment.productsModule) &&
+  hasExactRuntime(deployment.linkedLibraries.productManagementLib) &&
+  hasExactRuntime(deployment.linkedLibraries.productPaymentLib)
+
+export const hasVerifiedCheckoutAuthorityDeployment = ({
+  core,
+  wallet
+}: {
+  core: CoreAdmissionEvidence | undefined
+  wallet: AdmissionEvidence
+}) =>
+  hasCompleteSliceWalletAdmissionEvidence(wallet) &&
+  hasExactRuntime(wallet.contracts.weightedP256SignerV2) &&
+  hasExactRuntime(wallet.contracts.erc20AllowanceGuard) &&
+  hasVerifiedProductsModuleDeployment(core)

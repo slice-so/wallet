@@ -12,11 +12,11 @@ import type {
 
 export type SliceWalletCheckoutCoSignChallenge = {
   challenge: Hex
+  challengeExpiresAt: number
   challengeIssuedAt: number
-  expiresAt: number
-  spendWindowId: string
   validUntil: number
   windowEndExclusive: number
+  windowId: string
   windowStart: number
 }
 
@@ -31,14 +31,14 @@ export type SliceWalletCheckoutCoSignResult = {
 export type SliceWalletCheckoutCoSignerClient = {
   coSign: (input: {
     challenge: Hex
+    challengeExpiresAt: number
     challengeIssuedAt: number
     delegationId: string
-    expiresAt: number
     proofSignature: Hex
-    spendWindowId: string
     userOperation: SliceWalletUnsignedUserOperation
     validUntil: number
     windowEndExclusive: number
+    windowId: string
     windowStart: number
   }) => Promise<SliceWalletCheckoutCoSignResult>
   createChallenge: (

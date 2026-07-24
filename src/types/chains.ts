@@ -13,12 +13,18 @@ export type SliceWalletContractDeployments = {
   readonly entryPoint: SliceWalletContractDeployment & {
     readonly version: "0.7"
   }
+  readonly erc20AllowanceGuard: SliceWalletContractDeployment & {
+    readonly version: "1"
+  }
   readonly kernelFactory: SliceWalletContractDeployment
   readonly kernelImplementation: SliceWalletContractDeployment & {
     readonly version: "0.3.3"
   }
   readonly kernelMetaFactory: SliceWalletContractDeployment
   readonly p256Verifier: SliceWalletContractDeployment
+  readonly singleCallPolicy: SliceWalletContractDeployment & {
+    readonly version: "1"
+  }
   readonly soladyP256Verifier: SliceWalletContractDeployment
   readonly sudoPolicy: SliceWalletContractDeployment
   readonly timelockPolicy: SliceWalletContractDeployment
@@ -26,6 +32,25 @@ export type SliceWalletContractDeployments = {
   readonly webAuthnSigner: SliceWalletContractDeployment
   readonly weightedEcdsaSigner: SliceWalletContractDeployment
   readonly weightedP256Signer: SliceWalletContractDeployment
+  readonly weightedP256SignerV2: SliceWalletContractDeployment & {
+    readonly version: "2"
+  }
+}
+
+export type SliceWalletProductsModuleDeployment = {
+  readonly deployedImplementationAddress: Address | null
+  readonly deployedRuntimeCodeHash: Hex | null
+  readonly expectedRuntimeCodeHash: Hex
+  readonly proxyAddress: Address
+  readonly upgradeTransactionHash: Hex | null
+  readonly verifiedAtBlock: number | null
+}
+
+export type SliceWalletAuthorityKind = "checkout" | "generic"
+
+export type SliceWalletCoreLinkedLibraryDeployments = {
+  readonly productManagementLib: SliceWalletContractDeployment
+  readonly productPaymentLib: SliceWalletContractDeployment
 }
 
 export type SliceWalletExecutionSafetyEnvelope = {
@@ -53,7 +78,15 @@ export type SliceWalletFundingPolicy = {
 
 export type SliceWalletChainManifest = {
   readonly admitted: boolean
+  readonly authorityAdmission: {
+    readonly checkout: boolean
+    readonly generic: boolean
+  }
   readonly chain: Chain
+  readonly commerce: {
+    readonly linkedLibraries: SliceWalletCoreLinkedLibraryDeployments | null
+    readonly productsModule: SliceWalletProductsModuleDeployment | null
+  }
   readonly contracts: SliceWalletContractDeployments
   readonly defaultTransports: {
     readonly bundlerUrl: string

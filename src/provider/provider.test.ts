@@ -336,7 +336,7 @@ describe("Slice Wallet provider dispatch", () => {
     )
   })
 
-  test("discovers EIP-5792 and namespaced Slice permission capabilities", async () => {
+  test("keeps EIP-5792 available while unverified permission deployments stay hidden", async () => {
     const { provider } = createProvider()
 
     expect(
@@ -347,17 +347,7 @@ describe("Slice Wallet provider dispatch", () => {
     ).toEqual({
       [numberToHex(base.id)]: {
         atomic: { status: "supported" },
-        paymasterService: { supported: true },
-        slicePermissions: {
-          maximumCallsPerOperation: 1,
-          supportedTemplates: [
-            "native-transfer",
-            "erc20-transfer",
-            "erc20-approve",
-            "erc20-transfer-from"
-          ],
-          version: "1"
-        }
+        paymasterService: { supported: true }
       }
     })
     expect(

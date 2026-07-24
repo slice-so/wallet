@@ -10,6 +10,7 @@ export {
 } from "./accountPrediction"
 export * from "./calls"
 export {
+  assertSliceWalletAuthorityDeployment,
   getSliceWalletChainManifest,
   getSliceWalletChainPolicy,
   sliceWalletSupportedChainIds

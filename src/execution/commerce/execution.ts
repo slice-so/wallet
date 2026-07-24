@@ -53,11 +53,11 @@ const isBytes32 = (value: string): value is Hex =>
 
 type CoSignChallengeWire = {
   challenge: string
+  challengeExpiresAt: number
   challengeIssuedAt: number
-  expiresAt: number
-  spendWindowId: string
   validUntil: number
   windowEndExclusive: number
+  windowId: string
   windowStart: number
 }
 
@@ -65,18 +65,18 @@ const parseChallenge = (body: CoSignChallengeWire) => {
   const now = Math.floor(Date.now() / 1000)
   if (
     !isBytes32(body.challenge) ||
+    !Number.isSafeInteger(body.challengeExpiresAt) ||
     !Number.isSafeInteger(body.challengeIssuedAt) ||
-    !Number.isSafeInteger(body.expiresAt) ||
     !Number.isSafeInteger(body.validUntil) ||
     !Number.isSafeInteger(body.windowEndExclusive) ||
     !Number.isSafeInteger(body.windowStart) ||
-    typeof body.spendWindowId !== "string" ||
-    body.spendWindowId.length === 0 ||
+    typeof body.windowId !== "string" ||
+    body.windowId.length === 0 ||
     body.challengeIssuedAt > now ||
-    body.expiresAt <= now ||
-    body.expiresAt > body.challengeIssuedAt + 120 ||
+    body.challengeExpiresAt <= now ||
+    body.challengeExpiresAt > body.challengeIssuedAt + 120 ||
     body.validUntil <= now ||
-    body.validUntil > body.expiresAt ||
+    body.validUntil > body.challengeExpiresAt ||
     body.windowStart > body.challengeIssuedAt ||
     body.windowEndExclusive <= body.challengeIssuedAt
   ) {
@@ -84,11 +84,11 @@ const parseChallenge = (body: CoSignChallengeWire) => {
   }
   return {
     challenge: body.challenge,
+    challengeExpiresAt: body.challengeExpiresAt,
     challengeIssuedAt: body.challengeIssuedAt,
-    expiresAt: body.expiresAt,
-    spendWindowId: body.spendWindowId,
     validUntil: body.validUntil,
     windowEndExclusive: body.windowEndExclusive,
+    windowId: body.windowId,
     windowStart: body.windowStart
   }
 }
@@ -291,12 +291,12 @@ export const createSliceWalletCheckoutExecutionClient = ({
         {
           body: stringifyUserOperation({
             challenge: input.challenge,
+            challengeExpiresAt: input.challengeExpiresAt,
             challengeIssuedAt: input.challengeIssuedAt,
-            expiresAt: input.expiresAt,
             proofSignature: input.proofSignature,
-            spendWindowId: input.spendWindowId,
             validUntil: input.validUntil,
             windowEndExclusive: input.windowEndExclusive,
+            windowId: input.windowId,
             windowStart: input.windowStart,
             userOperation: input.userOperation
           }),
