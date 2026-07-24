@@ -5,7 +5,8 @@ import {
   custom,
   type Hex,
   keccak256,
-  numberToHex
+  numberToHex,
+  RpcRequestError
 } from "viem"
 import {
   entryPoint07Address,
@@ -26,6 +27,7 @@ import type {
 import type {
   SliceWalletProviderConfig,
   StoredGenericGrant,
+  StoredGenericGrantInstallation,
   StoredGenericGrantInstallationUserOperation,
   StoredGenericGrantRotation
 } from "../types/providerInternal"
@@ -37,6 +39,7 @@ import {
   deriveSliceWalletRegistryAccountAddress,
   executeSliceWalletGenericGrantReplacement,
   getSliceWalletGenericGrantInstallationAction,
+  isSliceWalletDefiniteBundlerRejection,
   resumeSliceWalletGenericGrantReplacement,
   submitSliceWalletGenericGrantInstallation
 } from "./runtime"
@@ -194,14 +197,24 @@ const createRotation = (
   version: 3
 })
 
-const installation = {
-  callDataHash: keccak256(installationUserOperation.callData),
+const createInstallation = (
+  userOperation: StoredGenericGrantInstallationUserOperation
+): StoredGenericGrantInstallation => ({
+  callDataHash: keccak256(userOperation.callData),
   entryPoint: installationEntryPoint,
-  nonce: "0x1" as Hex,
+  nonce: userOperation.nonce,
   sender: account,
-  userOperation: installationUserOperation,
-  userOperationHash
-}
+  userOperation,
+  userOperationHash: getUserOperationHash({
+    chainId: base.id,
+    entryPointAddress: installationEntryPoint,
+    entryPointVersion: "0.7",
+    userOperation:
+      deserializeStoredGenericGrantInstallationUserOperation(userOperation)
+  })
+})
+
+const installation = createInstallation(installationUserOperation)
 
 type SubmittedRotation = Extract<
   StoredGenericGrantRotation,
@@ -243,6 +256,104 @@ const updateRotationPhase = (
       ? {}
       : { installation: nextInstallation }),
     phase
+  }
+}
+
+const persistRotation = (rotation: StoredGenericGrantRotation) => {
+  if (!writeStoredSliceWalletGrantRotation(storage, rotation)) {
+    throw new Error("Test rotation journal could not be persisted.")
+  }
+  const persisted = readStoredSliceWalletGrantRotation(
+    storage,
+    base.id,
+    account,
+    1_800_000_001
+  )
+  if (persisted === null) {
+    throw new Error("Test rotation journal could not be read back.")
+  }
+  return persisted
+}
+
+const createTerminalBundlerRejection = (message: string) =>
+  new RpcRequestError({
+    body: {
+      id: 1,
+      jsonrpc: "2.0",
+      method: "eth_sendUserOperation",
+      params: []
+    },
+    error: { code: -32500, message },
+    url: "https://bundler.example/base"
+  })
+
+const recoverFromDefiniteReplayRejection = async (
+  freshInstallation: StoredGenericGrantInstallation
+) => {
+  let journal = persistRotation(createSubmittedRotation())
+  if (journal.installation === undefined) {
+    throw new Error("Missing persisted replay fixture.")
+  }
+  const originalInstallation = journal.installation
+  const rejection = createTerminalBundlerRejection(
+    "persisted operation is no longer valid"
+  )
+  await expect(
+    broadcastSliceWalletGenericGrantInstallation({
+      installation: originalInstallation,
+      isDefiniteTransportRejection: isSliceWalletDefiniteBundlerRejection,
+      resetRejected: () => {
+        journal = persistRotation(
+          updateRotationPhase(journal, "prepared", null)
+        )
+        return journal
+      },
+      transport: async () => {
+        throw rejection
+      }
+    })
+  ).rejects.toBe(rejection)
+  const resetJournal = readStoredSliceWalletGrantRotation(
+    storage,
+    base.id,
+    account,
+    1_800_000_001
+  )
+  if (resetJournal === null) {
+    throw new Error("Rejected replay reset was not persisted.")
+  }
+  journal = resetJournal
+  expect(resetJournal.phase).toBe("prepared")
+  expect(resetJournal.installation).toBeUndefined()
+
+  let prepareCount = 0
+  let transportCount = 0
+  const submitted = await submitSliceWalletGenericGrantInstallation({
+    initialRotation: journal,
+    isDefiniteTransportRejection: isSliceWalletDefiniteBundlerRejection,
+    prepare: async () => {
+      prepareCount += 1
+      return "prepared"
+    },
+    setPhase: async (rotation, phase, nextInstallation) => {
+      journal = persistRotation(
+        updateRotationPhase(rotation, phase, nextInstallation)
+      )
+      return journal
+    },
+    sign: async () => freshInstallation,
+    transport: async (candidate) => {
+      transportCount += 1
+      expect(candidate).toEqual(freshInstallation)
+      return candidate.userOperationHash
+    }
+  })
+  return {
+    journal,
+    originalInstallation,
+    prepareCount,
+    submitted: submitted.rotation,
+    transportCount
   }
 }
 
@@ -648,6 +759,8 @@ describe("generic grant replacement ordering", () => {
     let transported: StoredGenericGrantRotation["installation"] | undefined
     await broadcastSliceWalletGenericGrantInstallation({
       installation: reloaded.installation,
+      isDefiniteTransportRejection: () => false,
+      resetRejected: () => reloaded,
       transport: async (candidate) => {
         transported = candidate
         return candidate.userOperationHash
@@ -715,6 +828,8 @@ describe("generic grant replacement ordering", () => {
     }
     await broadcastSliceWalletGenericGrantInstallation({
       installation: dropped.installation,
+      isDefiniteTransportRejection: () => false,
+      resetRejected: () => dropped,
       transport: async (candidate) => {
         transportedOperations.push(JSON.stringify(candidate.userOperation))
         return candidate.userOperationHash
@@ -725,6 +840,136 @@ describe("generic grant replacement ordering", () => {
     expect(transportedOperations).toHaveLength(2)
     expect(new Set(transportedOperations).size).toBe(1)
     expect(dropped.installation.userOperationHash).toBe(userOperationHash)
+  })
+
+  test("replaces a terminally rejected persisted paymaster envelope", async () => {
+    const freshInstallation = createInstallation({
+      ...installationUserOperation,
+      paymasterData: "0xdcba"
+    })
+    const result = await recoverFromDefiniteReplayRejection(freshInstallation)
+
+    expect(result.originalInstallation.userOperation.paymasterData).toBe(
+      "0xabcd"
+    )
+    expect(result.journal).toMatchObject({
+      installation: {
+        userOperation: { paymasterData: "0xdcba" },
+        userOperationHash: freshInstallation.userOperationHash
+      },
+      phase: "submitted"
+    })
+    expect(result.submitted).toEqual(result.journal)
+    expect(result.prepareCount).toBe(1)
+    expect(result.transportCount).toBe(1)
+  })
+
+  test("replaces a terminally rejected stale gas envelope", async () => {
+    const freshInstallation = createInstallation({
+      ...installationUserOperation,
+      callGasLimit: "0x2",
+      maxFeePerGas: "0x3"
+    })
+    const result = await recoverFromDefiniteReplayRejection(freshInstallation)
+
+    expect(result.originalInstallation.userOperation).toMatchObject({
+      callGasLimit: "0x1",
+      maxFeePerGas: "0x2"
+    })
+    expect(result.journal).toMatchObject({
+      installation: {
+        userOperation: {
+          callGasLimit: "0x2",
+          maxFeePerGas: "0x3"
+        },
+        userOperationHash: freshInstallation.userOperationHash
+      },
+      phase: "submitted"
+    })
+    expect(result.prepareCount).toBe(1)
+    expect(result.transportCount).toBe(1)
+  })
+
+  test("retains and replays the exact envelope after an ambiguous transport failure", async () => {
+    const ambiguousFailure = new Error("response timed out")
+    const journal = persistRotation(createSubmittedRotation())
+    if (journal.installation === undefined) {
+      throw new Error("Missing ambiguous replay fixture.")
+    }
+    let resetCount = 0
+    await expect(
+      broadcastSliceWalletGenericGrantInstallation({
+        installation: journal.installation,
+        isDefiniteTransportRejection: isSliceWalletDefiniteBundlerRejection,
+        resetRejected: () => {
+          resetCount += 1
+          return updateRotationPhase(journal, "prepared", null)
+        },
+        transport: async () => {
+          throw ambiguousFailure
+        }
+      })
+    ).rejects.toBe(ambiguousFailure)
+
+    const retained = readStoredSliceWalletGrantRotation(
+      storage,
+      base.id,
+      account,
+      1_800_000_001
+    )
+    expect(resetCount).toBe(0)
+    expect(retained).toEqual(journal)
+    if (retained?.installation === undefined) {
+      throw new Error("Ambiguous replay envelope was not retained.")
+    }
+    let replayedHash: Hex | undefined
+    await broadcastSliceWalletGenericGrantInstallation({
+      installation: retained.installation,
+      isDefiniteTransportRejection: isSliceWalletDefiniteBundlerRejection,
+      resetRejected: () => updateRotationPhase(retained, "prepared", null),
+      transport: async (candidate) => {
+        replayedHash = candidate.userOperationHash
+        return candidate.userOperationHash
+      }
+    })
+    expect(replayedHash).toBe(journal.installation.userOperationHash)
+  })
+
+  test("preserves the replay envelope when a definite-rejection reset cannot persist", async () => {
+    const rejection = createTerminalBundlerRejection("paymaster expired")
+    const persistenceFailure = new Error("journal storage unavailable")
+    const journal = persistRotation(createSubmittedRotation())
+    if (journal.installation === undefined) {
+      throw new Error("Missing reset-failure replay fixture.")
+    }
+
+    try {
+      await broadcastSliceWalletGenericGrantInstallation({
+        installation: journal.installation,
+        isDefiniteTransportRejection: isSliceWalletDefiniteBundlerRejection,
+        resetRejected: () => {
+          throw persistenceFailure
+        },
+        transport: async () => {
+          throw rejection
+        }
+      })
+      throw new Error("Expected replay reset to fail.")
+    } catch (error) {
+      expect(error).toBeInstanceOf(AggregateError)
+      expect((error as AggregateError).errors).toEqual([
+        rejection,
+        persistenceFailure
+      ])
+    }
+    expect(
+      readStoredSliceWalletGrantRotation(
+        storage,
+        base.id,
+        account,
+        1_800_000_001
+      )
+    ).toEqual(journal)
   })
 
   test("resets to prepared only after the recorded full nonce advances", () => {

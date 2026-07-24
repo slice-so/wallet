@@ -208,7 +208,7 @@ const genericGrantRotationPhaseOrder: Record<
   "active-grant-committed": 6
 }
 
-const isExplicitBundlerRpcRejection = (error: Error) =>
+export const isSliceWalletDefiniteBundlerRejection = (error: Error) =>
   error instanceof BaseError &&
   error.walk((cause) => cause instanceof RpcRequestError) !== null
 
@@ -244,21 +244,42 @@ export const getSliceWalletGenericGrantInstallationAction = ({
 
 export const broadcastSliceWalletGenericGrantInstallation = async ({
   installation,
+  isDefiniteTransportRejection,
+  resetRejected,
   transport
 }: {
   installation: StoredGenericGrantInstallation
+  isDefiniteTransportRejection: (error: Error) => boolean
+  resetRejected: () =>
+    | Promise<StoredGenericGrantRotation>
+    | StoredGenericGrantRotation
   transport: (installation: StoredGenericGrantInstallation) => Promise<Hex>
 }) => {
-  const transportedHash = await transport(installation)
-  if (
-    transportedHash.toLowerCase() !==
-    installation.userOperationHash.toLowerCase()
-  ) {
-    throw new Error(
-      "Bundler returned a mismatched wallet permission installation hash."
-    )
+  try {
+    const transportedHash = await transport(installation)
+    if (
+      transportedHash.toLowerCase() !==
+      installation.userOperationHash.toLowerCase()
+    ) {
+      throw new Error(
+        "Bundler returned a mismatched wallet permission installation hash."
+      )
+    }
+    return transportedHash
+  } catch (error) {
+    if (!(error instanceof Error) || !isDefiniteTransportRejection(error)) {
+      throw error
+    }
+    try {
+      await resetRejected()
+    } catch (persistenceError) {
+      throw new AggregateError(
+        [error, persistenceError],
+        "Rejected wallet permission submission could not be reset."
+      )
+    }
+    throw error
   }
-  return transportedHash
 }
 
 export const submitSliceWalletGenericGrantInstallation = async <Prepared>({
@@ -299,24 +320,12 @@ export const submitSliceWalletGenericGrantInstallation = async <Prepared>({
     }
     throw error
   }
-  try {
-    await broadcastSliceWalletGenericGrantInstallation({
-      installation,
-      transport
-    })
-  } catch (error) {
-    if (error instanceof Error && isDefiniteTransportRejection(error)) {
-      try {
-        await setPhase(transportPending, "prepared", null)
-      } catch (persistenceError) {
-        throw new AggregateError(
-          [error, persistenceError],
-          "Rejected wallet permission submission could not be reset."
-        )
-      }
-    }
-    throw error
-  }
+  await broadcastSliceWalletGenericGrantInstallation({
+    installation,
+    isDefiniteTransportRejection,
+    resetRejected: () => setPhase(transportPending, "prepared", null),
+    transport
+  })
   return {
     rotation: await setPhase(transportPending, "submitted", installation)
   }
@@ -1152,7 +1161,7 @@ const createSliceWalletChainRuntime = (
     const bundler = createAccountBundler(wallet.rootAccount)
     const submitted = await submitSliceWalletGenericGrantInstallation({
       initialRotation: rotation,
-      isDefiniteTransportRejection: isExplicitBundlerRpcRejection,
+      isDefiniteTransportRejection: isSliceWalletDefiniteBundlerRejection,
       prepare: () =>
         bundler.prepareUserOperation({
           calls: installation.calls
@@ -1448,6 +1457,8 @@ const createSliceWalletChainRuntime = (
       const bundler = createAccountBundler(wallet.rootAccount)
       await broadcastSliceWalletGenericGrantInstallation({
         installation: storedInstallation,
+        isDefiniteTransportRejection: isSliceWalletDefiniteBundlerRejection,
+        resetRejected: () => setRotationPhase(rotation, "prepared", null),
         transport: (candidate) =>
           transportGenericGrantInstallation(bundler, candidate)
       })
