@@ -24,6 +24,8 @@ import type {
 } from "../types"
 import type {
   StoredGenericGrant,
+  StoredGenericGrantRotation,
+  StoredGenericGrantRotationPhase,
   StoredWalletCall
 } from "../types/providerInternal"
 import { parseSliceWalletGrantPermissions } from "./protocol"
@@ -31,6 +33,8 @@ import { parseSliceWalletGrantPermissions } from "./protocol"
 const accountStorageKey = "slice.wallet.provider.account"
 const grantStorageKey = (chainId: number, account: Address) =>
   `slice.wallet.provider.generic-grant:${chainId}:${account.toLowerCase()}`
+const grantRotationStorageKey = (chainId: number, account: Address) =>
+  `slice.wallet.provider.generic-rotation:${chainId}:${account.toLowerCase()}`
 const callStoragePrefix = "slice.wallet.provider.call:"
 const callRetentionMs = 24 * 60 * 60 * 1000
 
@@ -75,20 +79,23 @@ const read = (storage: Storage | null, key: string) => {
 }
 
 const write = (storage: Storage | null, key: string, value: object) => {
-  if (storage === null) return
+  if (storage === null) return false
   try {
-    storage.setItem(key, JSON.stringify(value))
+    const serialized = JSON.stringify(value)
+    storage.setItem(key, serialized)
+    return storage.getItem(key) === serialized
   } catch {
-    // Browser persistence is a capability, not a source of authority.
+    return false
   }
 }
 
 const remove = (storage: Storage | null, key: string) => {
-  if (storage === null) return
+  if (storage === null) return false
   try {
     storage.removeItem(key)
+    return storage.getItem(key) === null
   } catch {
-    // The in-memory provider still disconnects even if storage is unavailable.
+    return false
   }
 }
 
@@ -162,14 +169,11 @@ export const writeStoredSliceWalletAccount = (
 export const clearStoredSliceWalletAccount = (storage: Storage | null) =>
   remove(storage, accountStorageKey)
 
-export const readStoredSliceWalletGrant = (
-  storage: Storage | null,
-  chainId: number,
-  account: Address,
-  now = Math.floor(Date.now() / 1000)
+const parseStoredSliceWalletGrant = (
+  input: SliceWalletProviderValue,
+  now: number
 ): StoredGenericGrant | null => {
-  const input = read(storage, grantStorageKey(chainId, account))
-  const value = input === null ? null : record(input)
+  const value = record(input)
   if (
     value === null ||
     !hasOnlyKeys(value, [
@@ -209,10 +213,8 @@ export const readStoredSliceWalletGrant = (
     typeof value.policy !== "object" ||
     value.policy === null ||
     Array.isArray(value.policy)
-  ) {
-    clearStoredSliceWalletGrant(storage, chainId, account)
+  )
     return null
-  }
   try {
     const policy = parseSerializedWalletPolicyDescriptor(
       value.policy as WalletPolicyJsonValue
@@ -261,9 +263,28 @@ export const readStoredSliceWalletGrant = (
       signerId: value.signerId
     }
   } catch {
+    return null
+  }
+}
+
+export const readStoredSliceWalletGrant = (
+  storage: Storage | null,
+  chainId: number,
+  account: Address,
+  now = Math.floor(Date.now() / 1000)
+): StoredGenericGrant | null => {
+  const input = read(storage, grantStorageKey(chainId, account))
+  if (input === null) return null
+  const grant = parseStoredSliceWalletGrant(input, now)
+  if (
+    grant === null ||
+    grant.chainId !== chainId ||
+    grant.account.toLowerCase() !== account.toLowerCase()
+  ) {
     clearStoredSliceWalletGrant(storage, chainId, account)
     return null
   }
+  return grant
 }
 
 export const writeStoredSliceWalletGrant = (
@@ -276,6 +297,123 @@ export const clearStoredSliceWalletGrant = (
   chainId: number,
   account: Address
 ) => remove(storage, grantStorageKey(chainId, account))
+
+const grantRotationPhases = new Set<StoredGenericGrantRotationPhase>([
+  "prepared",
+  "submitting",
+  "submitted",
+  "installed",
+  "predecessor-disabled",
+  "frame-committed",
+  "active-grant-committed"
+])
+
+const grantsMatch = (left: StoredGenericGrant, right: StoredGenericGrant) =>
+  left.account.toLowerCase() === right.account.toLowerCase() &&
+  left.chainId === right.chainId &&
+  left.createdAt === right.createdAt &&
+  left.enableSignature.toLowerCase() === right.enableSignature.toLowerCase() &&
+  left.expiresAt === right.expiresAt &&
+  left.permissionId.toLowerCase() === right.permissionId.toLowerCase() &&
+  JSON.stringify(left.permissions) === JSON.stringify(right.permissions) &&
+  JSON.stringify(left.policy) === JSON.stringify(right.policy) &&
+  left.publicKey.toLowerCase() === right.publicKey.toLowerCase() &&
+  left.signerId.toLowerCase() === right.signerId.toLowerCase()
+
+export const readStoredSliceWalletGrantRotation = (
+  storage: Storage | null,
+  chainId: number,
+  account: Address,
+  now = Math.floor(Date.now() / 1000)
+): StoredGenericGrantRotation | null => {
+  const key = grantRotationStorageKey(chainId, account)
+  const input = read(storage, key)
+  if (input === null) return null
+  const value = record(input)
+  const invalid = () => {
+    remove(storage, key)
+    return null
+  }
+  if (
+    value === null ||
+    !hasOnlyKeys(value, [
+      "installationUserOperationHash",
+      "phase",
+      "predecessor",
+      "replacement",
+      "version"
+    ]) ||
+    value.version !== 1 ||
+    typeof value.phase !== "string" ||
+    !grantRotationPhases.has(value.phase as StoredGenericGrantRotationPhase) ||
+    typeof value.predecessor !== "object" ||
+    value.predecessor === null ||
+    Array.isArray(value.predecessor) ||
+    typeof value.replacement !== "object" ||
+    value.replacement === null ||
+    Array.isArray(value.replacement) ||
+    (value.installationUserOperationHash !== undefined &&
+      (typeof value.installationUserOperationHash !== "string" ||
+        !isHex(value.installationUserOperationHash, { strict: true }) ||
+        hexToBytes(value.installationUserOperationHash).length !== 32))
+  ) {
+    return invalid()
+  }
+  const predecessor = parseStoredSliceWalletGrant(value.predecessor, now)
+  const replacement = parseStoredSliceWalletGrant(value.replacement, now)
+  if (
+    predecessor === null ||
+    replacement === null ||
+    predecessor.account.toLowerCase() !== account.toLowerCase() ||
+    replacement.account.toLowerCase() !== account.toLowerCase() ||
+    predecessor.chainId !== chainId ||
+    replacement.chainId !== chainId ||
+    predecessor.permissionId.toLowerCase() ===
+      replacement.permissionId.toLowerCase() ||
+    JSON.stringify(predecessor.policy) !== JSON.stringify(replacement.policy) ||
+    JSON.stringify(predecessor.permissions) !==
+      JSON.stringify(replacement.permissions) ||
+    (value.phase === "submitted" &&
+      value.installationUserOperationHash === undefined) ||
+    ((value.phase === "prepared" || value.phase === "submitting") &&
+      value.installationUserOperationHash !== undefined)
+  ) {
+    return invalid()
+  }
+  return {
+    ...(value.installationUserOperationHash === undefined
+      ? {}
+      : {
+          installationUserOperationHash:
+            value.installationUserOperationHash as Hex
+        }),
+    phase: value.phase as StoredGenericGrantRotationPhase,
+    predecessor,
+    replacement,
+    version: 1
+  }
+}
+
+export const writeStoredSliceWalletGrantRotation = (
+  storage: Storage | null,
+  rotation: StoredGenericGrantRotation
+) =>
+  write(
+    storage,
+    grantRotationStorageKey(
+      rotation.replacement.chainId,
+      rotation.replacement.account
+    ),
+    rotation
+  )
+
+export const clearStoredSliceWalletGrantRotation = (
+  storage: Storage | null,
+  chainId: number,
+  account: Address
+) => remove(storage, grantRotationStorageKey(chainId, account))
+
+export const storedSliceWalletGrantsMatch = grantsMatch
 
 const callStorageKey = (id: string) =>
   `${callStoragePrefix}${keccak256(stringToHex(id))}`

@@ -47,6 +47,23 @@ export type StoredGenericGrant = Omit<SliceWalletPermissionGrant, "version"> & {
   signerId: Address
 }
 
+export type StoredGenericGrantRotationPhase =
+  | "prepared"
+  | "submitting"
+  | "submitted"
+  | "installed"
+  | "predecessor-disabled"
+  | "frame-committed"
+  | "active-grant-committed"
+
+export type StoredGenericGrantRotation = {
+  installationUserOperationHash?: Hex
+  phase: StoredGenericGrantRotationPhase
+  predecessor: StoredGenericGrant
+  replacement: StoredGenericGrant
+  version: 1
+}
+
 export type StoredWalletCall = {
   chainId: number
   createdAt: number

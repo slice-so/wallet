@@ -9,9 +9,11 @@ import {
   readStoredSliceWalletAccount,
   readStoredSliceWalletCall,
   readStoredSliceWalletGrant,
+  readStoredSliceWalletGrantRotation,
   writeStoredSliceWalletAccount,
   writeStoredSliceWalletCall,
-  writeStoredSliceWalletGrant
+  writeStoredSliceWalletGrant,
+  writeStoredSliceWalletGrantRotation
 } from "./storage"
 
 class MemoryStorage implements Storage {
@@ -45,8 +47,9 @@ class MemoryStorage implements Storage {
 const account = "0x0000000000000000000000000000000000000001" as Address
 const target = "0x0000000000000000000000000000000000000002" as Address
 const publicKey = `0x04${"11".repeat(64)}` as Hex
+const replacementPublicKey = `0x04${"22".repeat(64)}` as Hex
 
-const createGrant = () => {
+const createGrant = (sessionPublicKey = publicKey) => {
   const policy = {
     account,
     calls: [
@@ -64,7 +67,7 @@ const createGrant = () => {
     validUntil: 1_800_003_600,
     version: 1
   } as const
-  const signerId = getSliceWalletP256SignerId(publicKey)
+  const signerId = getSliceWalletP256SignerId(sessionPublicKey)
   return {
     account,
     chainId: 8453,
@@ -89,7 +92,7 @@ const createGrant = () => {
       }
     ],
     policy: serializeWalletPolicyDescriptor(policy),
-    publicKey,
+    publicKey: sessionPublicKey,
     signerId
   }
 }
@@ -116,7 +119,7 @@ describe("portable wallet provider storage", () => {
 
   test("persists public grant metadata without private key material", () => {
     const storage = new MemoryStorage()
-    writeStoredSliceWalletGrant(storage, createGrant())
+    expect(writeStoredSliceWalletGrant(storage, createGrant())).toBe(true)
     expect([...storage.values.values()][0]).not.toContain("privateKey")
     expect(
       readStoredSliceWalletGrant(storage, 8453, account, 1_800_000_001)
@@ -151,6 +154,64 @@ describe("portable wallet provider storage", () => {
     expect(
       readStoredSliceWalletGrant(storage, 8453, target, 1_800_000_001)
     ).toBeNull()
+  })
+
+  test("strictly persists and parses a recoverable rotation journal", () => {
+    const storage = new MemoryStorage()
+    const rotation = {
+      installationUserOperationHash: `0x${"33".repeat(32)}` as Hex,
+      phase: "submitted" as const,
+      predecessor: createGrant(),
+      replacement: createGrant(replacementPublicKey),
+      version: 1 as const
+    }
+
+    expect(writeStoredSliceWalletGrantRotation(storage, rotation)).toBe(true)
+    expect(
+      readStoredSliceWalletGrantRotation(
+        storage,
+        rotation.replacement.chainId,
+        rotation.replacement.account,
+        1_800_000_001
+      )
+    ).toEqual(rotation)
+
+    const [key, raw] =
+      [...storage.values.entries()].find(([entryKey]) =>
+        entryKey.includes("generic-rotation")
+      ) ?? []
+    if (key === undefined || raw === undefined)
+      throw new Error("Missing rotation fixture.")
+    storage.setItem(
+      key,
+      JSON.stringify({ ...JSON.parse(raw), untrustedPhaseData: true })
+    )
+    expect(
+      readStoredSliceWalletGrantRotation(
+        storage,
+        rotation.replacement.chainId,
+        rotation.replacement.account,
+        1_800_000_001
+      )
+    ).toBeNull()
+    expect(storage.getItem(key)).toBeNull()
+  })
+
+  test("reports rejected active-grant and journal writes", () => {
+    const storage = new MemoryStorage()
+    storage.setItem = () => {
+      throw new Error("quota exceeded")
+    }
+    const predecessor = createGrant()
+    expect(writeStoredSliceWalletGrant(storage, predecessor)).toBe(false)
+    expect(
+      writeStoredSliceWalletGrantRotation(storage, {
+        phase: "prepared",
+        predecessor,
+        replacement: createGrant(replacementPublicKey),
+        version: 1
+      })
+    ).toBe(false)
   })
 
   test("persists a tracked call by opaque id and expires it after retention", () => {

@@ -1,19 +1,30 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test"
-import { createPublicClient, custom, numberToHex } from "viem"
+import { createPublicClient, custom, type Hex, numberToHex } from "viem"
 import { base, optimism } from "viem/chains"
+import { getSliceWalletP256SignerId } from "../p256"
+import {
+  getWalletPermissionId,
+  serializeWalletPolicyDescriptor
+} from "../policy"
 import { buildRecoveryPermissionInitConfig } from "../recovery"
 import { parseSliceWalletUncompressedPublicKey } from "../rootValidator"
 import type {
   SliceWalletCeremonyBroker,
   SliceWalletRegistryCredential
 } from "../types"
-import type { SliceWalletProviderConfig } from "../types/providerInternal"
+import type {
+  SliceWalletProviderConfig,
+  StoredGenericGrant,
+  StoredGenericGrantRotation
+} from "../types/providerInternal"
 import {
   assertSliceWalletDeployedRootIdentity,
   assertSliceWalletRegistryAccountIdentity,
   createSliceWalletProviderRuntime,
   deriveSliceWalletRegistryAccountAddress,
-  executeSliceWalletGenericGrantReplacement
+  executeSliceWalletGenericGrantReplacement,
+  getSliceWalletGenericGrantInstallationAction,
+  resumeSliceWalletGenericGrantReplacement
 } from "./runtime"
 import {
   readStoredSliceWalletAccount,
@@ -83,6 +94,63 @@ const config = {
 
 beforeEach(() => storageValues.clear())
 
+const createRotationGrant = (publicKey: Hex): StoredGenericGrant => {
+  const policy = {
+    account,
+    calls: [
+      {
+        parameterRules: [],
+        selector: "0x00000000",
+        target: secondAccount,
+        valueLimit: 1n
+      }
+    ],
+    chainId: base.id,
+    grantKind: "generic",
+    rateLimit: { count: 1, intervalSec: 3600 },
+    validAfter: 1_800_000_000,
+    validUntil: 1_800_003_600,
+    version: 1
+  } as const
+  const signerId = getSliceWalletP256SignerId(publicKey)
+  return {
+    account,
+    chainId: base.id,
+    createdAt: 1_800_000_000,
+    enableSignature: "0x1234",
+    expiresAt: policy.validUntil,
+    permissionId: getWalletPermissionId(policy, signerId),
+    permissions: [
+      {
+        data: {
+          maximumValue: "0x1",
+          recipient: secondAccount,
+          template: "native-transfer"
+        },
+        policies: [
+          {
+            data: { count: 1, intervalSec: 3600 },
+            type: "rate-limit"
+          }
+        ],
+        type: "slice-call"
+      }
+    ],
+    policy: serializeWalletPolicyDescriptor(policy),
+    publicKey,
+    signerId
+  }
+}
+
+const createRotation = (
+  phase: StoredGenericGrantRotation["phase"] = "prepared"
+): StoredGenericGrantRotation => ({
+  phase,
+  predecessor: createRotationGrant(`0x04${"55".repeat(64)}`),
+  replacement: createRotationGrant(`0x04${"66".repeat(64)}`),
+  version: 1
+})
+
 describe("generic grant replacement ordering", () => {
   test("installs and verifies before disabling, then commits last", async () => {
     const events: string[] = []
@@ -102,9 +170,11 @@ describe("generic grant replacement ordering", () => {
       discardPending: async () => {
         events.push("discard")
       },
-      installReplacement: async (onSubmitted) => {
+      installReplacement: async () => {
         events.push("install")
-        onSubmitted()
+      },
+      persistPrepared: async (authorization) => {
+        events.push(`persist:${authorization}`)
       },
       verifyReplacement: async () => {
         events.push("verify")
@@ -114,6 +184,7 @@ describe("generic grant replacement ordering", () => {
     expect(result).toBe("complete")
     expect(events).toEqual([
       "authorize",
+      "persist:authorization",
       "install",
       "verify",
       "disable",
@@ -141,21 +212,29 @@ describe("generic grant replacement ordering", () => {
         discardPending: async () => {
           events.push("discard")
         },
-        installReplacement: async (onSubmitted) => {
+        installReplacement: async () => {
           events.push("install")
-          onSubmitted()
+        },
+        persistPrepared: async () => {
+          events.push("persist")
         },
         verifyReplacement: async () => {
           events.push("verify")
         }
       })
     ).rejects.toBe(failure)
-    expect(events).toEqual(["authorize", "install", "verify", "disable"])
+    expect(events).toEqual([
+      "authorize",
+      "persist",
+      "install",
+      "verify",
+      "disable"
+    ])
   })
 
-  test("discards an unsubmitted replacement and leaves the predecessor untouched", async () => {
+  test("discards a replacement when its journal is rejected before submission", async () => {
     const events: string[] = []
-    const failure = new Error("replacement installation failed")
+    const failure = new Error("rotation storage rejected")
 
     await expect(
       executeSliceWalletGenericGrantReplacement({
@@ -174,6 +253,9 @@ describe("generic grant replacement ordering", () => {
         },
         installReplacement: async () => {
           events.push("install")
+        },
+        persistPrepared: async () => {
+          events.push("persist")
           throw failure
         },
         verifyReplacement: async () => {
@@ -181,7 +263,186 @@ describe("generic grant replacement ordering", () => {
         }
       })
     ).rejects.toBe(failure)
-    expect(events).toEqual(["authorize", "install", "discard"])
+    expect(events).toEqual(["authorize", "persist", "discard"])
+  })
+
+  test("preserves an accepted replacement when the submission response is lost", async () => {
+    const events: string[] = []
+    const failure = new Error("response lost")
+
+    await expect(
+      executeSliceWalletGenericGrantReplacement({
+        authorize: async () => {
+          events.push("authorize")
+          return "authorization"
+        },
+        commit: async () => {
+          events.push("commit")
+        },
+        disablePredecessor: async () => {
+          events.push("disable")
+        },
+        discardPending: async () => {
+          events.push("discard")
+        },
+        installReplacement: async () => {
+          events.push("submit")
+          throw failure
+        },
+        persistPrepared: async () => {
+          events.push("persist")
+        },
+        verifyReplacement: async () => {
+          events.push("verify")
+        }
+      })
+    ).rejects.toBe(failure)
+    expect(events).toEqual(["authorize", "persist", "submit"])
+
+    expect(
+      getSliceWalletGenericGrantInstallationAction({
+        finalizedBlockNumber: null,
+        installed: false,
+        receipt: null,
+        rotation: createRotation("submitting")
+      })
+    ).toBe("wait")
+    expect(
+      getSliceWalletGenericGrantInstallationAction({
+        finalizedBlockNumber: null,
+        installed: true,
+        receipt: null,
+        rotation: createRotation("submitting")
+      })
+    ).toBe("installed")
+  })
+
+  test("retries only after a reverted installation is definitive", async () => {
+    const events: string[] = []
+    const receiptFailure = new Error("installation reverted")
+    const submitted = {
+      ...createRotation("submitted"),
+      installationUserOperationHash: userOperationHash
+    }
+    let attempt = 0
+    expect(
+      getSliceWalletGenericGrantInstallationAction({
+        finalizedBlockNumber: 9n,
+        installed: false,
+        receipt: { blockNumber: 10n, success: false },
+        rotation: submitted
+      })
+    ).toBe("wait")
+    expect(
+      getSliceWalletGenericGrantInstallationAction({
+        finalizedBlockNumber: 10n,
+        installed: false,
+        receipt: { blockNumber: 10n, success: false },
+        rotation: submitted
+      })
+    ).toBe("retry")
+    const run = () =>
+      resumeSliceWalletGenericGrantReplacement({
+        clearJournal: async () => {
+          events.push("clear")
+        },
+        disablePredecessor: async () => {
+          events.push("disable")
+        },
+        ensureFrameCommitted: async () => {
+          events.push("frame")
+        },
+        ensureInstalled: async (rotation) => {
+          attempt += 1
+          events.push(`install:${attempt}`)
+          if (attempt === 1) throw receiptFailure
+          return { ...rotation, phase: "installed" }
+        },
+        initialRotation: submitted,
+        persistActiveGrant: async () => {
+          events.push("active")
+        },
+        setPhase: async (rotation, phase) => {
+          events.push(`phase:${phase}`)
+          return { ...rotation, phase }
+        },
+        verifyFinalized: async () => {
+          events.push("verify")
+        }
+      })
+
+    await expect(run()).rejects.toBe(receiptFailure)
+    expect(events).toEqual(["install:1"])
+    await expect(run()).resolves.toMatchObject({
+      phase: "active-grant-committed"
+    })
+    expect(events).toEqual([
+      "install:1",
+      "install:2",
+      "disable",
+      "phase:predecessor-disabled",
+      "frame",
+      "phase:frame-committed",
+      "active",
+      "phase:active-grant-committed",
+      "verify",
+      "clear"
+    ])
+  })
+
+  test("resumes finalization after active storage fails post-disablement", async () => {
+    const events: string[] = []
+    const storageFailure = new Error("active storage unavailable")
+    let journal = createRotation("installed")
+    let activeAttempts = 0
+    const run = () =>
+      resumeSliceWalletGenericGrantReplacement({
+        clearJournal: async () => {
+          events.push("clear")
+        },
+        disablePredecessor: async () => {
+          events.push("disable")
+        },
+        ensureFrameCommitted: async () => {
+          events.push("frame")
+        },
+        ensureInstalled: async (rotation) => rotation,
+        initialRotation: journal,
+        persistActiveGrant: async () => {
+          activeAttempts += 1
+          events.push(`active:${activeAttempts}`)
+          if (activeAttempts === 1) throw storageFailure
+        },
+        setPhase: async (rotation, phase) => {
+          journal = { ...rotation, phase }
+          events.push(`phase:${phase}`)
+          return journal
+        },
+        verifyFinalized: async () => {
+          events.push("verify")
+        }
+      })
+
+    await expect(run()).rejects.toBe(storageFailure)
+    expect(journal.phase).toBe("frame-committed")
+    expect(events).toEqual([
+      "disable",
+      "phase:predecessor-disabled",
+      "frame",
+      "phase:frame-committed",
+      "active:1"
+    ])
+
+    await expect(run()).resolves.toMatchObject({
+      phase: "active-grant-committed"
+    })
+    expect(events.slice(5)).toEqual([
+      "frame",
+      "active:2",
+      "phase:active-grant-committed",
+      "verify",
+      "clear"
+    ])
   })
 })
 
