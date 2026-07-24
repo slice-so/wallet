@@ -56,18 +56,52 @@ export type StoredGenericGrantRotationPhase =
   | "frame-committed"
   | "active-grant-committed"
 
+type StoredGenericGrantInstallationUserOperationBase = {
+  callData: Hex
+  callGasLimit: Hex
+  maxFeePerGas: Hex
+  maxPriorityFeePerGas: Hex
+  nonce: Hex
+  preVerificationGas: Hex
+  sender: Address
+  signature: Hex
+  verificationGasLimit: Hex
+}
+
+export type StoredGenericGrantInstallationUserOperation =
+  StoredGenericGrantInstallationUserOperationBase &
+    (
+      | { factory?: never; factoryData?: never }
+      | { factory: Address; factoryData: Hex }
+    ) &
+    (
+      | {
+          paymaster?: never
+          paymasterData?: never
+          paymasterPostOpGasLimit?: never
+          paymasterVerificationGasLimit?: never
+        }
+      | {
+          paymaster: Address
+          paymasterData: Hex
+          paymasterPostOpGasLimit: Hex
+          paymasterVerificationGasLimit: Hex
+        }
+    )
+
 export type StoredGenericGrantInstallation = {
   callDataHash: Hex
   entryPoint: Address
   nonce: Hex
   sender: Address
+  userOperation: StoredGenericGrantInstallationUserOperation
   userOperationHash: Hex
 }
 
 type StoredGenericGrantRotationBase = {
   predecessor: StoredGenericGrant
   replacement: StoredGenericGrant
-  version: 2
+  version: 3
 }
 
 export type StoredGenericGrantRotation =

@@ -1,15 +1,22 @@
 import { describe, expect, test } from "bun:test"
-import type { Address, Hex } from "viem"
+import { type Address, type Hex, keccak256 } from "viem"
+import {
+  entryPoint07Address,
+  getUserOperationHash
+} from "viem/account-abstraction"
 import { getSliceWalletP256SignerId } from "../p256"
 import {
   getWalletPermissionId,
   serializeWalletPolicyDescriptor
 } from "../policy"
+import type { StoredGenericGrantInstallationUserOperation } from "../types/providerInternal"
 import {
+  deserializeStoredGenericGrantInstallationUserOperation,
   readStoredSliceWalletAccount,
   readStoredSliceWalletCall,
   readStoredSliceWalletGrant,
   readStoredSliceWalletGrantRotation,
+  serializeStoredGenericGrantInstallationUserOperation,
   writeStoredSliceWalletAccount,
   writeStoredSliceWalletCall,
   writeStoredSliceWalletGrant,
@@ -48,6 +55,30 @@ const account = "0x0000000000000000000000000000000000000001" as Address
 const target = "0x0000000000000000000000000000000000000002" as Address
 const publicKey = `0x04${"11".repeat(64)}` as Hex
 const replacementPublicKey = `0x04${"22".repeat(64)}` as Hex
+const installationEntryPoint = entryPoint07Address.toLowerCase() as Address
+const installationUserOperation = {
+  callData: "0x1234",
+  callGasLimit: "0x1",
+  maxFeePerGas: "0x2",
+  maxPriorityFeePerGas: "0x1",
+  nonce: "0x1",
+  paymaster: target,
+  paymasterData: "0xabcd",
+  paymasterPostOpGasLimit: "0x1",
+  paymasterVerificationGasLimit: "0x1",
+  preVerificationGas: "0x1",
+  sender: account,
+  signature: "0x5678",
+  verificationGasLimit: "0x1"
+} satisfies StoredGenericGrantInstallationUserOperation
+const installationUserOperationHash = getUserOperationHash({
+  chainId: 8453,
+  entryPointAddress: installationEntryPoint,
+  entryPointVersion: "0.7",
+  userOperation: deserializeStoredGenericGrantInstallationUserOperation(
+    installationUserOperation
+  )
+})
 
 const createGrant = (sessionPublicKey = publicKey) => {
   const policy = {
@@ -96,6 +127,21 @@ const createGrant = (sessionPublicKey = publicKey) => {
     signerId
   }
 }
+
+const createRotation = () => ({
+  installation: {
+    callDataHash: keccak256(installationUserOperation.callData),
+    entryPoint: installationEntryPoint,
+    nonce: "0x1" as Hex,
+    sender: account,
+    userOperation: installationUserOperation,
+    userOperationHash: installationUserOperationHash
+  },
+  phase: "submitted" as const,
+  predecessor: createGrant(),
+  replacement: createGrant(replacementPublicKey),
+  version: 3 as const
+})
 
 describe("portable wallet provider storage", () => {
   test("persists indexed accounts", () => {
@@ -158,20 +204,15 @@ describe("portable wallet provider storage", () => {
 
   test("strictly persists and parses a recoverable rotation journal", () => {
     const storage = new MemoryStorage()
-    const rotation = {
-      installation: {
-        callDataHash: `0x${"33".repeat(32)}` as Hex,
-        entryPoint: target,
-        nonce: "0x1" as Hex,
-        sender: account,
-        userOperationHash: `0x${"44".repeat(32)}` as Hex
-      },
-      phase: "submitted" as const,
-      predecessor: createGrant(),
-      replacement: createGrant(replacementPublicKey),
-      version: 2 as const
-    }
+    const rotation = createRotation()
 
+    expect(
+      serializeStoredGenericGrantInstallationUserOperation(
+        deserializeStoredGenericGrantInstallationUserOperation(
+          installationUserOperation
+        )
+      )
+    ).toEqual(installationUserOperation)
     expect(writeStoredSliceWalletGrantRotation(storage, rotation)).toBe(true)
     expect(
       readStoredSliceWalletGrantRotation(
@@ -225,6 +266,60 @@ describe("portable wallet provider storage", () => {
     expect(storage.getItem(key)).toBeNull()
   })
 
+  test("rejects non-canonical or identity-mismatched replay envelopes", () => {
+    const rotation = createRotation()
+    const invalidInstallations = [
+      {
+        ...rotation.installation,
+        userOperation: {
+          ...rotation.installation.userOperation,
+          untrustedField: true
+        }
+      },
+      {
+        ...rotation.installation,
+        userOperation: {
+          ...rotation.installation.userOperation,
+          callData: "0x1235"
+        }
+      },
+      {
+        ...rotation.installation,
+        userOperation: {
+          ...rotation.installation.userOperation,
+          nonce: "0x01"
+        }
+      },
+      {
+        ...rotation.installation,
+        entryPoint: entryPoint07Address
+      },
+      {
+        ...rotation.installation,
+        userOperationHash: `0x${"44".repeat(32)}`
+      }
+    ]
+
+    for (const installation of invalidInstallations) {
+      const storage = new MemoryStorage()
+      expect(
+        writeStoredSliceWalletGrantRotation(storage, {
+          ...rotation,
+          installation
+        } as typeof rotation)
+      ).toBe(true)
+      expect(
+        readStoredSliceWalletGrantRotation(
+          storage,
+          rotation.replacement.chainId,
+          rotation.replacement.account,
+          1_800_000_001
+        )
+      ).toBeNull()
+      expect(storage.values.size).toBe(0)
+    }
+  })
+
   test("reports rejected active-grant and journal writes", () => {
     const storage = new MemoryStorage()
     storage.setItem = () => {
@@ -237,7 +332,7 @@ describe("portable wallet provider storage", () => {
         phase: "prepared",
         predecessor,
         replacement: createGrant(replacementPublicKey),
-        version: 2
+        version: 3
       })
     ).toBe(false)
   })

@@ -10,6 +10,11 @@ import {
   toHex,
   zeroAddress
 } from "viem"
+import {
+  entryPoint07Address,
+  getUserOperationHash,
+  type UserOperation
+} from "viem/account-abstraction"
 import { assertSliceWalletAccountIndex } from "../accountIndex"
 import { maximumBrowserGenericGrantTtlSec } from "../constants"
 import { getSliceWalletP256SignerId } from "../p256Server"
@@ -28,6 +33,7 @@ import type {
 import type {
   StoredGenericGrant,
   StoredGenericGrantInstallation,
+  StoredGenericGrantInstallationUserOperation,
   StoredGenericGrantRotation,
   StoredGenericGrantRotationPhase,
   StoredWalletCall
@@ -312,10 +318,262 @@ const grantRotationPhases = new Set<StoredGenericGrantRotationPhase>([
   "active-grant-committed"
 ])
 
-const parseStoredGrantInstallation = (
+const parseCanonicalAddress = (
+  value: SliceWalletProviderValue | undefined
+): Address | null =>
+  typeof value === "string" &&
+  value === value.toLowerCase() &&
+  isAddress(value) &&
+  value !== zeroAddress
+    ? value
+    : null
+
+const parseCanonicalData = (
+  value: SliceWalletProviderValue | undefined
+): Hex | null =>
+  typeof value === "string" &&
+  value === value.toLowerCase() &&
+  value.length % 2 === 0 &&
+  isHex(value, { strict: true })
+    ? value
+    : null
+
+const parseCanonicalQuantity = (
+  value: SliceWalletProviderValue | undefined
+): Hex | null => {
+  if (
+    typeof value !== "string" ||
+    value !== value.toLowerCase() ||
+    !isHex(value, { strict: true })
+  ) {
+    return null
+  }
+  try {
+    return toHex(hexToBigInt(value)) === value ? value : null
+  } catch {
+    return null
+  }
+}
+
+const parseStoredGrantInstallationUserOperation = (
   input: SliceWalletProviderValue | undefined
+): StoredGenericGrantInstallationUserOperation | null => {
+  const value = input === undefined ? null : record(input)
+  if (
+    value === null ||
+    !hasOnlyKeys(value, [
+      "callData",
+      "callGasLimit",
+      "factory",
+      "factoryData",
+      "maxFeePerGas",
+      "maxPriorityFeePerGas",
+      "nonce",
+      "paymaster",
+      "paymasterData",
+      "paymasterPostOpGasLimit",
+      "paymasterVerificationGasLimit",
+      "preVerificationGas",
+      "sender",
+      "signature",
+      "verificationGasLimit"
+    ])
+  ) {
+    return null
+  }
+  const callData = parseCanonicalData(value.callData)
+  const callGasLimit = parseCanonicalQuantity(value.callGasLimit)
+  const factory =
+    value.factory === undefined
+      ? undefined
+      : parseCanonicalAddress(value.factory)
+  const factoryData =
+    value.factoryData === undefined
+      ? undefined
+      : parseCanonicalData(value.factoryData)
+  const maxFeePerGas = parseCanonicalQuantity(value.maxFeePerGas)
+  const maxPriorityFeePerGas = parseCanonicalQuantity(
+    value.maxPriorityFeePerGas
+  )
+  const nonce = parseCanonicalQuantity(value.nonce)
+  const paymaster =
+    value.paymaster === undefined
+      ? undefined
+      : parseCanonicalAddress(value.paymaster)
+  const paymasterData =
+    value.paymasterData === undefined
+      ? undefined
+      : parseCanonicalData(value.paymasterData)
+  const paymasterPostOpGasLimit =
+    value.paymasterPostOpGasLimit === undefined
+      ? undefined
+      : parseCanonicalQuantity(value.paymasterPostOpGasLimit)
+  const paymasterVerificationGasLimit =
+    value.paymasterVerificationGasLimit === undefined
+      ? undefined
+      : parseCanonicalQuantity(value.paymasterVerificationGasLimit)
+  const preVerificationGas = parseCanonicalQuantity(value.preVerificationGas)
+  const sender = parseCanonicalAddress(value.sender)
+  const signature = parseCanonicalData(value.signature)
+  const verificationGasLimit = parseCanonicalQuantity(
+    value.verificationGasLimit
+  )
+  const hasFactory = factory !== undefined
+  const hasPaymaster = paymaster !== undefined
+  if (
+    callData === null ||
+    callData === "0x" ||
+    callGasLimit === null ||
+    maxFeePerGas === null ||
+    maxPriorityFeePerGas === null ||
+    nonce === null ||
+    preVerificationGas === null ||
+    sender === null ||
+    signature === null ||
+    signature === "0x" ||
+    verificationGasLimit === null ||
+    (value.factory !== undefined && factory === null) ||
+    (value.factoryData !== undefined && factoryData === null) ||
+    hasFactory !== (factoryData !== undefined) ||
+    (value.paymaster !== undefined && paymaster === null) ||
+    (value.paymasterData !== undefined && paymasterData === null) ||
+    (value.paymasterPostOpGasLimit !== undefined &&
+      paymasterPostOpGasLimit === null) ||
+    (value.paymasterVerificationGasLimit !== undefined &&
+      paymasterVerificationGasLimit === null) ||
+    hasPaymaster !== (paymasterData !== undefined) ||
+    hasPaymaster !== (paymasterPostOpGasLimit !== undefined) ||
+    hasPaymaster !== (paymasterVerificationGasLimit !== undefined)
+  ) {
+    return null
+  }
+  const factoryFields =
+    factory === undefined ? {} : { factory, factoryData: factoryData as Hex }
+  const paymasterFields =
+    paymaster === undefined
+      ? {}
+      : {
+          paymaster,
+          paymasterData: paymasterData as Hex,
+          paymasterPostOpGasLimit: paymasterPostOpGasLimit as Hex,
+          paymasterVerificationGasLimit: paymasterVerificationGasLimit as Hex
+        }
+  return {
+    callData,
+    callGasLimit,
+    ...factoryFields,
+    maxFeePerGas,
+    maxPriorityFeePerGas,
+    nonce,
+    ...paymasterFields,
+    preVerificationGas,
+    sender,
+    signature,
+    verificationGasLimit
+  } as StoredGenericGrantInstallationUserOperation
+}
+
+export const deserializeStoredGenericGrantInstallationUserOperation = (
+  value: StoredGenericGrantInstallationUserOperation
+): UserOperation<"0.7"> => ({
+  callData: value.callData,
+  callGasLimit: hexToBigInt(value.callGasLimit),
+  ...(value.factory === undefined
+    ? {}
+    : { factory: value.factory, factoryData: value.factoryData }),
+  maxFeePerGas: hexToBigInt(value.maxFeePerGas),
+  maxPriorityFeePerGas: hexToBigInt(value.maxPriorityFeePerGas),
+  nonce: hexToBigInt(value.nonce),
+  ...(value.paymaster === undefined
+    ? {}
+    : {
+        paymaster: value.paymaster,
+        paymasterData: value.paymasterData,
+        paymasterPostOpGasLimit: hexToBigInt(value.paymasterPostOpGasLimit),
+        paymasterVerificationGasLimit: hexToBigInt(
+          value.paymasterVerificationGasLimit
+        )
+      }),
+  preVerificationGas: hexToBigInt(value.preVerificationGas),
+  sender: value.sender,
+  signature: value.signature,
+  verificationGasLimit: hexToBigInt(value.verificationGasLimit)
+})
+
+export const serializeStoredGenericGrantInstallationUserOperation = (
+  userOperation: UserOperation<"0.7">
+): StoredGenericGrantInstallationUserOperation => {
+  if (userOperation.authorization !== undefined) {
+    throw new Error(
+      "Generic permission installation cannot persist EIP-7702 authorization."
+    )
+  }
+  if (
+    userOperation.paymaster !== undefined &&
+    (userOperation.paymasterPostOpGasLimit === undefined ||
+      userOperation.paymasterVerificationGasLimit === undefined)
+  ) {
+    throw new Error(
+      "Generic permission installation paymaster fields are incomplete."
+    )
+  }
+  const factoryFields =
+    userOperation.factory === undefined
+      ? {}
+      : {
+          factory: userOperation.factory.toLowerCase() as Address,
+          factoryData: (userOperation.factoryData ?? "0x").toLowerCase() as Hex
+        }
+  const paymasterFields =
+    userOperation.paymaster === undefined
+      ? {}
+      : {
+          paymaster: userOperation.paymaster.toLowerCase() as Address,
+          paymasterData: (
+            userOperation.paymasterData ?? "0x"
+          ).toLowerCase() as Hex,
+          paymasterPostOpGasLimit: toHex(
+            userOperation.paymasterPostOpGasLimit as bigint
+          ),
+          paymasterVerificationGasLimit: toHex(
+            userOperation.paymasterVerificationGasLimit as bigint
+          )
+        }
+  const serialized = {
+    callData: userOperation.callData.toLowerCase() as Hex,
+    callGasLimit: toHex(userOperation.callGasLimit),
+    ...factoryFields,
+    maxFeePerGas: toHex(userOperation.maxFeePerGas),
+    maxPriorityFeePerGas: toHex(userOperation.maxPriorityFeePerGas),
+    nonce: toHex(userOperation.nonce),
+    ...paymasterFields,
+    preVerificationGas: toHex(userOperation.preVerificationGas),
+    sender: userOperation.sender.toLowerCase() as Address,
+    signature: userOperation.signature.toLowerCase() as Hex,
+    verificationGasLimit: toHex(userOperation.verificationGasLimit)
+  } as StoredGenericGrantInstallationUserOperation
+  const parsed = parseStoredGrantInstallationUserOperation(serialized)
+  if (parsed === null) {
+    throw new Error(
+      "Generic permission installation UserOperation is not canonical."
+    )
+  }
+  return parsed
+}
+
+const parseStoredGrantInstallation = (
+  input: SliceWalletProviderValue | undefined,
+  chainId: number
 ): StoredGenericGrantInstallation | null => {
   const value = input === undefined ? null : record(input)
+  const callDataHash = parseCanonicalData(value?.callDataHash)
+  const entryPoint = parseCanonicalAddress(value?.entryPoint)
+  const nonce = parseCanonicalQuantity(value?.nonce)
+  const sender = parseCanonicalAddress(value?.sender)
+  const userOperation = parseStoredGrantInstallationUserOperation(
+    value?.userOperation
+  )
+  const userOperationHash = parseCanonicalData(value?.userOperationHash)
   if (
     value === null ||
     !hasOnlyKeys(value, [
@@ -323,37 +581,45 @@ const parseStoredGrantInstallation = (
       "entryPoint",
       "nonce",
       "sender",
+      "userOperation",
       "userOperationHash"
     ]) ||
-    typeof value.callDataHash !== "string" ||
-    !isHex(value.callDataHash, { strict: true }) ||
-    hexToBytes(value.callDataHash).length !== 32 ||
-    typeof value.entryPoint !== "string" ||
-    !isAddress(value.entryPoint) ||
-    value.entryPoint.toLowerCase() === zeroAddress ||
-    typeof value.nonce !== "string" ||
-    !isHex(value.nonce, { strict: true }) ||
-    typeof value.sender !== "string" ||
-    !isAddress(value.sender) ||
-    typeof value.userOperationHash !== "string" ||
-    !isHex(value.userOperationHash, { strict: true }) ||
-    hexToBytes(value.userOperationHash).length !== 32
+    callDataHash === null ||
+    hexToBytes(callDataHash).length !== 32 ||
+    entryPoint === null ||
+    entryPoint !== entryPoint07Address.toLowerCase() ||
+    nonce === null ||
+    sender === null ||
+    userOperation === null ||
+    userOperationHash === null ||
+    hexToBytes(userOperationHash).length !== 32 ||
+    userOperation.sender !== sender ||
+    userOperation.nonce !== nonce ||
+    keccak256(userOperation.callData) !== callDataHash
   ) {
     return null
   }
   try {
-    if (toHex(hexToBigInt(value.nonce)) !== value.nonce.toLowerCase()) {
+    const recomputedHash = getUserOperationHash({
+      chainId,
+      entryPointAddress: entryPoint,
+      entryPointVersion: "0.7",
+      userOperation:
+        deserializeStoredGenericGrantInstallationUserOperation(userOperation)
+    })
+    if (recomputedHash.toLowerCase() !== userOperationHash) {
       return null
     }
   } catch {
     return null
   }
   return {
-    callDataHash: value.callDataHash,
-    entryPoint: value.entryPoint,
-    nonce: value.nonce,
-    sender: value.sender,
-    userOperationHash: value.userOperationHash
+    callDataHash,
+    entryPoint,
+    nonce,
+    sender,
+    userOperation,
+    userOperationHash
   }
 }
 
@@ -392,7 +658,7 @@ export const readStoredSliceWalletGrantRotation = (
       "replacement",
       "version"
     ]) ||
-    value.version !== 2 ||
+    value.version !== 3 ||
     typeof value.phase !== "string" ||
     !grantRotationPhases.has(value.phase as StoredGenericGrantRotationPhase) ||
     typeof value.predecessor !== "object" ||
@@ -413,7 +679,7 @@ export const readStoredSliceWalletGrantRotation = (
   const installation =
     value.installation === undefined
       ? null
-      : parseStoredGrantInstallation(value.installation)
+      : parseStoredGrantInstallation(value.installation, chainId)
   if (
     predecessor === null ||
     replacement === null ||
@@ -439,7 +705,7 @@ export const readStoredSliceWalletGrantRotation = (
   const base = {
     predecessor,
     replacement,
-    version: 2 as const
+    version: 3 as const
   }
   if (value.phase === "prepared") return { ...base, phase: value.phase }
   if (value.phase === "transport-pending" || value.phase === "submitted") {

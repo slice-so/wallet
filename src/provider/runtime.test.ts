@@ -1,5 +1,16 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test"
-import { createPublicClient, custom, type Hex, numberToHex } from "viem"
+import {
+  type Address,
+  createPublicClient,
+  custom,
+  type Hex,
+  keccak256,
+  numberToHex
+} from "viem"
+import {
+  entryPoint07Address,
+  getUserOperationHash
+} from "viem/account-abstraction"
 import { base, optimism } from "viem/chains"
 import { getSliceWalletP256SignerId } from "../p256"
 import {
@@ -15,11 +26,13 @@ import type {
 import type {
   SliceWalletProviderConfig,
   StoredGenericGrant,
+  StoredGenericGrantInstallationUserOperation,
   StoredGenericGrantRotation
 } from "../types/providerInternal"
 import {
   assertSliceWalletDeployedRootIdentity,
   assertSliceWalletRegistryAccountIdentity,
+  broadcastSliceWalletGenericGrantInstallation,
   createSliceWalletProviderRuntime,
   deriveSliceWalletRegistryAccountAddress,
   executeSliceWalletGenericGrantReplacement,
@@ -28,8 +41,11 @@ import {
   submitSliceWalletGenericGrantInstallation
 } from "./runtime"
 import {
+  deserializeStoredGenericGrantInstallationUserOperation,
   readStoredSliceWalletAccount,
-  writeStoredSliceWalletAccount
+  readStoredSliceWalletGrantRotation,
+  writeStoredSliceWalletAccount,
+  writeStoredSliceWalletGrantRotation
 } from "./storage"
 
 type RuntimeDependencies = NonNullable<
@@ -42,7 +58,30 @@ type ChainRuntime = ReturnType<ChainRuntimeFactory>
 
 const account = "0x0000000000000000000000000000000000000001" as const
 const secondAccount = "0x0000000000000000000000000000000000000002" as const
-const userOperationHash = `0x${"11".repeat(32)}` as const
+const installationEntryPoint = entryPoint07Address.toLowerCase() as Address
+const installationUserOperation = {
+  callData: "0x1234",
+  callGasLimit: "0x1",
+  maxFeePerGas: "0x2",
+  maxPriorityFeePerGas: "0x1",
+  nonce: "0x1",
+  paymaster: secondAccount,
+  paymasterData: "0xabcd",
+  paymasterPostOpGasLimit: "0x1",
+  paymasterVerificationGasLimit: "0x1",
+  preVerificationGas: "0x1",
+  sender: account,
+  signature: "0x5678",
+  verificationGasLimit: "0x1"
+} satisfies StoredGenericGrantInstallationUserOperation
+const userOperationHash = getUserOperationHash({
+  chainId: base.id,
+  entryPointAddress: installationEntryPoint,
+  entryPointVersion: "0.7",
+  userOperation: deserializeStoredGenericGrantInstallationUserOperation(
+    installationUserOperation
+  )
+})
 const credentialIdHash = `0x${"22".repeat(32)}` as const
 const rootPublicKey = `0x04${"33".repeat(64)}` as const
 const storedAccount = (
@@ -152,20 +191,26 @@ const createRotation = (
   phase,
   predecessor: createRotationGrant(`0x04${"55".repeat(64)}`),
   replacement: createRotationGrant(`0x04${"66".repeat(64)}`),
-  version: 2
+  version: 3
 })
 
 const installation = {
-  callDataHash: `0x${"77".repeat(32)}` as Hex,
-  entryPoint: secondAccount,
+  callDataHash: keccak256(installationUserOperation.callData),
+  entryPoint: installationEntryPoint,
   nonce: "0x1" as Hex,
   sender: account,
+  userOperation: installationUserOperation,
   userOperationHash
 }
 
+type SubmittedRotation = Extract<
+  StoredGenericGrantRotation,
+  { phase: "submitted" | "transport-pending" }
+>
+
 const createSubmittedRotation = (
   phase: "submitted" | "transport-pending" = "submitted"
-): StoredGenericGrantRotation => ({
+): SubmittedRotation => ({
   ...createRotation(),
   phase,
   installation
@@ -183,7 +228,7 @@ const updateRotationPhase = (
   const base = {
     predecessor: rest.predecessor,
     replacement: rest.replacement,
-    version: 2 as const
+    version: 3 as const
   }
   if (phase === "prepared") return { ...base, phase }
   if (phase === "submitted" || phase === "transport-pending") {
@@ -337,7 +382,7 @@ describe("generic grant replacement ordering", () => {
         sign: async () => {
           signCount += 1
           if (signCount === 1) throw cancellation
-          return { installation, request: "signed" }
+          return installation
         },
         transport: async () => {
           transportCount += 1
@@ -384,7 +429,7 @@ describe("generic grant replacement ordering", () => {
         },
         sign: async () => {
           signCount += 1
-          return { installation, request: "signed" }
+          return installation
         },
         transport: async () => {
           transportCount += 1
@@ -426,7 +471,7 @@ describe("generic grant replacement ordering", () => {
           journal = updateRotationPhase(rotation, phase, nextInstallation)
           return journal
         },
-        sign: async () => ({ installation, request: "signed" }),
+        sign: async () => installation,
         transport: async () => {
           transportCount += 1
           return userOperationHash
@@ -457,7 +502,7 @@ describe("generic grant replacement ordering", () => {
           journal = updateRotationPhase(rotation, phase, nextInstallation)
           return journal
         },
-        sign: async () => ({ installation, request: "signed" }),
+        sign: async () => installation,
         transport: async () => {
           transportCount += 1
           if (transportCount === 1) throw rejection
@@ -497,7 +542,7 @@ describe("generic grant replacement ordering", () => {
         },
         sign: async () => {
           events.push("sign")
-          return { installation, request: "signed" }
+          return installation
         },
         transport: async () => {
           transportCount += 1
@@ -519,6 +564,7 @@ describe("generic grant replacement ordering", () => {
     })
     expect(
       getSliceWalletGenericGrantInstallationAction({
+        currentNonce: null,
         finalizedBlockNumber: null,
         installed: false,
         receipt: null,
@@ -540,6 +586,7 @@ describe("generic grant replacement ordering", () => {
       ensureInstalled: async (rotation) => {
         expect(
           getSliceWalletGenericGrantInstallationAction({
+            currentNonce: null,
             finalizedBlockNumber: null,
             installed: true,
             receipt: null,
@@ -575,6 +622,141 @@ describe("generic grant replacement ordering", () => {
     ])
   })
 
+  test("reloads a transport-pending journal and broadcasts its exact stored operation", async () => {
+    const crashed = createSubmittedRotation("transport-pending")
+    expect(writeStoredSliceWalletGrantRotation(storage, crashed)).toBe(true)
+
+    const reloaded = readStoredSliceWalletGrantRotation(
+      storage,
+      base.id,
+      account,
+      1_800_000_001
+    )
+    if (reloaded?.installation === undefined) {
+      throw new Error("Missing replayable installation fixture.")
+    }
+    expect(
+      getSliceWalletGenericGrantInstallationAction({
+        currentNonce: 1n,
+        finalizedBlockNumber: null,
+        installed: false,
+        receipt: null,
+        rotation: reloaded
+      })
+    ).toBe("rebroadcast")
+
+    let transported: StoredGenericGrantRotation["installation"] | undefined
+    await broadcastSliceWalletGenericGrantInstallation({
+      installation: reloaded.installation,
+      transport: async (candidate) => {
+        transported = candidate
+        return candidate.userOperationHash
+      }
+    })
+    expect(transported).toEqual(reloaded.installation)
+    expect(
+      getUserOperationHash({
+        chainId: base.id,
+        entryPointAddress: reloaded.installation.entryPoint,
+        entryPointVersion: "0.7",
+        userOperation: deserializeStoredGenericGrantInstallationUserOperation(
+          reloaded.installation.userOperation
+        )
+      })
+    ).toBe(reloaded.installation.userOperationHash)
+
+    const submitted = updateRotationPhase(reloaded, "submitted")
+    expect(writeStoredSliceWalletGrantRotation(storage, submitted)).toBe(true)
+    expect(
+      readStoredSliceWalletGrantRotation(
+        storage,
+        base.id,
+        account,
+        1_800_000_001
+      )
+    ).toMatchObject({
+      installation: { userOperationHash },
+      phase: "submitted"
+    })
+  })
+
+  test("re-broadcasts an accepted-then-dropped operation without preparing a variant", async () => {
+    let dropped = createRotation()
+    let prepareCount = 0
+    const transportedOperations: string[] = []
+    await submitSliceWalletGenericGrantInstallation({
+      initialRotation: dropped,
+      isDefiniteTransportRejection: () => false,
+      prepare: async () => {
+        prepareCount += 1
+        return "prepared"
+      },
+      setPhase: async (rotation, phase, nextInstallation) => {
+        dropped = updateRotationPhase(rotation, phase, nextInstallation)
+        return dropped
+      },
+      sign: async () => installation,
+      transport: async (candidate) => {
+        transportedOperations.push(JSON.stringify(candidate.userOperation))
+        return candidate.userOperationHash
+      }
+    })
+    expect(
+      getSliceWalletGenericGrantInstallationAction({
+        currentNonce: 1n,
+        finalizedBlockNumber: null,
+        installed: false,
+        receipt: null,
+        rotation: dropped
+      })
+    ).toBe("rebroadcast")
+    if (dropped.installation === undefined) {
+      throw new Error("Missing dropped installation fixture.")
+    }
+    await broadcastSliceWalletGenericGrantInstallation({
+      installation: dropped.installation,
+      transport: async (candidate) => {
+        transportedOperations.push(JSON.stringify(candidate.userOperation))
+        return candidate.userOperationHash
+      }
+    })
+
+    expect(prepareCount).toBe(1)
+    expect(transportedOperations).toHaveLength(2)
+    expect(new Set(transportedOperations).size).toBe(1)
+    expect(dropped.installation.userOperationHash).toBe(userOperationHash)
+  })
+
+  test("resets to prepared only after the recorded full nonce advances", () => {
+    const pending = createSubmittedRotation("transport-pending")
+    expect(
+      getSliceWalletGenericGrantInstallationAction({
+        currentNonce: 0n,
+        finalizedBlockNumber: null,
+        installed: false,
+        receipt: null,
+        rotation: pending
+      })
+    ).toBe("wait")
+    expect(
+      getSliceWalletGenericGrantInstallationAction({
+        currentNonce: 2n,
+        finalizedBlockNumber: null,
+        installed: false,
+        receipt: null,
+        rotation: pending
+      })
+    ).toBe("retry")
+
+    const prepared = updateRotationPhase(pending, "prepared", null)
+    expect(prepared).toEqual({
+      phase: "prepared",
+      predecessor: pending.predecessor,
+      replacement: pending.replacement,
+      version: 3
+    })
+  })
+
   test("retries only after a reverted installation is definitive", async () => {
     const events: string[] = []
     const receiptFailure = new Error("installation reverted")
@@ -582,6 +764,7 @@ describe("generic grant replacement ordering", () => {
     let attempt = 0
     expect(
       getSliceWalletGenericGrantInstallationAction({
+        currentNonce: null,
         finalizedBlockNumber: 9n,
         installed: false,
         receipt: { blockNumber: 10n, success: false },
@@ -590,6 +773,7 @@ describe("generic grant replacement ordering", () => {
     ).toBe("wait")
     expect(
       getSliceWalletGenericGrantInstallationAction({
+        currentNonce: null,
         finalizedBlockNumber: 10n,
         installed: false,
         receipt: { blockNumber: 10n, success: false },

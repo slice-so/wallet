@@ -1,7 +1,9 @@
 import {
+  type Address,
   BaseError,
   createPublicClient,
   type Hex,
+  hexToBigInt,
   http,
   isAddressEqual,
   keccak256,
@@ -87,10 +89,12 @@ import {
   clearStoredSliceWalletAccount,
   clearStoredSliceWalletGrant,
   clearStoredSliceWalletGrantRotation,
+  deserializeStoredGenericGrantInstallationUserOperation,
   readStoredSliceWalletAccount,
   readStoredSliceWalletCall,
   readStoredSliceWalletGrant,
   readStoredSliceWalletGrantRotation,
+  serializeStoredGenericGrantInstallationUserOperation,
   storedSliceWalletGrantsMatch,
   writeStoredSliceWalletAccount,
   writeStoredSliceWalletGrant,
@@ -209,31 +213,55 @@ const isExplicitBundlerRpcRejection = (error: Error) =>
   error.walk((cause) => cause instanceof RpcRequestError) !== null
 
 export const getSliceWalletGenericGrantInstallationAction = ({
+  currentNonce,
   finalizedBlockNumber,
   installed,
   receipt,
   rotation
 }: {
+  currentNonce: bigint | null
   finalizedBlockNumber: bigint | null
   installed: boolean
   receipt: { blockNumber: bigint; success: boolean } | null
   rotation: StoredGenericGrantRotation
-}): "installed" | "retry" | "submit" | "wait" => {
+}): "installed" | "rebroadcast" | "retry" | "submit" | "wait" => {
   if (installed) return "installed"
   if (rotation.installation === undefined) {
     return rotation.phase === "prepared" ? "submit" : "retry"
   }
-  if (receipt === null || receipt.success) return "wait"
+  if (receipt === null) {
+    if (currentNonce === null) return "wait"
+    const recordedNonce = hexToBigInt(rotation.installation.nonce)
+    if (currentNonce === recordedNonce) return "rebroadcast"
+    return currentNonce > recordedNonce ? "retry" : "wait"
+  }
+  if (receipt.success) return "wait"
   return finalizedBlockNumber !== null &&
     receipt.blockNumber <= finalizedBlockNumber
     ? "retry"
     : "wait"
 }
 
-export const submitSliceWalletGenericGrantInstallation = async <
-  Prepared,
-  Request
->({
+export const broadcastSliceWalletGenericGrantInstallation = async ({
+  installation,
+  transport
+}: {
+  installation: StoredGenericGrantInstallation
+  transport: (installation: StoredGenericGrantInstallation) => Promise<Hex>
+}) => {
+  const transportedHash = await transport(installation)
+  if (
+    transportedHash.toLowerCase() !==
+    installation.userOperationHash.toLowerCase()
+  ) {
+    throw new Error(
+      "Bundler returned a mismatched wallet permission installation hash."
+    )
+  }
+  return transportedHash
+}
+
+export const submitSliceWalletGenericGrantInstallation = async <Prepared>({
   initialRotation,
   isDefiniteTransportRejection,
   prepare,
@@ -244,24 +272,21 @@ export const submitSliceWalletGenericGrantInstallation = async <
   initialRotation: StoredGenericGrantRotation
   isDefiniteTransportRejection: (error: Error) => boolean
   prepare: () => Promise<Prepared>
-  sign: (prepared: Prepared) => Promise<{
-    installation: StoredGenericGrantInstallation
-    request: Request
-  }>
+  sign: (prepared: Prepared) => Promise<StoredGenericGrantInstallation>
   setPhase: (
     rotation: StoredGenericGrantRotation,
     phase: StoredGenericGrantRotation["phase"],
     installation?: StoredGenericGrantInstallation | null
   ) => Promise<StoredGenericGrantRotation> | StoredGenericGrantRotation
-  transport: (request: Request) => Promise<Hex>
+  transport: (installation: StoredGenericGrantInstallation) => Promise<Hex>
 }) => {
-  const prepared = await sign(await prepare())
+  const installation = await sign(await prepare())
   let transportPending: StoredGenericGrantRotation
   try {
     transportPending = await setPhase(
       initialRotation,
       "transport-pending",
-      prepared.installation
+      installation
     )
   } catch (error) {
     try {
@@ -274,9 +299,11 @@ export const submitSliceWalletGenericGrantInstallation = async <
     }
     throw error
   }
-  let transportedHash: Hex
   try {
-    transportedHash = await transport(prepared.request)
+    await broadcastSliceWalletGenericGrantInstallation({
+      installation,
+      transport
+    })
   } catch (error) {
     if (error instanceof Error && isDefiniteTransportRejection(error)) {
       try {
@@ -290,21 +317,51 @@ export const submitSliceWalletGenericGrantInstallation = async <
     }
     throw error
   }
+  return {
+    rotation: await setPhase(transportPending, "submitted", installation)
+  }
+}
+
+const normalizePreparedGenericGrantInstallation = (
+  userOperation: UserOperation<"0.7">
+): UserOperation<"0.7"> => {
+  const {
+    authorization,
+    factory,
+    factoryData,
+    paymaster,
+    paymasterData,
+    paymasterPostOpGasLimit,
+    paymasterVerificationGasLimit,
+    ...base
+  } = userOperation
+  if (authorization !== undefined) {
+    throw new Error(
+      "Generic permission installation does not support EIP-7702 authorization."
+    )
+  }
   if (
-    transportedHash.toLowerCase() !==
-    prepared.installation.userOperationHash.toLowerCase()
+    paymaster !== undefined &&
+    (paymasterPostOpGasLimit === undefined ||
+      paymasterVerificationGasLimit === undefined)
   ) {
     throw new Error(
-      "Bundler returned a mismatched wallet permission installation hash."
+      "Prepared wallet permission installation paymaster fields are incomplete."
     )
   }
   return {
-    request: prepared.request,
-    rotation: await setPhase(
-      transportPending,
-      "submitted",
-      prepared.installation
-    )
+    ...base,
+    ...(factory === undefined
+      ? {}
+      : { factory, factoryData: factoryData ?? "0x" }),
+    ...(paymaster === undefined
+      ? {}
+      : {
+          paymaster,
+          paymasterData: paymasterData ?? "0x",
+          paymasterPostOpGasLimit,
+          paymasterVerificationGasLimit
+        })
   }
 }
 
@@ -650,6 +707,25 @@ const createSliceWalletChainRuntime = (
         : { defaultPaymasterUrl: config.paymasterUrl }),
       ...(paymasterService === undefined ? {} : { paymasterService })
     })
+
+  const transportGenericGrantInstallation = (
+    bundler: ReturnType<typeof createAccountBundler>,
+    installation: StoredGenericGrantInstallation
+  ) =>
+    bundler.request(
+      {
+        method: "eth_sendUserOperation",
+        params: [
+          formatUserOperationRequest(
+            deserializeStoredGenericGrantInstallationUserOperation(
+              installation.userOperation
+            )
+          ),
+          installation.entryPoint
+        ]
+      },
+      { retryCount: 0 }
+    )
 
   const waitForSuccessfulUserOperation = async (hash: Hex) => {
     const receipt = await receiptClient.waitForUserOperationReceipt({ hash })
@@ -1002,6 +1078,8 @@ const createSliceWalletChainRuntime = (
       right.installation?.nonce.toLowerCase() &&
     left.installation?.sender.toLowerCase() ===
       right.installation?.sender.toLowerCase() &&
+    JSON.stringify(left.installation?.userOperation) ===
+      JSON.stringify(right.installation?.userOperation) &&
     left.installation?.userOperationHash.toLowerCase() ===
       right.installation?.userOperationHash.toLowerCase() &&
     storedSliceWalletGrantsMatch(left.predecessor, right.predecessor) &&
@@ -1035,7 +1113,7 @@ const createSliceWalletChainRuntime = (
     const base = {
       predecessor: rotation.predecessor,
       replacement: rotation.replacement,
-      version: 2 as const
+      version: 3 as const
     }
     if (phase === "prepared") {
       return persistRotation({ ...base, phase })
@@ -1081,49 +1159,50 @@ const createSliceWalletChainRuntime = (
         }) as Promise<UserOperation<"0.7">>,
       setPhase: setRotationPhase,
       sign: async (prepared) => {
+        const canonicalPrepared =
+          normalizePreparedGenericGrantInstallation(prepared)
         const expectedCallData = await wallet.rootAccount.encodeCalls(
           installation.calls
         )
         if (
-          !isAddressEqual(prepared.sender, wallet.rootAccount.address) ||
-          prepared.callData.toLowerCase() !== expectedCallData.toLowerCase()
+          !isAddressEqual(
+            canonicalPrepared.sender,
+            wallet.rootAccount.address
+          ) ||
+          canonicalPrepared.callData.toLowerCase() !==
+            expectedCallData.toLowerCase()
         ) {
           throw new Error(
             "Prepared wallet permission installation identity is invalid."
           )
         }
         const request: UserOperation<"0.7"> = {
-          ...prepared,
-          signature: await wallet.rootAccount.signUserOperation(prepared)
+          ...canonicalPrepared,
+          signature:
+            await wallet.rootAccount.signUserOperation(canonicalPrepared)
         }
+        const userOperation =
+          serializeStoredGenericGrantInstallationUserOperation(request)
+        const replay =
+          deserializeStoredGenericGrantInstallationUserOperation(userOperation)
         const userOperationHash = getUserOperationHash({
           chainId: config.chain.id,
           entryPointAddress: wallet.rootAccount.entryPoint.address,
           entryPointVersion: "0.7",
-          userOperation: request
+          userOperation: replay
         })
         return {
-          installation: {
-            callDataHash: keccak256(request.callData),
-            entryPoint: wallet.rootAccount.entryPoint.address,
-            nonce: toHex(request.nonce),
-            sender: request.sender,
-            userOperationHash
-          },
-          request
+          callDataHash: keccak256(userOperation.callData),
+          entryPoint:
+            wallet.rootAccount.entryPoint.address.toLowerCase() as Address,
+          nonce: userOperation.nonce,
+          sender: userOperation.sender,
+          userOperation,
+          userOperationHash
         }
       },
-      transport: (request) =>
-        bundler.request(
-          {
-            method: "eth_sendUserOperation",
-            params: [
-              formatUserOperationRequest(request),
-              wallet.rootAccount.entryPoint.address
-            ]
-          },
-          { retryCount: 0 }
-        )
+      transport: (storedInstallation) =>
+        transportGenericGrantInstallation(bundler, storedInstallation)
     })
     const submittedInstallation = submitted.rotation.installation
     if (submittedInstallation === undefined) {
@@ -1270,6 +1349,7 @@ const createSliceWalletChainRuntime = (
   ) => {
     const installation = await getPermissionInstallCalls(session)
     let receipt: { blockNumber: bigint; success: boolean } | null = null
+    let currentNonce: bigint | null = null
     let finalizedBlockNumber: bigint | null = null
     if (rotation.installation !== undefined) {
       const wallet = await requireActiveWallet()
@@ -1326,6 +1406,13 @@ const createSliceWalletChainRuntime = (
           blockNumber: result.receipt.blockNumber,
           success: result.success
         }
+      } else if (installation.calls.length > 0) {
+        try {
+          currentNonce = await wallet.rootAccount.getNonce()
+        } catch {
+          // Without the canonical nonce, a recorded operation cannot be
+          // safely replayed or replaced.
+        }
       }
       if (receipt !== null && !receipt.success) {
         try {
@@ -1338,6 +1425,7 @@ const createSliceWalletChainRuntime = (
       }
     }
     const action = getSliceWalletGenericGrantInstallationAction({
+      currentNonce,
       finalizedBlockNumber,
       installed: installation.calls.length === 0,
       receipt,
@@ -1349,15 +1437,30 @@ const createSliceWalletChainRuntime = (
         ? setRotationPhase(rotation, "installed")
         : rotation
     }
-    if (action === "wait") {
-      if (
-        rotation.phase === "transport-pending" &&
-        rotation.installation === undefined
-      ) {
+    if (action === "rebroadcast") {
+      const storedInstallation = rotation.installation
+      if (storedInstallation === undefined) {
         throw new Error(
-          "Wallet permission installation is still ambiguous; retry after inclusion."
+          "Replayable wallet permission installation identity is missing."
         )
       }
+      const wallet = await requireActiveWallet()
+      const bundler = createAccountBundler(wallet.rootAccount)
+      await broadcastSliceWalletGenericGrantInstallation({
+        installation: storedInstallation,
+        transport: (candidate) =>
+          transportGenericGrantInstallation(bundler, candidate)
+      })
+      const submitted = setRotationPhase(
+        rotation,
+        "submitted",
+        storedInstallation
+      )
+      await waitForSuccessfulUserOperation(storedInstallation.userOperationHash)
+      await assertPermissionInstalled(session)
+      return setRotationPhase(submitted, "installed")
+    }
+    if (action === "wait") {
       if (receipt?.success) {
         throw new Error(
           "Wallet permission installation succeeded but is not yet observable onchain."
@@ -1653,7 +1756,7 @@ const createSliceWalletChainRuntime = (
               permissions,
               session
             }),
-            version: 2
+            version: 3
           } satisfies StoredGenericGrantRotation
           try {
             rotation = persistRotation(prepared)
