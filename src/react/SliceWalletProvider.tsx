@@ -18,7 +18,7 @@ import {
   isAddressEqual
 } from "viem"
 import { anvil } from "viem/chains"
-import { useConnection } from "wagmi"
+import { useConnection, useConnectionEffect } from "wagmi"
 import {
   type createSliceWalletCeremonyKernelAccount,
   getSliceWalletChainManifest
@@ -41,7 +41,10 @@ import type {
   SliceWalletStatus
 } from "../types/react"
 import { sliceWalletConnectorId } from "../wagmi"
-import { useSliceWalletAccountHydration } from "./accountHydration"
+import {
+  shouldLockReplacedSliceAccount,
+  useSliceWalletAccountHydration
+} from "./accountHydration"
 import {
   useSliceWalletCeremonyActions,
   useSliceWalletCeremonyConnection
@@ -110,6 +113,12 @@ export function SliceWalletProvider({
     connection.connector.id === sliceWalletConnectorId
       ? connection.address
       : null
+  const [sessionAccount, setSessionAccount] = useState<Address | null>(() =>
+    connection.address !== undefined &&
+    connection.connector?.id === sliceWalletConnectorId
+      ? connection.address
+      : null
+  )
   const [pendingAction, setPendingAction] =
     useState<SliceWalletPendingAction>(null)
   const [error, setError] = useState<string | null>(null)
@@ -131,8 +140,20 @@ export function SliceWalletProvider({
     },
     [notifications]
   )
+  // Reconnection temporarily hides the active account. Preserve the API
+  // session until Wagmi reports a real established disconnect.
+  useConnectionEffect({
+    config: wagmiConfig,
+    onDisconnect() {
+      setSessionAccount(null)
+    }
+  })
+  useEffect(() => {
+    if (connection.status !== "connected") return
+    setSessionAccount(connectedSliceAccount)
+  }, [connectedSliceAccount, connection.status])
   const sessionIntegration = useSliceWalletSessionIntegration({
-    account: connectedSliceAccount,
+    account: sessionAccount,
     ...(sessionConfig === undefined
       ? {}
       : {
@@ -286,10 +307,14 @@ export function SliceWalletProvider({
     const previousAccount = previousSliceAccountRef.current
     previousSliceAccountRef.current = connectedSliceAccount
     managementLifecycle.setAccount(connectedSliceAccount)
+    // Explicit disconnect locking belongs to the connector runtime. This path
+    // only locks a signer when a different Slice account replaces it.
     if (
       previousAccount !== null &&
-      (connectedSliceAccount === null ||
-        !isAddressEqual(previousAccount, connectedSliceAccount))
+      shouldLockReplacedSliceAccount({
+        connectedAccount: connectedSliceAccount,
+        previousAccount
+      })
     ) {
       void getFrameClient()
         .then((frameClient) =>
