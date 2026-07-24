@@ -59,6 +59,9 @@ describe("store management call policy", () => {
     expect(productsModuleSelectors).not.toContain(
       selectorFor(productsModuleAbi, "pay")
     )
+    expect(productsModuleSelectors).toContain(
+      selectorFor(productsModuleAbi, "multicall")
+    )
   })
 
   it("allows configureProduct only on generated product-action hooks", () => {

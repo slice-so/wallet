@@ -21,6 +21,7 @@ export type WalletDelegationOperation =
   | "configureProduct"
   | "editProduct"
   | "editProductMetadata"
+  | "multicall"
   | "orders:read"
   | "orders:update"
   | "removeProduct"

@@ -15,6 +15,7 @@ export const walletDelegationOperationValues = [
   "addProduct",
   "editProduct",
   "editProductMetadata",
+  "multicall",
   "removeProduct",
   "setProductType",
   "setStoreConfig",

@@ -33,6 +33,7 @@ export const sliceStoreManagementOperations = [
   "addProduct",
   "editProduct",
   "editProductMetadata",
+  "multicall",
   "removeProduct",
   "setProductType",
   "setStoreConfig",
@@ -76,11 +77,17 @@ const addCurrenciesSelector = getSelector({
   abi: slicerAbi,
   functionName: "_addCurrencies"
 })
+const multicallSelector = getSelector({
+  abi: productsModuleAbi,
+  functionName: "multicall"
+})
 
 const productManagementSelectors = sliceStoreManagementOperations
   .filter(
     (operation) =>
-      operation !== "configureProduct" && operation !== "_addCurrencies"
+      operation !== "configureProduct" &&
+      operation !== "_addCurrencies" &&
+      operation !== "multicall"
   )
   .map((functionName) => getSelector({ abi: productsModuleAbi, functionName }))
 
@@ -194,6 +201,12 @@ export const createSliceStoreManagementPolicyDescriptor = ({
         target: productsModuleAddress,
         valueLimit: 0n
       })),
+      {
+        parameterRules: [],
+        selector: multicallSelector,
+        target: productsModuleAddress,
+        valueLimit: 0n
+      },
       ...generatedHookAddresses.map((target) => ({
         parameterRules: [slicerIdRule],
         selector: configureProductSelector,

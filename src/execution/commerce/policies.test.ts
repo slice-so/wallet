@@ -58,6 +58,31 @@ describe("Slice store-management wallet policy", () => {
     ).not.toThrow()
   })
 
+  test("accepts ProductsModule multicall for batched management calls", () => {
+    const setProductType = encodeFunctionData({
+      abi: productsModuleAbi,
+      functionName: "setProductType",
+      args: [2913n, 1n, "2"]
+    })
+
+    expect(() =>
+      assertWalletCallsMatchPolicy(
+        [
+          {
+            data: encodeFunctionData({
+              abi: productsModuleAbi,
+              functionName: "multicall",
+              args: [[setProductType]]
+            }),
+            to: sliceProductsModuleAddress,
+            value: 0n
+          }
+        ],
+        policy
+      )
+    ).not.toThrow()
+  })
+
   test("accepts adding currencies on the bound slicer", () => {
     expect(() =>
       assertWalletCallsMatchPolicy(

@@ -20,6 +20,7 @@ export const storeManagementAllowedOperations = [
   "addProduct",
   "editProduct",
   "editProductMetadata",
+  "multicall",
   "removeProduct",
   "setProductType",
   "setStoreConfig",
@@ -48,7 +49,9 @@ const getFunctionSelector = ({
 const productManagementSelectors = storeManagementAllowedOperations
   .filter(
     (operation) =>
-      operation !== "configureProduct" && operation !== "_addCurrencies"
+      operation !== "configureProduct" &&
+      operation !== "_addCurrencies" &&
+      operation !== "multicall"
   )
   .map((functionName) =>
     getFunctionSelector({ abi: productsModuleAbi, functionName })
@@ -61,6 +64,10 @@ const configureProductSelector = getFunctionSelector({
 const addCurrenciesSelector = getFunctionSelector({
   abi: slicerAbi,
   functionName: "_addCurrencies"
+})
+const multicallSelector = getFunctionSelector({
+  abi: productsModuleAbi,
+  functionName: "multicall"
 })
 
 const generatedHookAddresses = generatedHookAddressList
@@ -76,6 +83,10 @@ export const createStoreManagementCallPolicy = (
         selector,
         target: productsModuleAddress
       })),
+      {
+        selector: multicallSelector,
+        target: productsModuleAddress
+      },
       ...generatedHookAddresses.map((target) => ({
         selector: configureProductSelector,
         target
