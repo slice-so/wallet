@@ -20,7 +20,8 @@ import {
   erc20Abi,
   type Hex,
   isAddress,
-  isAddressEqual
+  isAddressEqual,
+  zeroAddress
 } from "viem"
 import { anvil, base } from "viem/chains"
 import type {
@@ -35,7 +36,10 @@ import {
   getSliceCoreAddress,
   isGeneratedHookAddress
 } from "../generated/commerceFacts"
-import { sliceKernelTimelockPolicyAddress } from "./sliceKernelAddresses"
+import {
+  sliceKernelERC20AllowanceGuardAddress,
+  sliceKernelTimelockPolicyAddress
+} from "./sliceKernelAddresses"
 import {
   kernelTimelockPolicyCancelAbi,
   kernelValidationManagementAbi
@@ -60,6 +64,19 @@ const acceptedProductsModuleFunctions = [
   "removeProduct",
   "setProductType",
   "setStoreConfig"
+] as const
+const erc20AllowanceGuardAbi = [
+  {
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "spender", type: "address" },
+      { name: "expected", type: "uint256" }
+    ],
+    name: "assertAllowance",
+    outputs: [],
+    stateMutability: "view",
+    type: "function"
+  }
 ] as const
 const acceptedSliceCoreFunctions = ["slice"] as const
 const acceptedKernelValidationManagementFunctions = [
@@ -132,6 +149,35 @@ const isAcceptedTokenApproval = ({
       normalizeAddress(spender) === normalizeAddress(fundsModuleAddress) ||
       ((chainId === base.id || chainId === anvil.id) &&
         normalizeAddress(spender) === normalizeAddress(cdpBasePaymasterAddress))
+    )
+  } catch {
+    return false
+  }
+}
+
+const isAcceptedAllowanceAssertion = ({
+  data,
+  productsModuleAddress,
+  target,
+  value
+}: SliceSmartAccountCall & { productsModuleAddress: Address }) => {
+  if (
+    value !== 0n ||
+    !isAddressEqual(target, sliceKernelERC20AllowanceGuardAddress)
+  ) {
+    return false
+  }
+  try {
+    const decoded = decodeFunctionData({
+      abi: erc20AllowanceGuardAbi,
+      data
+    })
+    if (decoded.functionName !== "assertAllowance") return false
+    const [token, spender, expected] = decoded.args
+    return (
+      isAddress(token) &&
+      isAddressEqual(spender, productsModuleAddress) &&
+      expected > 0n
     )
   } catch {
     return false
@@ -259,6 +305,14 @@ export const classifySliceSmartAccountCall = (
   ) {
     return "auxiliary"
   }
+  if (
+    isAcceptedAllowanceAssertion({
+      ...call,
+      productsModuleAddress
+    })
+  ) {
+    return "auxiliary"
+  }
   return "unknown"
 }
 
@@ -317,84 +371,140 @@ export const isAcceptedSliceCallsOutcome = ({
 
 export const getSliceCheckoutSpendIntentFromCalls = (
   calls: readonly SliceSmartAccountCall[],
-  chainId: number
+  chainId: number,
+  expectedBuyer?: Address
 ): SliceCheckoutSpendIntent | null => {
   const productsModuleAddress = getProductsModuleAddress(chainId)
   const intent: SliceCheckoutSpendIntent = {
     approvals: [],
+    allowanceAssertions: [],
     nativeValue: 0n,
     payments: [],
     purchases: []
   }
-  let hasCheckoutCall = false
+  if (calls.length === 0 || calls.length % 2 === 0) return null
+  const checkoutCall = calls[calls.length - 1]
+  if (!isAddressEqual(checkoutCall.target, productsModuleAddress)) return null
 
-  for (const call of calls) {
-    if (!isAddressEqual(call.target, productsModuleAddress)) {
-      if (call.value !== 0n) return null
-
-      try {
-        const decoded = decodeFunctionData({ abi: erc20Abi, data: call.data })
-        if (decoded.functionName !== "approve") return null
-
-        const [spender, amount] = decoded.args
-        if (!isAddressEqual(spender, productsModuleAddress) || amount === 0n) {
-          return null
-        }
-        intent.approvals.push({ amount, currency: call.target })
-        continue
-      } catch {
-        return null
-      }
-    }
-
-    let decoded: ReturnType<typeof decodeFunctionData<typeof productsModuleAbi>>
-    try {
-      decoded = decodeFunctionData({
-        abi: productsModuleAbi,
-        data: call.data
-      })
-    } catch {
-      continue
-    }
-
-    if (decoded.functionName !== "buy" && decoded.functionName !== "pay") {
+  let previousToken: Address | undefined
+  for (let index = 0; index < calls.length - 1; index += 2) {
+    const approvalCall = calls[index]
+    const assertionCall = calls[index + 1]
+    if (
+      approvalCall.value !== 0n ||
+      assertionCall.value !== 0n ||
+      !isAddressEqual(
+        assertionCall.target,
+        sliceKernelERC20AllowanceGuardAddress
+      )
+    ) {
       return null
     }
-
-    hasCheckoutCall = true
-    intent.nativeValue += call.value
-
-    const [buyer, paymentParams] =
-      decoded.functionName === "buy"
-        ? [decoded.args[0], decoded.args[2]]
-        : [decoded.args[0], decoded.args[1]]
-
-    for (const payment of paymentParams) {
-      intent.payments.push({
-        amount: payment.amount,
-        currency: payment.currency
+    try {
+      const approval = decodeFunctionData({
+        abi: erc20Abi,
+        data: approvalCall.data
       })
-    }
-
-    if (decoded.functionName === "buy") {
-      const [, purchases, , referrer, platform] = decoded.args
-      for (const purchase of purchases) {
-        intent.purchases.push({
-          buyer,
-          currency: purchase.currency,
-          platform,
-          pricingData: [...purchase.data.pricingData],
-          products: purchase.products.map((product) => ({
-            productId: product.productId,
-            quantity: product.quantity,
-            variantId: product.variantId
-          })),
-          referrer,
-          slicerId: purchase.slicerId
-        })
+      const assertion = decodeFunctionData({
+        abi: erc20AllowanceGuardAbi,
+        data: assertionCall.data
+      })
+      if (
+        approval.functionName !== "approve" ||
+        assertion.functionName !== "assertAllowance"
+      ) {
+        return null
       }
+      const [spender, amount] = approval.args
+      const [token, assertionSpender, expected] = assertion.args
+      if (
+        amount === 0n ||
+        !isAddressEqual(spender, productsModuleAddress) ||
+        !isAddressEqual(token, approvalCall.target) ||
+        !isAddressEqual(assertionSpender, productsModuleAddress) ||
+        expected !== amount ||
+        (previousToken !== undefined &&
+          previousToken.toLowerCase() >= token.toLowerCase())
+      ) {
+        return null
+      }
+      previousToken = token
+      intent.approvals.push({ amount, currency: token })
+      intent.allowanceAssertions.push({ amount: expected, currency: token })
+    } catch {
+      return null
     }
   }
 
-  return hasCheckoutCall ? intent : null
+  let decoded: ReturnType<typeof decodeFunctionData<typeof productsModuleAbi>>
+  try {
+    decoded = decodeFunctionData({
+      abi: productsModuleAbi,
+      data: checkoutCall.data
+    })
+  } catch {
+    return null
+  }
+  if (decoded.functionName !== "buy" && decoded.functionName !== "pay") {
+    return null
+  }
+
+  intent.nativeValue = checkoutCall.value
+  const [buyer, paymentParams] =
+    decoded.functionName === "buy"
+      ? [decoded.args[0], decoded.args[2]]
+      : [decoded.args[0], decoded.args[1]]
+  if (expectedBuyer !== undefined && !isAddressEqual(buyer, expectedBuyer)) {
+    return null
+  }
+  if (
+    (decoded.functionName === "buy" && decoded.args[1].length === 0) ||
+    (decoded.functionName === "pay" && paymentParams.length === 0)
+  ) {
+    return null
+  }
+
+  const usedCurrencies = new Set<string>()
+  for (const payment of paymentParams) {
+    intent.payments.push({
+      amount: payment.amount,
+      currency: payment.currency
+    })
+    if (!isAddressEqual(payment.currency, zeroAddress)) {
+      usedCurrencies.add(payment.currency.toLowerCase())
+    }
+  }
+
+  if (decoded.functionName === "buy") {
+    const [, purchases, , referrer, platform] = decoded.args
+    for (const purchase of purchases) {
+      if (!isAddressEqual(purchase.currency, zeroAddress)) {
+        usedCurrencies.add(purchase.currency.toLowerCase())
+      }
+      intent.purchases.push({
+        buyer,
+        currency: purchase.currency,
+        platform,
+        pricingData: [...purchase.data.pricingData],
+        products: purchase.products.map((product) => ({
+          productId: product.productId,
+          quantity: product.quantity,
+          variantId: product.variantId
+        })),
+        referrer,
+        slicerId: purchase.slicerId
+      })
+    }
+  }
+
+  const approvedCurrencies = new Set(
+    intent.approvals.map(({ currency }) => currency.toLowerCase())
+  )
+  if (
+    approvedCurrencies.size !== usedCurrencies.size ||
+    [...usedCurrencies].some((currency) => !approvedCurrencies.has(currency))
+  ) {
+    return null
+  }
+  return intent
 }

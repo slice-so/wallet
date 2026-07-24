@@ -4,7 +4,6 @@ import type {
   SliceWalletCeremonyContinuationResult,
   SliceWalletPendingCeremony
 } from "./pendingCeremony"
-import type { SerializedWalletPolicyDescriptor } from "./policy"
 import type {
   SliceWalletCeremonySessionResult,
   SliceWalletSessionConnectInput,
@@ -76,6 +75,9 @@ export type SliceWalletParameters = {
   ceremonyMode?: SliceWalletCeremonyMode
   chainIds?: readonly number[]
   defaultChainId?: number
+  grantPermissions?: SliceWalletGrantPermissionsRequest & {
+    optional?: boolean
+  }
   idOrigin?: string
   session?: {
     audience: string
@@ -130,15 +132,46 @@ export type SliceWalletGenericPermission = {
   type: "slice-call"
 }
 
-export type SliceWalletGenericGrant = {
+export type SliceWalletGenericPermissionRule = Omit<
+  SliceWalletGenericPermission,
+  "policies"
+>
+
+export type SliceWalletGenericRateLimit = {
+  count: number
+  intervalSec: number
+}
+
+export type SliceWalletGrantPermissionsRequest = {
+  expiry: number
+  permissions: readonly SliceWalletGenericPermission[]
+}
+
+export type SliceWalletPermissionRequestInput = {
+  expiry: number
+  rateLimit: SliceWalletGenericRateLimit
+  rules: readonly SliceWalletGenericPermissionRule[]
+}
+
+export type SliceWalletPermissionGrant = {
   account: Address
   chainId: number
   createdAt: number
   expiresAt: number
   permissionId: Hex
-  policy: SerializedWalletPolicyDescriptor
-  publicKey: Hex
-  signerId: Address
+  permissions: readonly SliceWalletGenericPermission[]
+  version: "1"
+}
+
+export type SliceWalletPermissionCapabilities = {
+  maximumCallsPerOperation: 1
+  supportedTemplates: readonly [
+    "native-transfer",
+    "erc20-transfer",
+    "erc20-approve",
+    "erc20-transfer-from"
+  ]
+  version: "1"
 }
 
 export type SliceWalletEip6963ProviderInfo = {

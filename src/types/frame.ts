@@ -213,10 +213,15 @@ export type SliceWalletFrameRequest =
       method: "signCoSignRequest"
       params: {
         challenge: Hex
+        challengeIssuedAt: number
         delegationId: string
         expiresAt: number
         session: SliceWalletFrameSessionKey
+        spendWindowId: string
         userOperation: SliceWalletUnsignedUserOperation
+        validUntil: number
+        windowEndExclusive: number
+        windowStart: number
       }
       version: 1
     }
@@ -355,6 +360,25 @@ export type SliceWalletBridgeGrantProofResponse =
   | {
       signature: Hex
       type: "slice-wallet:bridge-grant-proof"
+      version: 1
+    }
+  | {
+      error: string
+      type: "slice-wallet:bridge-error"
+      version: 1
+    }
+
+export type SliceWalletBridgeRegistrationProofRequest = {
+  digest: Hex
+  session: SliceWalletFrameSessionKey
+  type: "slice-wallet:bridge-sign-registration"
+  version: 1
+}
+
+export type SliceWalletBridgeRegistrationProofResponse =
+  | {
+      signature: Hex
+      type: "slice-wallet:bridge-registration-proof"
       version: 1
     }
   | {

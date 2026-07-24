@@ -5,6 +5,7 @@ import { createErc20ApproveCallRule, getWalletPermissionId } from "../policy"
 import type { SliceWalletProtocolValue } from "../types"
 import {
   parseSliceWalletBridgeRecord,
+  parseSliceWalletBridgeRegistrationProofResponse,
   parseSliceWalletCeremonyAccountResponse,
   parseSliceWalletCeremonyResponse,
   parseSliceWalletCeremonyRootSignRequest,
@@ -243,6 +244,36 @@ describe("wallet ceremony protocol parser", () => {
         challenge
       )
     ).toThrow("normalized origin")
+  })
+
+  it("strictly parses pending-key registration proofs", () => {
+    const signature = `0x${"66".repeat(64)}` as Hex
+    expect(
+      parseSliceWalletBridgeRegistrationProofResponse({
+        signature,
+        type: "slice-wallet:bridge-registration-proof",
+        version: 1
+      })
+    ).toEqual({
+      signature,
+      type: "slice-wallet:bridge-registration-proof",
+      version: 1
+    })
+    expect(() =>
+      parseSliceWalletBridgeRegistrationProofResponse({
+        signature: "0x12",
+        type: "slice-wallet:bridge-registration-proof",
+        version: 1
+      })
+    ).toThrow("invalid length")
+    expect(() =>
+      parseSliceWalletBridgeRegistrationProofResponse({
+        extra: true,
+        signature,
+        type: "slice-wallet:bridge-registration-proof",
+        version: 1
+      })
+    ).toThrow("unknown field")
   })
 
   it("binds management bridge records to the challenged store", () => {

@@ -8,15 +8,25 @@ import {
   stringToHex
 } from "viem"
 import { assertSliceWalletAccountIndex } from "../accountIndex"
+import { maximumBrowserGenericGrantTtlSec } from "../constants"
+import { getSliceWalletP256SignerId } from "../p256Server"
 import {
+  getWalletPermissionId,
+  getWalletPolicyHash,
   parseSerializedWalletPolicyDescriptor,
   serializeWalletPolicyDescriptor
 } from "../policy"
-import type { SliceWalletProviderValue, WalletPolicyJsonValue } from "../types"
+import type {
+  SliceWalletGenericPermission,
+  SliceWalletProviderValue,
+  SliceWalletRegistryCredential,
+  WalletPolicyJsonValue
+} from "../types"
 import type {
   StoredGenericGrant,
   StoredWalletCall
 } from "../types/providerInternal"
+import { parseSliceWalletGrantPermissions } from "./protocol"
 
 const accountStorageKey = "slice.wallet.provider.account"
 const grantStorageKey = (chainId: number, account: Address) =>
@@ -24,11 +34,18 @@ const grantStorageKey = (chainId: number, account: Address) =>
 const callStoragePrefix = "slice.wallet.provider.call:"
 const callRetentionMs = 24 * 60 * 60 * 1000
 
-type StoredAccount = {
-  accountAddress: Address
-  accountIndex: number
-  credentialIdHash: Hex
-}
+type StoredAccount = Pick<
+  SliceWalletRegistryCredential,
+  | "accountAddress"
+  | "accountIndex"
+  | "createdAt"
+  | "credentialIdHash"
+  | "factoryVersion"
+  | "publicKey"
+  | "recoveryPermissionId"
+  | "recoverySignerAddress"
+  | "registrationKind"
+>
 
 type StoredRecord = {
   readonly [key: string]: SliceWalletProviderValue | undefined
@@ -85,7 +102,13 @@ export const readStoredSliceWalletAccount = (
     !hasOnlyKeys(value, [
       "accountAddress",
       "accountIndex",
-      "credentialIdHash"
+      "createdAt",
+      "credentialIdHash",
+      "factoryVersion",
+      "publicKey",
+      "recoveryPermissionId",
+      "recoverySignerAddress",
+      "registrationKind"
     ]) ||
     typeof value.accountAddress !== "string" ||
     !isAddress(value.accountAddress) ||
@@ -95,7 +118,25 @@ export const readStoredSliceWalletAccount = (
     value.accountIndex > 31 ||
     typeof value.credentialIdHash !== "string" ||
     !isHex(value.credentialIdHash, { strict: true }) ||
-    hexToBytes(value.credentialIdHash).length !== 32
+    hexToBytes(value.credentialIdHash).length !== 32 ||
+    typeof value.createdAt !== "string" ||
+    !Number.isFinite(Date.parse(value.createdAt)) ||
+    typeof value.factoryVersion !== "string" ||
+    value.factoryVersion.length === 0 ||
+    typeof value.publicKey !== "string" ||
+    !/^0x04[0-9a-fA-F]{128}$/.test(value.publicKey) ||
+    (value.recoveryPermissionId !== null &&
+      (typeof value.recoveryPermissionId !== "string" ||
+        !/^0x[0-9a-fA-F]{8}$/.test(value.recoveryPermissionId))) ||
+    (value.recoverySignerAddress !== null &&
+      (typeof value.recoverySignerAddress !== "string" ||
+        !isAddress(value.recoverySignerAddress))) ||
+    (value.recoveryPermissionId === null) !==
+      (value.recoverySignerAddress === null) ||
+    (value.registrationKind !== "device" &&
+      value.registrationKind !== "existing_account" &&
+      value.registrationKind !== "initial" &&
+      value.registrationKind !== "sub_account")
   ) {
     remove(storage, accountStorageKey)
     return null
@@ -103,7 +144,13 @@ export const readStoredSliceWalletAccount = (
   return {
     accountAddress: value.accountAddress,
     accountIndex: assertSliceWalletAccountIndex(value.accountIndex),
-    credentialIdHash: value.credentialIdHash
+    createdAt: value.createdAt,
+    credentialIdHash: value.credentialIdHash,
+    factoryVersion: value.factoryVersion,
+    publicKey: value.publicKey as Hex,
+    recoveryPermissionId: value.recoveryPermissionId as Hex | null,
+    recoverySignerAddress: value.recoverySignerAddress as Address | null,
+    registrationKind: value.registrationKind
   }
 }
 
@@ -132,6 +179,7 @@ export const readStoredSliceWalletGrant = (
       "enableSignature",
       "expiresAt",
       "permissionId",
+      "permissions",
       "policy",
       "publicKey",
       "signerId"
@@ -142,9 +190,11 @@ export const readStoredSliceWalletGrant = (
     !Number.isSafeInteger(value.chainId) ||
     typeof value.createdAt !== "number" ||
     !Number.isSafeInteger(value.createdAt) ||
+    value.createdAt > now ||
     typeof value.expiresAt !== "number" ||
     !Number.isSafeInteger(value.expiresAt) ||
     value.expiresAt <= now ||
+    value.expiresAt - value.createdAt > maximumBrowserGenericGrantTtlSec ||
     typeof value.permissionId !== "string" ||
     !/^0x[0-9a-fA-F]{8}$/.test(value.permissionId) ||
     typeof value.publicKey !== "string" ||
@@ -153,6 +203,9 @@ export const readStoredSliceWalletGrant = (
     !isAddress(value.signerId) ||
     typeof value.enableSignature !== "string" ||
     !isHex(value.enableSignature, { strict: true }) ||
+    !Array.isArray(value.permissions) ||
+    value.permissions.length < 1 ||
+    value.permissions.length > 16 ||
     typeof value.policy !== "object" ||
     value.policy === null ||
     Array.isArray(value.policy)
@@ -164,11 +217,33 @@ export const readStoredSliceWalletGrant = (
     const policy = parseSerializedWalletPolicyDescriptor(
       value.policy as WalletPolicyJsonValue
     )
+    const parsedRequest = parseSliceWalletGrantPermissions({
+      account: value.account,
+      chainId: value.chainId,
+      now: value.createdAt,
+      params: [
+        {
+          expiry: value.expiresAt,
+          permissions: value.permissions
+        }
+      ]
+    })
+    const expectedPolicy = {
+      ...parsedRequest.policy,
+      validAfter: policy.validAfter
+    }
     if (
       policy.grantKind !== "generic" ||
       policy.account.toLowerCase() !== value.account.toLowerCase() ||
       policy.chainId !== value.chainId ||
-      policy.validUntil !== value.expiresAt
+      policy.validUntil !== value.expiresAt ||
+      policy.validAfter > value.createdAt ||
+      value.createdAt - policy.validAfter > 600 ||
+      getWalletPolicyHash(expectedPolicy) !== getWalletPolicyHash(policy) ||
+      getSliceWalletP256SignerId(value.publicKey as Hex).toLowerCase() !==
+        value.signerId.toLowerCase() ||
+      getWalletPermissionId(policy, value.signerId).toLowerCase() !==
+        value.permissionId.toLowerCase()
     ) {
       throw new Error("Stored permission policy does not match its grant.")
     }
@@ -179,6 +254,8 @@ export const readStoredSliceWalletGrant = (
       enableSignature: value.enableSignature,
       expiresAt: value.expiresAt,
       permissionId: value.permissionId as Hex,
+      permissions:
+        parsedRequest.permissions as readonly SliceWalletGenericPermission[],
       policy: serializeWalletPolicyDescriptor(policy),
       publicKey: value.publicKey as Hex,
       signerId: value.signerId

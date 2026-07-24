@@ -54,7 +54,7 @@ export const formatSliceWalletExecutionGrantMessage = ({
   ].join("\n")
 }
 
-const coSignDomain = keccak256(stringToHex("Slice Wallet Checkout Co-sign v1"))
+const coSignDomain = keccak256(stringToHex("Slice Wallet Checkout Co-sign v2"))
 const sessionRequestDomain = keccak256(
   stringToHex("Slice Wallet Execution Session Request v1")
 )
@@ -111,20 +111,30 @@ export const hashSliceWalletCoSignRequest = ({
   accountNonce,
   appOrigin,
   challenge,
+  challengeIssuedAt,
   delegationId,
   expiresAt,
   proposalHash,
   session,
-  userOperationHash
+  spendWindowId,
+  userOperationHash,
+  validUntil,
+  windowEndExclusive,
+  windowStart
 }: {
   accountNonce: bigint
   appOrigin: string
   challenge: Hex
+  challengeIssuedAt: number
   delegationId: string
   expiresAt: number
   proposalHash: Hex
   session: SliceWalletFrameSession
+  spendWindowId: string
   userOperationHash: Hex
+  validUntil: number
+  windowEndExclusive: number
+  windowStart: number
 }) =>
   keccak256(
     encodeAbiParameters(
@@ -139,8 +149,13 @@ export const hashSliceWalletCoSignRequest = ({
         { name: "userOperationHash", type: "bytes32" },
         { name: "proposalHash", type: "bytes32" },
         { name: "challenge", type: "bytes32" },
-        { name: "accountNonce", type: "uint256" },
-        { name: "expiresAt", type: "uint48" }
+        { name: "challengeIssuedAt", type: "uint48" },
+        { name: "challengeExpiresAt", type: "uint48" },
+        { name: "spendWindowId", type: "string" },
+        { name: "windowStart", type: "uint48" },
+        { name: "windowEndExclusive", type: "uint48" },
+        { name: "validUntil", type: "uint48" },
+        { name: "accountNonce", type: "uint256" }
       ],
       [
         coSignDomain,
@@ -153,8 +168,13 @@ export const hashSliceWalletCoSignRequest = ({
         userOperationHash,
         proposalHash,
         challenge,
-        accountNonce,
-        expiresAt
+        challengeIssuedAt,
+        expiresAt,
+        spendWindowId,
+        windowStart,
+        windowEndExclusive,
+        validUntil,
+        accountNonce
       ]
     )
   )

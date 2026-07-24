@@ -21,5 +21,14 @@ export const sliceKernelWeightedEcdsaSignerAddress =
 export const sliceKernelWeightedP256SignerAddress =
   "0xAD6e9430244f179101207D614F3c810f987d0786" as const satisfies Address
 
+export const sliceKernelWeightedP256SignerV2Address =
+  "0x2Ea791821AeEf796EE4444f96e4B4F3A5e8BB5f5" as const satisfies Address
+
+export const sliceKernelSingleCallPolicyAddress =
+  "0xb01643c720984eaA0bc2A568c9a6E578655E7470" as const satisfies Address
+
+export const sliceKernelERC20AllowanceGuardAddress =
+  "0x5eF07dBFf4f1c4Ae5A386629193BAB686D40CC4B" as const satisfies Address
+
 export const sliceKernelTimelockPolicyAddress =
   "0x7f66B69270f96EC6793c545742CCBbBe028Be3f6" as const satisfies Address

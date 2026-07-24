@@ -27,6 +27,7 @@ export * from "./frame/messages"
 export {
   decodeSliceWalletWebAuthnAssertion,
   getSliceWalletP256SignerId,
+  hashSliceWalletWeightedP256CoSign,
   hashSliceWalletWeightedP256Proposal,
   normalizeSliceWalletP256Signature,
   verifySliceWalletP256

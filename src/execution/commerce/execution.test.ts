@@ -135,7 +135,12 @@ describe("Slice checkout execution client", () => {
       if (url.endsWith("/challenge")) {
         return Response.json({
           challenge: `0x${"55".repeat(32)}`,
-          expiresAt: now + 120
+          challengeIssuedAt: now,
+          expiresAt: now + 120,
+          spendWindowId: "lifetime",
+          validUntil: now + 120,
+          windowEndExclusive: now + 86_400,
+          windowStart: now - 100
         })
       }
       bodies.push(String(init?.body ?? ""))
@@ -143,7 +148,8 @@ describe("Slice checkout execution client", () => {
         coSignature: `0x${"66".repeat(65)}`,
         proposalHash: `0x${"77".repeat(32)}`,
         remainingUsdMicros: "99000000",
-        userOperationHash: `0x${"88".repeat(32)}`
+        userOperationHash: `0x${"88".repeat(32)}`,
+        validUntil: now + 120
       })
     }
     const client = createSliceWalletCheckoutExecutionClient({

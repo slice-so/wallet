@@ -51,7 +51,52 @@ const readJson = async <Result>(response: Response): Promise<Result> => {
 const isBytes32 = (value: string): value is Hex =>
   isHex(value, { strict: true }) && hexToBytes(value).length === 32
 
-const parseChallenge = (body: { challenge: string; expiresAt: number }) => {
+type CoSignChallengeWire = {
+  challenge: string
+  challengeIssuedAt: number
+  expiresAt: number
+  spendWindowId: string
+  validUntil: number
+  windowEndExclusive: number
+  windowStart: number
+}
+
+const parseChallenge = (body: CoSignChallengeWire) => {
+  const now = Math.floor(Date.now() / 1000)
+  if (
+    !isBytes32(body.challenge) ||
+    !Number.isSafeInteger(body.challengeIssuedAt) ||
+    !Number.isSafeInteger(body.expiresAt) ||
+    !Number.isSafeInteger(body.validUntil) ||
+    !Number.isSafeInteger(body.windowEndExclusive) ||
+    !Number.isSafeInteger(body.windowStart) ||
+    typeof body.spendWindowId !== "string" ||
+    body.spendWindowId.length === 0 ||
+    body.challengeIssuedAt > now ||
+    body.expiresAt <= now ||
+    body.expiresAt > body.challengeIssuedAt + 120 ||
+    body.validUntil <= now ||
+    body.validUntil > body.expiresAt ||
+    body.windowStart > body.challengeIssuedAt ||
+    body.windowEndExclusive <= body.challengeIssuedAt
+  ) {
+    throw new Error("Slice wallet execution challenge is invalid.")
+  }
+  return {
+    challenge: body.challenge,
+    challengeIssuedAt: body.challengeIssuedAt,
+    expiresAt: body.expiresAt,
+    spendWindowId: body.spendWindowId,
+    validUntil: body.validUntil,
+    windowEndExclusive: body.windowEndExclusive,
+    windowStart: body.windowStart
+  }
+}
+
+const parseSessionChallenge = (body: {
+  challenge: string
+  expiresAt: number
+}) => {
   if (
     !isBytes32(body.challenge) ||
     !Number.isSafeInteger(body.expiresAt) ||
@@ -220,7 +265,7 @@ export const createSliceWalletCheckoutExecutionClient = ({
 
   const createChallenge: SliceWalletCheckoutCoSignerClient["createChallenge"] =
     async (delegationId) => {
-      const body = await readJson<{ challenge: string; expiresAt: number }>(
+      const body = await readJson<CoSignChallengeWire>(
         await fetchImpl(
           endpoint(
             `/wallet-delegations/execution/p256/${encodeURIComponent(delegationId)}/co-sign/challenge`
@@ -237,6 +282,7 @@ export const createSliceWalletCheckoutExecutionClient = ({
       proposalHash: string
       remainingUsdMicros: string
       userOperationHash: string
+      validUntil: number
     }>(
       await fetchImpl(
         endpoint(
@@ -245,8 +291,13 @@ export const createSliceWalletCheckoutExecutionClient = ({
         {
           body: stringifyUserOperation({
             challenge: input.challenge,
+            challengeIssuedAt: input.challengeIssuedAt,
             expiresAt: input.expiresAt,
             proofSignature: input.proofSignature,
+            spendWindowId: input.spendWindowId,
+            validUntil: input.validUntil,
+            windowEndExclusive: input.windowEndExclusive,
+            windowStart: input.windowStart,
             userOperation: input.userOperation
           }),
           headers: { "content-type": "application/json" },
@@ -258,7 +309,9 @@ export const createSliceWalletCheckoutExecutionClient = ({
       !isHex(body.coSignature, { strict: true }) ||
       !isBytes32(body.proposalHash) ||
       !/^\d+$/.test(body.remainingUsdMicros) ||
-      !isBytes32(body.userOperationHash)
+      !isBytes32(body.userOperationHash) ||
+      !Number.isSafeInteger(body.validUntil) ||
+      body.validUntil !== input.validUntil
     ) {
       throw new Error("Slice checkout co-sign response is invalid.")
     }
@@ -266,7 +319,8 @@ export const createSliceWalletCheckoutExecutionClient = ({
       coSignature: body.coSignature,
       proposalHash: body.proposalHash,
       remainingUsdMicros: body.remainingUsdMicros,
-      userOperationHash: body.userOperationHash
+      userOperationHash: body.userOperationHash,
+      validUntil: body.validUntil
     }
   }
 
@@ -274,7 +328,7 @@ export const createSliceWalletCheckoutExecutionClient = ({
     coSign,
     createChallenge,
     createSessionChallenge: async (delegationId) =>
-      parseChallenge(
+      parseSessionChallenge(
         await readJson<{ challenge: string; expiresAt: number }>(
           await fetchImpl(
             endpoint(
@@ -455,7 +509,7 @@ export const createSliceWalletManagementExecutionClient = ({
   fetch: fetchImpl = fetch
 }: CreateSliceWalletCheckoutExecutionClientParameters): SliceWalletManagementExecutionClient => ({
   createSessionChallenge: async (delegationId) =>
-    parseChallenge(
+    parseSessionChallenge(
       await readJson<{ challenge: string; expiresAt: number }>(
         await fetchImpl(
           new URL(

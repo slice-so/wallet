@@ -63,6 +63,7 @@ export const resolveCanonicalSliceWalletConfig = (
     "ceremonyMode",
     "chainIds",
     "defaultChainId",
+    "grantPermissions",
     "idOrigin",
     "session",
     "transports"
@@ -221,6 +222,24 @@ export const resolveCanonicalSliceWalletConfig = (
   ) {
     throw invalidProviderRequest("Slice Wallet session config is invalid.")
   }
+  const grantPermissions = parameters.grantPermissions
+  if (
+    grantPermissions !== undefined &&
+    (typeof grantPermissions !== "object" ||
+      grantPermissions === null ||
+      Array.isArray(grantPermissions) ||
+      Object.keys(grantPermissions).some(
+        (key) => key !== "expiry" && key !== "optional" && key !== "permissions"
+      ) ||
+      !Number.isSafeInteger(grantPermissions.expiry) ||
+      !Array.isArray(grantPermissions.permissions) ||
+      (grantPermissions.optional !== undefined &&
+        typeof grantPermissions.optional !== "boolean"))
+  ) {
+    throw invalidProviderRequest(
+      "Slice Wallet grantPermissions config is invalid."
+    )
+  }
   return {
     announce: parameters.announce ?? true,
     ceremonyMode: parameters.ceremonyMode ?? "auto",
@@ -228,6 +247,7 @@ export const resolveCanonicalSliceWalletConfig = (
     defaultChainId,
     idOrigin,
     requireAdmittedChain: !chainIds.includes(anvil.id),
+    ...(grantPermissions === undefined ? {} : { grantPermissions }),
     ...(session === undefined ? {} : { session })
   }
 }

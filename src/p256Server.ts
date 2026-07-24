@@ -12,7 +12,7 @@ import {
   slice,
   toHex
 } from "viem"
-import { sliceWalletKernelAddresses } from "./constants"
+import { sliceKernelWeightedP256SignerV2Address } from "./execution/utils/sliceKernelAddresses"
 
 const p256Order =
   0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551n
@@ -127,6 +127,13 @@ const weightedP256ProposalTypes = {
   ]
 } as const
 
+const weightedP256CoSignTypes = {
+  CoSign: [
+    { name: "userOperationHash", type: "bytes32" },
+    { name: "validUntil", type: "uint48" }
+  ]
+} as const
+
 export const hashSliceWalletWeightedP256Proposal = ({
   account,
   callData,
@@ -144,7 +151,7 @@ export const hashSliceWalletWeightedP256Proposal = ({
     domain: {
       chainId,
       name: "WeightedP256Signer",
-      verifyingContract: sliceWalletKernelAddresses.weightedP256Signer,
+      verifyingContract: sliceKernelWeightedP256SignerV2Address,
       version: "0.0.1"
     },
     message: {
@@ -155,6 +162,27 @@ export const hashSliceWalletWeightedP256Proposal = ({
     },
     primaryType: "Proposal",
     types: weightedP256ProposalTypes
+  })
+
+export const hashSliceWalletWeightedP256CoSign = ({
+  chainId,
+  userOperationHash,
+  validUntil
+}: {
+  chainId: number
+  userOperationHash: Hex
+  validUntil: number
+}) =>
+  hashTypedData({
+    domain: {
+      chainId,
+      name: "WeightedP256Signer",
+      verifyingContract: sliceKernelWeightedP256SignerV2Address,
+      version: "0.0.1"
+    },
+    message: { userOperationHash, validUntil },
+    primaryType: "CoSign",
+    types: weightedP256CoSignTypes
   })
 
 export const normalizeSliceWalletP256Scalars = normalizeP256Scalars

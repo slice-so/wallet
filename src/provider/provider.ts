@@ -141,6 +141,12 @@ const parseWalletConnect = (
   let session:
     | Parameters<SliceWalletProvider["connectWithSession"]>[0]
     | undefined
+  let grantPermissions:
+    | {
+        optional: boolean
+        params: readonly [SliceWalletProviderValue]
+      }
+    | undefined
   for (const [name, capability] of Object.entries(input.capabilities)) {
     if (name === "session") {
       if (
@@ -218,6 +224,38 @@ const parseWalletConnect = (
       }
       continue
     }
+    if (name === "grantPermissions") {
+      if (
+        typeof capability !== "object" ||
+        capability === null ||
+        Array.isArray(capability) ||
+        Object.keys(capability).some(
+          (key) =>
+            key !== "expiry" && key !== "optional" && key !== "permissions"
+        ) ||
+        !("expiry" in capability) ||
+        !("permissions" in capability) ||
+        (Reflect.get(capability, "optional") !== undefined &&
+          typeof Reflect.get(capability, "optional") !== "boolean")
+      ) {
+        throw invalidProviderRequest(
+          "wallet_connect grantPermissions capability is invalid."
+        )
+      }
+      const grantCapability = capability as {
+        readonly [key: string]: SliceWalletProviderValue | undefined
+      }
+      grantPermissions = {
+        optional: grantCapability.optional === true,
+        params: [
+          {
+            expiry: grantCapability.expiry,
+            permissions: grantCapability.permissions
+          }
+        ]
+      }
+      continue
+    }
     if (
       typeof capability === "object" &&
       capability !== null &&
@@ -231,7 +269,10 @@ const parseWalletConnect = (
       `Unsupported wallet_connect capability: ${name}.`
     )
   }
-  return { ...(session === undefined ? {} : { session }) }
+  return {
+    ...(grantPermissions === undefined ? {} : { grantPermissions }),
+    ...(session === undefined ? {} : { session })
+  }
 }
 
 const assertEthAccountsRequest = (
@@ -417,19 +458,43 @@ export const createSliceWalletProviderInternal = (
     if (method === "eth_requestAccounts") return [await connect()]
     if (method === "wallet_connect") {
       const parsed = parseWalletConnect(params)
+      const wasConnected = (await runtime.getAccounts()).length > 0
       const connected =
         parsed.session === undefined
           ? { account: await connect() }
           : await connectWithSession(parsed.session)
       const account = connected.account
+      let grantedPermission: SliceWalletProviderValue | undefined
+      if (parsed.grantPermissions !== undefined) {
+        try {
+          grantedPermission = await runtime.createGrant(
+            parseSliceWalletGrantPermissions({
+              account,
+              chainId: runtime.chainId,
+              now: Math.floor(Date.now() / 1_000),
+              params: parsed.grantPermissions.params
+            }),
+            { reuseMatching: true }
+          )
+        } catch (error) {
+          if (!parsed.grantPermissions.optional) {
+            if (!wasConnected) await disconnect().catch(() => undefined)
+            throw error
+          }
+        }
+      }
       return {
         accounts: [
           {
             address: account,
-            capabilities:
-              connected.session === undefined
+            capabilities: {
+              ...(grantedPermission === undefined
                 ? {}
-                : { session: connected.session }
+                : { grantPermissions: grantedPermission }),
+              ...(connected.session === undefined
+                ? {}
+                : { session: connected.session })
+            }
           }
         ]
       }
@@ -532,7 +597,17 @@ export const createSliceWalletProviderInternal = (
           numberToHex(chainId),
           {
             atomic: { status: "supported" },
-            paymasterService: { supported: true }
+            paymasterService: { supported: true },
+            slicePermissions: {
+              maximumCallsPerOperation: 1,
+              supportedTemplates: [
+                "native-transfer",
+                "erc20-transfer",
+                "erc20-approve",
+                "erc20-transfer-from"
+              ],
+              version: "1"
+            }
           }
         ])
       )

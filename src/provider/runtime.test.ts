@@ -21,6 +21,20 @@ const account = "0x0000000000000000000000000000000000000001" as const
 const secondAccount = "0x0000000000000000000000000000000000000002" as const
 const userOperationHash = `0x${"11".repeat(32)}` as const
 const credentialIdHash = `0x${"22".repeat(32)}` as const
+const rootPublicKey = `0x04${"33".repeat(64)}` as const
+const storedAccount = (
+  accountAddress: typeof account | typeof secondAccount
+) => ({
+  accountAddress,
+  accountIndex: 0,
+  createdAt: "2026-01-01T00:00:00.000Z",
+  credentialIdHash,
+  factoryVersion: "1",
+  publicKey: rootPublicKey,
+  recoveryPermissionId: null,
+  recoverySignerAddress: null,
+  registrationKind: "initial" as const
+})
 const storageValues = new Map<string, string>()
 const storage = {
   clear: () => storageValues.clear(),
@@ -192,11 +206,7 @@ describe("multichain provider runtime routing", () => {
       ?.mockImplementation(async () => {
         throw failure
       })
-    writeStoredSliceWalletAccount(storage, {
-      accountAddress: account,
-      accountIndex: 0,
-      credentialIdHash
-    })
+    writeStoredSliceWalletAccount(storage, storedAccount(account))
 
     try {
       await runtime.revokePermissions()
@@ -205,22 +215,16 @@ describe("multichain provider runtime routing", () => {
       expect(error).toBeInstanceOf(AggregateError)
       expect((error as AggregateError).errors).toEqual([failure])
     }
-    expect(readStoredSliceWalletAccount(storage)).toEqual({
-      accountAddress: account,
-      accountIndex: 0,
-      credentialIdHash
-    })
+    expect(readStoredSliceWalletAccount(storage)).toEqual(
+      storedAccount(account)
+    )
   })
 
   test("disconnect locks the account without revoking persistent grants", async () => {
     const fixture = createRuntimeFixture()
     const runtime = createSliceWalletProviderRuntime(config, fixture)
     runtime.getChainRuntime(optimism.id)
-    writeStoredSliceWalletAccount(storage, {
-      accountAddress: account,
-      accountIndex: 0,
-      credentialIdHash
-    })
+    writeStoredSliceWalletAccount(storage, storedAccount(account))
 
     await runtime.disconnect()
 
@@ -235,11 +239,7 @@ describe("multichain provider runtime routing", () => {
   test("disconnect creates a signer frame when no chain runtime is active", async () => {
     const fixture = createRuntimeFixture()
     const runtime = createSliceWalletProviderRuntime(config, fixture)
-    writeStoredSliceWalletAccount(storage, {
-      accountAddress: account,
-      accountIndex: 0,
-      credentialIdHash
-    })
+    writeStoredSliceWalletAccount(storage, storedAccount(account))
 
     await runtime.disconnect()
 
@@ -252,11 +252,7 @@ describe("multichain provider runtime routing", () => {
   test("clears the stored account after every chain revokes successfully", async () => {
     const fixture = createRuntimeFixture()
     const runtime = createSliceWalletProviderRuntime(config, fixture)
-    writeStoredSliceWalletAccount(storage, {
-      accountAddress: account,
-      accountIndex: 0,
-      credentialIdHash
-    })
+    writeStoredSliceWalletAccount(storage, storedAccount(account))
 
     expect(await runtime.revokePermissions()).toBe(true)
 
@@ -315,9 +311,8 @@ describe("multichain provider runtime routing", () => {
     )
     const selection = {
       connected: {
-        accountAddress: secondAccount,
-        accountIndex: 1,
-        credentialIdHash
+        ...storedAccount(secondAccount),
+        accountIndex: 1
       }
     }
     const fixture = createRuntimeFixture((_chainId, creation) =>
@@ -332,11 +327,7 @@ describe("multichain provider runtime routing", () => {
           }
     )
     const runtime = createSliceWalletProviderRuntime(config, fixture)
-    writeStoredSliceWalletAccount(storage, {
-      accountAddress: account,
-      accountIndex: 0,
-      credentialIdHash
-    })
+    writeStoredSliceWalletAccount(storage, storedAccount(account))
 
     const staleHydration = runtime.connect()
     const switched = await runtime.switchAccount()
@@ -360,9 +351,8 @@ describe("multichain provider runtime routing", () => {
     )
     const selection = {
       connected: {
-        accountAddress: secondAccount,
-        accountIndex: 1,
-        credentialIdHash
+        ...storedAccount(secondAccount),
+        accountIndex: 1
       }
     }
     const fixture = createRuntimeFixture((_chainId, creation) =>
@@ -383,11 +373,7 @@ describe("multichain provider runtime routing", () => {
           }
     )
     const runtime = createSliceWalletProviderRuntime(config, fixture)
-    writeStoredSliceWalletAccount(storage, {
-      accountAddress: account,
-      accountIndex: 0,
-      credentialIdHash
-    })
+    writeStoredSliceWalletAccount(storage, storedAccount(account))
 
     const staleHydration = runtime.connect()
     await runtime.switchAccount()
@@ -400,9 +386,8 @@ describe("multichain provider runtime routing", () => {
   test("cancels an open signer frame before switching to B", async () => {
     const selection = {
       connected: {
-        accountAddress: secondAccount,
-        accountIndex: 1,
-        credentialIdHash
+        ...storedAccount(secondAccount),
+        accountIndex: 1
       }
     }
     const fixture = createRuntimeFixture(() => ({
@@ -415,11 +400,7 @@ describe("multichain provider runtime routing", () => {
       )
     }))
     const runtime = createSliceWalletProviderRuntime(config, fixture)
-    writeStoredSliceWalletAccount(storage, {
-      accountAddress: account,
-      accountIndex: 0,
-      credentialIdHash
-    })
+    writeStoredSliceWalletAccount(storage, storedAccount(account))
     runtime.getChainRuntime()
     const broker = fixture.brokerByChain.get(base.id)
     if (broker === undefined) throw new Error("Missing runtime broker.")
@@ -444,11 +425,7 @@ describe("multichain provider runtime routing", () => {
       )
     }))
     const runtime = createSliceWalletProviderRuntime(config, fixture)
-    writeStoredSliceWalletAccount(storage, {
-      accountAddress: account,
-      accountIndex: 0,
-      credentialIdHash
-    })
+    writeStoredSliceWalletAccount(storage, storedAccount(account))
 
     await expect(runtime.switchAccount()).rejects.toThrow("chooser cancelled")
     expect(readStoredSliceWalletAccount(storage)?.accountAddress).toBe(account)
@@ -464,11 +441,7 @@ describe("multichain provider runtime routing", () => {
       )
     }))
     const runtime = createSliceWalletProviderRuntime(config, fixture)
-    writeStoredSliceWalletAccount(storage, {
-      accountAddress: account,
-      accountIndex: 0,
-      credentialIdHash
-    })
+    writeStoredSliceWalletAccount(storage, storedAccount(account))
 
     await expect(runtime.switchAccount()).rejects.toThrow(
       "registry lookup failed"
@@ -479,9 +452,8 @@ describe("multichain provider runtime routing", () => {
   test("keeps B active when switching chains after an account switch", async () => {
     const selection = {
       connected: {
-        accountAddress: secondAccount,
-        accountIndex: 1,
-        credentialIdHash
+        ...storedAccount(secondAccount),
+        accountIndex: 1
       }
     }
     const fixture = createRuntimeFixture(() => ({
@@ -501,11 +473,7 @@ describe("multichain provider runtime routing", () => {
       )
     }))
     const runtime = createSliceWalletProviderRuntime(config, fixture)
-    writeStoredSliceWalletAccount(storage, {
-      accountAddress: account,
-      accountIndex: 0,
-      credentialIdHash
-    })
+    writeStoredSliceWalletAccount(storage, storedAccount(account))
 
     await runtime.switchAccount()
     runtime.switchChain(optimism.id)

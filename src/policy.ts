@@ -5,6 +5,7 @@ import {
   ParamCondition,
   toCallPolicy,
   toRateLimitPolicy,
+  toSudoPolicy,
   toTimestampPolicy
 } from "@zerodev/permissions/policies"
 import {
@@ -20,6 +21,8 @@ import {
   slice,
   toFunctionSelector
 } from "viem"
+import { maximumBrowserGenericGrantTtlSec } from "./constants"
+import { sliceKernelSingleCallPolicyAddress } from "./execution/utils/sliceKernelAddresses"
 import type {
   SerializedWalletPolicyDescriptor,
   WalletCall,
@@ -358,6 +361,50 @@ const compareCallRules = (
   return leftKey.localeCompare(rightKey)
 }
 
+const erc20TransferSelector = toFunctionSelector("transfer(address,uint256)")
+const erc20ApproveSelector = toFunctionSelector("approve(address,uint256)")
+const erc20TransferFromSelector = toFunctionSelector(
+  "transferFrom(address,address,uint256)"
+)
+
+const isCanonicalAddressParameter = (value: Hex) =>
+  /^0x0{24}[0-9a-f]{40}$/.test(value)
+
+const assertGenericCallRule = (call: WalletPolicyCallRule) => {
+  if (call.selector === "0x00000000") {
+    if (call.parameterRules.length !== 0 || call.valueLimit <= 0n) {
+      throw new Error("Generic native-transfer rule is non-canonical.")
+    }
+    return
+  }
+  if (call.valueLimit !== 0n) {
+    throw new Error("Generic ERC-20 rules cannot transfer native value.")
+  }
+  const expectedOffsets =
+    call.selector === erc20TransferFromSelector
+      ? [0, 32, 64]
+      : call.selector === erc20TransferSelector ||
+          call.selector === erc20ApproveSelector
+        ? [0, 32]
+        : null
+  if (
+    expectedOffsets === null ||
+    call.parameterRules.length !== expectedOffsets.length ||
+    call.parameterRules.some(
+      (rule, index) =>
+        rule.offset !== expectedOffsets[index] ||
+        rule.params.length !== 1 ||
+        (index < expectedOffsets.length - 1
+          ? rule.condition !== "equal" ||
+            !isCanonicalAddressParameter(rule.params[0] as Hex)
+          : rule.condition !== "less_than_or_equal" ||
+            hexToBigInt(rule.params[0] as Hex) <= 0n)
+    )
+  ) {
+    throw new Error("Generic ERC-20 call rule is non-canonical.")
+  }
+}
+
 export const normalizeWalletPolicyDescriptor = (
   descriptor: WalletPolicyDescriptor
 ): WalletPolicyDescriptor => {
@@ -367,6 +414,8 @@ export const normalizeWalletPolicyDescriptor = (
     throw new Error("Wallet policy chain id must be a positive safe integer.")
   }
   if (
+    !Number.isSafeInteger(descriptor.validAfter) ||
+    !Number.isSafeInteger(descriptor.validUntil) ||
     descriptor.validAfter < 0 ||
     descriptor.validUntil <= descriptor.validAfter
   ) {
@@ -374,14 +423,29 @@ export const normalizeWalletPolicyDescriptor = (
   }
   if (descriptor.calls.length === 0)
     throw new Error("Wallet policy requires at least one call rule.")
+  if (descriptor.grantKind === "generic" && descriptor.calls.length > 16) {
+    throw new Error("Generic wallet policies support at most 16 call rules.")
+  }
   if (
-    descriptor.rateLimit !== undefined &&
-    (!Number.isSafeInteger(descriptor.rateLimit.count) ||
-      descriptor.rateLimit.count <= 0 ||
-      !Number.isSafeInteger(descriptor.rateLimit.intervalSec) ||
-      descriptor.rateLimit.intervalSec <= 0)
+    (descriptor.grantKind === "generic" &&
+      descriptor.rateLimit === undefined) ||
+    (descriptor.rateLimit !== undefined &&
+      (!Number.isSafeInteger(descriptor.rateLimit.count) ||
+        descriptor.rateLimit.count < 1 ||
+        descriptor.rateLimit.count > 100 ||
+        !Number.isSafeInteger(descriptor.rateLimit.intervalSec) ||
+        descriptor.rateLimit.intervalSec < 60 ||
+        descriptor.rateLimit.intervalSec >
+          descriptor.validUntil - descriptor.validAfter))
   ) {
     throw new Error("Wallet policy call-count limit is invalid.")
+  }
+  if (
+    descriptor.grantKind === "generic" &&
+    descriptor.validUntil - descriptor.validAfter >
+      maximumBrowserGenericGrantTtlSec + 300
+  ) {
+    throw new Error("Generic wallet policy exceeds the maximum lifetime.")
   }
 
   const calls = descriptor.calls
@@ -400,6 +464,12 @@ export const normalizeWalletPolicyDescriptor = (
   )
   if (new Set(callKeys).size !== callKeys.length) {
     throw new Error("Wallet policy contains duplicate call rules.")
+  }
+  if (calls.some((call) => call.valueLimit < 0n)) {
+    throw new Error("Wallet policy value limits must be unsigned.")
+  }
+  if (descriptor.grantKind === "generic") {
+    for (const call of calls) assertGenericCallRule(call)
   }
 
   return {
@@ -479,6 +549,13 @@ export const toWalletPermissionPolicies = (
     })
   ]
 
+  if (normalized.grantKind === "generic") {
+    policies.push(
+      toSudoPolicy({
+        policyAddress: sliceKernelSingleCallPolicyAddress
+      })
+    )
+  }
   if (normalized.rateLimit !== undefined) {
     policies.push(
       toRateLimitPolicy({
@@ -535,7 +612,7 @@ export const createErc20TransferCallRule = ({
     equalAddressRule(0, recipient),
     maximumAmountRule(32, maximumAmount)
   ],
-  selector: toFunctionSelector("transfer(address,uint256)"),
+  selector: erc20TransferSelector,
   target: token,
   valueLimit: 0n
 })
@@ -553,7 +630,7 @@ export const createErc20ApproveCallRule = ({
     equalAddressRule(0, spender),
     maximumAmountRule(32, maximumAmount)
   ],
-  selector: toFunctionSelector("approve(address,uint256)"),
+  selector: erc20ApproveSelector,
   target: token,
   valueLimit: 0n
 })
@@ -574,7 +651,7 @@ export const createErc20TransferFromCallRule = ({
     equalAddressRule(32, recipient),
     maximumAmountRule(64, maximumAmount)
   ],
-  selector: toFunctionSelector("transferFrom(address,address,uint256)"),
+  selector: erc20TransferFromSelector,
   target: token,
   valueLimit: 0n
 })
@@ -624,6 +701,11 @@ export const assertWalletCallsMatchPolicy = (
 ) => {
   const normalized = normalizeWalletPolicyDescriptor(descriptor)
   if (calls.length === 0) throw new Error("Wallet operation contains no calls.")
+  if (normalized.grantKind === "generic" && calls.length !== 1) {
+    throw new Error(
+      "Generic wallet permissions allow exactly one call per operation."
+    )
+  }
   for (const call of calls) {
     const matchingRule = normalized.calls.find(
       (rule) =>

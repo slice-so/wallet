@@ -34,6 +34,47 @@ export const sliceWalletConnector = (parameters: SliceWalletProviderConfig) => {
       }
       return Number(chainId)
     }
+    const parseConnectResult = (
+      value: SliceWalletProviderValue | undefined
+    ) => {
+      if (
+        typeof value !== "object" ||
+        value === null ||
+        Array.isArray(value) ||
+        !Array.isArray(Reflect.get(value, "accounts")) ||
+        Reflect.get(value, "accounts").length !== 1
+      ) {
+        throw new Error("Slice Wallet returned an invalid connection result.")
+      }
+      const connected = Reflect.get(value, "accounts")[0] as
+        | SliceWalletProviderValue
+        | undefined
+      if (
+        typeof connected !== "object" ||
+        connected === null ||
+        Array.isArray(connected)
+      ) {
+        throw new Error("Slice Wallet returned an invalid connected account.")
+      }
+      const connectedRecord = connected as {
+        readonly [key: string]: SliceWalletProviderValue | undefined
+      }
+      if (
+        typeof connectedRecord.address !== "string" ||
+        !isAddress(connectedRecord.address) ||
+        typeof connectedRecord.capabilities !== "object" ||
+        connectedRecord.capabilities === null ||
+        Array.isArray(connectedRecord.capabilities)
+      ) {
+        throw new Error("Slice Wallet returned an invalid connected account.")
+      }
+      return {
+        account: connectedRecord.address,
+        capabilities: connectedRecord.capabilities as {
+          readonly [key: string]: SliceWalletProviderValue | undefined
+        }
+      }
+    }
 
     return {
       icon: sliceWalletProviderIcon,
@@ -91,17 +132,64 @@ export const sliceWalletConnector = (parameters: SliceWalletProviderConfig) => {
         if (sessionResult !== null) {
           await parameters.session?.onSession?.(sessionResult.session)
         }
-        const accounts =
-          sessionResult === null
-            ? parseAccounts(
-                await getProvider().request({
-                  method:
-                    isReconnecting === true
-                      ? "eth_accounts"
-                      : "eth_requestAccounts"
-                })
-              )
-            : [sessionResult.account]
+        let grantedPermission: SliceWalletProviderValue | undefined
+        let accounts: readonly Address[]
+        if (
+          sessionResult === null &&
+          isReconnecting !== true &&
+          parameters.grantPermissions !== undefined
+        ) {
+          const { account, capabilities } = parseConnectResult(
+            await getProvider().request({
+              method: "wallet_connect",
+              params: [
+                {
+                  capabilities: {
+                    grantPermissions: parameters.grantPermissions
+                  },
+                  version: "1"
+                }
+              ]
+            })
+          )
+          accounts = [account]
+          grantedPermission = capabilities.grantPermissions
+        } else {
+          accounts =
+            sessionResult === null
+              ? parseAccounts(
+                  await getProvider().request({
+                    method:
+                      isReconnecting === true
+                        ? "eth_accounts"
+                        : "eth_requestAccounts"
+                  })
+                )
+              : [sessionResult.account]
+          if (
+            sessionResult !== null &&
+            parameters.grantPermissions !== undefined
+          ) {
+            try {
+              grantedPermission = await getProvider().request({
+                method: "wallet_grantPermissions",
+                params: [
+                  {
+                    expiry: parameters.grantPermissions.expiry,
+                    permissions: parameters.grantPermissions.permissions
+                  }
+                ]
+              })
+            } catch (error) {
+              if (parameters.grantPermissions.optional !== true) {
+                await getProvider()
+                  .request({ method: "wallet_disconnect" })
+                  .catch(() => undefined)
+                throw error
+              }
+            }
+          }
+        }
         if (accounts.length === 0) {
           throw new Error("Slice Wallet is not connected.")
         }
@@ -110,7 +198,10 @@ export const sliceWalletConnector = (parameters: SliceWalletProviderConfig) => {
             ? accounts.map((address) => ({
                 address,
                 capabilities: {
-                  atomic: { status: "supported" }
+                  atomic: { status: "supported" },
+                  ...(grantedPermission === undefined
+                    ? {}
+                    : { grantPermissions: grantedPermission })
                 }
               }))
             : accounts) as never,

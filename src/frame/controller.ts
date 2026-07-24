@@ -1,5 +1,6 @@
 import {
   bytesToHex,
+  type Hex,
   hexToBytes,
   isAddress,
   isAddressEqual,
@@ -7,7 +8,12 @@ import {
   stringToBytes
 } from "viem"
 import { getUserOperationHash } from "viem/account-abstraction"
-import { sliceWalletDefaultRpId, sliceWalletEntryPoint } from "../constants"
+import { parseSliceWalletFrameSession } from "../ceremony/protocol"
+import {
+  maximumBrowserGenericGrantTtlSec,
+  sliceWalletDefaultRpId,
+  sliceWalletEntryPoint
+} from "../constants"
 import { assertSliceWalletExecutionSafety } from "../executionSafety"
 import {
   encodeSliceWalletSyntheticWebAuthnSignature,
@@ -21,6 +27,8 @@ import type {
   SliceWalletBridgeGrantProofRequest,
   SliceWalletBridgeGrantProofResponse,
   SliceWalletBridgeRecord,
+  SliceWalletBridgeRegistrationProofRequest,
+  SliceWalletBridgeRegistrationProofResponse,
   SliceWalletBridgeUnlockChallenge,
   SliceWalletBridgeUnlockRequest,
   SliceWalletFrameConnectRequest,
@@ -176,6 +184,50 @@ const parseBridgeGrantProofRequest = (
   }
 }
 
+const isBridgeRegistrationProofRequest = (value: SliceWalletProtocolValue) => {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false
+  }
+  return Reflect.get(value, "type") === "slice-wallet:bridge-sign-registration"
+}
+
+const parseBridgeRegistrationProofRequest = (
+  value: SliceWalletProtocolValue
+): SliceWalletBridgeRegistrationProofRequest => {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error("Bridge registration proof request must be an object.")
+  }
+  const input = value as {
+    readonly [key: string]: SliceWalletProtocolValue
+  }
+  if (
+    Object.keys(input).length !== 4 ||
+    input.type !== "slice-wallet:bridge-sign-registration" ||
+    input.version !== 1 ||
+    typeof input.digest !== "string" ||
+    !isHex(input.digest, { strict: true }) ||
+    input.digest !== input.digest.toLowerCase() ||
+    hexToBytes(input.digest).length !== 32
+  ) {
+    throw new Error("Bridge registration proof request is invalid.")
+  }
+  const parsed = parseSliceWalletFrameRequest({
+    id: "bridge",
+    method: "getPendingSession",
+    params: input.session ?? null,
+    version: 1
+  })
+  if (parsed.method !== "getPendingSession") {
+    throw new Error("Bridge registration proof request is invalid.")
+  }
+  return {
+    digest: input.digest as Hex,
+    session: parsed.params,
+    type: "slice-wallet:bridge-sign-registration",
+    version: 1
+  }
+}
+
 const errorResponse = (id: string, error: Error): SliceWalletFrameResponse => ({
   error: { code: "invalid_request", message: error.message },
   id,
@@ -213,17 +265,21 @@ export const attachSliceWalletSignerFrame = ({
     if (parentOrigin === null) throw new Error("Wallet frame is not connected.")
     const stored = await sessionStore.get(parentOrigin, key)
     if (stored === null) throw new Error("Wallet session is unavailable.")
-    if (stored.session.expiresAt <= now())
+    const session = parseSliceWalletFrameSession(stored.session)
+    if (session.expiresAt <= now())
       throw new Error("Wallet session has expired.")
     if (
-      !(await sessionStore.isAccountUnlocked(
-        parentOrigin,
-        stored.session.account
-      ))
+      session.grantKind === "generic" &&
+      session.expiresAt - now() > maximumBrowserGenericGrantTtlSec
+    ) {
+      throw new Error("Generic wallet session exceeds the maximum lifetime.")
+    }
+    if (
+      !(await sessionStore.isAccountUnlocked(parentOrigin, session.account))
     ) {
       throw new Error("Wallet session is locked. Connect with your passkey.")
     }
-    return stored
+    return { ...stored, session }
   }
 
   const getPendingOrStoredSession = async (
@@ -232,10 +288,17 @@ export const attachSliceWalletSignerFrame = ({
     if (parentOrigin === null) throw new Error("Wallet frame is not connected.")
     const pending = await sessionStore.getPending(parentOrigin, key)
     if (pending === null) return getStoredSession(key)
-    if (pending.session.expiresAt <= now()) {
+    const session = parseSliceWalletFrameSession(pending.session)
+    if (session.expiresAt <= now()) {
       throw new Error("Wallet session has expired.")
     }
-    return pending
+    if (
+      session.grantKind === "generic" &&
+      session.expiresAt - now() > maximumBrowserGenericGrantTtlSec
+    ) {
+      throw new Error("Generic wallet session exceeds the maximum lifetime.")
+    }
+    return { ...pending, session }
   }
 
   const handleRequest = async (request: SliceWalletFrameRequest) => {
@@ -245,6 +308,12 @@ export const attachSliceWalletSignerFrame = ({
       const policy = request.params.policy
       if (policy.validUntil <= now())
         throw new Error("Wallet policy is already expired.")
+      if (
+        policy.grantKind === "generic" &&
+        policy.validUntil - now() > maximumBrowserGenericGrantTtlSec
+      ) {
+        throw new Error("Generic wallet policy exceeds the maximum lifetime.")
+      }
       const keyPair = await generateSliceWalletP256KeyPair(cryptoImpl)
       const session: SliceWalletFrameSession = {
         account: policy.account,
@@ -369,8 +438,16 @@ export const attachSliceWalletSignerFrame = ({
         throw new Error("Only checkout sessions may request co-signing.")
       }
       if (
+        request.params.challengeIssuedAt > now() ||
         request.params.expiresAt <= now() ||
-        request.params.expiresAt > now() + 300
+        request.params.expiresAt > request.params.challengeIssuedAt + 120 ||
+        request.params.validUntil <= now() ||
+        request.params.validUntil > request.params.expiresAt ||
+        request.params.validUntil > stored.session.expiresAt ||
+        request.params.windowStart > request.params.challengeIssuedAt ||
+        request.params.windowEndExclusive <= request.params.challengeIssuedAt ||
+        (stored.session.checkout?.budgetPeriodSec === 86_400 &&
+          request.params.validUntil >= request.params.windowEndExclusive)
       ) {
         throw new Error("Co-sign challenge expiration is invalid.")
       }
@@ -412,11 +489,16 @@ export const attachSliceWalletSignerFrame = ({
         accountNonce: request.params.userOperation.nonce,
         appOrigin: parentOrigin,
         challenge: request.params.challenge,
+        challengeIssuedAt: request.params.challengeIssuedAt,
         delegationId: request.params.delegationId,
         expiresAt: request.params.expiresAt,
         proposalHash,
         session: stored.session,
-        userOperationHash
+        spendWindowId: request.params.spendWindowId,
+        userOperationHash,
+        validUntil: request.params.validUntil,
+        windowEndExclusive: request.params.windowEndExclusive,
+        windowStart: request.params.windowStart
       })
       const [proofSignature, signature] = await Promise.all([
         signSliceWalletP256({
@@ -483,10 +565,13 @@ export const attachSliceWalletSignerFrame = ({
           "User operation sender does not match the wallet session."
         )
       }
-      assertWalletCallsMatchPolicy(
-        decodeScopedCalls(request.params.userOperation.callData),
-        stored.session.policy
+      const scopedCalls = decodeScopedCalls(
+        request.params.userOperation.callData
       )
+      if (stored.session.grantKind === "generic" && scopedCalls.length !== 1) {
+        throw new Error("Generic permissions authorize exactly one inner call.")
+      }
+      assertWalletCallsMatchPolicy(scopedCalls, stored.session.policy)
       assertSliceWalletExecutionSafety({
         chainId: stored.session.chainId,
         userOperation: request.params.userOperation
@@ -633,9 +718,45 @@ export const attachSliceWalletSignerFrame = ({
       async (messageEvent: MessageEvent<SliceWalletProtocolValue>) => {
         if (handled) return
         handled = true
-        let response: SliceWalletBridgeGrantProofResponse
+        let response:
+          | SliceWalletBridgeGrantProofResponse
+          | SliceWalletBridgeRegistrationProofResponse
         try {
+          if (isBridgeRegistrationProofRequest(messageEvent.data)) {
+            const request = parseBridgeRegistrationProofRequest(
+              messageEvent.data
+            )
+            const parsedSession = parseSliceWalletFrameSession(session.session)
+            if (
+              parsedSession.grantKind !== "generic" ||
+              request.session.account.toLowerCase() !==
+                parsedSession.account.toLowerCase() ||
+              request.session.chainId !== parsedSession.chainId ||
+              request.session.grantKind !== parsedSession.grantKind ||
+              request.session.slicerId !== parsedSession.slicerId
+            ) {
+              throw new Error(
+                "Bridge registration proof does not match the pending generic session."
+              )
+            }
+            response = {
+              signature: await signSliceWalletP256({
+                cryptoImpl,
+                key: session.privateKey,
+                message: hexToBytes(request.digest)
+              }),
+              type: "slice-wallet:bridge-registration-proof",
+              version: 1
+            }
+            port.postMessage(response)
+            clearTimeout(timeout)
+            port.close()
+            return
+          }
           const request = parseBridgeGrantProofRequest(messageEvent.data)
+          if (session.session.grantKind === "generic") {
+            throw new Error("Generic permissions require a registration proof.")
+          }
           if (
             request.expiresAt !== session.session.expiresAt ||
             request.session.account.toLowerCase() !==

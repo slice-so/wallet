@@ -18,6 +18,7 @@ import type { SliceWalletP256KeyPair } from "./types"
 
 export {
   getSliceWalletP256SignerId,
+  hashSliceWalletWeightedP256CoSign,
   hashSliceWalletWeightedP256Proposal,
   normalizeSliceWalletP256Signature,
   verifySliceWalletP256

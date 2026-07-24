@@ -12,6 +12,7 @@ import {
   toHex
 } from "viem"
 import { sliceWalletKernelAddresses } from "./constants"
+import { sliceKernelWeightedP256SignerV2Address } from "./execution/utils/sliceKernelAddresses"
 import { sliceWalletWebAuthnDummySignature } from "./rootValidator"
 
 const getP256Coordinates = (publicKey: Hex) => {
@@ -46,7 +47,8 @@ export const encodeWeightedP256SignerData = ({
 export const weightedP256DummySignature = concat([
   toHex(1n, { size: 32 }),
   toHex(1n, { size: 32 }),
-  constants.DUMMY_ECDSA_SIG
+  constants.DUMMY_ECDSA_SIG,
+  toHex(1n, { size: 6 })
 ])
 
 export const toWeightedP256Signer = ({
@@ -62,7 +64,7 @@ export const toWeightedP256Signer = ({
   getDummySignature: () => weightedP256DummySignature,
   getSignerData: () =>
     encodeWeightedP256SignerData({ coSignerAddress, publicKey }),
-  signerContractAddress: sliceWalletKernelAddresses.weightedP256Signer
+  signerContractAddress: sliceKernelWeightedP256SignerV2Address
 })
 
 export const toSliceWalletWebAuthnSessionSigner = ({

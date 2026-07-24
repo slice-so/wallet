@@ -7,6 +7,14 @@ import type {
 } from "./policy"
 
 export type SliceCheckoutApproval = { amount: bigint; currency: Address }
+export type SliceCheckoutAllowanceAssertion = {
+  amount: bigint
+  currency: Address
+}
+export type SliceCheckoutAllowanceTotal = {
+  amount: bigint
+  currency: Address
+}
 export type SliceCheckoutPayment = { amount: bigint; currency: Address }
 export type SliceCheckoutProductLineItem = {
   productId: number
@@ -24,6 +32,7 @@ export type SliceCheckoutPurchase = {
 }
 export type SliceCheckoutSpendIntent = {
   approvals: SliceCheckoutApproval[]
+  allowanceAssertions: SliceCheckoutAllowanceAssertion[]
   nativeValue: bigint
   payments: SliceCheckoutPayment[]
   purchases: SliceCheckoutPurchase[]

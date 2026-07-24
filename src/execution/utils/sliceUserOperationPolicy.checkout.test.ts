@@ -3,6 +3,7 @@ import { productsModuleAbi } from "@slicekit/abi"
 import { type Address, encodeFunctionData, erc20Abi, zeroAddress } from "viem"
 import { entryPoint07Address } from "viem/account-abstraction"
 import { anvil, base } from "viem/chains"
+import { buildSliceCheckoutAllowanceEnvelope } from "../commerce/checkout"
 import { getProductsModuleAddress } from "../generated/commerceFacts"
 import { coinbaseSmartWalletExecutionAbi } from "./slicePaymasterAbis"
 import {
@@ -44,15 +45,31 @@ const buyCallData = encodeFunctionData({
 
 describe("getSliceUserOperationCheckoutSpendIntent", () => {
   it("decodes product purchases and additional payments", () => {
+    const envelope = buildSliceCheckoutAllowanceEnvelope({
+      chainId: base.id,
+      checkoutCall: {
+        data: buyCallData,
+        to: productsModuleAddress,
+        value: 11n
+      },
+      tokenTotals: [{ amount: 20n, currency: token }]
+    })
     const callData = encodeFunctionData({
       abi: coinbaseSmartWalletExecutionAbi,
-      functionName: "execute",
-      args: [productsModuleAddress, 11n, buyCallData]
+      functionName: "executeBatch",
+      args: [
+        envelope.map((call) => ({
+          data: call.data ?? "0x",
+          target: call.to,
+          value: call.value ?? 0n
+        }))
+      ]
     })
 
     expect(getSliceUserOperationCheckoutSpendIntent(callData, base.id)).toEqual(
       {
-        approvals: [],
+        allowanceAssertions: [{ amount: 20n, currency: token }],
+        approvals: [{ amount: 20n, currency: token }],
         nativeValue: 11n,
         payments: [{ amount: 5n, currency: token }],
         purchases: [
@@ -70,7 +87,7 @@ describe("getSliceUserOperationCheckoutSpendIntent", () => {
     )
   })
 
-  it("extracts an existing approval without requiring one", () => {
+  it("rejects an approval without its exact allowance assertion", () => {
     const approval = encodeFunctionData({
       abi: erc20Abi,
       functionName: "approve",
@@ -88,17 +105,32 @@ describe("getSliceUserOperationCheckoutSpendIntent", () => {
     })
 
     expect(
-      getSliceUserOperationCheckoutSpendIntent(callData, base.id)?.approvals
-    ).toEqual([{ amount: 20n, currency: token }])
+      getSliceUserOperationCheckoutSpendIntent(callData, base.id)
+    ).toBeNull()
   })
 })
 
 describe("isAcceptedSliceUserOperation", () => {
+  const envelope = buildSliceCheckoutAllowanceEnvelope({
+    chainId: base.id,
+    checkoutCall: {
+      data: buyCallData,
+      to: productsModuleAddress,
+      value: 0n
+    },
+    tokenTotals: [{ amount: 20n, currency: token }]
+  })
   const userOperation = {
     callData: encodeFunctionData({
       abi: coinbaseSmartWalletExecutionAbi,
-      functionName: "execute",
-      args: [productsModuleAddress, 0n, buyCallData]
+      functionName: "executeBatch",
+      args: [
+        envelope.map((call) => ({
+          data: call.data ?? "0x",
+          target: call.to,
+          value: call.value ?? 0n
+        }))
+      ]
     }),
     nonce: "0x0",
     sender: buyer

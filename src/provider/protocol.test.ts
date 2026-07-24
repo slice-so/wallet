@@ -105,34 +105,37 @@ describe("portable wallet provider protocol", () => {
     expect(parsed.policy.grantKind).toBe("generic")
     expect(parsed.policy.rateLimit).toEqual({ count: 10, intervalSec: 3600 })
     expect(parsed.policy.calls).toHaveLength(2)
-    expect(() =>
-      assertWalletCallsMatchPolicy(
-        [
-          { data: "0x", to: recipient, value: 1_000_000n },
-          {
-            data: encodeFunctionData({
-              abi: [
-                {
-                  inputs: [
-                    { name: "to", type: "address" },
-                    { name: "amount", type: "uint256" }
-                  ],
-                  name: "transfer",
-                  outputs: [{ name: "", type: "bool" }],
-                  stateMutability: "nonpayable",
-                  type: "function"
-                }
+    const allowedCalls = [
+      { data: "0x" as Hex, to: recipient, value: 1_000_000n },
+      {
+        data: encodeFunctionData({
+          abi: [
+            {
+              inputs: [
+                { name: "to", type: "address" },
+                { name: "amount", type: "uint256" }
               ],
-              args: [recipient, 500n],
-              functionName: "transfer"
-            }),
-            to: token,
-            value: 0n
-          }
-        ],
-        parsed.policy
-      )
-    ).not.toThrow()
+              name: "transfer",
+              outputs: [{ name: "", type: "bool" }],
+              stateMutability: "nonpayable",
+              type: "function"
+            }
+          ],
+          args: [recipient, 500n],
+          functionName: "transfer"
+        }),
+        to: token,
+        value: 0n
+      }
+    ]
+    for (const call of allowedCalls) {
+      expect(() =>
+        assertWalletCallsMatchPolicy([call], parsed.policy)
+      ).not.toThrow()
+    }
+    expect(() =>
+      assertWalletCallsMatchPolicy(allowedCalls, parsed.policy)
+    ).toThrow("exactly one call")
   })
 
   test("rejects parent-provided signers and opaque required permissions", () => {
@@ -171,6 +174,75 @@ describe("portable wallet provider protocol", () => {
         ])
       })
     ).toThrow("Unsupported wallet permission type")
+  })
+
+  test("enforces canonical generic grant ceilings at the provider boundary", () => {
+    const permission = {
+      data: {
+        maximumValue: "0x1",
+        recipient,
+        template: "native-transfer"
+      },
+      policies: [
+        {
+          data: { count: 1, intervalSec: 60 },
+          type: "rate-limit"
+        }
+      ],
+      type: "slice-call"
+    } as const
+    const parse = (
+      permissions: SliceWalletProviderValue[],
+      expiry = now + 3_600
+    ) =>
+      parseSliceWalletGrantPermissions({
+        account,
+        chainId,
+        now,
+        params: [{ expiry, permissions }]
+      })
+
+    expect(() => parse([permission], now + 30 * 24 * 60 * 60 + 1)).toThrow(
+      "within the next 30 days"
+    )
+    expect(() => parse(Array.from({ length: 17 }, () => permission))).toThrow(
+      "between 1 and 16"
+    )
+    expect(() =>
+      parse([
+        {
+          ...permission,
+          policies: [
+            {
+              data: { count: 101, intervalSec: 60 },
+              type: "rate-limit"
+            }
+          ]
+        }
+      ])
+    ).toThrow("count 1 to 100")
+    expect(() =>
+      parse([
+        permission,
+        {
+          ...permission,
+          policies: [
+            {
+              data: { count: 1, intervalSec: 61 },
+              type: "rate-limit"
+            }
+          ]
+        }
+      ])
+    ).toThrow("same rate limit")
+    expect(() =>
+      parse([
+        {
+          ...permission,
+          data: { ...permission.data, unexpected: true }
+        }
+      ])
+    ).toThrow("unknown field")
   })
 
   test("validates 5792 chain, sender, and required capabilities", () => {
@@ -370,7 +442,7 @@ describe("portable wallet provider protocol", () => {
     )
   })
 
-  test("normalizes all public maximum amounts as hex quantities", () => {
+  test("accepts only canonical public maximum amounts", () => {
     const parsed = parseSliceWalletGrantPermissions({
       account,
       chainId,
@@ -381,12 +453,17 @@ describe("portable wallet provider protocol", () => {
           permissions: [
             {
               data: {
-                maximumAmount: 25n,
+                maximumAmount: "0x19",
                 spender: recipient,
                 template: "erc20-approve",
                 token
               },
-              policies: [],
+              policies: [
+                {
+                  data: { count: 1, intervalSec: 60 },
+                  type: "rate-limit"
+                }
+              ],
               type: "slice-call"
             }
           ]

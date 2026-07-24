@@ -15,6 +15,7 @@ import {
   pad,
   parseAbiParameters,
   toFunctionSelector,
+  toHex,
   zeroAddress
 } from "viem"
 import type { UserOperation } from "viem/account-abstraction"
@@ -340,7 +341,12 @@ export const createSliceWalletPermissionAccount = async (
       })
     )
     return wrapEnableSignature(
-      concat(["0xff", result.signature, constants.DUMMY_ECDSA_SIG])
+      concat([
+        "0xff",
+        result.signature,
+        constants.DUMMY_ECDSA_SIG,
+        toHex(session.expiresAt, { size: 6 })
+      ])
     )
   }
 
@@ -398,14 +404,20 @@ export const createSliceWalletPermissionAccount = async (
       coSigned.proposalHash.toLowerCase() !==
         result.proposalHash.toLowerCase() ||
       coSigned.userOperationHash.toLowerCase() !==
-        result.userOperationHash.toLowerCase()
+        result.userOperationHash.toLowerCase() ||
+      coSigned.validUntil !== challenge.validUntil
     ) {
       throw new Error(
         "Slice co-signer response does not match the signed operation."
       )
     }
     return wrapEnableSignature(
-      concat(["0xff", result.signature, coSigned.coSignature])
+      concat([
+        "0xff",
+        result.signature,
+        coSigned.coSignature,
+        toHex(coSigned.validUntil, { size: 6 })
+      ])
     )
   }
 

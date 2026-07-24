@@ -1,5 +1,7 @@
 import { getSliceWalletChainPolicy } from "./chains"
 
+export const maximumBrowserGenericGrantTtlSec = 30 * 24 * 60 * 60
+
 const baseManifest = getSliceWalletChainPolicy(8453)
 
 export const sliceWalletKernelVersion =

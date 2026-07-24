@@ -68,6 +68,16 @@
       "import": "./dist/esm/policy.js",
       "default": "./dist/esm/policy.js"
     },
+    "./permissions": {
+      "development": {
+        "types": "./src/permissions.ts",
+        "import": "./src/permissions.ts",
+        "default": "./src/permissions.ts"
+      },
+      "types": "./dist/esm/permissions.d.ts",
+      "import": "./dist/esm/permissions.js",
+      "default": "./dist/esm/permissions.js"
+    },
     "./recovery": {
       "development": {
         "types": "./src/recovery.ts",
@@ -162,11 +172,15 @@
     "viem": "catalog:"
   },
   "peerDependencies": {
+    "@tanstack/react-query": "catalog:",
     "@wagmi/core": "catalog:",
     "react": ">=18",
     "wagmi": "catalog:"
   },
   "peerDependenciesMeta": {
+    "@tanstack/react-query": {
+      "optional": true
+    },
     "@wagmi/core": {
       "optional": true
     },

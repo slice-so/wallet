@@ -23,6 +23,7 @@ const request = {
       ],
       chainId: 8453,
       grantKind: "generic",
+      rateLimit: { count: 1, intervalSec: 60 },
       validAfter: 100,
       validUntil: 200,
       version: 1

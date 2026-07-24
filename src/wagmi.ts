@@ -8,3 +8,6 @@ export const sliceWallet = (parameters: SliceWalletParameters = {}) =>
   sliceWalletConnector(
     resolveCanonicalSliceWalletConfig({ announce: false, ...parameters })
   )
+
+export * from "./wagmi/permissionActions"
+export * from "./wagmi/permissionHooks"

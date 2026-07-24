@@ -8,6 +8,7 @@ await buildPackage({
     "./src/argon2id.ts",
     "./src/ceremonyRoutes.ts",
     "./src/frame.ts",
+    "./src/permissions.ts",
     "./src/policy.ts",
     "./src/provider.ts",
     "./src/recovery.ts",

@@ -10,6 +10,7 @@ import type {
   SliceWalletBridgeChallenge,
   SliceWalletBridgeGrantProofResponse,
   SliceWalletBridgeRecord,
+  SliceWalletBridgeRegistrationProofResponse,
   SliceWalletCeremonyAccountMessage,
   SliceWalletCeremonyAccountResponse,
   SliceWalletCeremonyConnectMessage,
@@ -807,6 +808,32 @@ export const parseSliceWalletBridgeGrantProofResponse = (
   }
   return {
     error: stringValue(input.error, "Signer grant-proof error"),
+    type: "slice-wallet:bridge-error",
+    version: 1
+  }
+}
+
+export const parseSliceWalletBridgeRegistrationProofResponse = (
+  value: SliceWalletProtocolValue
+): SliceWalletBridgeRegistrationProofResponse => {
+  const input = record(value, "Signer registration-proof response")
+  if (input.type === "slice-wallet:bridge-registration-proof") {
+    assertKeys(input, ["signature", "type", "version"])
+    if (input.version !== 1) {
+      throw new Error("Signer registration proof is invalid.")
+    }
+    return {
+      signature: hexValue(input.signature, "Signer registration proof", 64),
+      type: "slice-wallet:bridge-registration-proof",
+      version: 1
+    }
+  }
+  assertKeys(input, ["error", "type", "version"])
+  if (input.type !== "slice-wallet:bridge-error" || input.version !== 1) {
+    throw new Error("Signer registration-proof error is invalid.")
+  }
+  return {
+    error: stringValue(input.error, "Signer registration-proof error"),
     type: "slice-wallet:bridge-error",
     version: 1
   }

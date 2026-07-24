@@ -47,17 +47,8 @@ const publicGrant = {
   createdAt: 1_800_000_000,
   expiresAt: 1_800_003_600,
   permissionId,
-  policy: {
-    account,
-    calls: [],
-    chainId: base.id,
-    grantKind: "generic" as const,
-    validAfter: 1_800_000_000,
-    validUntil: 1_800_003_600,
-    version: 1 as const
-  },
-  publicKey: `0x04${"11".repeat(64)}` as const,
-  signerId: "0x0000000000000000000000000000000000000002" as const
+  permissions: [],
+  version: "1" as const
 }
 
 const createRuntime = () => {
@@ -74,14 +65,20 @@ const createRuntime = () => {
     connected = false
     return true
   })
-  const createGrant = mock(async () => ({
-    account,
-    chainId: base.id,
-    expiresAt: publicGrant.expiresAt,
-    permissionId,
-    permissions: [],
-    version: "1" as const
-  }))
+  const createGrant = mock(
+    async (
+      _grant: Parameters<ProviderRuntime["createGrant"]>[0],
+      _options?: Parameters<ProviderRuntime["createGrant"]>[1]
+    ) => ({
+      account,
+      chainId: base.id,
+      createdAt: publicGrant.createdAt,
+      expiresAt: publicGrant.expiresAt,
+      permissionId,
+      permissions: [],
+      version: "1" as const
+    })
+  )
   const getGrants = mock(async () => [publicGrant])
   const revokeGrant = mock(async () => {})
   const requestSession = mock(async () => ({
@@ -224,6 +221,72 @@ describe("Slice Wallet provider dispatch", () => {
     )
   })
 
+  test("uses the standalone parser for required and optional connect-time grants", async () => {
+    const expiry = Math.floor(Date.now() / 1_000) + 3_600
+    const grantPermissions = {
+      expiry,
+      permissions: [
+        {
+          data: {
+            maximumValue: "0x1",
+            recipient: account,
+            template: "native-transfer"
+          },
+          policies: [
+            {
+              data: { count: 1, intervalSec: 60 },
+              type: "rate-limit"
+            }
+          ],
+          type: "slice-call"
+        }
+      ]
+    } as const
+    const { createGrant, provider } = createProvider()
+    const connected = await request(provider, "wallet_connect", [
+      {
+        capabilities: { grantPermissions },
+        version: "1"
+      }
+    ])
+    expect(connected).toEqual({
+      accounts: [
+        {
+          address: account,
+          capabilities: {
+            grantPermissions: {
+              account,
+              chainId: base.id,
+              createdAt: publicGrant.createdAt,
+              expiresAt: publicGrant.expiresAt,
+              permissionId,
+              permissions: [],
+              version: "1"
+            }
+          }
+        }
+      ]
+    })
+    expect(createGrant.mock.calls[0]?.[1]).toEqual({ reuseMatching: true })
+
+    const optional = createProvider()
+    expect(
+      await request(optional.provider, "wallet_connect", [
+        {
+          capabilities: {
+            grantPermissions: {
+              expiry,
+              optional: true,
+              permissions: []
+            }
+          },
+          version: "1"
+        }
+      ])
+    ).toEqual({ accounts: [{ address: account, capabilities: {} }] })
+    expect(optional.createGrant).not.toHaveBeenCalled()
+  })
+
   test("accepts only closed pre-prepared wallet_connect session scalars", async () => {
     const { provider, runtime } = createProvider()
     const sessionSigner = "0x0000000000000000000000000000000000000002" as const
@@ -273,7 +336,7 @@ describe("Slice Wallet provider dispatch", () => {
     )
   })
 
-  test("filters 5792 capabilities and advertises no permission standard", async () => {
+  test("discovers EIP-5792 and namespaced Slice permission capabilities", async () => {
     const { provider } = createProvider()
 
     expect(
@@ -284,7 +347,17 @@ describe("Slice Wallet provider dispatch", () => {
     ).toEqual({
       [numberToHex(base.id)]: {
         atomic: { status: "supported" },
-        paymasterService: { supported: true }
+        paymasterService: { supported: true },
+        slicePermissions: {
+          maximumCallsPerOperation: 1,
+          supportedTemplates: [
+            "native-transfer",
+            "erc20-transfer",
+            "erc20-approve",
+            "erc20-transfer-from"
+          ],
+          version: "1"
+        }
       }
     })
     expect(

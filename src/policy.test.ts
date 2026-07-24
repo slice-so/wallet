@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test"
 import { type Address, encodeFunctionData, erc20Abi } from "viem"
+import { sliceKernelSingleCallPolicyAddress } from "./execution/utils/sliceKernelAddresses"
 import {
   assertWalletCallsMatchPolicy,
   createErc20ApproveCallRule,
@@ -27,6 +28,7 @@ const descriptor = (
   calls,
   chainId: 8453,
   grantKind: "generic",
+  rateLimit: { count: 1, intervalSec: 60 },
   validAfter: 100,
   validUntil: 200,
   version: 1
@@ -66,9 +68,14 @@ describe("normalized wallet policies", () => {
     )
 
     const policies = toWalletPermissionPolicies(first)
-    expect(policies).toHaveLength(2)
+    expect(policies).toHaveLength(4)
     expect(policies[0].policyParams.type).toBe("call")
     expect(policies[1].policyParams.type).toBe("timestamp")
+    expect(policies[2].policyParams).toMatchObject({
+      policyAddress: sliceKernelSingleCallPolicyAddress,
+      type: "sudo"
+    })
+    expect(policies[3].policyParams.type).toBe("rate-limit")
   })
 
   it("accepts only the constrained native and ERC-20 templates", () => {
@@ -92,38 +99,39 @@ describe("normalized wallet policies", () => {
       })
     ])
 
-    expect(() =>
-      assertWalletCallsMatchPolicy(
-        [
-          { to: recipient, value: 2n },
-          {
-            data: encodeFunctionData({
-              abi: erc20Abi,
-              functionName: "transfer",
-              args: [recipient, 100n]
-            }),
-            to: token
-          },
-          {
-            data: encodeFunctionData({
-              abi: erc20Abi,
-              functionName: "approve",
-              args: [spender, 50n]
-            }),
-            to: token
-          },
-          {
-            data: encodeFunctionData({
-              abi: erc20Abi,
-              functionName: "transferFrom",
-              args: [account, recipient, 75n]
-            }),
-            to: token
-          }
-        ],
-        policy
-      )
-    ).not.toThrow()
+    const allowedCalls = [
+      { to: recipient, value: 2n },
+      {
+        data: encodeFunctionData({
+          abi: erc20Abi,
+          functionName: "transfer",
+          args: [recipient, 100n]
+        }),
+        to: token
+      },
+      {
+        data: encodeFunctionData({
+          abi: erc20Abi,
+          functionName: "approve",
+          args: [spender, 50n]
+        }),
+        to: token
+      },
+      {
+        data: encodeFunctionData({
+          abi: erc20Abi,
+          functionName: "transferFrom",
+          args: [account, recipient, 75n]
+        }),
+        to: token
+      }
+    ] as const
+    for (const call of allowedCalls) {
+      expect(() => assertWalletCallsMatchPolicy([call], policy)).not.toThrow()
+    }
+    expect(() => assertWalletCallsMatchPolicy(allowedCalls, policy)).toThrow(
+      "exactly one call"
+    )
 
     expect(() =>
       assertWalletCallsMatchPolicy(

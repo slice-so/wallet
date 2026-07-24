@@ -28,6 +28,7 @@ import {
   generatedHookAddressList,
   getProductsModuleAddress
 } from "../generated/commerceFacts"
+import { sliceKernelERC20AllowanceGuardAddress } from "../utils/sliceKernelAddresses"
 
 export const sliceStoreManagementOperations = [
   "addProduct",
@@ -68,6 +69,9 @@ const getSelector = ({
 const buySelector = getSelector({ abi: productsModuleAbi, functionName: "buy" })
 const paySelector = getSelector({ abi: productsModuleAbi, functionName: "pay" })
 const approveSelector = toFunctionSelector("approve(address,uint256)")
+const assertAllowanceSelector = toFunctionSelector(
+  "assertAllowance(address,address,uint256)"
+)
 const configureProductSelector = getSelector({
   abi: registryProductActionAbi,
   functionName: "configureProduct"
@@ -98,17 +102,22 @@ export const createSliceCheckoutPolicyDescriptor = ({
   tokenAddresses = []
 }: CreateSliceCheckoutPolicyParameters): WalletPolicyDescriptor => {
   const productsModuleAddress = getProductsModuleAddress(chainId)
+  const buyerRule = {
+    condition: "equal" as const,
+    offset: 0,
+    params: [pad(account, { size: 32 })]
+  }
   return {
     account,
     calls: [
       {
-        parameterRules: [],
+        parameterRules: [buyerRule],
         selector: buySelector,
         target: productsModuleAddress,
         valueLimit: maxUint256
       },
       {
-        parameterRules: [],
+        parameterRules: [buyerRule],
         selector: paySelector,
         target: productsModuleAddress,
         valueLimit: maxUint256
@@ -127,7 +136,20 @@ export const createSliceCheckoutPolicyDescriptor = ({
           target,
           valueLimit: 0n
         })
-      )
+      ),
+      {
+        parameterRules: [
+          {
+            condition: "equal",
+            offset: 32,
+            params: [pad(productsModuleAddress, { size: 32 })]
+          },
+          createPositiveAmountRule(64)
+        ],
+        selector: assertAllowanceSelector,
+        target: sliceKernelERC20AllowanceGuardAddress,
+        valueLimit: 0n
+      }
     ],
     chainId,
     grantKind: "checkout",
@@ -149,6 +171,7 @@ export const assertSliceCheckoutPolicyDescriptor = (
   const tokenAddresses = normalized.calls
     .filter(
       (call) =>
+        call.selector === approveSelector &&
         call.target.toLowerCase() !== productsModuleAddress.toLowerCase()
     )
     .map((call) => call.target)

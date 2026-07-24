@@ -7,12 +7,14 @@ import {
   maxUint256,
   numberToHex
 } from "viem"
+import { maximumBrowserGenericGrantTtlSec } from "../constants"
 import {
   createErc20ApproveCallRule,
   createErc20TransferCallRule,
   createErc20TransferFromCallRule,
   createNativeTransferCallRule,
-  getWalletPermissionValidAfter
+  getWalletPermissionValidAfter,
+  normalizeWalletPolicyDescriptor
 } from "../policy"
 import type {
   SliceWalletGenericPermission,
@@ -90,7 +92,7 @@ const address = (
   if (!isAddress(parsed)) {
     throw invalidProviderRequest(`${label} must be an address.`)
   }
-  return parsed as Address
+  return parsed.toLowerCase() as Address
 }
 
 const hex = (value: SliceWalletProviderValue | undefined, label: string) => {
@@ -106,13 +108,12 @@ const quantity = (
   label: string
 ) => {
   let parsed: bigint
-  if (typeof value === "bigint") parsed = value
-  else if (typeof value === "number" && Number.isSafeInteger(value)) {
-    parsed = BigInt(value)
-  } else if (typeof value === "string" && isHex(value, { strict: true })) {
-    parsed = hexToBigInt(value)
+  if (typeof value === "string" && /^0x(?:0|[1-9a-f][0-9a-f]*)$/.test(value)) {
+    parsed = hexToBigInt(value as Hex)
   } else {
-    throw invalidProviderRequest(`${label} must be a hex quantity.`)
+    throw invalidProviderRequest(
+      `${label} must be a canonical lowercase hex quantity.`
+    )
   }
   if (parsed < 0n || parsed > maxUint256) {
     throw invalidProviderRequest(`${label} is outside uint256.`)
@@ -394,8 +395,10 @@ const parseRateLimit = (
   assertKeys(data, ["count", "intervalSec"])
   const count = integer(data.count, "Rate-limit count")
   const intervalSec = integer(data.intervalSec, "Rate-limit interval")
-  if (count <= 0 || intervalSec <= 0) {
-    throw invalidProviderRequest("Rate-limit values must be positive.")
+  if (count < 1 || count > 100 || intervalSec < 60) {
+    throw invalidProviderRequest(
+      "Rate limit must use count 1 to 100 and an interval of at least 60 seconds."
+    )
   }
   return { count, intervalSec }
 }
@@ -415,9 +418,9 @@ const parseGenericPermission = (
     throw invalidProviderRequest("Permission required flag must be boolean.")
   }
   const policies = array(permission.policies, "Permission policies")
-  if (policies.length > 1) {
+  if (policies.length !== 1) {
     throw invalidProviderRequest(
-      "A permission supports at most one rate limit."
+      "Every permission requires exactly one common rate limit."
     )
   }
   const parsedPolicies = policies.map((policy) => {
@@ -514,7 +517,9 @@ const parseGenericPermission = (
   throw invalidProviderRequest("Unsupported wallet permission template.")
 }
 
-const toPermissionCallRule = (permission: SliceWalletGenericPermission) => {
+export const toSliceWalletGenericPermissionCallRule = (
+  permission: SliceWalletGenericPermission
+) => {
   const data = permission.data
   if (data.template === "native-transfer") {
     return createNativeTransferCallRule({
@@ -569,36 +574,26 @@ export const parseSliceWalletGrantPermissions = ({
     )
   }
   const expiresAt = integer(input.expiry, "Permission expiry")
-  if (expiresAt <= now) {
-    throw invalidProviderRequest("Permission expiry must be in the future.")
+  if (expiresAt <= now || expiresAt - now > maximumBrowserGenericGrantTtlSec) {
+    throw invalidProviderRequest(
+      "Permission expiry must be within the next 30 days."
+    )
   }
   const requested = array(input.permissions, "Permissions")
   if (requested.length === 0 || requested.length > 16) {
     throw invalidProviderRequest("Request between 1 and 16 permissions.")
   }
   const permissions: SliceWalletGenericPermission[] = []
-  for (const value of requested) {
-    const candidate = record(value, "Wallet permission")
-    try {
-      permissions.push(parseGenericPermission(value))
-    } catch (error) {
-      if (candidate.required === false) continue
-      throw error
-    }
-  }
-  if (permissions.length === 0) {
-    throw invalidProviderRequest(
-      "No supported wallet permission was requested."
-    )
-  }
+  for (const value of requested) permissions.push(parseGenericPermission(value))
   const limits = permissions
     .flatMap((permission) => permission.policies)
     .map((policy) => policy.data)
   const rateLimit = limits[0]
   if (
+    rateLimit === undefined ||
+    rateLimit.intervalSec > expiresAt - now ||
     limits.some(
       (limit) =>
-        rateLimit === undefined ||
         limit.count !== rateLimit.count ||
         limit.intervalSec !== rateLimit.intervalSec
     )
@@ -609,15 +604,15 @@ export const parseSliceWalletGrantPermissions = ({
   }
   return {
     permissions,
-    policy: {
+    policy: normalizeWalletPolicyDescriptor({
       account,
-      calls: permissions.map(toPermissionCallRule),
+      calls: permissions.map(toSliceWalletGenericPermissionCallRule),
       chainId,
       grantKind: "generic" as const,
-      ...(rateLimit === undefined ? {} : { rateLimit }),
+      rateLimit,
       validAfter: getWalletPermissionValidAfter(now * 1_000),
       validUntil: expiresAt,
       version: 1 as const
-    }
+    })
   }
 }

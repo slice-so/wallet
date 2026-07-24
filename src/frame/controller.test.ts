@@ -201,8 +201,9 @@ describe("isolated signer-frame controller", () => {
       calls: [createNativeTransferCallRule({ maximumValue: 1n, recipient })],
       chainId: 8453,
       grantKind: "generic",
-      validAfter: 100,
-      validUntil: 2_000_000_000,
+      rateLimit: { count: 1, intervalSec: 60 },
+      validAfter: Math.floor(Date.now() / 1_000) - 300,
+      validUntil: Math.floor(Date.now() / 1_000) + 3_600,
       version: 1
     } as const
     const created = receive(connection.port1)
@@ -257,8 +258,9 @@ describe("isolated signer-frame controller", () => {
       calls: [createNativeTransferCallRule({ maximumValue: 1n, recipient })],
       chainId: 8453,
       grantKind: "generic",
-      validAfter: 100,
-      validUntil: 2_000_000_000,
+      rateLimit: { count: 1, intervalSec: 60 },
+      validAfter: Math.floor(Date.now() / 1_000) - 300,
+      validUntil: Math.floor(Date.now() / 1_000) + 3_600,
       version: 1
     } as const
     const created = receive(connection.port1)
@@ -300,6 +302,18 @@ describe("isolated signer-frame controller", () => {
       nonce,
       origin: "https://app.example",
       type: "slice-wallet:bridge-record"
+    })
+    const registrationProof = receive(trusted.port1)
+    trusted.port1.postMessage({
+      digest: `0x${"77".repeat(32)}`,
+      session: { account, chainId: 8453, grantKind: "generic" },
+      type: "slice-wallet:bridge-sign-registration",
+      version: 1
+    } satisfies SliceWalletProtocolValue)
+    expect(await registrationProof).toMatchObject({
+      signature: expect.stringMatching(/^0x[0-9a-f]{128}$/),
+      type: "slice-wallet:bridge-registration-proof",
+      version: 1
     })
 
     const committed = receive(connection.port1)
@@ -976,9 +990,11 @@ describe("isolated signer-frame controller", () => {
       method: "signCoSignRequest",
       params: {
         challenge: nonce,
+        challengeIssuedAt: 100,
         delegationId: "delegation-1",
         expiresAt: 200,
         session: { account, chainId: 8453, grantKind: "checkout" },
+        spendWindowId: "lifetime",
         userOperation: {
           callData: "0x",
           callGasLimit: 3_000_001n,
@@ -988,7 +1004,10 @@ describe("isolated signer-frame controller", () => {
           preVerificationGas: 1n,
           sender: account,
           verificationGasLimit: 1n
-        }
+        },
+        validUntil: 200,
+        windowEndExclusive: 2_000_000_001,
+        windowStart: 0
       },
       version: 1
     } satisfies SliceWalletProtocolValue)
@@ -1029,6 +1048,7 @@ describe("isolated signer-frame controller", () => {
       calls: [createNativeTransferCallRule({ maximumValue: 1n, recipient })],
       chainId: 8453,
       grantKind: "generic",
+      rateLimit: { count: 1, intervalSec: 60 },
       validAfter: 90,
       validUntil: 1_000,
       version: 1
