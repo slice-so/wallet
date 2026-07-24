@@ -1,6 +1,15 @@
-import { productsModuleAbi, registryProductActionAbi } from "@slicekit/abi"
+import {
+  productsModuleAbi,
+  registryProductActionAbi,
+  slicerAbi
+} from "@slicekit/abi"
 import { CallPolicyVersion, toCallPolicy } from "@zerodev/permissions/policies"
-import { type Abi, type AbiFunction, toFunctionSelector } from "viem"
+import {
+  type Abi,
+  type AbiFunction,
+  type Address,
+  toFunctionSelector
+} from "viem"
 import type { WalletDelegationOperation } from "../../types/delegation"
 import {
   generatedHookAddressList,
@@ -14,7 +23,8 @@ export const storeManagementAllowedOperations = [
   "removeProduct",
   "setProductType",
   "setStoreConfig",
-  "configureProduct"
+  "configureProduct",
+  "_addCurrencies"
 ] as const satisfies readonly WalletDelegationOperation[]
 
 const getFunctionSelector = ({
@@ -36,7 +46,10 @@ const getFunctionSelector = ({
 }
 
 const productManagementSelectors = storeManagementAllowedOperations
-  .filter((operation) => operation !== "configureProduct")
+  .filter(
+    (operation) =>
+      operation !== "configureProduct" && operation !== "_addCurrencies"
+  )
   .map((functionName) =>
     getFunctionSelector({ abi: productsModuleAbi, functionName })
   )
@@ -45,10 +58,17 @@ const configureProductSelector = getFunctionSelector({
   abi: registryProductActionAbi,
   functionName: "configureProduct"
 })
+const addCurrenciesSelector = getFunctionSelector({
+  abi: slicerAbi,
+  functionName: "_addCurrencies"
+})
 
 const generatedHookAddresses = generatedHookAddressList
 
-export const createStoreManagementCallPolicy = (chainId: number) => {
+export const createStoreManagementCallPolicy = (
+  chainId: number,
+  slicerAddress: Address
+) => {
   const productsModuleAddress = getProductsModuleAddress(chainId)
   return toCallPolicy({
     permissions: [
@@ -59,7 +79,11 @@ export const createStoreManagementCallPolicy = (chainId: number) => {
       ...generatedHookAddresses.map((target) => ({
         selector: configureProductSelector,
         target
-      }))
+      })),
+      {
+        selector: addCurrenciesSelector,
+        target: slicerAddress
+      }
     ],
     policyVersion: CallPolicyVersion.V0_0_5
   })

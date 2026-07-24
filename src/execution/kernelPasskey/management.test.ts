@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test"
-import { productsModuleAbi, registryProductActionAbi } from "@slicekit/abi"
+import {
+  productsModuleAbi,
+  registryProductActionAbi,
+  slicerAbi
+} from "@slicekit/abi"
 import { type Abi, type AbiFunction, toFunctionSelector } from "viem"
 import { base } from "viem/chains"
 import {
@@ -21,8 +25,10 @@ const selectorFor = (abi: Abi, functionName: string) => {
 }
 
 describe("store management call policy", () => {
+  const slicerAddress = "0x1111111111111111111111111111111111111111"
+
   it("allows only the intended product-management selectors", () => {
-    const policy = createStoreManagementCallPolicy(base.id)
+    const policy = createStoreManagementCallPolicy(base.id, slicerAddress)
     if (policy.policyParams.type !== "call") {
       throw new Error("Store management policy must be a call policy.")
     }
@@ -40,7 +46,10 @@ describe("store management call policy", () => {
 
     expect(productsModuleSelectors.sort()).toEqual(
       storeManagementAllowedOperations
-        .filter((operation) => operation !== "configureProduct")
+        .filter(
+          (operation) =>
+            operation !== "configureProduct" && operation !== "_addCurrencies"
+        )
         .map((operation) => selectorFor(productsModuleAbi, operation))
         .sort()
     )
@@ -53,7 +62,7 @@ describe("store management call policy", () => {
   })
 
   it("allows configureProduct only on generated product-action hooks", () => {
-    const policy = createStoreManagementCallPolicy(base.id)
+    const policy = createStoreManagementCallPolicy(base.id, slicerAddress)
     if (policy.policyParams.type !== "call") {
       throw new Error("Store management policy must be a call policy.")
     }
@@ -71,5 +80,20 @@ describe("store management call policy", () => {
     )
 
     expect(configuredTargets.sort()).toEqual(generatedTargets.sort())
+  })
+
+  it("allows adding currencies only on the bound slicer", () => {
+    const policy = createStoreManagementCallPolicy(base.id, slicerAddress)
+    if (policy.policyParams.type !== "call") {
+      throw new Error("Store management policy must be a call policy.")
+    }
+
+    const permissions = policy.policyParams.permissions ?? []
+    const addCurrenciesSelector = selectorFor(slicerAbi, "_addCurrencies")
+    const configuredTargets = permissions
+      .filter((permission) => permission.selector === addCurrenciesSelector)
+      .map((permission) => permission.target.toLowerCase())
+
+    expect(configuredTargets).toEqual([slicerAddress.toLowerCase()])
   })
 })

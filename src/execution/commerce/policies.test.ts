@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { productsModuleAbi } from "@slicekit/abi"
+import { productsModuleAbi, slicerAbi } from "@slicekit/abi"
 import { encodeFunctionData, zeroAddress } from "viem"
 import { assertWalletCallsMatchPolicy } from "../../policy"
 import { getProductsModuleAddress } from "../generated/commerceFacts"
@@ -48,6 +48,54 @@ describe("Slice store-management wallet policy", () => {
               abi: productsModuleAbi,
               functionName: "removeProduct",
               args: [2913n, 1n]
+            }),
+            to: sliceProductsModuleAddress,
+            value: 0n
+          }
+        ],
+        policy
+      )
+    ).not.toThrow()
+  })
+
+  test("accepts adding currencies on the bound slicer", () => {
+    expect(() =>
+      assertWalletCallsMatchPolicy(
+        [
+          {
+            data: encodeFunctionData({
+              abi: slicerAbi,
+              functionName: "_addCurrencies",
+              args: [[zeroAddress]]
+            }),
+            to: slicerAddress,
+            value: 0n
+          }
+        ],
+        policy
+      )
+    ).not.toThrow()
+  })
+
+  test("accepts store configuration for the bound slicer", () => {
+    expect(() =>
+      assertWalletCallsMatchPolicy(
+        [
+          {
+            data: encodeFunctionData({
+              abi: productsModuleAbi,
+              functionName: "setStoreConfig",
+              args: [
+                2913n,
+                {
+                  isClosed: true,
+                  productTypeActions: [],
+                  productTypePricingStrategies: [],
+                  referralFeeStore: 0,
+                  slicerActions: [],
+                  slicerPricingStrategies: []
+                }
+              ]
             }),
             to: sliceProductsModuleAddress,
             value: 0n
