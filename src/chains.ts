@@ -188,10 +188,10 @@ const manifests = [
           "0xf86faf7bdc6657af2c9cfe4ab7d966434c7534803d102f802c68faeeafd04254"
       },
       weightedP256Signer: {
-        address: "0xDb6BFE831FEe7AC73A2AFdF0128760797624aB3A",
+        address: "0xe9c0dBa15040D8B20a94D5bCA18382496B277485",
         deployedRuntimeCodeHash: null,
         expectedRuntimeCodeHash:
-          "0xb272d6164420c7ae74308987fcb60e91304f1e055360b1278972f2d539f576ab",
+          "0x0ff03c4f6b84fb76e48e8fb090efe4e30f9e15a7a9e758f7e035876394a6523c",
         version: "1"
       },
       timelockPolicy: {
@@ -355,10 +355,10 @@ const manifests = [
           "0xe519f84c3f2c9ef1638b500fced1257b705f6d412b2adaedf6cc7f17fb39f9ed"
       },
       weightedP256Signer: {
-        address: "0xDb6BFE831FEe7AC73A2AFdF0128760797624aB3A",
+        address: "0xe9c0dBa15040D8B20a94D5bCA18382496B277485",
         deployedRuntimeCodeHash: null,
         expectedRuntimeCodeHash:
-          "0xb272d6164420c7ae74308987fcb60e91304f1e055360b1278972f2d539f576ab",
+          "0x0ff03c4f6b84fb76e48e8fb090efe4e30f9e15a7a9e758f7e035876394a6523c",
         version: "1"
       },
       timelockPolicy: {
@@ -522,10 +522,10 @@ const manifests = [
           "0xd9dea77190cbc2104d2ecd8beab745196d3c5a01fe7b0ba49ee5b3b6c9a90be2"
       },
       weightedP256Signer: {
-        address: "0xDb6BFE831FEe7AC73A2AFdF0128760797624aB3A",
+        address: "0xe9c0dBa15040D8B20a94D5bCA18382496B277485",
         deployedRuntimeCodeHash: null,
         expectedRuntimeCodeHash:
-          "0xb272d6164420c7ae74308987fcb60e91304f1e055360b1278972f2d539f576ab",
+          "0x0ff03c4f6b84fb76e48e8fb090efe4e30f9e15a7a9e758f7e035876394a6523c",
         version: "1"
       },
       timelockPolicy: {
@@ -694,10 +694,10 @@ const manifests = [
           "0x38bf435be1112dabcaf5af04d6398fd3ad1f432173fd46e3864ff73f9e0b036f"
       },
       weightedP256Signer: {
-        address: "0xDb6BFE831FEe7AC73A2AFdF0128760797624aB3A",
+        address: "0xe9c0dBa15040D8B20a94D5bCA18382496B277485",
         deployedRuntimeCodeHash: null,
         expectedRuntimeCodeHash:
-          "0xb272d6164420c7ae74308987fcb60e91304f1e055360b1278972f2d539f576ab",
+          "0x0ff03c4f6b84fb76e48e8fb090efe4e30f9e15a7a9e758f7e035876394a6523c",
         version: "1"
       },
       timelockPolicy: {
