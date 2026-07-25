@@ -25,36 +25,28 @@ const normalizeAmount = (value: bigint, label: string) => {
   return numberToHex(value)
 }
 
-const withRequired = (required: boolean | undefined): { required?: boolean } =>
-  required === undefined ? {} : { required }
-
 export const nativeTransferPermission = ({
   maximumValue,
-  recipient,
-  required
+  recipient
 }: {
   maximumValue: bigint
   recipient: Address
-  required?: boolean
 }): SliceWalletGenericPermissionRule => ({
   data: {
     maximumValue: normalizeAmount(maximumValue, "Maximum native value"),
     recipient: normalizeAddress(recipient, "Native transfer recipient"),
     template: "native-transfer"
   },
-  ...withRequired(required),
   type: "slice-call"
 })
 
 export const erc20TransferPermission = ({
   maximumAmount,
   recipient,
-  required,
   token
 }: {
   maximumAmount: bigint
   recipient: Address
-  required?: boolean
   token: Address
 }): SliceWalletGenericPermissionRule => ({
   data: {
@@ -63,18 +55,15 @@ export const erc20TransferPermission = ({
     template: "erc20-transfer",
     token: normalizeAddress(token, "Token address")
   },
-  ...withRequired(required),
   type: "slice-call"
 })
 
 export const erc20ApprovePermission = ({
   maximumAmount,
-  required,
   spender,
   token
 }: {
   maximumAmount: bigint
-  required?: boolean
   spender: Address
   token: Address
 }): SliceWalletGenericPermissionRule => ({
@@ -84,7 +73,6 @@ export const erc20ApprovePermission = ({
     template: "erc20-approve",
     token: normalizeAddress(token, "Token address")
   },
-  ...withRequired(required),
   type: "slice-call"
 })
 
@@ -92,13 +80,11 @@ export const erc20TransferFromPermission = ({
   account,
   maximumAmount,
   recipient,
-  required,
   token
 }: {
   account: Address
   maximumAmount: bigint
   recipient: Address
-  required?: boolean
   token: Address
 }): SliceWalletGenericPermissionRule => ({
   data: {
@@ -108,7 +94,6 @@ export const erc20TransferFromPermission = ({
     template: "erc20-transfer-from",
     token: normalizeAddress(token, "Token address")
   },
-  ...withRequired(required),
   type: "slice-call"
 })
 

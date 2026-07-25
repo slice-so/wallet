@@ -445,9 +445,6 @@ const parseGenericPermission = (
         template
       },
       policies: parsedPolicies,
-      ...(permission.required === undefined
-        ? {}
-        : { required: permission.required }),
       type: "slice-call"
     }
   }
@@ -464,9 +461,6 @@ const parseGenericPermission = (
         token: address(data.token, "Token address")
       },
       policies: parsedPolicies,
-      ...(permission.required === undefined
-        ? {}
-        : { required: permission.required }),
       type: "slice-call"
     }
   }
@@ -483,9 +477,6 @@ const parseGenericPermission = (
         token: address(data.token, "Token address")
       },
       policies: parsedPolicies,
-      ...(permission.required === undefined
-        ? {}
-        : { required: permission.required }),
       type: "slice-call"
     }
   }
@@ -509,9 +500,6 @@ const parseGenericPermission = (
         token: address(data.token, "Token address")
       },
       policies: parsedPolicies,
-      ...(permission.required === undefined
-        ? {}
-        : { required: permission.required }),
       type: "slice-call"
     }
   }

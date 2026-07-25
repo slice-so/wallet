@@ -139,8 +139,9 @@ const createRotation = () => ({
   },
   phase: "submitted" as const,
   predecessor: createGrant(),
+  rebroadcastAttempts: 0,
   replacement: createGrant(replacementPublicKey),
-  version: 3 as const
+  version: 4 as const
 })
 
 describe("portable wallet provider storage", () => {
@@ -229,7 +230,22 @@ describe("portable wallet provider storage", () => {
       ) ?? []
     if (key === undefined || raw === undefined)
       throw new Error("Missing rotation fixture.")
-    const hashless = JSON.parse(raw)
+    const legacy = JSON.parse(raw)
+    delete legacy.rebroadcastAttempts
+    storage.setItem(key, JSON.stringify({ ...legacy, version: 3 }))
+    expect(
+      readStoredSliceWalletGrantRotation(
+        storage,
+        rotation.replacement.chainId,
+        rotation.replacement.account,
+        1_800_000_001
+      )
+    ).toEqual(rotation)
+
+    expect(writeStoredSliceWalletGrantRotation(storage, rotation)).toBe(true)
+    const current = storage.getItem(key)
+    if (current === null) throw new Error("Missing current rotation fixture.")
+    const hashless = JSON.parse(current)
     delete hashless.installation
     storage.setItem(
       key,
@@ -331,8 +347,9 @@ describe("portable wallet provider storage", () => {
       writeStoredSliceWalletGrantRotation(storage, {
         phase: "prepared",
         predecessor,
+        rebroadcastAttempts: 0,
         replacement: createGrant(replacementPublicKey),
-        version: 3
+        version: 4
       })
     ).toBe(false)
   })

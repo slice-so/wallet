@@ -79,6 +79,22 @@ describe("canonical Slice Wallet config", () => {
   })
 
   test("allows Anvil only with explicit loopback identity and transports", () => {
+    if (process.env.NODE_ENV === "production") {
+      expect(() =>
+        resolveCanonicalSliceWalletConfig({
+          chainIds: [31_337],
+          defaultChainId: 31_337,
+          idOrigin: "http://localhost:3003",
+          transports: {
+            31337: {
+              bundlerUrl: "http://localhost:3001/api/bundler",
+              rpcUrl: "http://127.0.0.1:8545"
+            }
+          }
+        })
+      ).toThrow("unavailable in production")
+      return
+    }
     const config = resolveCanonicalSliceWalletConfig({
       chainIds: [31_337],
       defaultChainId: 31_337,

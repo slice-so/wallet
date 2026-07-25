@@ -784,12 +784,15 @@ export const sliceWalletChainManifests = Object.freeze({
     : {})
 } as Readonly<Record<number, SliceWalletChainManifest>>)
 
-export const sliceWalletSupportedChainIds = Object.freeze([
-  ...manifests
+export const sliceWalletSupportedChainIds = Object.freeze(
+  manifests
     .filter((manifest) => manifest.admitted)
-    .map((manifest) => manifest.chain.id),
-  ...(includeDevelopmentManifest ? [developmentManifest.chain.id] : [])
-])
+    .map((manifest) => manifest.chain.id)
+)
+
+export const sliceWalletDevelopmentChainIds = Object.freeze(
+  includeDevelopmentManifest ? [developmentManifest.chain.id] : []
+)
 
 export const getSliceWalletChainManifest = (chainId: number) => {
   const manifest = sliceWalletChainManifests[chainId]

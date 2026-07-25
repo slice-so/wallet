@@ -100,8 +100,9 @@ export type StoredGenericGrantInstallation = {
 
 type StoredGenericGrantRotationBase = {
   predecessor: StoredGenericGrant
+  rebroadcastAttempts: number
   replacement: StoredGenericGrant
-  version: 3
+  version: 4
 }
 
 export type StoredGenericGrantRotation =

@@ -649,18 +649,36 @@ export const readStoredSliceWalletGrantRotation = (
     remove(storage, key)
     return null
   }
-  if (
-    value === null ||
-    !hasOnlyKeys(value, [
+  const legacyJournal =
+    value !== null &&
+    value.version === 3 &&
+    hasOnlyKeys(value, [
       "installation",
       "phase",
       "predecessor",
       "replacement",
       "version"
-    ]) ||
-    value.version !== 3 ||
+    ])
+  const currentJournal =
+    value !== null &&
+    value.version === 4 &&
+    hasOnlyKeys(value, [
+      "installation",
+      "phase",
+      "predecessor",
+      "rebroadcastAttempts",
+      "replacement",
+      "version"
+    ])
+  if (
+    value === null ||
+    (!legacyJournal && !currentJournal) ||
     typeof value.phase !== "string" ||
     !grantRotationPhases.has(value.phase as StoredGenericGrantRotationPhase) ||
+    (currentJournal &&
+      (typeof value.rebroadcastAttempts !== "number" ||
+        !Number.isSafeInteger(value.rebroadcastAttempts) ||
+        value.rebroadcastAttempts < 0)) ||
     typeof value.predecessor !== "object" ||
     value.predecessor === null ||
     Array.isArray(value.predecessor) ||
@@ -704,8 +722,12 @@ export const readStoredSliceWalletGrantRotation = (
   }
   const base = {
     predecessor,
+    rebroadcastAttempts:
+      legacyJournal || typeof value.rebroadcastAttempts !== "number"
+        ? 0
+        : value.rebroadcastAttempts,
     replacement,
-    version: 3 as const
+    version: 4 as const
   }
   if (value.phase === "prepared") return { ...base, phase: value.phase }
   if (value.phase === "transport-pending" || value.phase === "submitted") {

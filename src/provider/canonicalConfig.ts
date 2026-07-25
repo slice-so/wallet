@@ -1,6 +1,7 @@
 import { anvil } from "viem/chains"
 import {
   getSliceWalletChainManifest,
+  sliceWalletDevelopmentChainIds,
   sliceWalletSupportedChainIds
 } from "../chains"
 import type { SliceWalletParameters } from "../types"
@@ -89,7 +90,7 @@ export const resolveCanonicalSliceWalletConfig = (
   const chainIds = parameters.chainIds ?? [
     defaultSliceWalletChainId,
     ...sliceWalletSupportedChainIds.filter(
-      (chainId) => chainId !== defaultSliceWalletChainId && chainId !== anvil.id
+      (chainId) => chainId !== defaultSliceWalletChainId
     )
   ]
   if (
@@ -102,7 +103,21 @@ export const resolveCanonicalSliceWalletConfig = (
       "Slice Wallet requires unique supported chains."
     )
   }
-  if (chainIds.includes(anvil.id) && chainIds.length !== 1) {
+  const configuredDevelopmentChainIds = chainIds.filter((chainId) =>
+    sliceWalletDevelopmentChainIds.includes(chainId)
+  )
+  if (
+    chainIds.includes(anvil.id) &&
+    !sliceWalletDevelopmentChainIds.includes(anvil.id)
+  ) {
+    throw invalidProviderRequest(
+      "The Anvil Slice Wallet chain is unavailable in production."
+    )
+  }
+  if (
+    configuredDevelopmentChainIds.length > 0 &&
+    (chainIds.length !== 1 || configuredDevelopmentChainIds[0] !== anvil.id)
+  ) {
     throw invalidProviderRequest(
       "The Anvil Slice Wallet chain cannot be mixed with production chains."
     )

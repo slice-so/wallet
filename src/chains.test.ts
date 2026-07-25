@@ -5,8 +5,10 @@ import {
   getSliceWalletChainManifest,
   getSliceWalletChainPolicy,
   sliceWalletChainManifests,
+  sliceWalletDevelopmentChainIds,
   sliceWalletSupportedChainIds
 } from "./chains"
+import { sliceKernelWeightedP256SignerAddress } from "./execution/utils/sliceKernelAddresses"
 
 describe("Slice Wallet chain manifest", () => {
   test("deep-freezes generated security and operational metadata", () => {
@@ -41,6 +43,9 @@ describe("Slice Wallet chain manifest", () => {
       base.contracts.rateLimitPolicy.expectedRuntimeCodeHash
     )
     expect(base.contracts.weightedP256Signer.deployedRuntimeCodeHash).toBeNull()
+    expect(base.contracts.weightedP256Signer.address).toBe(
+      sliceKernelWeightedP256SignerAddress
+    )
     expect(() =>
       assertSliceWalletAuthorityDeployment({
         authority: "generic",
@@ -56,7 +61,7 @@ describe("Slice Wallet chain manifest", () => {
   })
 
   test("exposes only chains with complete admission evidence", () => {
-    expect(sliceWalletSupportedChainIds).toEqual([1, 10, 8453, 42161, anvil.id])
+    expect(sliceWalletSupportedChainIds).toEqual([1, 10, 8453, 42161])
     for (const chainId of sliceWalletSupportedChainIds) {
       expect(getSliceWalletChainPolicy(chainId).admitted).toBe(true)
       expect(getSliceWalletChainManifest(chainId).chain.id).toBe(chainId)
@@ -65,6 +70,14 @@ describe("Slice Wallet chain manifest", () => {
   })
 
   test("admits the deterministically seeded local development chain", () => {
+    if (process.env.NODE_ENV === "production") {
+      expect(sliceWalletDevelopmentChainIds).toEqual([])
+      expect(() => getSliceWalletChainManifest(anvil.id)).toThrow(
+        "Slice Wallet chain 31337 is not provisioned."
+      )
+      return
+    }
+    expect(sliceWalletDevelopmentChainIds).toEqual([anvil.id])
     const local = getSliceWalletChainManifest(anvil.id)
 
     expect(local.authorityAdmission).toEqual({

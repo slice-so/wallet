@@ -81,6 +81,7 @@ describe("portable wallet provider protocol", () => {
                   type: "rate-limit"
                 }
               ],
+              required: false,
               type: "slice-call"
             },
             {
@@ -106,6 +107,7 @@ describe("portable wallet provider protocol", () => {
     expect(parsed.policy.grantKind).toBe("generic")
     expect(parsed.policy.rateLimit).toEqual({ count: 10, intervalSec: 3600 })
     expect(parsed.policy.calls).toHaveLength(2)
+    expect(parsed.permissions[0]).not.toHaveProperty("required")
     expect(toSliceWalletGenericPermissions(parsed.policy)).toEqual(
       parsed.permissions
     )

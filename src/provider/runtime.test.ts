@@ -15,6 +15,7 @@ import {
 import { base, optimism } from "viem/chains"
 import { getSliceWalletP256SignerId } from "../p256"
 import {
+  deserializeWalletPolicyDescriptor,
   getWalletPermissionId,
   serializeWalletPolicyDescriptor
 } from "../policy"
@@ -22,6 +23,7 @@ import { buildRecoveryPermissionInitConfig } from "../recovery"
 import { parseSliceWalletUncompressedPublicKey } from "../rootValidator"
 import type {
   SliceWalletCeremonyBroker,
+  SliceWalletGenericPermission,
   SliceWalletRegistryCredential
 } from "../types"
 import type {
@@ -32,6 +34,10 @@ import type {
   StoredGenericGrantRotation
 } from "../types/providerInternal"
 import {
+  parseSliceWalletGrantPermissions,
+  toSliceWalletGenericPermissions
+} from "./protocol"
+import {
   assertSliceWalletDeployedRootIdentity,
   assertSliceWalletRegistryAccountIdentity,
   broadcastSliceWalletGenericGrantInstallation,
@@ -39,6 +45,7 @@ import {
   deriveSliceWalletRegistryAccountAddress,
   executeSliceWalletGenericGrantReplacement,
   getSliceWalletGenericGrantInstallationAction,
+  getSliceWalletPendingGrantPermissions,
   isSliceWalletDefiniteBundlerRejection,
   resumeSliceWalletGenericGrantReplacement,
   submitSliceWalletGenericGrantInstallation
@@ -193,8 +200,9 @@ const createRotation = (
 ): StoredGenericGrantRotation => ({
   phase,
   predecessor: createRotationGrant(`0x04${"55".repeat(64)}`),
+  rebroadcastAttempts: 0,
   replacement: createRotationGrant(`0x04${"66".repeat(64)}`),
-  version: 3
+  version: 4
 })
 
 const createInstallation = (
@@ -240,8 +248,9 @@ const updateRotationPhase = (
   const { installation: _installation, ...rest } = rotation
   const base = {
     predecessor: rest.predecessor,
+    rebroadcastAttempts: phase === "prepared" ? 0 : rest.rebroadcastAttempts,
     replacement: rest.replacement,
-    version: 3 as const
+    version: 4 as const
   }
   if (phase === "prepared") return { ...base, phase }
   if (phase === "submitted" || phase === "transport-pending") {
@@ -287,7 +296,11 @@ const createTerminalBundlerRejection = (message: string) =>
     url: "https://bundler.example/base"
   })
 
-const createBundlerRpcError = (code: number, message: string) =>
+const createBundlerRpcError = (
+  code: number,
+  message: string,
+  url = "https://bundler.example/base"
+) =>
   new RpcRequestError({
     body: {
       id: 1,
@@ -296,7 +309,7 @@ const createBundlerRpcError = (code: number, message: string) =>
       params: []
     },
     error: { code, message },
-    url: "https://bundler.example/base"
+    url
   })
 
 const recoverFromDefiniteReplayRejection = async (
@@ -384,6 +397,15 @@ describe("generic grant replacement ordering", () => {
     expect(
       isSliceWalletDefiniteBundlerRejection(
         createBundlerRpcError(-32500, "AA24 signature error")
+      )
+    ).toBe(true)
+    expect(
+      isSliceWalletDefiniteBundlerRejection(
+        createBundlerRpcError(
+          -32500,
+          "AA24 signature error",
+          "https://mempool.example/rpc"
+        )
       )
     ).toBe(true)
   })
@@ -965,6 +987,126 @@ describe("generic grant replacement ordering", () => {
     expect(replayedHash).toBe(journal.installation.userOperationHash)
   })
 
+  test("eventually resets repeated ambiguous rebroadcast rejections", async () => {
+    const rejection = createBundlerRpcError(
+      -32602,
+      "invalid user operation signature"
+    )
+    let journal = persistRotation(createSubmittedRotation("transport-pending"))
+    let resetCount = 0
+
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      expect(
+        getSliceWalletGenericGrantInstallationAction({
+          currentNonce: 1n,
+          finalizedBlockNumber: null,
+          installed: false,
+          receipt: null,
+          rotation: journal
+        })
+      ).toBe("rebroadcast")
+      journal = persistRotation({
+        ...journal,
+        rebroadcastAttempts: attempt
+      })
+      const replayInstallation = journal.installation
+      if (replayInstallation === undefined) {
+        throw new Error("Missing bounded replay fixture.")
+      }
+      await expect(
+        broadcastSliceWalletGenericGrantInstallation({
+          installation: replayInstallation,
+          isDefiniteTransportRejection: isSliceWalletDefiniteBundlerRejection,
+          ...(attempt === 3
+            ? {
+                resetAmbiguous: () => {
+                  resetCount += 1
+                  journal = persistRotation(
+                    updateRotationPhase(journal, "prepared", null)
+                  )
+                  return journal
+                }
+              }
+            : {}),
+          resetRejected: () => {
+            return updateRotationPhase(journal, "prepared", null)
+          },
+          transport: async () => {
+            throw rejection
+          }
+        })
+      ).rejects.toBe(rejection)
+    }
+
+    expect(resetCount).toBe(1)
+    expect(journal).toMatchObject({
+      phase: "prepared",
+      rebroadcastAttempts: 0
+    })
+    expect(journal.installation).toBeUndefined()
+  })
+
+  test("reports a pending replacement in the dapp's original permission order", () => {
+    const rotation = createRotation()
+    const requestedOrder = [
+      {
+        data: {
+          maximumAmount: "0x2" as const,
+          recipient: account,
+          template: "erc20-transfer" as const,
+          token: secondAccount
+        },
+        policies: rotation.replacement.permissions[0]?.policies ?? [],
+        type: "slice-call" as const
+      },
+      ...rotation.replacement.permissions
+    ] satisfies readonly SliceWalletGenericPermission[]
+    const parsed = parseSliceWalletGrantPermissions({
+      account: rotation.replacement.account,
+      chainId: rotation.replacement.chainId,
+      now: rotation.replacement.createdAt,
+      params: [
+        {
+          expiry: rotation.replacement.expiresAt,
+          permissions: requestedOrder
+        }
+      ]
+    })
+    const withRequestedPolicy = (grant: StoredGenericGrant) => ({
+      ...grant,
+      permissionId: getWalletPermissionId(parsed.policy, grant.signerId),
+      permissions: parsed.permissions,
+      policy: serializeWalletPolicyDescriptor(parsed.policy)
+    })
+    const requestedRotation = {
+      ...rotation,
+      predecessor: withRequestedPolicy(rotation.predecessor),
+      replacement: withRequestedPolicy(rotation.replacement)
+    }
+    const persistedRotation = persistRotation(requestedRotation)
+    const replacement = persistedRotation.replacement
+    const pending = {
+      account: replacement.account,
+      chainId: replacement.chainId,
+      expiresAt: replacement.expiresAt,
+      grantKind: "generic" as const,
+      permissionId: replacement.permissionId,
+      policy: deserializeWalletPolicyDescriptor(replacement.policy),
+      publicKey: replacement.publicKey,
+      signerId: replacement.signerId
+    }
+
+    expect(toSliceWalletGenericPermissions(pending.policy)).not.toEqual(
+      requestedOrder
+    )
+    expect(
+      getSliceWalletPendingGrantPermissions({
+        pending,
+        rotation: persistedRotation
+      })
+    ).toEqual(requestedOrder)
+  })
+
   test("preserves the replay envelope when a definite-rejection reset cannot persist", async () => {
     const rejection = createTerminalBundlerRejection("paymaster expired")
     const persistenceFailure = new Error("journal storage unavailable")
@@ -1027,8 +1169,9 @@ describe("generic grant replacement ordering", () => {
     expect(prepared).toEqual({
       phase: "prepared",
       predecessor: pending.predecessor,
+      rebroadcastAttempts: 0,
       replacement: pending.replacement,
-      version: 3
+      version: 4
     })
   })
 

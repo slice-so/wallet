@@ -218,12 +218,13 @@ export const sliceWalletChainManifests = Object.freeze({
 )
 
 export const sliceWalletSupportedChainIds = Object.freeze(
-  [
-    ...manifests
-      .filter((manifest) => manifest.admitted)
-      .map((manifest) => manifest.chain.id),
-    ...(includeDevelopmentManifest ? [developmentManifest.chain.id] : [])
-  ]
+  manifests
+    .filter((manifest) => manifest.admitted)
+    .map((manifest) => manifest.chain.id)
+)
+
+export const sliceWalletDevelopmentChainIds = Object.freeze(
+  includeDevelopmentManifest ? [developmentManifest.chain.id] : []
 )
 
 export const getSliceWalletChainManifest = (chainId: number) => {

@@ -212,6 +212,7 @@ const genericGrantRotationPhaseOrder: Record<
 const definiteBundlerRejectionCodes = new Set([
   -32500, -32501, -32502, -32503, -32504, -32505, -32506, -32507
 ])
+const maximumGenericGrantRebroadcastAttempts = 3
 
 export const isSliceWalletDefiniteBundlerRejection = (error: Error) => {
   if (!(error instanceof BaseError)) return false
@@ -222,7 +223,7 @@ export const isSliceWalletDefiniteBundlerRejection = (error: Error) => {
     rpcError !== null &&
     definiteBundlerRejectionCodes.has(rpcError.code) &&
     !/(already known|already present|mempool|replacement underpriced|underpriced)/i.test(
-      rpcError.message
+      rpcError.details
     )
   )
 }
@@ -247,7 +248,12 @@ export const getSliceWalletGenericGrantInstallationAction = ({
   if (receipt === null) {
     if (currentNonce === null) return "wait"
     const recordedNonce = hexToBigInt(rotation.installation.nonce)
-    if (currentNonce === recordedNonce) return "rebroadcast"
+    if (currentNonce === recordedNonce) {
+      return rotation.rebroadcastAttempts >=
+        maximumGenericGrantRebroadcastAttempts
+        ? "retry"
+        : "rebroadcast"
+    }
     return currentNonce > recordedNonce ? "retry" : "wait"
   }
   if (receipt.success) return "wait"
@@ -260,11 +266,15 @@ export const getSliceWalletGenericGrantInstallationAction = ({
 export const broadcastSliceWalletGenericGrantInstallation = async ({
   installation,
   isDefiniteTransportRejection,
+  resetAmbiguous,
   resetRejected,
   transport
 }: {
   installation: StoredGenericGrantInstallation
   isDefiniteTransportRejection: (error: Error) => boolean
+  resetAmbiguous?: () =>
+    | Promise<StoredGenericGrantRotation>
+    | StoredGenericGrantRotation
   resetRejected: () =>
     | Promise<StoredGenericGrantRotation>
     | StoredGenericGrantRotation
@@ -282,15 +292,18 @@ export const broadcastSliceWalletGenericGrantInstallation = async ({
     }
     return transportedHash
   } catch (error) {
-    if (!(error instanceof Error) || !isDefiniteTransportRejection(error)) {
-      throw error
-    }
+    if (!(error instanceof Error)) throw error
+    const definite = isDefiniteTransportRejection(error)
+    const reset = definite ? resetRejected : resetAmbiguous
+    if (reset === undefined) throw error
     try {
-      await resetRejected()
+      await reset()
     } catch (persistenceError) {
       throw new AggregateError(
         [error, persistenceError],
-        "Rejected wallet permission submission could not be reset."
+        definite
+          ? "Rejected wallet permission submission could not be reset."
+          : "Ambiguous wallet permission rebroadcast could not be reset."
       )
     }
     throw error
@@ -501,6 +514,31 @@ const toPublicGrant = (
   permissions: grant.permissions,
   version: "1"
 })
+
+const sessionMatchesGrant = (
+  session: SliceWalletFrameSession,
+  grant: StoredGenericGrant
+) =>
+  session.grantKind === "generic" &&
+  session.chainId === grant.chainId &&
+  isAddressEqual(session.account, grant.account) &&
+  session.expiresAt === grant.expiresAt &&
+  session.permissionId.toLowerCase() === grant.permissionId.toLowerCase() &&
+  session.publicKey.toLowerCase() === grant.publicKey.toLowerCase() &&
+  session.signerId.toLowerCase() === grant.signerId.toLowerCase() &&
+  getWalletPolicyHash(session.policy) ===
+    getWalletPolicyHash(deserializeWalletPolicyDescriptor(grant.policy))
+
+export const getSliceWalletPendingGrantPermissions = ({
+  pending,
+  rotation
+}: {
+  pending: SliceWalletFrameSession
+  rotation: StoredGenericGrantRotation | null
+}): readonly SliceWalletGenericPermission[] =>
+  rotation !== null && sessionMatchesGrant(pending, rotation.replacement)
+    ? rotation.replacement.permissions
+    : toSliceWalletGenericPermissions(pending.policy)
 
 const createSliceWalletChainRuntime = (
   config: SliceWalletChainRuntimeConfig,
@@ -1056,20 +1094,6 @@ const createSliceWalletChainRuntime = (
     return session
   }
 
-  const sessionMatchesGrant = (
-    session: SliceWalletFrameSession,
-    grant: StoredGenericGrant
-  ) =>
-    session.grantKind === "generic" &&
-    session.chainId === grant.chainId &&
-    isAddressEqual(session.account, grant.account) &&
-    session.expiresAt === grant.expiresAt &&
-    session.permissionId.toLowerCase() === grant.permissionId.toLowerCase() &&
-    session.publicKey.toLowerCase() === grant.publicKey.toLowerCase() &&
-    session.signerId.toLowerCase() === grant.signerId.toLowerCase() &&
-    getWalletPolicyHash(session.policy) ===
-      getWalletPolicyHash(deserializeWalletPolicyDescriptor(grant.policy))
-
   const getPermissionInstallCalls = (session: SliceWalletFrameSession) =>
     buildSliceWalletPermissionInstallCalls({
       account: session.account,
@@ -1094,6 +1118,7 @@ const createSliceWalletChainRuntime = (
   ) =>
     left.version === right.version &&
     left.phase === right.phase &&
+    left.rebroadcastAttempts === right.rebroadcastAttempts &&
     left.installation?.callDataHash.toLowerCase() ===
       right.installation?.callDataHash.toLowerCase() &&
     left.installation?.entryPoint.toLowerCase() ===
@@ -1136,8 +1161,10 @@ const createSliceWalletChainRuntime = (
   ) => {
     const base = {
       predecessor: rotation.predecessor,
+      rebroadcastAttempts:
+        phase === "prepared" ? 0 : rotation.rebroadcastAttempts,
       replacement: rotation.replacement,
-      version: 3 as const
+      version: 4 as const
     }
     if (phase === "prepared") {
       return persistRotation({ ...base, phase })
@@ -1470,15 +1497,24 @@ const createSliceWalletChainRuntime = (
       }
       const wallet = await requireActiveWallet()
       const bundler = createAccountBundler(wallet.rootAccount)
+      const replaying = persistRotation({
+        ...rotation,
+        rebroadcastAttempts: rotation.rebroadcastAttempts + 1
+      })
+      const resetAmbiguous =
+        replaying.rebroadcastAttempts >= maximumGenericGrantRebroadcastAttempts
+          ? () => setRotationPhase(replaying, "prepared", null)
+          : null
       await broadcastSliceWalletGenericGrantInstallation({
         installation: storedInstallation,
         isDefiniteTransportRejection: isSliceWalletDefiniteBundlerRejection,
-        resetRejected: () => setRotationPhase(rotation, "prepared", null),
+        ...(resetAmbiguous === null ? {} : { resetAmbiguous }),
+        resetRejected: () => setRotationPhase(replaying, "prepared", null),
         transport: (candidate) =>
           transportGenericGrantInstallation(bundler, candidate)
       })
       const submitted = setRotationPhase(
-        rotation,
+        replaying,
         "submitted",
         storedInstallation
       )
@@ -1777,12 +1813,13 @@ const createSliceWalletChainRuntime = (
           const prepared = {
             phase: "prepared",
             predecessor: previous,
+            rebroadcastAttempts: 0,
             replacement: toStoredGrant({
               enableSignature: authorization.enableSignature,
               permissions,
               session
             }),
-            version: 3
+            version: 4
           } satisfies StoredGenericGrantRotation
           try {
             rotation = persistRotation(prepared)
@@ -1819,9 +1856,17 @@ const createSliceWalletChainRuntime = (
     } catch {
       return [toPublicGrant(grant.stored)]
     }
+    const rotation = readStoredSliceWalletGrantRotation(
+      storage,
+      config.chain.id,
+      grant.stored.account
+    )
     const replacement = toStoredGrant({
       enableSignature: "0x",
-      permissions: toSliceWalletGenericPermissions(pending.policy),
+      permissions: getSliceWalletPendingGrantPermissions({
+        pending,
+        rotation
+      }),
       session: pending
     })
     return [toPublicGrant(grant.stored), toPublicGrant(replacement)]
