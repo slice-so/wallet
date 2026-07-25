@@ -14,21 +14,6 @@ type AdmissionEvidence = {
   }
 }
 
-type ProductsModuleAdmissionEvidence = AdmissionContractEvidence & {
-  deployedImplementationAddress: string | null
-  proxyAddress: string
-  upgradeTransactionHash: string | null
-  verifiedAtBlock: number | null
-}
-
-type CoreAdmissionEvidence = {
-  linkedLibraries: {
-    productManagementLib: AdmissionContractEvidence
-    productPaymentLib: AdmissionContractEvidence
-  }
-  productsModule: ProductsModuleAdmissionEvidence
-}
-
 const baseWalletContractNames = [
   "callPolicy",
   "ecdsaSigner",
@@ -42,8 +27,7 @@ const baseWalletContractNames = [
   "timelockPolicy",
   "webAuthnRootValidator",
   "webAuthnSigner",
-  "weightedEcdsaSigner",
-  "weightedP256Signer"
+  "weightedEcdsaSigner"
 ] as const
 
 const hasExactRuntime = (contract: AdmissionContractEvidence | undefined) =>
@@ -69,26 +53,8 @@ export const hasVerifiedGenericAuthorityDeployment = (
   hasCompleteSliceWalletAdmissionEvidence(deployment) &&
   hasExactRuntime(deployment.contracts.singleCallPolicy)
 
-export const hasVerifiedProductsModuleDeployment = (
-  deployment: CoreAdmissionEvidence | undefined
+export const hasVerifiedCheckoutAuthorityDeployment = (
+  deployment: AdmissionEvidence
 ) =>
-  deployment !== undefined &&
-  deployment.productsModule.proxyAddress.length > 0 &&
-  deployment.productsModule.deployedImplementationAddress !== null &&
-  deployment.productsModule.upgradeTransactionHash !== null &&
-  deployment.productsModule.verifiedAtBlock !== null &&
-  hasExactRuntime(deployment.productsModule) &&
-  hasExactRuntime(deployment.linkedLibraries.productManagementLib) &&
-  hasExactRuntime(deployment.linkedLibraries.productPaymentLib)
-
-export const hasVerifiedCheckoutAuthorityDeployment = ({
-  core,
-  wallet
-}: {
-  core: CoreAdmissionEvidence | undefined
-  wallet: AdmissionEvidence
-}) =>
-  hasCompleteSliceWalletAdmissionEvidence(wallet) &&
-  hasExactRuntime(wallet.contracts.weightedP256SignerV2) &&
-  hasExactRuntime(wallet.contracts.erc20AllowanceGuard) &&
-  hasVerifiedProductsModuleDeployment(core)
+  hasCompleteSliceWalletAdmissionEvidence(deployment) &&
+  hasExactRuntime(deployment.contracts.weightedP256Signer)

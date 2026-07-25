@@ -28,7 +28,6 @@ import {
   generatedHookAddressList,
   getProductsModuleAddress
 } from "../generated/commerceFacts"
-import { sliceKernelERC20AllowanceGuardAddress } from "../utils/sliceKernelAddresses"
 
 export const sliceStoreManagementOperations = [
   "addProduct",
@@ -69,9 +68,6 @@ const getSelector = ({
 const buySelector = getSelector({ abi: productsModuleAbi, functionName: "buy" })
 const paySelector = getSelector({ abi: productsModuleAbi, functionName: "pay" })
 const approveSelector = toFunctionSelector("approve(address,uint256)")
-const assertAllowanceSelector = toFunctionSelector(
-  "assertAllowance(address,address,uint256)"
-)
 const configureProductSelector = getSelector({
   abi: registryProductActionAbi,
   functionName: "configureProduct"
@@ -136,20 +132,7 @@ export const createSliceCheckoutPolicyDescriptor = ({
           target,
           valueLimit: 0n
         })
-      ),
-      {
-        parameterRules: [
-          {
-            condition: "equal",
-            offset: 32,
-            params: [pad(productsModuleAddress, { size: 32 })]
-          },
-          createPositiveAmountRule(64)
-        ],
-        selector: assertAllowanceSelector,
-        target: sliceKernelERC20AllowanceGuardAddress,
-        valueLimit: 0n
-      }
+      )
     ],
     chainId,
     grantKind: "checkout",

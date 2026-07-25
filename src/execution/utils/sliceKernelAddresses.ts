@@ -22,16 +22,10 @@ export const sliceKernelWeightedEcdsaSignerAddress =
   "0x45fC7d684683773DDA5bE3b3ba0a7997EccFdb0a" as const satisfies Address
 
 export const sliceKernelWeightedP256SignerAddress =
-  "0xAD6e9430244f179101207D614F3c810f987d0786" as const satisfies Address
-
-export const sliceKernelWeightedP256SignerV2Address =
-  canonicalWalletContracts.weightedP256SignerV2.address
+  canonicalWalletContracts.weightedP256Signer.address
 
 export const sliceKernelSingleCallPolicyAddress =
   canonicalWalletContracts.singleCallPolicy.address
-
-export const sliceKernelERC20AllowanceGuardAddress =
-  canonicalWalletContracts.erc20AllowanceGuard.address
 
 export const sliceKernelTimelockPolicyAddress =
   "0x7f66B69270f96EC6793c545742CCBbBe028Be3f6" as const satisfies Address

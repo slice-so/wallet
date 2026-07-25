@@ -12,7 +12,7 @@ import {
   slice,
   toHex
 } from "viem"
-import { sliceKernelWeightedP256SignerV2Address } from "./execution/utils/sliceKernelAddresses"
+import { sliceKernelWeightedP256SignerAddress } from "./execution/utils/sliceKernelAddresses"
 
 const p256Order =
   0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551n
@@ -151,7 +151,7 @@ export const hashSliceWalletWeightedP256Proposal = ({
     domain: {
       chainId,
       name: "WeightedP256Signer",
-      verifyingContract: sliceKernelWeightedP256SignerV2Address,
+      verifyingContract: sliceKernelWeightedP256SignerAddress,
       version: "0.0.1"
     },
     message: {
@@ -177,7 +177,7 @@ export const hashSliceWalletWeightedP256CoSign = ({
     domain: {
       chainId,
       name: "WeightedP256Signer",
-      verifyingContract: sliceKernelWeightedP256SignerV2Address,
+      verifyingContract: sliceKernelWeightedP256SignerAddress,
       version: "0.0.1"
     },
     message: { userOperationHash, validUntil },

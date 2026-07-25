@@ -36,10 +36,7 @@ import {
   getSliceCoreAddress,
   isGeneratedHookAddress
 } from "../generated/commerceFacts"
-import {
-  sliceKernelERC20AllowanceGuardAddress,
-  sliceKernelTimelockPolicyAddress
-} from "./sliceKernelAddresses"
+import { sliceKernelTimelockPolicyAddress } from "./sliceKernelAddresses"
 import {
   kernelTimelockPolicyCancelAbi,
   kernelValidationManagementAbi
@@ -64,19 +61,6 @@ const acceptedProductsModuleFunctions = [
   "removeProduct",
   "setProductType",
   "setStoreConfig"
-] as const
-const erc20AllowanceGuardAbi = [
-  {
-    inputs: [
-      { name: "token", type: "address" },
-      { name: "spender", type: "address" },
-      { name: "expected", type: "uint256" }
-    ],
-    name: "assertAllowance",
-    outputs: [],
-    stateMutability: "view",
-    type: "function"
-  }
 ] as const
 const acceptedSliceCoreFunctions = ["slice"] as const
 const acceptedKernelValidationManagementFunctions = [
@@ -149,35 +133,6 @@ const isAcceptedTokenApproval = ({
       normalizeAddress(spender) === normalizeAddress(fundsModuleAddress) ||
       ((chainId === base.id || chainId === anvil.id) &&
         normalizeAddress(spender) === normalizeAddress(cdpBasePaymasterAddress))
-    )
-  } catch {
-    return false
-  }
-}
-
-const isAcceptedAllowanceAssertion = ({
-  data,
-  productsModuleAddress,
-  target,
-  value
-}: SliceSmartAccountCall & { productsModuleAddress: Address }) => {
-  if (
-    value !== 0n ||
-    !isAddressEqual(target, sliceKernelERC20AllowanceGuardAddress)
-  ) {
-    return false
-  }
-  try {
-    const decoded = decodeFunctionData({
-      abi: erc20AllowanceGuardAbi,
-      data
-    })
-    if (decoded.functionName !== "assertAllowance") return false
-    const [token, spender, expected] = decoded.args
-    return (
-      isAddress(token) &&
-      isAddressEqual(spender, productsModuleAddress) &&
-      expected > 0n
     )
   } catch {
     return false
@@ -305,14 +260,6 @@ export const classifySliceSmartAccountCall = (
   ) {
     return "auxiliary"
   }
-  if (
-    isAcceptedAllowanceAssertion({
-      ...call,
-      productsModuleAddress
-    })
-  ) {
-    return "auxiliary"
-  }
   return "unknown"
 }
 
@@ -377,52 +324,29 @@ export const getSliceCheckoutSpendIntentFromCalls = (
   const productsModuleAddress = getProductsModuleAddress(chainId)
   const intent: SliceCheckoutSpendIntent = {
     approvals: [],
-    allowanceAssertions: [],
     nativeValue: 0n,
     payments: [],
     purchases: []
   }
-  if (calls.length === 0 || calls.length % 2 === 0) return null
+  if (calls.length === 0) return null
   const checkoutCall = calls[calls.length - 1]
   if (!isAddressEqual(checkoutCall.target, productsModuleAddress)) return null
 
   let previousToken: Address | undefined
-  for (let index = 0; index < calls.length - 1; index += 2) {
+  for (let index = 0; index < calls.length - 1; index += 1) {
     const approvalCall = calls[index]
-    const assertionCall = calls[index + 1]
-    if (
-      approvalCall.value !== 0n ||
-      assertionCall.value !== 0n ||
-      !isAddressEqual(
-        assertionCall.target,
-        sliceKernelERC20AllowanceGuardAddress
-      )
-    ) {
-      return null
-    }
+    if (approvalCall.value !== 0n) return null
     try {
       const approval = decodeFunctionData({
         abi: erc20Abi,
         data: approvalCall.data
       })
-      const assertion = decodeFunctionData({
-        abi: erc20AllowanceGuardAbi,
-        data: assertionCall.data
-      })
-      if (
-        approval.functionName !== "approve" ||
-        assertion.functionName !== "assertAllowance"
-      ) {
-        return null
-      }
+      if (approval.functionName !== "approve") return null
       const [spender, amount] = approval.args
-      const [token, assertionSpender, expected] = assertion.args
+      const token = approvalCall.target
       if (
         amount === 0n ||
         !isAddressEqual(spender, productsModuleAddress) ||
-        !isAddressEqual(token, approvalCall.target) ||
-        !isAddressEqual(assertionSpender, productsModuleAddress) ||
-        expected !== amount ||
         (previousToken !== undefined &&
           previousToken.toLowerCase() >= token.toLowerCase())
       ) {
@@ -430,7 +354,6 @@ export const getSliceCheckoutSpendIntentFromCalls = (
       }
       previousToken = token
       intent.approvals.push({ amount, currency: token })
-      intent.allowanceAssertions.push({ amount: expected, currency: token })
     } catch {
       return null
     }

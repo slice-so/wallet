@@ -1,12 +1,6 @@
 import { describe, expect, it } from "bun:test"
 import { productsModuleAbi } from "@slicekit/abi"
-import {
-  type Address,
-  encodeFunctionData,
-  erc20Abi,
-  maxUint256,
-  zeroAddress
-} from "viem"
+import { type Address, encodeFunctionData, maxUint256, zeroAddress } from "viem"
 import { base } from "viem/chains"
 import { getProductsModuleAddress } from "../generated/commerceFacts"
 import {
@@ -60,7 +54,7 @@ describe("checkout allowance envelope", () => {
     tokenAddresses: [tokenA, tokenB]
   })
 
-  it("builds deterministic exact approval and assertion pairs", () => {
+  it("builds deterministic aggregate approvals", () => {
     const calls = buildSliceCheckoutAllowanceEnvelope({
       chainId: base.id,
       checkoutCall,
@@ -71,12 +65,8 @@ describe("checkout allowance envelope", () => {
       ]
     })
 
-    expect(calls).toHaveLength(5)
+    expect(calls).toHaveLength(3)
     expect(getSliceCheckoutSpendIntent(calls, base.id, buyer)).toMatchObject({
-      allowanceAssertions: [
-        { amount: 8n, currency: tokenA },
-        { amount: 5n, currency: tokenB }
-      ],
       approvals: [
         { amount: 8n, currency: tokenA },
         { amount: 5n, currency: tokenB }
@@ -85,7 +75,7 @@ describe("checkout allowance envelope", () => {
     expect(() => assertSliceCheckoutCalls(calls, policy)).not.toThrow()
   })
 
-  it("rejects missing, reordered, duplicate, or mismatched assertions", () => {
+  it("rejects missing, reordered, or duplicate approvals", () => {
     const calls = buildSliceCheckoutAllowanceEnvelope({
       chainId: base.id,
       checkoutCall,
@@ -95,34 +85,13 @@ describe("checkout allowance envelope", () => {
       ]
     })
     expect(
-      getSliceCheckoutSpendIntent([calls[0], ...calls.slice(2)], base.id)
+      getSliceCheckoutSpendIntent([calls[1], checkoutCall], base.id)
     ).toBeNull()
     expect(
-      getSliceCheckoutSpendIntent(
-        [calls[2], calls[3], calls[0], calls[1], checkoutCall],
-        base.id
-      )
+      getSliceCheckoutSpendIntent([calls[1], calls[0], checkoutCall], base.id)
     ).toBeNull()
     expect(
-      getSliceCheckoutSpendIntent(
-        [calls[0], calls[1], calls[0], calls[1], checkoutCall],
-        base.id
-      )
-    ).toBeNull()
-
-    const wrongAmountApproval = {
-      ...calls[0],
-      data: encodeFunctionData({
-        abi: erc20Abi,
-        functionName: "approve",
-        args: [productsModule, 9n]
-      })
-    }
-    expect(
-      getSliceCheckoutSpendIntent(
-        [wrongAmountApproval, calls[1], ...calls.slice(2)],
-        base.id
-      )
+      getSliceCheckoutSpendIntent([calls[0], calls[0], checkoutCall], base.id)
     ).toBeNull()
   })
 

@@ -46,16 +46,6 @@ const freezeManifest = (manifest: SliceWalletChainManifest) => {
     Object.freeze(manifest.chain.blockExplorers)
   }
   Object.freeze(manifest.chain)
-  if (manifest.commerce.productsModule !== null) {
-    Object.freeze(manifest.commerce.productsModule)
-  }
-  if (manifest.commerce.linkedLibraries !== null) {
-    for (const library of Object.values(manifest.commerce.linkedLibraries)) {
-      Object.freeze(library)
-    }
-    Object.freeze(manifest.commerce.linkedLibraries)
-  }
-  Object.freeze(manifest.commerce)
   for (const contract of Object.values(manifest.contracts)) {
     Object.freeze(contract)
   }
@@ -92,10 +82,6 @@ const manifests = [
           http: ["https://eth.merkle.io"]
         }
       }
-    },
-    commerce: {
-      linkedLibraries: null,
-      productsModule: null
     },
     contracts: {
       entryPoint: {
@@ -188,31 +174,17 @@ const manifests = [
           "0xf86faf7bdc6657af2c9cfe4ab7d966434c7534803d102f802c68faeeafd04254"
       },
       weightedP256Signer: {
-        address: "0xAD6e9430244f179101207D614F3c810f987d0786",
-        deployedRuntimeCodeHash:
-          "0x302550729fddf79d32fad7af872079c5bddfa50cd256c568df208f0bc3ae75aa",
-        expectedRuntimeCodeHash:
-          "0x302550729fddf79d32fad7af872079c5bddfa50cd256c568df208f0bc3ae75aa"
-      },
-      weightedP256SignerV2: {
-        address: "0x2Ea791821AeEf796EE4444f96e4B4F3A5e8BB5f5",
+        address: "0xB91ec993AF1127b5C9271396dFE0AF2712eF47cf",
         deployedRuntimeCodeHash: null,
         expectedRuntimeCodeHash:
           "0xdebcf6c2aa2eac6c405b84a69c806fa61d252fdb4d9db0a9361be1673fe4cd70",
-        version: "2"
+        version: "1"
       },
       singleCallPolicy: {
         address: "0xb01643c720984eaA0bc2A568c9a6E578655E7470",
         deployedRuntimeCodeHash: null,
         expectedRuntimeCodeHash:
           "0xbb358c7efdb0c13ffd7388bc76ac3b711e5b70a12027894d7ac70dd86bf198cf",
-        version: "1"
-      },
-      erc20AllowanceGuard: {
-        address: "0x5eF07dBFf4f1c4Ae5A386629193BAB686D40CC4B",
-        deployedRuntimeCodeHash: null,
-        expectedRuntimeCodeHash:
-          "0xe7f628f095116bf5ed357d8e8ecba8689b1dc1a9d75a87a62f33d87e2e3798d8",
         version: "1"
       },
       timelockPolicy: {
@@ -270,10 +242,6 @@ const manifests = [
           http: ["https://mainnet.optimism.io"]
         }
       }
-    },
-    commerce: {
-      linkedLibraries: null,
-      productsModule: null
     },
     contracts: {
       entryPoint: {
@@ -366,31 +334,17 @@ const manifests = [
           "0xe519f84c3f2c9ef1638b500fced1257b705f6d412b2adaedf6cc7f17fb39f9ed"
       },
       weightedP256Signer: {
-        address: "0xAD6e9430244f179101207D614F3c810f987d0786",
-        deployedRuntimeCodeHash:
-          "0x02b510eabd6e28ecee7458edfcbd899180c022e574dad3c1cc93412abc5d2dd4",
-        expectedRuntimeCodeHash:
-          "0x02b510eabd6e28ecee7458edfcbd899180c022e574dad3c1cc93412abc5d2dd4"
-      },
-      weightedP256SignerV2: {
-        address: "0x2Ea791821AeEf796EE4444f96e4B4F3A5e8BB5f5",
+        address: "0xB91ec993AF1127b5C9271396dFE0AF2712eF47cf",
         deployedRuntimeCodeHash: null,
         expectedRuntimeCodeHash:
           "0xdebcf6c2aa2eac6c405b84a69c806fa61d252fdb4d9db0a9361be1673fe4cd70",
-        version: "2"
+        version: "1"
       },
       singleCallPolicy: {
         address: "0xb01643c720984eaA0bc2A568c9a6E578655E7470",
         deployedRuntimeCodeHash: null,
         expectedRuntimeCodeHash:
           "0xbb358c7efdb0c13ffd7388bc76ac3b711e5b70a12027894d7ac70dd86bf198cf",
-        version: "1"
-      },
-      erc20AllowanceGuard: {
-        address: "0x5eF07dBFf4f1c4Ae5A386629193BAB686D40CC4B",
-        deployedRuntimeCodeHash: null,
-        expectedRuntimeCodeHash:
-          "0xe7f628f095116bf5ed357d8e8ecba8689b1dc1a9d75a87a62f33d87e2e3798d8",
         version: "1"
       },
       timelockPolicy: {
@@ -447,34 +401,6 @@ const manifests = [
         default: {
           http: ["https://mainnet.base.org"]
         }
-      }
-    },
-    commerce: {
-      linkedLibraries: {
-        productManagementLib: {
-          address: "0x586FD42B36868Ffa47334D79c64769F62E5Fa35d",
-          deployedRuntimeCodeHash: null,
-          expectedRuntimeCodeHash:
-            "0xc295041324a33b77daf02d21ef277eecdba269bac28a2a7558301910d6734af9"
-        },
-        productPaymentLib: {
-          address: "0x7A7De78088e9985dd36bAe4f8F633e5E596d9372",
-          deployedRuntimeCodeHash: null,
-          expectedRuntimeCodeHash:
-            "0x68176bdab087683f8abd32d48cb3c0cb8c2306cb128e3e78fd0b621bfb34b540"
-        }
-      },
-      productsModule: {
-        proxyAddress: "0xb9d5B99d5D0fA04dD7eb2b0CD7753317C2ea1a84",
-        deployedImplementationAddress:
-          "0x0901C4316b23c048fbFC99dA80943D23D5144272",
-        deployedRuntimeCodeHash:
-          "0xee92378a76f48bea38d0f9d5fc6acf0e00fe912585d7f439761d21613c48d7f7",
-        expectedRuntimeCodeHash:
-          "0x0f9ed2a85a347110c51f0a0e951987191fc03350912dd450576a8d9dae5b43dd",
-        upgradeTransactionHash:
-          "0x113ceaee01bb7030a84859bef95f7f2c966c3b516666b4b274cf42ce328511ea",
-        verifiedAtBlock: 49036300
       }
     },
     contracts: {
@@ -568,31 +494,17 @@ const manifests = [
           "0xd9dea77190cbc2104d2ecd8beab745196d3c5a01fe7b0ba49ee5b3b6c9a90be2"
       },
       weightedP256Signer: {
-        address: "0xAD6e9430244f179101207D614F3c810f987d0786",
-        deployedRuntimeCodeHash:
-          "0xe9b3e9cb5ce3aca28fd9e1246997f51ae1eb2b98766b6e1a082f2fff059bbb5c",
-        expectedRuntimeCodeHash:
-          "0xe9b3e9cb5ce3aca28fd9e1246997f51ae1eb2b98766b6e1a082f2fff059bbb5c"
-      },
-      weightedP256SignerV2: {
-        address: "0x2Ea791821AeEf796EE4444f96e4B4F3A5e8BB5f5",
+        address: "0xB91ec993AF1127b5C9271396dFE0AF2712eF47cf",
         deployedRuntimeCodeHash: null,
         expectedRuntimeCodeHash:
           "0xdebcf6c2aa2eac6c405b84a69c806fa61d252fdb4d9db0a9361be1673fe4cd70",
-        version: "2"
+        version: "1"
       },
       singleCallPolicy: {
         address: "0xb01643c720984eaA0bc2A568c9a6E578655E7470",
         deployedRuntimeCodeHash: null,
         expectedRuntimeCodeHash:
           "0xbb358c7efdb0c13ffd7388bc76ac3b711e5b70a12027894d7ac70dd86bf198cf",
-        version: "1"
-      },
-      erc20AllowanceGuard: {
-        address: "0x5eF07dBFf4f1c4Ae5A386629193BAB686D40CC4B",
-        deployedRuntimeCodeHash: null,
-        expectedRuntimeCodeHash:
-          "0xe7f628f095116bf5ed357d8e8ecba8689b1dc1a9d75a87a62f33d87e2e3798d8",
         version: "1"
       },
       timelockPolicy: {
@@ -655,10 +567,6 @@ const manifests = [
           http: ["https://arb1.arbitrum.io/rpc"]
         }
       }
-    },
-    commerce: {
-      linkedLibraries: null,
-      productsModule: null
     },
     contracts: {
       entryPoint: {
@@ -751,31 +659,17 @@ const manifests = [
           "0x38bf435be1112dabcaf5af04d6398fd3ad1f432173fd46e3864ff73f9e0b036f"
       },
       weightedP256Signer: {
-        address: "0xAD6e9430244f179101207D614F3c810f987d0786",
-        deployedRuntimeCodeHash:
-          "0x5fa4e404e89ea1f5406315c042590621e2bc4e1ebbd5d24527ef96f4f6680d6c",
-        expectedRuntimeCodeHash:
-          "0x5fa4e404e89ea1f5406315c042590621e2bc4e1ebbd5d24527ef96f4f6680d6c"
-      },
-      weightedP256SignerV2: {
-        address: "0x2Ea791821AeEf796EE4444f96e4B4F3A5e8BB5f5",
+        address: "0xB91ec993AF1127b5C9271396dFE0AF2712eF47cf",
         deployedRuntimeCodeHash: null,
         expectedRuntimeCodeHash:
           "0xdebcf6c2aa2eac6c405b84a69c806fa61d252fdb4d9db0a9361be1673fe4cd70",
-        version: "2"
+        version: "1"
       },
       singleCallPolicy: {
         address: "0xb01643c720984eaA0bc2A568c9a6E578655E7470",
         deployedRuntimeCodeHash: null,
         expectedRuntimeCodeHash:
           "0xbb358c7efdb0c13ffd7388bc76ac3b711e5b70a12027894d7ac70dd86bf198cf",
-        version: "1"
-      },
-      erc20AllowanceGuard: {
-        address: "0x5eF07dBFf4f1c4Ae5A386629193BAB686D40CC4B",
-        deployedRuntimeCodeHash: null,
-        expectedRuntimeCodeHash:
-          "0xe7f628f095116bf5ed357d8e8ecba8689b1dc1a9d75a87a62f33d87e2e3798d8",
         version: "1"
       },
       timelockPolicy: {
@@ -810,14 +704,53 @@ const manifests = [
   }
 ] as const
 
-export const sliceWalletChainManifests = Object.freeze(
-  Object.fromEntries(
-    manifests.map((manifest) => [
-      manifest.chain.id,
-      freezeManifest(parseBigIntFields(manifest))
-    ])
-  ) as Readonly<Record<number, SliceWalletChainManifest>>
-)
+const productionManifests = Object.fromEntries(
+  manifests.map((manifest) => [
+    manifest.chain.id,
+    freezeManifest(parseBigIntFields(manifest))
+  ])
+) as Readonly<Record<number, SliceWalletChainManifest>>
+
+const canonicalDevelopmentManifest = productionManifests[8453]
+if (canonicalDevelopmentManifest === undefined) {
+  throw new Error("The canonical Base wallet manifest is missing.")
+}
+
+const developmentManifest = freezeManifest({
+  ...canonicalDevelopmentManifest,
+  admitted: true,
+  authorityAdmission: { checkout: true, generic: true },
+  chain: {
+    ...canonicalDevelopmentManifest.chain,
+    blockExplorers: {
+      default: { name: "Anvil RPC", url: "http://127.0.0.1:8545" }
+    },
+    id: 31337,
+    name: "Anvil",
+    rpcUrls: { default: { http: ["http://127.0.0.1:8545"] } }
+  },
+  contracts: Object.fromEntries(
+    Object.entries(canonicalDevelopmentManifest.contracts).map(
+      ([name, contract]) => [
+        name,
+        {
+          ...contract,
+          deployedRuntimeCodeHash: contract.expectedRuntimeCodeHash
+        }
+      ]
+    )
+  ) as SliceWalletChainManifest["contracts"],
+  defaultTransports: {
+    bundlerUrl: "http://127.0.0.1:4337",
+    rpcUrl: "http://127.0.0.1:8545"
+  },
+  rip7212Available: false
+})
+
+export const sliceWalletChainManifests = Object.freeze({
+  ...productionManifests,
+  [developmentManifest.chain.id]: developmentManifest
+} as Readonly<Record<number, SliceWalletChainManifest>>)
 
 export const sliceWalletSupportedChainIds = Object.freeze(
   manifests

@@ -3,8 +3,6 @@
 import { spawnSync } from "node:child_process"
 import { readFileSync, writeFileSync } from "node:fs"
 import { resolve } from "node:path"
-import { getProductsModuleAddress } from "@slice/indexer-shared"
-import coreDeployments from "../../contracts/core/deployments/addresses.json"
 import deployments from "../../contracts/wallet/deployments/addresses.json"
 import policy from "../config/chains.policy.json"
 import {
@@ -16,11 +14,7 @@ import {
 const outputPath = resolve(import.meta.dir, "../src/chains.ts")
 const checkOnly = process.argv.includes("--check")
 
-if (
-  coreDeployments.version !== 1 ||
-  deployments.version !== 1 ||
-  policy.version !== 1
-) {
+if (deployments.version !== 1 || policy.version !== 1) {
   throw new Error("Unsupported Slice wallet chain input version.")
 }
 
@@ -34,7 +28,6 @@ const pinnedAddressContractNames = [
   "callPolicy",
   "ecdsaSigner",
   "entryPoint",
-  "erc20AllowanceGuard",
   "kernelFactory",
   "kernelImplementation",
   "kernelMetaFactory",
@@ -45,8 +38,7 @@ const pinnedAddressContractNames = [
   "webAuthnRootValidator",
   "webAuthnSigner",
   "weightedEcdsaSigner",
-  "weightedP256Signer",
-  "weightedP256SignerV2"
+  "weightedP256Signer"
 ] as const
 const canonicalDeployment = deployments.chains["8453"]
 
@@ -90,24 +82,10 @@ const entries = chainIds.map((chainId) => {
     ])
   )
   const admitted = hasCompleteSliceWalletAdmissionEvidence(deployment)
-  const coreDeployment =
-    coreDeployments.chains[chainId as keyof typeof coreDeployments.chains]
-  const productsModule = coreDeployment?.productsModule
-  if (
-    productsModule !== undefined &&
-    productsModule.proxyAddress.toLowerCase() !==
-      getProductsModuleAddress(Number(chainId)).toLowerCase()
-  ) {
-    throw new Error(
-      `ProductsModule deployment facts for chain ${chainId} do not reference the canonical proxy.`
-    )
-  }
   const genericAuthorityAdmitted =
     hasVerifiedGenericAuthorityDeployment(deployment)
-  const checkoutAuthorityAdmitted = hasVerifiedCheckoutAuthorityDeployment({
-    core: coreDeployment,
-    wallet: deployment
-  })
+  const checkoutAuthorityAdmitted =
+    hasVerifiedCheckoutAuthorityDeployment(deployment)
 
   return {
     admitted,
@@ -128,10 +106,6 @@ const entries = chainIds.map((chainId) => {
       rpcUrls: {
         default: { http: [policyChain.defaultTransports.rpcUrl] }
       }
-    },
-    commerce: {
-      linkedLibraries: coreDeployment?.linkedLibraries ?? null,
-      productsModule: productsModule ?? null
     },
     contracts,
     defaultTransports: policyChain.defaultTransports,
@@ -177,16 +151,6 @@ const freezeManifest = (manifest: SliceWalletChainManifest) => {
     Object.freeze(manifest.chain.blockExplorers)
   }
   Object.freeze(manifest.chain)
-  if (manifest.commerce.productsModule !== null) {
-    Object.freeze(manifest.commerce.productsModule)
-  }
-  if (manifest.commerce.linkedLibraries !== null) {
-    for (const library of Object.values(manifest.commerce.linkedLibraries)) {
-      Object.freeze(library)
-    }
-    Object.freeze(manifest.commerce.linkedLibraries)
-  }
-  Object.freeze(manifest.commerce)
   for (const contract of Object.values(manifest.contracts)) {
     Object.freeze(contract)
   }
@@ -199,13 +163,53 @@ const freezeManifest = (manifest: SliceWalletChainManifest) => {
 
 const manifests = ${JSON.stringify(entries, null, 2)} as const
 
-export const sliceWalletChainManifests = Object.freeze(
-  Object.fromEntries(
-    manifests.map((manifest) => [
-      manifest.chain.id,
-      freezeManifest(parseBigIntFields(manifest))
-    ])
-  ) as Readonly<Record<number, SliceWalletChainManifest>>
+const productionManifests = Object.fromEntries(
+  manifests.map((manifest) => [
+    manifest.chain.id,
+    freezeManifest(parseBigIntFields(manifest))
+  ])
+) as Readonly<Record<number, SliceWalletChainManifest>>
+
+const canonicalDevelopmentManifest = productionManifests[8453]
+if (canonicalDevelopmentManifest === undefined) {
+  throw new Error("The canonical Base wallet manifest is missing.")
+}
+
+const developmentManifest = freezeManifest({
+  ...canonicalDevelopmentManifest,
+  admitted: true,
+  authorityAdmission: { checkout: true, generic: true },
+  chain: {
+    ...canonicalDevelopmentManifest.chain,
+    blockExplorers: {
+      default: { name: "Anvil RPC", url: "http://127.0.0.1:8545" }
+    },
+    id: 31337,
+    name: "Anvil",
+    rpcUrls: { default: { http: ["http://127.0.0.1:8545"] } }
+  },
+  contracts: Object.fromEntries(
+    Object.entries(canonicalDevelopmentManifest.contracts).map(
+      ([name, contract]) => [
+        name,
+        {
+          ...contract,
+          deployedRuntimeCodeHash: contract.expectedRuntimeCodeHash
+        }
+      ]
+    )
+  ) as SliceWalletChainManifest["contracts"],
+  defaultTransports: {
+    bundlerUrl: "http://127.0.0.1:4337",
+    rpcUrl: "http://127.0.0.1:8545"
+  },
+  rip7212Available: false
+})
+
+export const sliceWalletChainManifests = Object.freeze({
+  ...productionManifests,
+  [developmentManifest.chain.id]: developmentManifest
+} as Readonly<Record<number, SliceWalletChainManifest>>
 )
 
 export const sliceWalletSupportedChainIds = Object.freeze(

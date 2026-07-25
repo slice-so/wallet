@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { anvil } from "viem/chains"
 import {
   assertSliceWalletAuthorityDeployment,
   getSliceWalletChainManifest,
@@ -18,12 +19,6 @@ describe("Slice Wallet chain manifest", () => {
     expect(Object.isFrozen(base.contracts)).toBe(true)
     expect(Object.isFrozen(base.contracts.weightedP256Signer)).toBe(true)
     expect(Object.isFrozen(base.authorityAdmission)).toBe(true)
-    expect(Object.isFrozen(base.commerce)).toBe(true)
-    expect(Object.isFrozen(base.commerce.productsModule)).toBe(true)
-    expect(Object.isFrozen(base.commerce.linkedLibraries)).toBe(true)
-    expect(
-      Object.isFrozen(base.commerce.linkedLibraries?.productPaymentLib)
-    ).toBe(true)
     expect(Object.isFrozen(base.executionSafety)).toBe(true)
     expect(Object.isFrozen(base.defaultTransports)).toBe(true)
     expect(Object.isFrozen(base.funding.sponsoredSecurityOperations)).toBe(true)
@@ -40,18 +35,7 @@ describe("Slice Wallet chain manifest", () => {
       generic: false
     })
     expect(base.contracts.singleCallPolicy.deployedRuntimeCodeHash).toBeNull()
-    expect(
-      base.contracts.weightedP256SignerV2.deployedRuntimeCodeHash
-    ).toBeNull()
-    expect(
-      base.contracts.erc20AllowanceGuard.deployedRuntimeCodeHash
-    ).toBeNull()
-    expect(base.commerce.productsModule?.deployedRuntimeCodeHash).not.toBe(
-      base.commerce.productsModule?.expectedRuntimeCodeHash
-    )
-    expect(
-      base.commerce.linkedLibraries?.productPaymentLib.deployedRuntimeCodeHash
-    ).toBeNull()
+    expect(base.contracts.weightedP256Signer.deployedRuntimeCodeHash).toBeNull()
     expect(() =>
       assertSliceWalletAuthorityDeployment({
         authority: "generic",
@@ -73,6 +57,28 @@ describe("Slice Wallet chain manifest", () => {
       expect(getSliceWalletChainManifest(chainId).chain.id).toBe(chainId)
     }
     expect(getSliceWalletChainManifest(8453).chain.id).toBe(8453)
+  })
+
+  test("admits the deterministically seeded local development chain", () => {
+    const local = getSliceWalletChainManifest(anvil.id)
+
+    expect(local.authorityAdmission).toEqual({
+      checkout: true,
+      generic: true
+    })
+    expect(local.contracts.weightedP256Signer.deployedRuntimeCodeHash).toBe(
+      local.contracts.weightedP256Signer.expectedRuntimeCodeHash
+    )
+    expect(local.defaultTransports).toEqual({
+      bundlerUrl: "http://127.0.0.1:4337",
+      rpcUrl: "http://127.0.0.1:8545"
+    })
+    expect(() =>
+      assertSliceWalletAuthorityDeployment({
+        authority: "checkout",
+        chainId: anvil.id
+      })
+    ).not.toThrow()
   })
 
   test("rejects chains missing from the generated inputs", () => {

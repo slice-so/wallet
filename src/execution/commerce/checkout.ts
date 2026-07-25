@@ -16,21 +16,6 @@ import type {
 } from "../../types/commerce"
 import { getProductsModuleAddress } from "../generated/commerceFacts"
 import { getSliceCheckoutSpendIntentFromCalls } from "../utils/sliceCallPolicy"
-import { sliceKernelERC20AllowanceGuardAddress } from "../utils/sliceKernelAddresses"
-
-const erc20AllowanceGuardAbi = [
-  {
-    inputs: [
-      { name: "token", type: "address" },
-      { name: "spender", type: "address" },
-      { name: "expected", type: "uint256" }
-    ],
-    name: "assertAllowance",
-    outputs: [],
-    stateMutability: "view",
-    type: "function"
-  }
-] as const
 
 export const buildSliceCheckoutAllowanceEnvelope = ({
   chainId,
@@ -67,8 +52,8 @@ export const buildSliceCheckoutAllowanceEnvelope = ({
       .sort((left, right) =>
         left.currency.toLowerCase().localeCompare(right.currency.toLowerCase())
       )
-      .flatMap(({ amount, currency }): WalletCall[] => [
-        {
+      .map(
+        ({ amount, currency }): WalletCall => ({
           data: encodeFunctionData({
             abi: erc20Abi,
             functionName: "approve",
@@ -76,17 +61,8 @@ export const buildSliceCheckoutAllowanceEnvelope = ({
           }),
           to: currency,
           value: 0n
-        },
-        {
-          data: encodeFunctionData({
-            abi: erc20AllowanceGuardAbi,
-            functionName: "assertAllowance",
-            args: [currency, productsModuleAddress, amount]
-          }),
-          to: sliceKernelERC20AllowanceGuardAddress,
-          value: 0n
-        }
-      ]),
+        })
+      ),
     checkoutCall
   ]
 }

@@ -68,7 +68,6 @@ describe("getSliceUserOperationCheckoutSpendIntent", () => {
 
     expect(getSliceUserOperationCheckoutSpendIntent(callData, base.id)).toEqual(
       {
-        allowanceAssertions: [{ amount: 20n, currency: token }],
         approvals: [{ amount: 20n, currency: token }],
         nativeValue: 11n,
         payments: [
@@ -94,11 +93,11 @@ describe("getSliceUserOperationCheckoutSpendIntent", () => {
     )
   })
 
-  it("rejects an approval without its exact allowance assertion", () => {
+  it("rejects an approval for another spender", () => {
     const approval = encodeFunctionData({
       abi: erc20Abi,
       functionName: "approve",
-      args: [productsModuleAddress, 20n]
+      args: [buyer, 20n]
     })
     const callData = encodeFunctionData({
       abi: coinbaseSmartWalletExecutionAbi,

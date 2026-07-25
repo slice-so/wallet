@@ -194,6 +194,7 @@
   "devDependencies": {
     "@slice/indexer-shared": "workspace:*",
     "@slice/typescript-config": "workspace:*",
+    "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@wagmi/core": "catalog:",
     "fake-indexeddb": "^6.2.4",

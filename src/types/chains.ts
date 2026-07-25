@@ -13,9 +13,6 @@ export type SliceWalletContractDeployments = {
   readonly entryPoint: SliceWalletContractDeployment & {
     readonly version: "0.7"
   }
-  readonly erc20AllowanceGuard: SliceWalletContractDeployment & {
-    readonly version: "1"
-  }
   readonly kernelFactory: SliceWalletContractDeployment
   readonly kernelImplementation: SliceWalletContractDeployment & {
     readonly version: "0.3.3"
@@ -31,27 +28,12 @@ export type SliceWalletContractDeployments = {
   readonly webAuthnRootValidator: SliceWalletContractDeployment
   readonly webAuthnSigner: SliceWalletContractDeployment
   readonly weightedEcdsaSigner: SliceWalletContractDeployment
-  readonly weightedP256Signer: SliceWalletContractDeployment
-  readonly weightedP256SignerV2: SliceWalletContractDeployment & {
-    readonly version: "2"
+  readonly weightedP256Signer: SliceWalletContractDeployment & {
+    readonly version: "1"
   }
 }
 
-export type SliceWalletProductsModuleDeployment = {
-  readonly deployedImplementationAddress: Address | null
-  readonly deployedRuntimeCodeHash: Hex | null
-  readonly expectedRuntimeCodeHash: Hex
-  readonly proxyAddress: Address
-  readonly upgradeTransactionHash: Hex | null
-  readonly verifiedAtBlock: number | null
-}
-
 export type SliceWalletAuthorityKind = "checkout" | "generic"
-
-export type SliceWalletCoreLinkedLibraryDeployments = {
-  readonly productManagementLib: SliceWalletContractDeployment
-  readonly productPaymentLib: SliceWalletContractDeployment
-}
 
 export type SliceWalletExecutionSafetyEnvelope = {
   readonly maxCallGasLimit: bigint
@@ -83,10 +65,6 @@ export type SliceWalletChainManifest = {
     readonly generic: boolean
   }
   readonly chain: Chain
-  readonly commerce: {
-    readonly linkedLibraries: SliceWalletCoreLinkedLibraryDeployments | null
-    readonly productsModule: SliceWalletProductsModuleDeployment | null
-  }
   readonly contracts: SliceWalletContractDeployments
   readonly defaultTransports: {
     readonly bundlerUrl: string

@@ -12,7 +12,6 @@ import {
   parseEventLogs,
   zeroAddress
 } from "viem"
-import coreDeployments from "../../contracts/core/deployments/addresses.json"
 import deployments from "../../contracts/wallet/deployments/addresses.json"
 import policy from "../config/chains.policy.json"
 
@@ -148,57 +147,6 @@ for (const [name, contract] of Object.entries(deployment.contracts)) {
   assert(
     contract.deployedRuntimeCodeHash === observedHash,
     `${name} deployment facts do not record the observed runtime hash.`
-  )
-}
-
-const coreDeployment =
-  coreDeployments.chains[chainKey as keyof typeof coreDeployments.chains]
-if (coreDeployment !== undefined) {
-  for (const [name, library] of Object.entries(
-    coreDeployment.linkedLibraries
-  )) {
-    const code = await client.getCode({ address: getAddress(library.address) })
-    const observedHash =
-      code === undefined || code === "0x" ? null : keccak256(code)
-    assert(observedHash !== null, `${name} has no runtime code.`)
-    assert(
-      observedHash === library.expectedRuntimeCodeHash,
-      `${name} runtime hash is ${observedHash ?? "missing"}; expected ${library.expectedRuntimeCodeHash}.`
-    )
-    assert(
-      observedHash === library.deployedRuntimeCodeHash,
-      `${name} deployment facts do not record the observed runtime hash.`
-    )
-  }
-  const productsModule = coreDeployment.productsModule
-  const implementationSlot = await client.getStorageAt({
-    address: getAddress(productsModule.proxyAddress),
-    slot: kernelImplementationSlot
-  })
-  const implementationAddress =
-    implementationSlot === undefined
-      ? null
-      : getAddress(`0x${implementationSlot.slice(-40)}`)
-  const implementationCode =
-    implementationAddress === null
-      ? undefined
-      : await client.getCode({ address: implementationAddress })
-  const implementationHash =
-    implementationCode === undefined || implementationCode === "0x"
-      ? null
-      : keccak256(implementationCode)
-  assert(
-    implementationAddress?.toLowerCase() ===
-      productsModule.deployedImplementationAddress?.toLowerCase(),
-    `ProductsModule implementation is ${implementationAddress ?? "missing"}; deployment facts record ${productsModule.deployedImplementationAddress ?? "missing"}.`
-  )
-  assert(
-    implementationHash === productsModule.deployedRuntimeCodeHash,
-    `ProductsModule runtime hash is ${implementationHash ?? "missing"}; deployment facts record ${productsModule.deployedRuntimeCodeHash ?? "missing"}.`
-  )
-  assert(
-    implementationHash === productsModule.expectedRuntimeCodeHash,
-    `ProductsModule runtime hash is ${implementationHash ?? "missing"}; expected ${productsModule.expectedRuntimeCodeHash}.`
   )
 }
 
