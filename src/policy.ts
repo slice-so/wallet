@@ -5,7 +5,6 @@ import {
   ParamCondition,
   toCallPolicy,
   toRateLimitPolicy,
-  toSudoPolicy,
   toTimestampPolicy
 } from "@zerodev/permissions/policies"
 import {
@@ -22,7 +21,6 @@ import {
   toFunctionSelector
 } from "viem"
 import { maximumBrowserGenericGrantTtlSec } from "./constants"
-import { sliceKernelSingleCallPolicyAddress } from "./execution/utils/sliceKernelAddresses"
 import type {
   SerializedWalletPolicyDescriptor,
   WalletCall,
@@ -549,13 +547,6 @@ export const toWalletPermissionPolicies = (
     })
   ]
 
-  if (normalized.grantKind === "generic") {
-    policies.push(
-      toSudoPolicy({
-        policyAddress: sliceKernelSingleCallPolicyAddress
-      })
-    )
-  }
   if (normalized.rateLimit !== undefined) {
     policies.push(
       toRateLimitPolicy({
@@ -715,11 +706,6 @@ export const assertWalletCallsMatchPolicy = (
 ) => {
   const normalized = normalizeWalletPolicyDescriptor(descriptor)
   if (calls.length === 0) throw new Error("Wallet operation contains no calls.")
-  if (normalized.grantKind === "generic" && calls.length !== 1) {
-    throw new Error(
-      "Generic wallet permissions allow exactly one call per operation."
-    )
-  }
   for (const call of calls) {
     const matchingRule = normalized.calls.find(
       (rule) =>

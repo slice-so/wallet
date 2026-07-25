@@ -106,7 +106,8 @@ describe("signer-frame protocol parser", () => {
         callData: "0x",
         nonce: 0n,
         sender: account,
-        session: { account, chainId: 8453, grantKind: "checkout" }
+        session: { account, chainId: 8453, grantKind: "checkout" },
+        validUntil: 200
       },
       version: 1
     } as const satisfies SliceWalletProtocolValue

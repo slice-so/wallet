@@ -171,7 +171,6 @@ const assertPermissionCapability = async (
   )
   if (
     Reflect.get(permissionCapability, "version") !== "1" ||
-    Reflect.get(permissionCapability, "maximumCallsPerOperation") !== 1 ||
     !Array.isArray(supportedTemplates) ||
     supportedTemplates.join(",") !==
       "native-transfer,erc20-transfer,erc20-approve,erc20-transfer-from"

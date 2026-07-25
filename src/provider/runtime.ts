@@ -933,7 +933,7 @@ const createSliceWalletChainRuntime = (
   ) => {
     const wallet = await requireActiveWallet()
     const grant = await hydrateGrant()
-    if (grant !== null && calls.length === 1) {
+    if (grant !== null) {
       try {
         assertWalletCallsMatchPolicy(calls, grant.session.policy)
       } catch {

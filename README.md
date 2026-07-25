@@ -47,7 +47,7 @@ The application supplies one to 16 rules built from four templates:
 
 Every grant has one shared UserOperation rate limit (`count` 1–100 and `intervalSec` from 60 seconds through the grant lifetime) and expires within 30 days. The counter counts delegated UserOperations, not inner calls. One-use access is `count: 1` with an interval equal to the requested lifetime. The wallet keeps one active grant for each exact origin, account, and chain; rotation replaces that grant and revocation disables it onchain.
 
-The browser key is a non-extractable P-256 key isolated by exact origin, account, chain, and grant kind. Generic execution requires its signature plus every installed onchain policy, including the policy that permits exactly one inner `CALL`. The consent ceremony displays the canonical origin, chain, expiry, raw target/token and recipient/spender addresses, maximum amount, operation, and rate. The app never supplies a signer, permission ID, policy hash, enable signature, or UserOperation. Registry metadata is not execution authority, so an already installed, locally hydrated grant remains usable through an auth-registry outage.
+The browser key is a non-extractable P-256 key isolated by exact origin, account, chain, and grant kind. Generic execution requires its signature plus the standard Kernel-compatible Call, Timestamp, and Rate Limit policies. The Call Policy validates every leg of an atomic batch against the granted rules; value and amount limits apply per inner call, while the rate limit counts the batch as one UserOperation. The consent ceremony displays the canonical origin, chain, expiry, raw target/token and recipient/spender addresses, maximum amount, operation, and rate. The app never supplies a signer, permission ID, policy hash, enable signature, or UserOperation. Registry metadata is not execution authority, so an already installed, locally hydrated grant remains usable through an auth-registry outage.
 
 ### Capability discovery and errors
 
@@ -62,8 +62,7 @@ The browser key is a non-extractable P-256 key isolated by exact origin, account
       "erc20-transfer",
       "erc20-approve",
       "erc20-transfer-from"
-    ],
-    maximumCallsPerOperation: 1
+    ]
   }
 }
 ```
@@ -233,7 +232,7 @@ The exported Wagmi grant, list, rotate, and revoke actions follow the same provi
 
 EIP-5792 is only the call envelope and status protocol. Applications send the standard version `2.0.0` fields—`from`, `chainId`, `atomicRequired`, and `calls[{to,data,value}]`—through EIP-1193, Viem, or Wagmi. Slice Wallet selects the authority and constructs the Kernel UserOperation internally.
 
-A non-empty request containing exactly one call executes without another prompt only when it matches an active generic descriptor. An empty list is rejected. Multiple calls, an unmatched target, selector, recipient, spender, value or amount, an expired grant, or a chain/rate mismatch uses the existing visible root-confirmation path. The wallet never decomposes a multi-call request into separately permissioned operations and never falls through to a checkout or management key.
+A non-empty request executes without another prompt only when every call matches an active generic descriptor. Matching multi-call requests execute as one atomic UserOperation and consume one rate-limit unit. An empty list is rejected. An unmatched target, selector, recipient, spender, value or amount, an expired grant, or a chain/rate mismatch uses the existing visible root-confirmation path. The wallet never decomposes a multi-call request into separately permissioned operations and never falls through to a checkout or management key.
 
 Paymaster sponsorship is optional and does not change permission scope or validity. A request may use the standard paymaster capability with a canonical JSON-compatible context. Permission deadlines apply equally to self-funded and sponsored operations.
 

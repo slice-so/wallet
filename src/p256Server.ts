@@ -123,7 +123,8 @@ const weightedP256ProposalTypes = {
     { name: "account", type: "address" },
     { name: "id", type: "bytes32" },
     { name: "callData", type: "bytes" },
-    { name: "nonce", type: "uint256" }
+    { name: "nonce", type: "uint256" },
+    { name: "validUntil", type: "uint48" }
   ]
 } as const
 
@@ -139,13 +140,15 @@ export const hashSliceWalletWeightedP256Proposal = ({
   callData,
   chainId,
   nonce,
-  permissionId
+  permissionId,
+  validUntil
 }: {
   account: Address
   callData: Hex
   chainId: number
   nonce: bigint
   permissionId: Hex
+  validUntil: number
 }) =>
   hashTypedData({
     domain: {
@@ -158,7 +161,8 @@ export const hashSliceWalletWeightedP256Proposal = ({
       account,
       callData,
       id: pad(permissionId, { dir: "right", size: 32 }),
-      nonce
+      nonce,
+      validUntil
     },
     primaryType: "Proposal",
     types: weightedP256ProposalTypes

@@ -340,7 +340,7 @@ export const parseSliceWalletFrameRequest = (
     }
   }
   if (method === "signCheckoutProposal") {
-    assertKeys(params, ["callData", "nonce", "sender", "session"])
+    assertKeys(params, ["callData", "nonce", "sender", "session", "validUntil"])
     return {
       id,
       method,
@@ -348,7 +348,8 @@ export const parseSliceWalletFrameRequest = (
         callData: hexValue(params.callData, "Checkout call data"),
         nonce: bigintValue(params.nonce, "Checkout account nonce"),
         sender: addressValue(params.sender, "Checkout sender"),
-        session: parseSessionKey(params.session)
+        session: parseSessionKey(params.session),
+        validUntil: integerValue(params.validUntil, "Checkout validity")
       },
       version: 1
     }

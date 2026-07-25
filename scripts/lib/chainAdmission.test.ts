@@ -1,12 +1,27 @@
 import { describe, expect, it } from "bun:test"
 import { hasCompleteSliceWalletAdmissionEvidence } from "./chainAdmission"
 
+const exactRuntime = {
+  deployedRuntimeCodeHash: "0x1234",
+  expectedRuntimeCodeHash: "0x1234"
+} as const
+
 const completeEvidence = {
   contracts: {
-    entryPoint: {
-      deployedRuntimeCodeHash: "0x1234",
-      expectedRuntimeCodeHash: "0x1234"
-    }
+    callPolicy: exactRuntime,
+    ecdsaSigner: exactRuntime,
+    entryPoint: exactRuntime,
+    kernelFactory: exactRuntime,
+    kernelImplementation: exactRuntime,
+    kernelMetaFactory: exactRuntime,
+    p256Verifier: exactRuntime,
+    soladyP256Verifier: exactRuntime,
+    sudoPolicy: exactRuntime,
+    timelockPolicy: exactRuntime,
+    timestampPolicy: exactRuntime,
+    webAuthnRootValidator: exactRuntime,
+    webAuthnSigner: exactRuntime,
+    weightedEcdsaSigner: exactRuntime
   },
   status: "admitted",
   verification: {
@@ -24,6 +39,7 @@ describe("wallet chain admission evidence", () => {
       hasCompleteSliceWalletAdmissionEvidence({
         ...completeEvidence,
         contracts: {
+          ...completeEvidence.contracts,
           entryPoint: {
             deployedRuntimeCodeHash: "0xabcd",
             expectedRuntimeCodeHash: "0x1234"

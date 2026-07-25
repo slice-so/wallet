@@ -415,6 +415,12 @@ export const attachSliceWalletSignerFrame = ({
       if (!isAddressEqual(request.params.sender, stored.session.account)) {
         throw new Error("Checkout sender does not match the wallet session.")
       }
+      if (
+        request.params.validUntil <= now() ||
+        request.params.validUntil > stored.session.expiresAt
+      ) {
+        throw new Error("Checkout validity is outside the wallet session.")
+      }
       validateCheckoutCalls(
         decodeScopedCalls(request.params.callData),
         stored.session
@@ -424,7 +430,8 @@ export const attachSliceWalletSignerFrame = ({
         callData: request.params.callData,
         chainId: stored.session.chainId,
         nonce: request.params.nonce,
-        permissionId: stored.session.permissionId
+        permissionId: stored.session.permissionId,
+        validUntil: request.params.validUntil
       })
       const signature = await signSliceWalletP256({
         cryptoImpl,
@@ -484,7 +491,8 @@ export const attachSliceWalletSignerFrame = ({
         callData: request.params.userOperation.callData,
         chainId: stored.session.chainId,
         nonce: request.params.userOperation.nonce,
-        permissionId: stored.session.permissionId
+        permissionId: stored.session.permissionId,
+        validUntil: request.params.validUntil
       })
       const digest = hashSliceWalletCoSignRequest({
         accountNonce: request.params.userOperation.nonce,
@@ -569,9 +577,6 @@ export const attachSliceWalletSignerFrame = ({
       const scopedCalls = decodeScopedCalls(
         request.params.userOperation.callData
       )
-      if (stored.session.grantKind === "generic" && scopedCalls.length !== 1) {
-        throw new Error("Generic permissions authorize exactly one inner call.")
-      }
       assertWalletCallsMatchPolicy(scopedCalls, stored.session.policy)
       assertSliceWalletExecutionSafety({
         chainId: stored.session.chainId,

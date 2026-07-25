@@ -205,6 +205,7 @@ export type SliceWalletFrameRequest =
         nonce: bigint
         sender: Address
         session: SliceWalletFrameSessionKey
+        validUntil: number
       }
       version: 1
     }

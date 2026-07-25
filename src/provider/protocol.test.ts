@@ -135,7 +135,7 @@ describe("portable wallet provider protocol", () => {
     }
     expect(() =>
       assertWalletCallsMatchPolicy(allowedCalls, parsed.policy)
-    ).toThrow("exactly one call")
+    ).not.toThrow()
   })
 
   test("rejects parent-provided signers and opaque required permissions", () => {

@@ -27,21 +27,26 @@ describe("Slice Wallet chain manifest", () => {
     ).toThrow()
   })
 
-  test("fails closed while authority deployments do not match verified facts", () => {
+  test("admits only authorities whose required deployments match verified facts", () => {
     const base = getSliceWalletChainManifest(8453)
 
     expect(base.authorityAdmission).toEqual({
       checkout: false,
-      generic: false
+      generic: true
     })
-    expect(base.contracts.singleCallPolicy.deployedRuntimeCodeHash).toBeNull()
+    expect(base.contracts.timestampPolicy.deployedRuntimeCodeHash).toBe(
+      base.contracts.timestampPolicy.expectedRuntimeCodeHash
+    )
+    expect(base.contracts.rateLimitPolicy.deployedRuntimeCodeHash).toBe(
+      base.contracts.rateLimitPolicy.expectedRuntimeCodeHash
+    )
     expect(base.contracts.weightedP256Signer.deployedRuntimeCodeHash).toBeNull()
     expect(() =>
       assertSliceWalletAuthorityDeployment({
         authority: "generic",
         chainId: 8453
       })
-    ).toThrow("Slice Wallet generic authority is not verified on chain 8453.")
+    ).not.toThrow()
     expect(() =>
       assertSliceWalletAuthorityDeployment({
         authority: "checkout",

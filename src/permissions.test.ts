@@ -62,7 +62,6 @@ const grant: SliceWalletPermissionGrant = {
 const capabilities = {
   "0x2105": {
     slicePermissions: {
-      maximumCallsPerOperation: 1,
       supportedTemplates: [
         "native-transfer",
         "erc20-transfer",

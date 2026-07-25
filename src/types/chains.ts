@@ -19,12 +19,11 @@ export type SliceWalletContractDeployments = {
   }
   readonly kernelMetaFactory: SliceWalletContractDeployment
   readonly p256Verifier: SliceWalletContractDeployment
-  readonly singleCallPolicy: SliceWalletContractDeployment & {
-    readonly version: "1"
-  }
+  readonly rateLimitPolicy: SliceWalletContractDeployment
   readonly soladyP256Verifier: SliceWalletContractDeployment
   readonly sudoPolicy: SliceWalletContractDeployment
   readonly timelockPolicy: SliceWalletContractDeployment
+  readonly timestampPolicy: SliceWalletContractDeployment
   readonly webAuthnRootValidator: SliceWalletContractDeployment
   readonly webAuthnSigner: SliceWalletContractDeployment
   readonly weightedEcdsaSigner: SliceWalletContractDeployment

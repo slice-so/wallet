@@ -164,7 +164,6 @@ export type SliceWalletPermissionGrant = {
 }
 
 export type SliceWalletPermissionCapabilities = {
-  maximumCallsPerOperation: 1
   supportedTemplates: readonly [
     "native-transfer",
     "erc20-transfer",

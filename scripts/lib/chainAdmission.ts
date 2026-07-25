@@ -25,6 +25,7 @@ const baseWalletContractNames = [
   "soladyP256Verifier",
   "sudoPolicy",
   "timelockPolicy",
+  "timestampPolicy",
   "webAuthnRootValidator",
   "webAuthnSigner",
   "weightedEcdsaSigner"
@@ -51,7 +52,7 @@ export const hasVerifiedGenericAuthorityDeployment = (
   deployment: AdmissionEvidence
 ) =>
   hasCompleteSliceWalletAdmissionEvidence(deployment) &&
-  hasExactRuntime(deployment.contracts.singleCallPolicy)
+  hasExactRuntime(deployment.contracts.rateLimitPolicy)
 
 export const hasVerifiedCheckoutAuthorityDeployment = (
   deployment: AdmissionEvidence

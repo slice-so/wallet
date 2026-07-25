@@ -61,7 +61,7 @@ const manifests = [
     admitted: true,
     authorityAdmission: {
       checkout: false,
-      generic: false
+      generic: true
     },
     chain: {
       blockExplorers: {
@@ -145,6 +145,20 @@ const manifests = [
           "0x5934c38b0fac23319486e13370cfb9835a1b70cd10c6821351c669dfac74b356",
         version: "0.0.5"
       },
+      timestampPolicy: {
+        address: "0xB9f8f524bE6EcD8C945b1b87f9ae5C192FdCE20F",
+        deployedRuntimeCodeHash:
+          "0x1e7146c888fec3f757e9ed5473b766cdb8a782e1e10c39f65cbc68f4ab83c4d2",
+        expectedRuntimeCodeHash:
+          "0x1e7146c888fec3f757e9ed5473b766cdb8a782e1e10c39f65cbc68f4ab83c4d2"
+      },
+      rateLimitPolicy: {
+        address: "0xf63d4139B25c836334edD76641356c6b74C86873",
+        deployedRuntimeCodeHash:
+          "0xb4fffdb494637e8e5bfc15d6500202c252392b498e518668f896dc6da0221183",
+        expectedRuntimeCodeHash:
+          "0xb4fffdb494637e8e5bfc15d6500202c252392b498e518668f896dc6da0221183"
+      },
       sudoPolicy: {
         address: "0x67b436caD8a6D025DF6C82C5BB43fbF11fC5B9B7",
         deployedRuntimeCodeHash:
@@ -174,17 +188,10 @@ const manifests = [
           "0xf86faf7bdc6657af2c9cfe4ab7d966434c7534803d102f802c68faeeafd04254"
       },
       weightedP256Signer: {
-        address: "0xB91ec993AF1127b5C9271396dFE0AF2712eF47cf",
+        address: "0xDb6BFE831FEe7AC73A2AFdF0128760797624aB3A",
         deployedRuntimeCodeHash: null,
         expectedRuntimeCodeHash:
-          "0xdebcf6c2aa2eac6c405b84a69c806fa61d252fdb4d9db0a9361be1673fe4cd70",
-        version: "1"
-      },
-      singleCallPolicy: {
-        address: "0xb01643c720984eaA0bc2A568c9a6E578655E7470",
-        deployedRuntimeCodeHash: null,
-        expectedRuntimeCodeHash:
-          "0xbb358c7efdb0c13ffd7388bc76ac3b711e5b70a12027894d7ac70dd86bf198cf",
+          "0xb272d6164420c7ae74308987fcb60e91304f1e055360b1278972f2d539f576ab",
         version: "1"
       },
       timelockPolicy: {
@@ -221,7 +228,7 @@ const manifests = [
     admitted: true,
     authorityAdmission: {
       checkout: false,
-      generic: false
+      generic: true
     },
     chain: {
       blockExplorers: {
@@ -305,6 +312,20 @@ const manifests = [
           "0x5934c38b0fac23319486e13370cfb9835a1b70cd10c6821351c669dfac74b356",
         version: "0.0.5"
       },
+      timestampPolicy: {
+        address: "0xB9f8f524bE6EcD8C945b1b87f9ae5C192FdCE20F",
+        deployedRuntimeCodeHash:
+          "0x1e7146c888fec3f757e9ed5473b766cdb8a782e1e10c39f65cbc68f4ab83c4d2",
+        expectedRuntimeCodeHash:
+          "0x1e7146c888fec3f757e9ed5473b766cdb8a782e1e10c39f65cbc68f4ab83c4d2"
+      },
+      rateLimitPolicy: {
+        address: "0xf63d4139B25c836334edD76641356c6b74C86873",
+        deployedRuntimeCodeHash:
+          "0xb4fffdb494637e8e5bfc15d6500202c252392b498e518668f896dc6da0221183",
+        expectedRuntimeCodeHash:
+          "0xb4fffdb494637e8e5bfc15d6500202c252392b498e518668f896dc6da0221183"
+      },
       sudoPolicy: {
         address: "0x67b436caD8a6D025DF6C82C5BB43fbF11fC5B9B7",
         deployedRuntimeCodeHash:
@@ -334,17 +355,10 @@ const manifests = [
           "0xe519f84c3f2c9ef1638b500fced1257b705f6d412b2adaedf6cc7f17fb39f9ed"
       },
       weightedP256Signer: {
-        address: "0xB91ec993AF1127b5C9271396dFE0AF2712eF47cf",
+        address: "0xDb6BFE831FEe7AC73A2AFdF0128760797624aB3A",
         deployedRuntimeCodeHash: null,
         expectedRuntimeCodeHash:
-          "0xdebcf6c2aa2eac6c405b84a69c806fa61d252fdb4d9db0a9361be1673fe4cd70",
-        version: "1"
-      },
-      singleCallPolicy: {
-        address: "0xb01643c720984eaA0bc2A568c9a6E578655E7470",
-        deployedRuntimeCodeHash: null,
-        expectedRuntimeCodeHash:
-          "0xbb358c7efdb0c13ffd7388bc76ac3b711e5b70a12027894d7ac70dd86bf198cf",
+          "0xb272d6164420c7ae74308987fcb60e91304f1e055360b1278972f2d539f576ab",
         version: "1"
       },
       timelockPolicy: {
@@ -381,7 +395,7 @@ const manifests = [
     admitted: true,
     authorityAdmission: {
       checkout: false,
-      generic: false
+      generic: true
     },
     chain: {
       blockExplorers: {
@@ -465,6 +479,20 @@ const manifests = [
           "0x5934c38b0fac23319486e13370cfb9835a1b70cd10c6821351c669dfac74b356",
         version: "0.0.5"
       },
+      timestampPolicy: {
+        address: "0xB9f8f524bE6EcD8C945b1b87f9ae5C192FdCE20F",
+        deployedRuntimeCodeHash:
+          "0x1e7146c888fec3f757e9ed5473b766cdb8a782e1e10c39f65cbc68f4ab83c4d2",
+        expectedRuntimeCodeHash:
+          "0x1e7146c888fec3f757e9ed5473b766cdb8a782e1e10c39f65cbc68f4ab83c4d2"
+      },
+      rateLimitPolicy: {
+        address: "0xf63d4139B25c836334edD76641356c6b74C86873",
+        deployedRuntimeCodeHash:
+          "0xb4fffdb494637e8e5bfc15d6500202c252392b498e518668f896dc6da0221183",
+        expectedRuntimeCodeHash:
+          "0xb4fffdb494637e8e5bfc15d6500202c252392b498e518668f896dc6da0221183"
+      },
       sudoPolicy: {
         address: "0x67b436caD8a6D025DF6C82C5BB43fbF11fC5B9B7",
         deployedRuntimeCodeHash:
@@ -494,17 +522,10 @@ const manifests = [
           "0xd9dea77190cbc2104d2ecd8beab745196d3c5a01fe7b0ba49ee5b3b6c9a90be2"
       },
       weightedP256Signer: {
-        address: "0xB91ec993AF1127b5C9271396dFE0AF2712eF47cf",
+        address: "0xDb6BFE831FEe7AC73A2AFdF0128760797624aB3A",
         deployedRuntimeCodeHash: null,
         expectedRuntimeCodeHash:
-          "0xdebcf6c2aa2eac6c405b84a69c806fa61d252fdb4d9db0a9361be1673fe4cd70",
-        version: "1"
-      },
-      singleCallPolicy: {
-        address: "0xb01643c720984eaA0bc2A568c9a6E578655E7470",
-        deployedRuntimeCodeHash: null,
-        expectedRuntimeCodeHash:
-          "0xbb358c7efdb0c13ffd7388bc76ac3b711e5b70a12027894d7ac70dd86bf198cf",
+          "0xb272d6164420c7ae74308987fcb60e91304f1e055360b1278972f2d539f576ab",
         version: "1"
       },
       timelockPolicy: {
@@ -546,7 +567,7 @@ const manifests = [
     admitted: true,
     authorityAdmission: {
       checkout: false,
-      generic: false
+      generic: true
     },
     chain: {
       blockExplorers: {
@@ -630,6 +651,20 @@ const manifests = [
           "0x5934c38b0fac23319486e13370cfb9835a1b70cd10c6821351c669dfac74b356",
         version: "0.0.5"
       },
+      timestampPolicy: {
+        address: "0xB9f8f524bE6EcD8C945b1b87f9ae5C192FdCE20F",
+        deployedRuntimeCodeHash:
+          "0x1e7146c888fec3f757e9ed5473b766cdb8a782e1e10c39f65cbc68f4ab83c4d2",
+        expectedRuntimeCodeHash:
+          "0x1e7146c888fec3f757e9ed5473b766cdb8a782e1e10c39f65cbc68f4ab83c4d2"
+      },
+      rateLimitPolicy: {
+        address: "0xf63d4139B25c836334edD76641356c6b74C86873",
+        deployedRuntimeCodeHash:
+          "0xb4fffdb494637e8e5bfc15d6500202c252392b498e518668f896dc6da0221183",
+        expectedRuntimeCodeHash:
+          "0xb4fffdb494637e8e5bfc15d6500202c252392b498e518668f896dc6da0221183"
+      },
       sudoPolicy: {
         address: "0x67b436caD8a6D025DF6C82C5BB43fbF11fC5B9B7",
         deployedRuntimeCodeHash:
@@ -659,17 +694,10 @@ const manifests = [
           "0x38bf435be1112dabcaf5af04d6398fd3ad1f432173fd46e3864ff73f9e0b036f"
       },
       weightedP256Signer: {
-        address: "0xB91ec993AF1127b5C9271396dFE0AF2712eF47cf",
+        address: "0xDb6BFE831FEe7AC73A2AFdF0128760797624aB3A",
         deployedRuntimeCodeHash: null,
         expectedRuntimeCodeHash:
-          "0xdebcf6c2aa2eac6c405b84a69c806fa61d252fdb4d9db0a9361be1673fe4cd70",
-        version: "1"
-      },
-      singleCallPolicy: {
-        address: "0xb01643c720984eaA0bc2A568c9a6E578655E7470",
-        deployedRuntimeCodeHash: null,
-        expectedRuntimeCodeHash:
-          "0xbb358c7efdb0c13ffd7388bc76ac3b711e5b70a12027894d7ac70dd86bf198cf",
+          "0xb272d6164420c7ae74308987fcb60e91304f1e055360b1278972f2d539f576ab",
         version: "1"
       },
       timelockPolicy: {

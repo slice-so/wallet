@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test"
 import { type Address, encodeFunctionData, erc20Abi } from "viem"
-import { sliceKernelSingleCallPolicyAddress } from "./execution/utils/sliceKernelAddresses"
 import {
   assertWalletCallsMatchPolicy,
   createErc20ApproveCallRule,
@@ -68,14 +67,10 @@ describe("normalized wallet policies", () => {
     )
 
     const policies = toWalletPermissionPolicies(first)
-    expect(policies).toHaveLength(4)
+    expect(policies).toHaveLength(3)
     expect(policies[0].policyParams.type).toBe("call")
     expect(policies[1].policyParams.type).toBe("timestamp")
-    expect(policies[2].policyParams).toMatchObject({
-      policyAddress: sliceKernelSingleCallPolicyAddress,
-      type: "sudo"
-    })
-    expect(policies[3].policyParams.type).toBe("rate-limit")
+    expect(policies[2].policyParams.type).toBe("rate-limit")
   })
 
   it("accepts only the constrained native and ERC-20 templates", () => {
@@ -129,9 +124,9 @@ describe("normalized wallet policies", () => {
     for (const call of allowedCalls) {
       expect(() => assertWalletCallsMatchPolicy([call], policy)).not.toThrow()
     }
-    expect(() => assertWalletCallsMatchPolicy(allowedCalls, policy)).toThrow(
-      "exactly one call"
-    )
+    expect(() =>
+      assertWalletCallsMatchPolicy(allowedCalls, policy)
+    ).not.toThrow()
 
     expect(() =>
       assertWalletCallsMatchPolicy(

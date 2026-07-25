@@ -336,7 +336,8 @@ export const createSliceWalletPermissionAccount = async (
           callData: userOperation.callData,
           nonce: userOperation.nonce,
           sender: userOperation.sender ?? address,
-          session: frameSessionKey
+          session: frameSessionKey,
+          validUntil: session.expiresAt
         }
       })
     )

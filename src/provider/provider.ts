@@ -610,7 +610,6 @@ export const createSliceWalletProviderInternal = (
             ...(hasGenericAuthorityDeployment(chainId)
               ? {
                   slicePermissions: {
-                    maximumCallsPerOperation: 1,
                     supportedTemplates: [
                       "native-transfer",
                       "erc20-transfer",
