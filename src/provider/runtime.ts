@@ -84,6 +84,7 @@ import {
   unauthorizedProviderRequest
 } from "./errors"
 import { revokeSliceWalletGrantState } from "./grantRevocation"
+import { toSliceWalletGenericPermissions } from "./protocol"
 import { forwardSliceWalletRpc } from "./rpc"
 import {
   clearStoredSliceWalletAccount,
@@ -208,9 +209,23 @@ const genericGrantRotationPhaseOrder: Record<
   "active-grant-committed": 6
 }
 
-export const isSliceWalletDefiniteBundlerRejection = (error: Error) =>
-  error instanceof BaseError &&
-  error.walk((cause) => cause instanceof RpcRequestError) !== null
+const definiteBundlerRejectionCodes = new Set([
+  -32500, -32501, -32502, -32503, -32504, -32505, -32506, -32507
+])
+
+export const isSliceWalletDefiniteBundlerRejection = (error: Error) => {
+  if (!(error instanceof BaseError)) return false
+  const rpcError = error.walk(
+    (cause) => cause instanceof RpcRequestError
+  ) as RpcRequestError | null
+  return (
+    rpcError !== null &&
+    definiteBundlerRejectionCodes.has(rpcError.code) &&
+    !/(already known|already present|mempool|replacement underpriced|underpriced)/i.test(
+      rpcError.message
+    )
+  )
+}
 
 export const getSliceWalletGenericGrantInstallationAction = ({
   currentNonce,
@@ -1237,7 +1252,7 @@ const createSliceWalletChainRuntime = (
   }): StoredGenericGrant => ({
     account: session.account,
     chainId: session.chainId,
-    createdAt: Math.floor(Date.now() / 1000),
+    createdAt: Math.min(session.expiresAt - 1, session.policy.validAfter + 300),
     enableSignature,
     expiresAt: session.expiresAt,
     permissionId: session.permissionId,
@@ -1806,7 +1821,7 @@ const createSliceWalletChainRuntime = (
     }
     const replacement = toStoredGrant({
       enableSignature: "0x",
-      permissions: grant.stored.permissions,
+      permissions: toSliceWalletGenericPermissions(pending.policy),
       session: pending
     })
     return [toPublicGrant(grant.stored), toPublicGrant(replacement)]

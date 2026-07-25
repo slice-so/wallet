@@ -10,4 +10,3 @@ export const sliceWallet = (parameters: SliceWalletParameters = {}) =>
   )
 
 export * from "./wagmi/permissionActions"
-export * from "./wagmi/permissionHooks"

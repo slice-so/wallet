@@ -240,66 +240,54 @@ assert(
 
 if (userOperationCanary !== null) {
   const [receipt, transaction] = await Promise.all([
-    client
-      .getTransactionReceipt({
-        hash: userOperationCanary.transactionHash
-      })
-      .catch(() => null),
-    client
-      .getTransaction({
-        hash: userOperationCanary.transactionHash
-      })
-      .catch(() => null)
-  ])
-  assert(receipt !== null, "The canary transaction receipt is unavailable.")
-  assert(transaction !== null, "The canary transaction is unavailable.")
-
-  if (receipt !== null && transaction !== null) {
-    assert(receipt.status === "success", "The canary transaction reverted.")
-    assert(
-      transaction.to?.toLowerCase() ===
-        deployment.contracts.entryPoint.address.toLowerCase(),
-      "The canary transaction was not submitted through the pinned EntryPoint."
-    )
-
-    const events = parseEventLogs({
-      abi: userOperationEventAbi,
-      eventName: "UserOperationEvent",
-      logs: receipt.logs,
-      strict: true
+    client.getTransactionReceipt({
+      hash: userOperationCanary.transactionHash
+    }),
+    client.getTransaction({
+      hash: userOperationCanary.transactionHash
     })
-    const canaryEvent = events.find(
-      (event) =>
-        event.args.userOpHash.toLowerCase() ===
-          userOperationCanary.userOperationHash.toLowerCase() &&
-        event.args.sender.toLowerCase() ===
-          userOperationCanary.accountAddress.toLowerCase()
+  ])
+  assert(receipt.status === "success", "The canary transaction reverted.")
+  assert(
+    transaction.to?.toLowerCase() ===
+      deployment.contracts.entryPoint.address.toLowerCase(),
+    "The canary transaction was not submitted through the pinned EntryPoint."
+  )
+
+  const events = parseEventLogs({
+    abi: userOperationEventAbi,
+    eventName: "UserOperationEvent",
+    logs: receipt.logs,
+    strict: true
+  })
+  const canaryEvent = events.find(
+    (event) =>
+      event.args.userOpHash.toLowerCase() ===
+        userOperationCanary.userOperationHash.toLowerCase() &&
+      event.args.sender.toLowerCase() ===
+        userOperationCanary.accountAddress.toLowerCase()
+  )
+  assert(canaryEvent !== undefined, "The canary UserOperationEvent is missing.")
+  assert(
+    canaryEvent?.args.success === true,
+    "The canary user operation failed."
+  )
+  if (canaryEvent !== undefined) {
+    const executionSafety = chainPolicy.executionSafety
+    const maximumEnvelopeGas =
+      BigInt(executionSafety.maxCallGasLimit) +
+      BigInt(executionSafety.maxVerificationGasLimit) +
+      BigInt(executionSafety.maxPreVerificationGas) +
+      BigInt(executionSafety.maxPaymasterVerificationGasLimit) +
+      BigInt(executionSafety.maxPaymasterPostOpGasLimit)
+    assert(
+      canaryEvent.args.actualGasUsed <= maximumEnvelopeGas,
+      "The execution-safety gas envelope is below the admitted canary usage."
     )
     assert(
-      canaryEvent !== undefined,
-      "The canary UserOperationEvent is missing."
+      canaryEvent.args.actualGasCost <= BigInt(executionSafety.maxPrefundWei),
+      "The execution-safety prefund cap is below the admitted canary cost."
     )
-    assert(
-      canaryEvent?.args.success === true,
-      "The canary user operation failed."
-    )
-    if (canaryEvent !== undefined) {
-      const executionSafety = chainPolicy.executionSafety
-      const maximumEnvelopeGas =
-        BigInt(executionSafety.maxCallGasLimit) +
-        BigInt(executionSafety.maxVerificationGasLimit) +
-        BigInt(executionSafety.maxPreVerificationGas) +
-        BigInt(executionSafety.maxPaymasterVerificationGasLimit) +
-        BigInt(executionSafety.maxPaymasterPostOpGasLimit)
-      assert(
-        canaryEvent.args.actualGasUsed <= maximumEnvelopeGas,
-        "The execution-safety gas envelope is below the admitted canary usage."
-      )
-      assert(
-        canaryEvent.args.actualGasCost <= BigInt(executionSafety.maxPrefundWei),
-        "The execution-safety prefund cap is below the admitted canary cost."
-      )
-    }
   }
 
   const accountCode = await client.getCode({

@@ -89,7 +89,7 @@ export const resolveCanonicalSliceWalletConfig = (
   const chainIds = parameters.chainIds ?? [
     defaultSliceWalletChainId,
     ...sliceWalletSupportedChainIds.filter(
-      (chainId) => chainId !== defaultSliceWalletChainId
+      (chainId) => chainId !== defaultSliceWalletChainId && chainId !== anvil.id
     )
   ]
   if (

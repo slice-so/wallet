@@ -21,7 +21,11 @@ import {
   hashSliceWalletWeightedP256Proposal,
   signSliceWalletP256
 } from "../p256"
-import { assertWalletCallsMatchPolicy, getWalletPermissionId } from "../policy"
+import {
+  assertWalletCallsMatchPolicy,
+  getWalletPermissionId,
+  getWalletPolicyHash
+} from "../policy"
 import type {
   SliceWalletBridgeChallenge,
   SliceWalletBridgeGrantProofRequest,
@@ -43,6 +47,7 @@ import type {
 } from "../types"
 import {
   formatSliceWalletExecutionGrantMessage,
+  hashSliceWalletAppPermissionRegistrationFields,
   hashSliceWalletCoSignRequest,
   hashSliceWalletSessionRequest
 } from "./messages"
@@ -201,15 +206,31 @@ const parseBridgeRegistrationProofRequest = (
     readonly [key: string]: SliceWalletProtocolValue
   }
   if (
-    Object.keys(input).length !== 4 ||
+    Object.keys(input).length !== 8 ||
     input.type !== "slice-wallet:bridge-sign-registration" ||
     input.version !== 1 ||
-    typeof input.digest !== "string" ||
-    !isHex(input.digest, { strict: true }) ||
-    input.digest !== input.digest.toLowerCase() ||
-    hexToBytes(input.digest).length !== 32
+    input.action !== "register" ||
+    typeof input.accountIndex !== "number" ||
+    !Number.isSafeInteger(input.accountIndex) ||
+    input.accountIndex < 0 ||
+    input.accountIndex > 31 ||
+    typeof input.challengeExpiresAt !== "number" ||
+    !Number.isSafeInteger(input.challengeExpiresAt) ||
+    input.challengeExpiresAt <= 0
   ) {
     throw new Error("Bridge registration proof request is invalid.")
+  }
+  const canonicalBytes32 = (field: "challenge" | "requestHash") => {
+    const candidate = input[field]
+    if (
+      typeof candidate !== "string" ||
+      !isHex(candidate, { strict: true }) ||
+      candidate !== candidate.toLowerCase() ||
+      hexToBytes(candidate).length !== 32
+    ) {
+      throw new Error("Bridge registration proof request is invalid.")
+    }
+    return candidate as Hex
   }
   const parsed = parseSliceWalletFrameRequest({
     id: "bridge",
@@ -221,7 +242,11 @@ const parseBridgeRegistrationProofRequest = (
     throw new Error("Bridge registration proof request is invalid.")
   }
   return {
-    digest: input.digest as Hex,
+    accountIndex: input.accountIndex,
+    action: input.action,
+    challenge: canonicalBytes32("challenge"),
+    challengeExpiresAt: input.challengeExpiresAt,
+    requestHash: canonicalBytes32("requestHash"),
     session: parsed.params,
     type: "slice-wallet:bridge-sign-registration",
     version: 1
@@ -749,7 +774,22 @@ export const attachSliceWalletSignerFrame = ({
               signature: await signSliceWalletP256({
                 cryptoImpl,
                 key: session.privateKey,
-                message: hexToBytes(request.digest)
+                message: hexToBytes(
+                  hashSliceWalletAppPermissionRegistrationFields({
+                    accountAddress: parsedSession.account,
+                    accountIndex: request.accountIndex,
+                    action: request.action,
+                    appOrigin: bridgedParentOrigin,
+                    challenge: request.challenge,
+                    challengeExpiresAt: request.challengeExpiresAt,
+                    chainId: parsedSession.chainId,
+                    permissionId: parsedSession.permissionId,
+                    policyHash: getWalletPolicyHash(parsedSession.policy),
+                    requestHash: request.requestHash,
+                    signerAddress: parsedSession.signerId,
+                    signerPublicKey: parsedSession.publicKey
+                  })
+                )
               }),
               type: "slice-wallet:bridge-registration-proof",
               version: 1

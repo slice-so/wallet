@@ -5,7 +5,8 @@ import {
   isAddress,
   isHex,
   maxUint256,
-  numberToHex
+  numberToHex,
+  toFunctionSelector
 } from "viem"
 import { maximumBrowserGenericGrantTtlSec } from "../constants"
 import {
@@ -549,6 +550,98 @@ export const toSliceWalletGenericPermissionCallRule = (
   })
 }
 
+const erc20TransferSelector = toFunctionSelector("transfer(address,uint256)")
+const erc20ApproveSelector = toFunctionSelector("approve(address,uint256)")
+const erc20TransferFromSelector = toFunctionSelector(
+  "transferFrom(address,address,uint256)"
+)
+
+const addressFromPolicyParameter = (value: Hex) =>
+  `0x${value.slice(-40)}` as Address
+
+export const toSliceWalletGenericPermissions = (
+  descriptor: WalletPolicyDescriptor
+): readonly SliceWalletGenericPermission[] => {
+  const policy = normalizeWalletPolicyDescriptor(descriptor)
+  if (policy.grantKind !== "generic" || policy.rateLimit === undefined) {
+    throw new Error("Generic wallet permissions require a rate-limited policy.")
+  }
+  const policies = [
+    { data: policy.rateLimit, type: "rate-limit" as const }
+  ] as const
+
+  return policy.calls.map((call): SliceWalletGenericPermission => {
+    if (call.selector === "0x00000000") {
+      return {
+        data: {
+          maximumValue: numberToHex(call.valueLimit),
+          recipient: call.target,
+          template: "native-transfer"
+        },
+        policies,
+        type: "slice-call"
+      }
+    }
+
+    const amount = call.parameterRules.at(-1)?.params[0]
+    if (amount === undefined) {
+      throw new Error("Generic wallet policy amount is unavailable.")
+    }
+    if (
+      call.selector === erc20TransferSelector ||
+      call.selector === erc20ApproveSelector
+    ) {
+      const recipient = call.parameterRules[0]?.params[0]
+      if (recipient === undefined) {
+        throw new Error("Generic wallet policy recipient is unavailable.")
+      }
+      return {
+        data:
+          call.selector === erc20TransferSelector
+            ? {
+                maximumAmount: numberToHex(hexToBigInt(amount)),
+                recipient: addressFromPolicyParameter(recipient),
+                template: "erc20-transfer",
+                token: call.target
+              }
+            : {
+                maximumAmount: numberToHex(hexToBigInt(amount)),
+                spender: addressFromPolicyParameter(recipient),
+                template: "erc20-approve",
+                token: call.target
+              },
+        policies,
+        type: "slice-call"
+      }
+    }
+    if (call.selector === erc20TransferFromSelector) {
+      const account = call.parameterRules[0]?.params[0]
+      const recipient = call.parameterRules[1]?.params[0]
+      if (account === undefined || recipient === undefined) {
+        throw new Error("Generic wallet policy participants are unavailable.")
+      }
+      return {
+        data: {
+          account: addressFromPolicyParameter(account),
+          maximumAmount: numberToHex(hexToBigInt(amount)),
+          recipient: addressFromPolicyParameter(recipient),
+          template: "erc20-transfer-from",
+          token: call.target
+        },
+        policies,
+        type: "slice-call"
+      }
+    }
+    throw new Error("Unsupported generic wallet policy call rule.")
+  })
+}
+
+const isOptionalPermission = (value: SliceWalletProviderValue) =>
+  typeof value === "object" &&
+  value !== null &&
+  !Array.isArray(value) &&
+  Reflect.get(value, "required") === false
+
 export const parseSliceWalletGrantPermissions = ({
   account,
   chainId,
@@ -584,7 +677,18 @@ export const parseSliceWalletGrantPermissions = ({
     throw invalidProviderRequest("Request between 1 and 16 permissions.")
   }
   const permissions: SliceWalletGenericPermission[] = []
-  for (const value of requested) permissions.push(parseGenericPermission(value))
+  for (const value of requested) {
+    try {
+      permissions.push(parseGenericPermission(value))
+    } catch (error) {
+      if (!isOptionalPermission(value)) throw error
+    }
+  }
+  if (permissions.length === 0) {
+    throw invalidProviderRequest(
+      "Permission request contains no supported permissions."
+    )
+  }
   const limits = permissions
     .flatMap((permission) => permission.policies)
     .map((policy) => policy.data)

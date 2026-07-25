@@ -95,7 +95,7 @@ const parseGrant = (
     !Number.isSafeInteger(input.expiresAt) ||
     typeof input.permissionId !== "string" ||
     !isHex(input.permissionId, { strict: true }) ||
-    !/^0x[0-9a-f]{8}$/.test(input.permissionId) ||
+    !/^0x[0-9a-fA-F]{8}$/.test(input.permissionId) ||
     !Array.isArray(input.permissions) ||
     input.version !== "1" ||
     input.account.toLowerCase() !== expected.account.toLowerCase() ||
@@ -114,11 +114,16 @@ const parseGrant = (
     chainId: input.chainId,
     createdAt: input.createdAt,
     expiresAt: input.expiresAt,
-    permissionId: input.permissionId,
+    permissionId: input.permissionId.toLowerCase() as Hex,
     permissions: parsedRequest.permissions,
     version: "1"
   }
 }
+
+const permissionCapabilities = new WeakMap<
+  Pick<SliceWalletProvider, "request">,
+  Set<string>
+>()
 
 const assertPermissionCapability = async (
   provider: Pick<SliceWalletProvider, "request">
@@ -129,6 +134,10 @@ const assertPermissionCapability = async (
   const chainId = parseChainId(
     await provider.request({ method: "eth_chainId" })
   )
+  const capabilityKey = `${account.toLowerCase()}:${chainId}`
+  if (permissionCapabilities.get(provider)?.has(capabilityKey)) {
+    return { account, chainId }
+  }
   let capabilityValue: SliceWalletProviderValue | undefined
   try {
     capabilityValue = await provider.request({
@@ -177,6 +186,9 @@ const assertPermissionCapability = async (
   ) {
     throw new SliceWalletPermissionUnsupportedWalletError()
   }
+  const supported = permissionCapabilities.get(provider) ?? new Set<string>()
+  supported.add(capabilityKey)
+  permissionCapabilities.set(provider, supported)
   return { account, chainId }
 }
 

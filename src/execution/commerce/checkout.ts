@@ -49,9 +49,15 @@ export const buildSliceCheckoutAllowanceEnvelope = ({
 
   return [
     ...[...totals.values()]
-      .sort((left, right) =>
-        left.currency.toLowerCase().localeCompare(right.currency.toLowerCase())
-      )
+      .sort((left, right) => {
+        const leftCurrency = left.currency.toLowerCase()
+        const rightCurrency = right.currency.toLowerCase()
+        return leftCurrency < rightCurrency
+          ? -1
+          : leftCurrency > rightCurrency
+            ? 1
+            : 0
+      })
       .map(
         ({ amount, currency }): WalletCall => ({
           data: encodeFunctionData({

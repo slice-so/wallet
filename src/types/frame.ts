@@ -370,7 +370,11 @@ export type SliceWalletBridgeGrantProofResponse =
     }
 
 export type SliceWalletBridgeRegistrationProofRequest = {
-  digest: Hex
+  accountIndex: number
+  action: "register"
+  challenge: Hex
+  challengeExpiresAt: number
+  requestHash: Hex
   session: SliceWalletFrameSessionKey
   type: "slice-wallet:bridge-sign-registration"
   version: 1

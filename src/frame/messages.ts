@@ -1,6 +1,185 @@
-import { encodeAbiParameters, type Hex, keccak256, stringToHex } from "viem"
+import {
+  type Address,
+  encodeAbiParameters,
+  type Hex,
+  hexToBytes,
+  isAddress,
+  isHex,
+  keccak256,
+  stringToHex
+} from "viem"
+import { assertSliceWalletAccountIndex } from "../accountIndex"
 import { encodeWalletPolicyDescriptor, getWalletPolicyHash } from "../policy"
 import type { SliceWalletFrameSession } from "../types/frame"
+
+const appPermissionRequestDomain = keccak256(
+  stringToHex("Slice Wallet App Permission Request v1")
+)
+const appPermissionRootAuthorizationDomain = keccak256(
+  stringToHex("Slice Wallet App Permission Root Authorization v1")
+)
+const appPermissionRegistrationDomain = keccak256(
+  stringToHex("Slice Wallet App Permission P256 Registration v1")
+)
+const appPermissionIdentityAbi = [
+  { name: "domain", type: "bytes32" },
+  { name: "originHash", type: "bytes32" },
+  { name: "account", type: "address" },
+  { name: "accountIndex", type: "uint8" },
+  { name: "chainId", type: "uint256" },
+  { name: "signerId", type: "address" },
+  { name: "publicKeyHash", type: "bytes32" },
+  { name: "permissionId", type: "bytes4" },
+  { name: "policyHash", type: "bytes32" }
+] as const
+
+const normalizeAppPermissionOrigin = (value: string) => {
+  const url = new URL(value)
+  const isLoopback =
+    url.protocol === "http:" &&
+    (url.hostname === "localhost" ||
+      url.hostname === "127.0.0.1" ||
+      url.hostname === "[::1]")
+  if (
+    (url.protocol !== "https:" && !isLoopback) ||
+    url.username !== "" ||
+    url.password !== "" ||
+    url.pathname !== "/" ||
+    url.search !== "" ||
+    url.hash !== ""
+  ) {
+    throw new Error("Application permission origin is invalid.")
+  }
+  return url.origin
+}
+
+const appPermissionFixedHex = (value: Hex, size: number, label: string) => {
+  if (
+    !isHex(value, { strict: true }) ||
+    value !== value.toLowerCase() ||
+    hexToBytes(value).length !== size
+  ) {
+    throw new Error(`${label} must be canonical ${size}-byte hex.`)
+  }
+  return value
+}
+
+const appPermissionIdentityEncoding = ({
+  accountAddress,
+  accountIndex,
+  appOrigin,
+  chainId,
+  permissionId,
+  policyHash,
+  signerAddress,
+  signerPublicKey
+}: {
+  accountAddress: Address
+  accountIndex: number
+  appOrigin: string
+  chainId: number
+  permissionId: Hex
+  policyHash: Hex
+  signerAddress: Address
+  signerPublicKey: Hex
+}) => {
+  if (
+    !isAddress(accountAddress) ||
+    !isAddress(signerAddress) ||
+    !Number.isSafeInteger(chainId) ||
+    chainId <= 0
+  ) {
+    throw new Error("Application permission identity is invalid.")
+  }
+  const publicKey = appPermissionFixedHex(
+    signerPublicKey,
+    65,
+    "Permission signer public key"
+  )
+  if (!publicKey.startsWith("0x04")) {
+    throw new Error("Permission signer public key must be uncompressed.")
+  }
+  return [
+    keccak256(stringToHex(normalizeAppPermissionOrigin(appOrigin))),
+    accountAddress,
+    assertSliceWalletAccountIndex(accountIndex),
+    BigInt(chainId),
+    signerAddress,
+    keccak256(publicKey),
+    appPermissionFixedHex(permissionId, 4, "Permission id"),
+    appPermissionFixedHex(policyHash, 32, "Permission policy hash")
+  ] as const
+}
+
+export const hashSliceWalletAppPermissionRequestFields = (
+  identity: Parameters<typeof appPermissionIdentityEncoding>[0]
+) =>
+  keccak256(
+    encodeAbiParameters(appPermissionIdentityAbi, [
+      appPermissionRequestDomain,
+      ...appPermissionIdentityEncoding(identity)
+    ])
+  )
+
+const hashSliceWalletAppPermissionAuthorizationFields = (
+  domain: Hex,
+  input: Parameters<typeof appPermissionIdentityEncoding>[0] & {
+    action: "register"
+    challenge: Hex
+    challengeExpiresAt: number
+    requestHash: Hex
+  }
+) => {
+  if (
+    !Number.isSafeInteger(input.challengeExpiresAt) ||
+    input.challengeExpiresAt <= 0
+  ) {
+    throw new Error("Application permission challenge expiry is invalid.")
+  }
+  const requestHash = appPermissionFixedHex(
+    input.requestHash,
+    32,
+    "Permission request hash"
+  )
+  if (requestHash !== hashSliceWalletAppPermissionRequestFields(input)) {
+    throw new Error("Application permission request hash does not match.")
+  }
+  return keccak256(
+    encodeAbiParameters(
+      [
+        ...appPermissionIdentityAbi,
+        { name: "actionHash", type: "bytes32" },
+        { name: "requestHash", type: "bytes32" },
+        { name: "challenge", type: "bytes32" },
+        { name: "challengeExpiresAt", type: "uint48" }
+      ],
+      [
+        domain,
+        ...appPermissionIdentityEncoding(input),
+        keccak256(stringToHex(input.action)),
+        requestHash,
+        appPermissionFixedHex(input.challenge, 32, "Permission challenge"),
+        input.challengeExpiresAt
+      ]
+    )
+  )
+}
+
+export const hashSliceWalletAppPermissionRootAuthorizationFields = (
+  input: Parameters<typeof hashSliceWalletAppPermissionAuthorizationFields>[1]
+) =>
+  hashSliceWalletAppPermissionAuthorizationFields(
+    appPermissionRootAuthorizationDomain,
+    input
+  )
+
+export const hashSliceWalletAppPermissionRegistrationFields = (
+  input: Parameters<typeof hashSliceWalletAppPermissionAuthorizationFields>[1]
+) =>
+  hashSliceWalletAppPermissionAuthorizationFields(
+    appPermissionRegistrationDomain,
+    input
+  )
 
 export const formatSliceWalletExecutionGrantMessage = ({
   appOrigin,

@@ -56,7 +56,7 @@ describe("Slice Wallet chain manifest", () => {
   })
 
   test("exposes only chains with complete admission evidence", () => {
-    expect(sliceWalletSupportedChainIds).toEqual([1, 10, 8453, 42161])
+    expect(sliceWalletSupportedChainIds).toEqual([1, 10, 8453, 42161, anvil.id])
     for (const chainId of sliceWalletSupportedChainIds) {
       expect(getSliceWalletChainPolicy(chainId).admitted).toBe(true)
       expect(getSliceWalletChainManifest(chainId).chain.id).toBe(chainId)

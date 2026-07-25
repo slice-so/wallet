@@ -1,7 +1,4 @@
 import type { Address } from "viem"
-import { getSliceWalletChainPolicy } from "../../chains"
-
-const canonicalWalletContracts = getSliceWalletChainPolicy(8453).contracts
 
 export const sliceKernelV33Version = "3.3" as const
 export const sliceKernelPasskeyBackend = "kernel-passkey" as const
@@ -22,7 +19,7 @@ export const sliceKernelWeightedEcdsaSignerAddress =
   "0x45fC7d684683773DDA5bE3b3ba0a7997EccFdb0a" as const satisfies Address
 
 export const sliceKernelWeightedP256SignerAddress =
-  canonicalWalletContracts.weightedP256Signer.address
+  "0xe9c0dBa15040D8B20a94D5bCA18382496B277485" as const satisfies Address
 
 export const sliceKernelTimelockPolicyAddress =
   "0x7f66B69270f96EC6793c545742CCBbBe028Be3f6" as const satisfies Address

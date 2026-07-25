@@ -31,6 +31,11 @@ const baseWalletContractNames = [
   "weightedEcdsaSigner"
 ] as const
 
+const authoritySpecificContractNames = new Set([
+  "rateLimitPolicy",
+  "weightedP256Signer"
+])
+
 const hasExactRuntime = (contract: AdmissionContractEvidence | undefined) =>
   contract !== undefined &&
   contract.deployedRuntimeCodeHash !== null &&
@@ -42,6 +47,10 @@ export const hasCompleteSliceWalletAdmissionEvidence = (
   deployment.status === "admitted" &&
   baseWalletContractNames.every((name) =>
     hasExactRuntime(deployment.contracts[name])
+  ) &&
+  Object.entries(deployment.contracts).every(
+    ([name, contract]) =>
+      authoritySpecificContractNames.has(name) || hasExactRuntime(contract)
   ) &&
   deployment.verification.factoryStakerApproved &&
   deployment.verification.p256CanaryPassed &&

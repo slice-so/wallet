@@ -287,6 +287,18 @@ const createTerminalBundlerRejection = (message: string) =>
     url: "https://bundler.example/base"
   })
 
+const createBundlerRpcError = (code: number, message: string) =>
+  new RpcRequestError({
+    body: {
+      id: 1,
+      jsonrpc: "2.0",
+      method: "eth_sendUserOperation",
+      params: []
+    },
+    error: { code, message },
+    url: "https://bundler.example/base"
+  })
+
 const recoverFromDefiniteReplayRejection = async (
   freshInstallation: StoredGenericGrantInstallation
 ) => {
@@ -358,6 +370,24 @@ const recoverFromDefiniteReplayRejection = async (
 }
 
 describe("generic grant replacement ordering", () => {
+  test("keeps ambiguous JSON-RPC submission failures reconcilable", () => {
+    expect(
+      isSliceWalletDefiniteBundlerRejection(
+        createBundlerRpcError(-32603, "Internal error")
+      )
+    ).toBe(false)
+    expect(
+      isSliceWalletDefiniteBundlerRejection(
+        createBundlerRpcError(-32500, "User operation is already known")
+      )
+    ).toBe(false)
+    expect(
+      isSliceWalletDefiniteBundlerRejection(
+        createBundlerRpcError(-32500, "AA24 signature error")
+      )
+    ).toBe(true)
+  })
+
   test("installs and verifies before disabling, then commits last", async () => {
     const events: string[] = []
 

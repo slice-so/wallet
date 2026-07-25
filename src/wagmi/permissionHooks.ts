@@ -15,6 +15,14 @@ import {
   rotateSliceWalletPermission
 } from "./permissionActions"
 
+const normalizePermissionOrigin = (origin: string) => {
+  try {
+    return new URL(origin).origin
+  } catch {
+    return null
+  }
+}
+
 const usePermissionQueryKey = <config extends Config>({
   config,
   connector,
@@ -24,7 +32,7 @@ const usePermissionQueryKey = <config extends Config>({
   return [
     "slicePermissions",
     connector?.uid ?? connection.connector?.uid ?? null,
-    new URL(origin).origin,
+    normalizePermissionOrigin(origin),
     connection.address?.toLowerCase() ?? null,
     connection.chainId ?? null
   ] as const
@@ -35,8 +43,14 @@ export const useSliceWalletPermissions = <config extends Config>(
 ) => {
   const queryKey = usePermissionQueryKey(parameters)
   return useQuery({
-    enabled: queryKey[3] !== null && queryKey[4] !== null,
-    queryFn: () => getSliceWalletPermissions(parameters),
+    enabled:
+      queryKey[2] !== null && queryKey[3] !== null && queryKey[4] !== null,
+    queryFn: () => {
+      if (queryKey[2] === null) {
+        throw new Error("Slice permission origin is invalid.")
+      }
+      return getSliceWalletPermissions(parameters)
+    },
     queryKey
   })
 }

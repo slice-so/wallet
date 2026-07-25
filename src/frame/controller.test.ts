@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { type Address, type Hex, hexToBytes } from "viem"
 import { verifySliceWalletP256 } from "../p256Server"
-import { createNativeTransferCallRule } from "../policy"
+import { createNativeTransferCallRule, getWalletPolicyHash } from "../policy"
 import type {
   SliceWalletFrameResponse,
   SliceWalletMessageWindow,
@@ -11,7 +11,11 @@ import type {
   SliceWalletWindowMessage
 } from "../types/frame"
 import { attachSliceWalletSignerFrame } from "./controller"
-import { hashSliceWalletSessionRequest } from "./messages"
+import {
+  hashSliceWalletAppPermissionRegistrationFields,
+  hashSliceWalletAppPermissionRequestFields,
+  hashSliceWalletSessionRequest
+} from "./messages"
 
 const account = "0x1000000000000000000000000000000000000001" as Address
 const recipient = "0x2000000000000000000000000000000000000002" as Address
@@ -303,18 +307,63 @@ describe("isolated signer-frame controller", () => {
       origin: "https://app.example",
       type: "slice-wallet:bridge-record"
     })
+    const pendingSession = [...store.pending.values()][0]?.session
+    if (pendingSession === undefined) {
+      throw new Error("Missing pending generic session.")
+    }
+    const registrationChallenge = `0x${"77".repeat(32)}` as Hex
+    const registrationIdentity = {
+      accountAddress: pendingSession.account,
+      accountIndex: 0,
+      appOrigin: "https://app.example",
+      chainId: pendingSession.chainId,
+      permissionId: pendingSession.permissionId,
+      policyHash: getWalletPolicyHash(pendingSession.policy),
+      signerAddress: pendingSession.signerId,
+      signerPublicKey: pendingSession.publicKey
+    }
+    const requestHash =
+      hashSliceWalletAppPermissionRequestFields(registrationIdentity)
     const registrationProof = receive(trusted.port1)
     trusted.port1.postMessage({
-      digest: `0x${"77".repeat(32)}`,
+      accountIndex: 0,
+      action: "register",
+      challenge: registrationChallenge,
+      challengeExpiresAt: 1_800_000_100,
+      requestHash,
       session: { account, chainId: 8453, grantKind: "generic" },
       type: "slice-wallet:bridge-sign-registration",
       version: 1
     } satisfies SliceWalletProtocolValue)
-    expect(await registrationProof).toMatchObject({
+    const proofResponse = await registrationProof
+    if (
+      proofResponse === null ||
+      !("signature" in proofResponse) ||
+      typeof proofResponse.signature !== "string"
+    ) {
+      throw new Error("Missing registration proof.")
+    }
+    const registrationSignature = proofResponse.signature as Hex
+    expect(proofResponse).toMatchObject({
       signature: expect.stringMatching(/^0x[0-9a-f]{128}$/),
       type: "slice-wallet:bridge-registration-proof",
       version: 1
     })
+    expect(
+      await verifySliceWalletP256({
+        message: hexToBytes(
+          hashSliceWalletAppPermissionRegistrationFields({
+            ...registrationIdentity,
+            action: "register",
+            challenge: registrationChallenge,
+            challengeExpiresAt: 1_800_000_100,
+            requestHash
+          })
+        ),
+        publicKey: pendingSession.publicKey,
+        signature: registrationSignature
+      })
+    ).toBe(true)
 
     const committed = receive(connection.port1)
     connection.port1.postMessage({

@@ -47,6 +47,26 @@ describe("wallet chain admission evidence", () => {
         }
       })
     ).toBe(false)
+    const { entryPoint: _entryPoint, ...missingRequiredContract } =
+      completeEvidence.contracts
+    expect(
+      hasCompleteSliceWalletAdmissionEvidence({
+        ...completeEvidence,
+        contracts: missingRequiredContract
+      })
+    ).toBe(false)
+    expect(
+      hasCompleteSliceWalletAdmissionEvidence({
+        ...completeEvidence,
+        contracts: {
+          ...completeEvidence.contracts,
+          futureWalletContract: {
+            deployedRuntimeCodeHash: null,
+            expectedRuntimeCodeHash: "0x1234"
+          }
+        }
+      })
+    ).toBe(false)
     expect(
       hasCompleteSliceWalletAdmissionEvidence({
         ...completeEvidence,

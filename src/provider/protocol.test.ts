@@ -6,7 +6,8 @@ import { SliceWalletProviderRpcError } from "./errors"
 import {
   parseSliceWalletGrantPermissions,
   parseSliceWalletSendCalls,
-  parseSliceWalletTransaction
+  parseSliceWalletTransaction,
+  toSliceWalletGenericPermissions
 } from "./protocol"
 
 const account = "0x0000000000000000000000000000000000000001" as Address
@@ -105,6 +106,9 @@ describe("portable wallet provider protocol", () => {
     expect(parsed.policy.grantKind).toBe("generic")
     expect(parsed.policy.rateLimit).toEqual({ count: 10, intervalSec: 3600 })
     expect(parsed.policy.calls).toHaveLength(2)
+    expect(toSliceWalletGenericPermissions(parsed.policy)).toEqual(
+      parsed.permissions
+    )
     const allowedCalls = [
       { data: "0x" as Hex, to: recipient, value: 1_000_000n },
       {
@@ -174,6 +178,46 @@ describe("portable wallet provider protocol", () => {
         ])
       })
     ).toThrow("Unsupported wallet permission type")
+  })
+
+  test("skips unsupported optional permissions", () => {
+    const parsed = parseSliceWalletGrantPermissions({
+      account,
+      chainId,
+      now,
+      params: asProviderValue([
+        {
+          expiry: now + 3600,
+          permissions: [
+            {
+              data: { target: token },
+              policies: [],
+              required: false,
+              type: "contract-call"
+            },
+            {
+              data: {
+                maximumValue: "0x1",
+                recipient,
+                template: "native-transfer"
+              },
+              policies: [
+                {
+                  data: { count: 1, intervalSec: 3600 },
+                  type: "rate-limit"
+                }
+              ],
+              type: "slice-call"
+            }
+          ]
+        }
+      ])
+    })
+
+    expect(parsed.permissions).toHaveLength(1)
+    expect(parsed.permissions[0]?.data).toMatchObject({
+      template: "native-transfer"
+    })
   })
 
   test("enforces canonical generic grant ceilings at the provider boundary", () => {
