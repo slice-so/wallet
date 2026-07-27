@@ -1,3 +1,4 @@
+export { createSliceWalletAccountBundler } from "./accountBundler"
 export * from "./canonicalProvider"
 export * from "./discovery"
 export * from "./errors"

@@ -1,4 +1,5 @@
 import {
+  type Address,
   decodeAbiParameters,
   decodeFunctionData,
   encodeAbiParameters,
@@ -99,4 +100,20 @@ export const decodeErc7579WalletCalls = (
   }
 
   throw new Error("Delegated execution mode must be CALL.")
+}
+
+export const decodeSliceWalletRootUserOperationCalls = ({
+  account,
+  callData
+}: {
+  account: Address
+  callData: Hex
+}): readonly WalletCall[] => {
+  try {
+    return decodeErc7579WalletCalls(callData)
+  } catch {
+    // Kernel root validation executes account-administration calldata as a
+    // direct self-call instead of wrapping it in ERC-7579 execute.
+    return [{ data: callData, to: account, value: 0n }]
+  }
 }

@@ -16,6 +16,10 @@ const isExecutionRequestError = (error: Error, status: number, code: string) =>
 export const isSliceWalletDelegationNotFoundError = (error: Error) =>
   isExecutionRequestError(error, 404, "delegation_not_found")
 
+export const isSliceWalletDelegationUnavailableError = (error: Error) =>
+  isSliceWalletDelegationNotFoundError(error) ||
+  isExecutionRequestError(error, 403, "invalid_delegation")
+
 export const getSliceWalletPendingRegistrationAction = ({
   hasPendingFrame,
   replacement

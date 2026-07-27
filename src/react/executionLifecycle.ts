@@ -37,7 +37,10 @@ import {
   isRegisteredManagementReplacement,
   managementFrameMatchesStored
 } from "./managementOperations"
-import { retrySliceWalletFinalityAction } from "./permissionLifecycle"
+import {
+  isSliceWalletDelegationUnavailableError,
+  retrySliceWalletFinalityAction
+} from "./permissionLifecycle"
 
 type RootAccount = Awaited<
   ReturnType<typeof createSliceWalletCeremonyKernelAccount>
@@ -89,6 +92,26 @@ export const useSliceWalletExecutionLifecycle = ({
   storeManagement: SliceWalletProviderAdapters["storeManagement"]
   walletChainId: number
 }) => {
+  const clearCheckoutExecutionSession = useCallback(async () => {
+    setExecutionSession(null)
+    const activeAccount = activeWalletRef.current?.kernelAccount.address
+    if (!activeAccount) return
+    await clearStoredExecutionSession(activeAccount, "checkout")
+    try {
+      const frameClient = await getFrameClient()
+      await frameClient.request({
+        method: "clearSession",
+        params: {
+          account: activeAccount,
+          chainId: walletChainId,
+          grantKind: "checkout"
+        }
+      })
+    } catch {
+      // Parent metadata is cleared; iframe state can clear later.
+    }
+  }, [activeWalletRef, getFrameClient, setExecutionSession, walletChainId])
+
   const refreshExecutionAllowance = useCallback(async () => {
     const activeAccount = activeWalletRef.current?.kernelAccount.address
     if (!executionSession || !activeAccount) return
@@ -115,7 +138,7 @@ export const useSliceWalletExecutionLifecycle = ({
         session
       })
       if (!snapshot.delegation) {
-        setExecutionSession(null)
+        await clearCheckoutExecutionSession()
         return
       }
       const delegation = snapshot.delegation
@@ -131,17 +154,25 @@ export const useSliceWalletExecutionLifecycle = ({
               remainingUsdMicros: BigInt(delegation.remainingUsdMicros)
             }
       )
-    } catch {
-      // Allowance refresh is best-effort; the active session remains usable.
+    } catch (caught) {
+      const error =
+        caught instanceof Error
+          ? caught
+          : new Error("Slice Wallet delegation refresh failed.")
+      if (isSliceWalletDelegationUnavailableError(error)) {
+        await clearCheckoutExecutionSession()
+      }
+      // Transient refresh failures leave the active session unchanged.
     }
   }, [
     activeWalletRef,
     checkoutExecution,
+    clearCheckoutExecutionSession,
     executionSession,
     fetchCheckoutDelegation,
     getFrameClient,
-    setExecutionSession,
-    walletChainId
+    walletChainId,
+    setExecutionSession
   ])
 
   const clearManagementExecutionSession = useCallback(
