@@ -179,6 +179,21 @@ const unlockCommittedAccount = async (
 }
 
 describe("isolated signer-frame controller", () => {
+  test("rejects odd-length application permission identity fields", () => {
+    expect(() =>
+      hashSliceWalletAppPermissionRequestFields({
+        accountAddress: account,
+        accountIndex: 0,
+        appOrigin: "https://app.example",
+        chainId: 8453,
+        permissionId: "0x1234567" as Hex,
+        policyHash: `0x${"11".repeat(32)}`,
+        signerAddress: recipient,
+        signerPublicKey: `0x04${"22".repeat(64)}`
+      })
+    ).toThrow("Permission id must be canonical 4-byte hex.")
+  })
+
   test("binds the first parent origin and rejects substitute connections", async () => {
     const parent = new MessageChannel()
     const window = new MockMessageWindow(parent.port1)

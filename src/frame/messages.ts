@@ -2,7 +2,6 @@ import {
   type Address,
   encodeAbiParameters,
   type Hex,
-  hexToBytes,
   isAddress,
   isHex,
   keccak256,
@@ -57,7 +56,7 @@ const appPermissionFixedHex = (value: Hex, size: number, label: string) => {
   if (
     !isHex(value, { strict: true }) ||
     value !== value.toLowerCase() ||
-    hexToBytes(value).length !== size
+    value.length !== 2 + size * 2
   ) {
     throw new Error(`${label} must be canonical ${size}-byte hex.`)
   }
