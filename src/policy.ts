@@ -356,7 +356,7 @@ const compareCallRules = (
 ) => {
   const leftKey = `${left.target.toLowerCase()}:${left.selector.toLowerCase()}`
   const rightKey = `${right.target.toLowerCase()}:${right.selector.toLowerCase()}`
-  return leftKey.localeCompare(rightKey)
+  return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0
 }
 
 const erc20TransferSelector = toFunctionSelector("transfer(address,uint256)")

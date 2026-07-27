@@ -1247,6 +1247,28 @@ describe("generic grant replacement ordering", () => {
     ])
   })
 
+  test("retries a finalized successful installation that is no longer enabled", () => {
+    const submitted = createSubmittedRotation()
+    expect(
+      getSliceWalletGenericGrantInstallationAction({
+        currentNonce: null,
+        finalizedBlockNumber: 9n,
+        installed: false,
+        receipt: { blockNumber: 10n, success: true },
+        rotation: submitted
+      })
+    ).toBe("wait")
+    expect(
+      getSliceWalletGenericGrantInstallationAction({
+        currentNonce: null,
+        finalizedBlockNumber: 10n,
+        installed: false,
+        receipt: { blockNumber: 10n, success: true },
+        rotation: submitted
+      })
+    ).toBe("retry")
+  })
+
   test("resumes finalization after active storage fails post-disablement", async () => {
     const events: string[] = []
     const storageFailure = new Error("active storage unavailable")
@@ -1683,6 +1705,8 @@ describe("multichain provider runtime routing", () => {
     expect(readStoredSliceWalletAccount(storage)?.accountAddress).toBe(
       secondAccount
     )
+    expect(fixture.revokeGrantByChain.get(base.id)).toHaveBeenCalledTimes(1)
+    expect(fixture.revokeGrantByChain.get(optimism.id)).toHaveBeenCalledTimes(1)
   })
 
   test("an old hydration finally cannot clear the current runtime identity", async () => {

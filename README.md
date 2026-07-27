@@ -184,9 +184,9 @@ import {
   nativeTransferPermission
 } from "@slicekit/wallet/permissions"
 import {
-  sliceWallet,
-  useGrantSliceWalletPermissions
+  sliceWallet
 } from "@slicekit/wallet/wagmi"
+import { useGrantSliceWalletPermissions } from "@slicekit/wallet/react"
 import { useSendCalls } from "wagmi"
 import { base } from "wagmi/chains"
 

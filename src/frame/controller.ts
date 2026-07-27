@@ -757,6 +757,9 @@ export const attachSliceWalletSignerFrame = ({
             const request = parseBridgeRegistrationProofRequest(
               messageEvent.data
             )
+            if (request.challengeExpiresAt <= now()) {
+              throw new Error("Bridge registration challenge has expired.")
+            }
             const parsedSession = parseSliceWalletFrameSession(session.session)
             if (
               parsedSession.grantKind !== "generic" ||

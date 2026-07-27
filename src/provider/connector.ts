@@ -114,6 +114,7 @@ export const sliceWalletConnector = (parameters: SliceWalletProviderConfig) => {
             params: [{ chainId: `0x${chainId.toString(16)}` }]
           })
         }
+        await switchPromise
         const sessionPromise =
           parameters.session === undefined || isReconnecting === true
             ? null
@@ -127,7 +128,6 @@ export const sliceWalletConnector = (parameters: SliceWalletProviderConfig) => {
                   ? {}
                   : { ttlSeconds: parameters.session.ttlSeconds })
               })
-        await switchPromise
         const sessionResult = await sessionPromise
         if (sessionResult !== null) {
           await parameters.session?.onSession?.(sessionResult.session)

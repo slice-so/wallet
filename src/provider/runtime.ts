@@ -191,7 +191,23 @@ export const executeSliceWalletGenericGrantReplacement = async <
     await disablePredecessor()
     return await commit(authorization)
   } catch (error) {
-    if (!prepared) await discardPending()
+    if (!prepared) {
+      try {
+        await discardPending()
+      } catch (discardError) {
+        throw new AggregateError(
+          [
+            error instanceof Error
+              ? error
+              : new Error("Wallet permission replacement failed."),
+            discardError instanceof Error
+              ? discardError
+              : new Error("Pending wallet permission cleanup failed.")
+          ],
+          "Wallet permission replacement and pending-key cleanup both failed."
+        )
+      }
+    }
     throw error
   }
 }
@@ -256,7 +272,6 @@ export const getSliceWalletGenericGrantInstallationAction = ({
     }
     return currentNonce > recordedNonce ? "retry" : "wait"
   }
-  if (receipt.success) return "wait"
   return finalizedBlockNumber !== null &&
     receipt.blockNumber <= finalizedBlockNumber
     ? "retry"
@@ -932,6 +947,24 @@ const createSliceWalletChainRuntime = (
       return null
     }
     const wallet = await requireActiveWallet()
+    const rotation = readStoredSliceWalletGrantRotation(
+      storage,
+      config.chain.id,
+      wallet.rootAccount.address
+    )
+    if (
+      rotation !== null &&
+      genericGrantRotationPhaseOrder[rotation.phase] >=
+        genericGrantRotationPhaseOrder["predecessor-disabled"]
+    ) {
+      try {
+        await finishRotation(await getFrame(), rotation)
+      } catch {
+        // The predecessor is already disabled. Fall back to root authority
+        // until rotation recovery can finish.
+        return null
+      }
+    }
     const stored = readStoredSliceWalletGrant(
       storage,
       config.chain.id,
@@ -1362,6 +1395,96 @@ const createSliceWalletChainRuntime = (
     }
   }
 
+  const abandonUnavailableRotation = async (
+    rotation: StoredGenericGrantRotation
+  ) => {
+    let terminal =
+      rotation.phase === "prepared" ||
+      genericGrantRotationPhaseOrder[rotation.phase] >=
+        genericGrantRotationPhaseOrder.installed
+    if (!terminal && rotation.installation !== undefined) {
+      const installation = rotation.installation
+      let receipt: Awaited<
+        ReturnType<typeof receiptClient.getUserOperationReceipt>
+      > | null = null
+      try {
+        receipt = await receiptClient.getUserOperationReceipt({
+          hash: installation.userOperationHash
+        })
+      } catch {
+        // A transport error cannot prove the recorded operation is terminal.
+      }
+      if (receipt !== null) {
+        if (
+          receipt.userOpHash.toLowerCase() !==
+            installation.userOperationHash.toLowerCase() ||
+          !isAddressEqual(receipt.sender, installation.sender) ||
+          toHex(receipt.nonce).toLowerCase() !==
+            installation.nonce.toLowerCase()
+        ) {
+          throw new Error(
+            "Wallet permission installation receipt identity is invalid."
+          )
+        }
+        try {
+          const finalized = await publicClient.getBlock({
+            blockTag: "finalized"
+          })
+          terminal = receipt.receipt.blockNumber <= finalized.number
+        } catch {
+          // A receipt is not terminal until its block is finalized.
+        }
+      } else {
+        try {
+          const wallet = await requireActiveWallet()
+          terminal =
+            (await wallet.rootAccount.getNonce()) >
+            hexToBigInt(installation.nonce)
+        } catch {
+          // Without the current nonce, an absent receipt is inconclusive.
+        }
+      }
+    }
+    if (!terminal) {
+      throw new Error(
+        "Submitted wallet permission key is unavailable; installation is still pending."
+      )
+    }
+
+    if (rotation.phase !== "prepared") {
+      await uninstallGrant(rotation.replacement)
+    }
+    if (
+      genericGrantRotationPhaseOrder[rotation.phase] >=
+      genericGrantRotationPhaseOrder["predecessor-disabled"]
+    ) {
+      clearStoredSliceWalletGrant(
+        storage,
+        rotation.predecessor.chainId,
+        rotation.predecessor.account
+      )
+      await (await getFrame()).request({
+        method: "clearSession",
+        params: {
+          account: rotation.predecessor.account,
+          chainId: rotation.predecessor.chainId,
+          grantKind: "generic"
+        }
+      })
+    }
+    if (
+      !clearStoredSliceWalletGrantRotation(
+        storage,
+        rotation.replacement.chainId,
+        rotation.replacement.account
+      )
+    ) {
+      throw new Error(
+        "Wallet permission rotation journal could not be cleared."
+      )
+    }
+  }
+
   const getRotationSession = async (rotation: StoredGenericGrantRotation) => {
     const pending = await getPendingGenericSession()
     if (pending !== null) {
@@ -1379,19 +1502,8 @@ const createSliceWalletChainRuntime = (
     ) {
       return committed
     }
-    if (rotation.phase === "prepared") {
-      clearStoredSliceWalletGrantRotation(
-        storage,
-        rotation.replacement.chainId,
-        rotation.replacement.account
-      )
-      throw new Error(
-        "Prepared wallet permission key is unavailable; retry the rotation."
-      )
-    }
-    throw new Error(
-      "Submitted wallet permission key is unavailable; rotation recovery is required."
-    )
+    await abandonUnavailableRotation(rotation)
+    return null
   }
 
   const reconcileRotationInstallation = async (
@@ -1465,7 +1577,7 @@ const createSliceWalletChainRuntime = (
           // safely replayed or replaced.
         }
       }
-      if (receipt !== null && !receipt.success) {
+      if (receipt !== null) {
         try {
           finalizedBlockNumber = (
             await publicClient.getBlock({ blockTag: "finalized" })
@@ -1604,6 +1716,7 @@ const createSliceWalletChainRuntime = (
     initialRotation: StoredGenericGrantRotation
   ) => {
     const session = await getRotationSession(initialRotation)
+    if (session === null) return null
     const finalized = await resumeSliceWalletGenericGrantReplacement({
       clearJournal: async (rotation) => {
         if (
@@ -1659,30 +1772,86 @@ const createSliceWalletChainRuntime = (
       readStoredSliceWalletAccount(storage)?.accountAddress
     if (account === undefined) return
     const stored = readStoredSliceWalletGrant(storage, config.chain.id, account)
-    if (stored === null) return
+    const rotation = readStoredSliceWalletGrantRotation(
+      storage,
+      config.chain.id,
+      account
+    )
+    const grants =
+      rotation === null
+        ? stored === null
+          ? []
+          : [stored]
+        : [rotation.replacement, rotation.predecessor]
+    if (grants.length === 0) return
     if (
       permissionId !== undefined &&
-      stored.permissionId.toLowerCase() !== permissionId.toLowerCase()
+      !grants.some(
+        (grant) =>
+          grant.permissionId.toLowerCase() === permissionId.toLowerCase()
+      )
     ) {
       throw invalidProviderRequest(
         "Permission id does not match this origin's grant."
       )
     }
+    const primary = grants[0]
+    if (primary === undefined) return
     await revokeSliceWalletGrantState({
       clearSession: async () => {
-        await (await getFrame()).request({
-          method: "clearSession",
-          params: {
-            account: stored.account,
-            chainId: stored.chainId,
-            grantKind: "generic"
-          }
-        })
+        const frame = await getFrame()
+        const results = await Promise.allSettled([
+          frame.request({
+            method: "clearSession",
+            params: {
+              account: primary.account,
+              chainId: primary.chainId,
+              grantKind: "generic"
+            }
+          }),
+          frame.request({
+            method: "discardSession",
+            params: {
+              account: primary.account,
+              chainId: primary.chainId,
+              grantKind: "generic"
+            }
+          })
+        ])
+        const failures = results.flatMap((result) =>
+          result.status === "rejected"
+            ? [
+                result.reason instanceof Error
+                  ? result.reason
+                  : new Error("Wallet signer frame cleanup failed.")
+              ]
+            : []
+        )
+        if (failures.length > 0) {
+          throw new AggregateError(
+            failures,
+            "Wallet signer frame cleanup failed."
+          )
+        }
       },
-      clearStored: () =>
-        clearStoredSliceWalletGrant(storage, config.chain.id, stored.account),
-      permissionId: stored.permissionId,
-      uninstall: () => uninstallGrant(stored)
+      clearStored: () => {
+        clearStoredSliceWalletGrant(storage, config.chain.id, primary.account)
+        clearStoredSliceWalletGrantRotation(
+          storage,
+          config.chain.id,
+          primary.account
+        )
+      },
+      permissionId: primary.permissionId,
+      uninstall: async () => {
+        const seen = new Set<string>()
+        for (const grant of grants) {
+          const id = grant.permissionId.toLowerCase()
+          if (seen.has(id)) continue
+          seen.add(id)
+          await uninstallGrant(grant)
+        }
+      }
     })
   }
 
@@ -1695,7 +1864,7 @@ const createSliceWalletChainRuntime = (
       policy: WalletPolicyDescriptor
     },
     options: { reuseMatching?: boolean } = {}
-  ) => {
+  ): Promise<SliceWalletPermissionGrant> => {
     assertSliceWalletAuthorityDeployment({
       authority: "generic",
       chainId: config.chain.id
@@ -1718,7 +1887,14 @@ const createSliceWalletChainRuntime = (
         policy,
         previous
       )
-      return finishRotation(await getFrame(), existingRotation)
+      return finishRotation(await getFrame(), existingRotation).then(
+        (grant) =>
+          grant ??
+          createGrant(
+            { permissions, policy },
+            { ...options, reuseMatching: false }
+          )
+      )
     }
     if (options.reuseMatching === true && previous !== null) {
       const previousPolicy = deserializeWalletPolicyDescriptor(previous.policy)
@@ -1737,9 +1913,14 @@ const createSliceWalletChainRuntime = (
     const frame = await getFrame()
     const pending = await getPendingGenericSession()
     if (pending !== null) {
-      throw new Error(
-        "A pending generic permission has no durable rotation journal."
-      )
+      await frame.request({
+        method: "discardSession",
+        params: {
+          account: pending.account,
+          chainId: pending.chainId,
+          grantKind: "generic"
+        }
+      })
     }
     const result = await frame.request({
       method: "createSession",
@@ -1793,7 +1974,13 @@ const createSliceWalletChainRuntime = (
           if (rotation === null) {
             throw new Error("Wallet permission rotation was not prepared.")
           }
-          return finishRotation(frame, rotation)
+          const grant = await finishRotation(frame, rotation)
+          if (grant === null) {
+            throw new Error(
+              "New wallet permission key became unavailable during rotation."
+            )
+          }
+          return grant
         },
         disablePredecessor: async () => {
           if (rotation === null) {
@@ -1942,7 +2129,7 @@ const createSliceWalletChainRuntime = (
     connectWithSession,
     createGrant,
     destroy: () => {
-      void framePromise?.then((frame) => frame.destroy())
+      void framePromise?.then((frame) => frame.destroy()).catch(() => {})
       framePromise = null
       hydrationPromise = null
       activeWallet = null
@@ -2109,8 +2296,28 @@ export const createSliceWalletProviderRuntime = (
         ) {
           return runtime.commitAccount(selection)
         }
+        const revocationResults = await Promise.allSettled(
+          [...chainConfigs.keys()].map((chainId) =>
+            getChainRuntime(chainId).revokeGrant()
+          )
+        )
+        const revocationFailures = collectFailures(
+          revocationResults,
+          "Wallet permission revocation failed during account switch."
+        )
+        if (revocationFailures.length > 0) {
+          throw new AggregateError(
+            revocationFailures,
+            "Wallet permissions could not be revoked before switching accounts."
+          )
+        }
         for (const chainId of chainConfigs.keys()) {
           clearStoredSliceWalletGrant(storage, chainId, snapshot.accountAddress)
+          clearStoredSliceWalletGrantRotation(
+            storage,
+            chainId,
+            snapshot.accountAddress
+          )
         }
         return runtime.commitAccount(selection)
       } catch (error) {

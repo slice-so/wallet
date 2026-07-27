@@ -10,6 +10,7 @@ import {
   serializeWalletPolicyDescriptor
 } from "../policy"
 import type { StoredGenericGrantInstallationUserOperation } from "../types/providerInternal"
+import { parseSliceWalletGrantPermissions } from "./protocol"
 import {
   deserializeStoredGenericGrantInstallationUserOperation,
   readStoredSliceWalletAccount,
@@ -280,6 +281,60 @@ describe("portable wallet provider storage", () => {
       )
     ).toBeNull()
     expect(storage.getItem(key)).toBeNull()
+  })
+
+  test("accepts a replacement with different policy and permissions", () => {
+    const storage = new MemoryStorage()
+    const rotation = createRotation()
+    const expiry = rotation.replacement.expiresAt + 600
+    const currentPermission = rotation.replacement.permissions[0]
+    if (currentPermission?.data.template !== "native-transfer") {
+      throw new Error("Missing native-transfer rotation fixture.")
+    }
+    const parsed = parseSliceWalletGrantPermissions({
+      account: rotation.replacement.account,
+      chainId: rotation.replacement.chainId,
+      now: rotation.replacement.createdAt,
+      params: [
+        {
+          expiry,
+          permissions: [
+            {
+              ...currentPermission,
+              data: { ...currentPermission.data, maximumValue: "0x2" }
+            }
+          ]
+        }
+      ]
+    })
+    const descriptor = {
+      ...parsed.policy,
+      validAfter: rotation.replacement.policy.validAfter
+    }
+    const policy = serializeWalletPolicyDescriptor(descriptor)
+    const replacement = {
+      ...rotation.replacement,
+      expiresAt: expiry,
+      permissionId: getWalletPermissionId(
+        descriptor,
+        rotation.replacement.signerId
+      ),
+      permissions: parsed.permissions,
+      policy
+    }
+    const changedRotation = { ...rotation, replacement }
+
+    expect(writeStoredSliceWalletGrantRotation(storage, changedRotation)).toBe(
+      true
+    )
+    expect(
+      readStoredSliceWalletGrantRotation(
+        storage,
+        replacement.chainId,
+        replacement.account,
+        1_800_000_001
+      )
+    ).toEqual(changedRotation)
   })
 
   test("rejects non-canonical or identity-mismatched replay envelopes", () => {

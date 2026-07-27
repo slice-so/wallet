@@ -707,9 +707,6 @@ export const readStoredSliceWalletGrantRotation = (
     replacement.chainId !== chainId ||
     predecessor.permissionId.toLowerCase() ===
       replacement.permissionId.toLowerCase() ||
-    JSON.stringify(predecessor.policy) !== JSON.stringify(replacement.policy) ||
-    JSON.stringify(predecessor.permissions) !==
-      JSON.stringify(replacement.permissions) ||
     (value.installation !== undefined && installation === null) ||
     (installation !== null &&
       installation.sender.toLowerCase() !==
