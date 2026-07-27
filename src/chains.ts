@@ -775,13 +775,9 @@ const developmentManifest = freezeManifest({
   rip7212Available: false
 })
 
-const includeDevelopmentManifest = process.env.NODE_ENV !== "production"
-
 export const sliceWalletChainManifests = Object.freeze({
   ...productionManifests,
-  ...(includeDevelopmentManifest
-    ? { [developmentManifest.chain.id]: developmentManifest }
-    : {})
+  [developmentManifest.chain.id]: developmentManifest
 } as Readonly<Record<number, SliceWalletChainManifest>>)
 
 export const sliceWalletSupportedChainIds = Object.freeze(
@@ -790,9 +786,9 @@ export const sliceWalletSupportedChainIds = Object.freeze(
     .map((manifest) => manifest.chain.id)
 )
 
-export const sliceWalletDevelopmentChainIds = Object.freeze(
-  includeDevelopmentManifest ? [developmentManifest.chain.id] : []
-)
+export const sliceWalletDevelopmentChainIds = Object.freeze([
+  developmentManifest.chain.id
+])
 
 export const getSliceWalletChainManifest = (chainId: number) => {
   const manifest = sliceWalletChainManifests[chainId]

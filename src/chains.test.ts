@@ -70,13 +70,6 @@ describe("Slice Wallet chain manifest", () => {
   })
 
   test("admits the deterministically seeded local development chain", () => {
-    if (process.env.NODE_ENV === "production") {
-      expect(sliceWalletDevelopmentChainIds).toEqual([])
-      expect(() => getSliceWalletChainManifest(anvil.id)).toThrow(
-        "Slice Wallet chain 31337 is not provisioned."
-      )
-      return
-    }
     expect(sliceWalletDevelopmentChainIds).toEqual([anvil.id])
     const local = getSliceWalletChainManifest(anvil.id)
 
@@ -97,6 +90,7 @@ describe("Slice Wallet chain manifest", () => {
         chainId: anvil.id
       })
     ).not.toThrow()
+    expect(getSliceWalletChainPolicy(anvil.id)).toBe(local)
   })
 
   test("rejects chains missing from the generated inputs", () => {
