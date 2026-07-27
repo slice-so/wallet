@@ -1,9 +1,15 @@
 import {
+  fundsModuleAbi,
   productsModuleAbi,
   registryProductActionAbi,
+  sliceCoreAbi,
   slicerAbi
 } from "@slicekit/abi"
-import { CallPolicyVersion, toCallPolicy } from "@zerodev/permissions/policies"
+import {
+  CallPolicyVersion,
+  ParamCondition,
+  toCallPolicy
+} from "@zerodev/permissions/policies"
 import {
   type Abi,
   type AbiFunction,
@@ -13,17 +19,23 @@ import {
 import type { WalletDelegationOperation } from "../../types/delegation"
 import {
   generatedHookAddressList,
-  getProductsModuleAddress
+  getFundsModuleAddress,
+  getProductsModuleAddress,
+  getSliceCoreAddress
 } from "../generated/commerceFacts"
 
 export const storeManagementAllowedOperations = [
+  "batchWithdraw",
   "addProduct",
   "editProduct",
   "editProductMetadata",
   "multicall",
+  "release",
   "removeProduct",
+  "setRoles",
   "setProductType",
   "setStoreConfig",
+  "slice",
   "configureProduct",
   "_addCurrencies"
 ] as const satisfies readonly WalletDelegationOperation[]
@@ -49,9 +61,13 @@ const getFunctionSelector = ({
 const productManagementSelectors = storeManagementAllowedOperations
   .filter(
     (operation) =>
+      operation !== "batchWithdraw" &&
       operation !== "configureProduct" &&
       operation !== "_addCurrencies" &&
-      operation !== "multicall"
+      operation !== "multicall" &&
+      operation !== "release" &&
+      operation !== "setRoles" &&
+      operation !== "slice"
   )
   .map((functionName) =>
     getFunctionSelector({ abi: productsModuleAbi, functionName })
@@ -69,14 +85,22 @@ const multicallSelector = getFunctionSelector({
   abi: productsModuleAbi,
   functionName: "multicall"
 })
+const sliceSelector = getFunctionSelector({
+  abi: sliceCoreAbi,
+  functionName: "slice"
+})
 
 const generatedHookAddresses = generatedHookAddressList
 
 export const createStoreManagementCallPolicy = (
   chainId: number,
-  slicerAddress: Address
+  slicerAddress: Address,
+  accountAddress: Address,
+  sessionSignerAddress: Address
 ) => {
   const productsModuleAddress = getProductsModuleAddress(chainId)
+  const fundsModuleAddress = getFundsModuleAddress(chainId)
+  const sliceCoreAddress = getSliceCoreAddress(chainId)
   return toCallPolicy({
     permissions: [
       ...productManagementSelectors.map((selector) => ({
@@ -94,6 +118,41 @@ export const createStoreManagementCallPolicy = (
       {
         selector: addCurrenciesSelector,
         target: slicerAddress
+      },
+      {
+        abi: slicerAbi,
+        args: [
+          null,
+          {
+            condition: ParamCondition.NOT_EQUAL,
+            value: sessionSignerAddress
+          }
+        ],
+        functionName: "setRoles",
+        target: slicerAddress
+      },
+      {
+        abi: slicerAbi,
+        args: [
+          { condition: ParamCondition.EQUAL, value: accountAddress },
+          null,
+          { condition: ParamCondition.EQUAL, value: true }
+        ],
+        functionName: "release",
+        target: slicerAddress
+      },
+      {
+        abi: fundsModuleAbi,
+        args: [
+          { condition: ParamCondition.EQUAL, value: accountAddress },
+          null
+        ],
+        functionName: "batchWithdraw",
+        target: fundsModuleAddress
+      },
+      {
+        selector: sliceSelector,
+        target: sliceCoreAddress
       }
     ],
     policyVersion: CallPolicyVersion.V0_0_5

@@ -82,6 +82,7 @@ export const managementFrameMatchesStored = (
         account: stored.accountAddress,
         chainId,
         expiresAt: frame.expiresAt,
+        sessionSignerAddress: stored.signerAddress,
         slicerAddress: stored.slicerAddress,
         slicerId: stored.slicerId,
         startsAt: frame.policy.validAfter

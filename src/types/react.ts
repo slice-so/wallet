@@ -258,6 +258,7 @@ export type SliceWalletContextValue = {
   getManagementExecutionSession: (
     slicerId: number
   ) => SliceWalletManagementExecutionSession | null
+  getStoreCreationExecutionSession: () => SliceWalletManagementExecutionSession | null
   managementHydration: SliceWalletManagementHydrationSnapshot
   pendingAction: SliceWalletPendingAction
   pendingCeremony: SliceWalletPendingCeremony | null

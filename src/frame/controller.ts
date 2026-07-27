@@ -8,6 +8,10 @@ import {
 } from "viem"
 import { getUserOperationHash } from "viem/account-abstraction"
 import { sliceWalletDefaultRpId, sliceWalletEntryPoint } from "../constants"
+import {
+  bindSliceStoreManagementPolicySigner,
+  deriveSliceStoreManagementPolicyScope
+} from "../execution/commerce/policies"
 import { assertSliceWalletExecutionSafety } from "../executionSafety"
 import {
   encodeSliceWalletSyntheticWebAuthnSignature,
@@ -242,10 +246,26 @@ export const attachSliceWalletSignerFrame = ({
     if (parentOrigin === null) throw new Error("Wallet frame is not connected.")
 
     if (request.method === "createSession") {
-      const policy = request.params.policy
-      if (policy.validUntil <= now())
+      const requestedPolicy = request.params.policy
+      if (requestedPolicy.validUntil <= now())
         throw new Error("Wallet policy is already expired.")
       const keyPair = await generateSliceWalletP256KeyPair(cryptoImpl)
+      const policy =
+        requestedPolicy.grantKind === "management"
+          ? bindSliceStoreManagementPolicySigner(
+              requestedPolicy,
+              keyPair.signerId
+            )
+          : requestedPolicy
+      if (policy.grantKind === "management") {
+        const scope = deriveSliceStoreManagementPolicyScope(
+          policy,
+          keyPair.signerId
+        )
+        if (request.params.slicerId !== scope.slicerId) {
+          throw new Error("Wallet management session scope is invalid.")
+        }
+      }
       const session: SliceWalletFrameSession = {
         account: policy.account,
         chainId: policy.chainId,

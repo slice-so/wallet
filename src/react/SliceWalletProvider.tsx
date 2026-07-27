@@ -384,6 +384,10 @@ export function SliceWalletProvider({
     (slicerId: number) => managementExecutionSessions.get(slicerId) ?? null,
     [managementExecutionSessions]
   )
+  const getStoreCreationExecutionSession = useCallback(
+    () => managementExecutionSessions.values().next().value ?? null,
+    [managementExecutionSessions]
+  )
 
   const getConnectorProvider = useCallback(async () => {
     const connector = wagmiConfig.connectors.find(
@@ -538,6 +542,7 @@ export function SliceWalletProvider({
       hasStoredCredential,
       loginWallet,
       getManagementExecutionSession,
+      getStoreCreationExecutionSession,
       managementHydration,
       pendingAction,
       pendingCeremony,
@@ -567,6 +572,7 @@ export function SliceWalletProvider({
       hasStoredCredential,
       loginWallet,
       getManagementExecutionSession,
+      getStoreCreationExecutionSession,
       managementHydration,
       pendingAction,
       pendingCeremony,

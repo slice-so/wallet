@@ -345,12 +345,14 @@ const createBuyerExecutionValidator = async ({
 }
 
 const createStoreManagementExecutionValidator = async ({
+  accountAddress,
   client,
   sessionPrivateKey,
   sessionSignerAddress,
   slicerAddress,
   validUntil
 }: {
+  accountAddress: Address
   client: KernelSmartAccountImplementation["client"]
   sessionPrivateKey?: Hex
   sessionSignerAddress: Address
@@ -367,7 +369,12 @@ const createStoreManagementExecutionValidator = async ({
     flag: PolicyFlags.NOT_FOR_VALIDATE_SIG,
     kernelVersion: buyerKernelVersion,
     policies: [
-      createStoreManagementCallPolicy(getClientChainId(client), slicerAddress),
+      createStoreManagementCallPolicy(
+        getClientChainId(client),
+        slicerAddress,
+        accountAddress,
+        sessionSignerAddress
+      ),
       toTimestampPolicy({ validUntil })
     ],
     signer
@@ -399,6 +406,7 @@ export const createSliceExecutionAccount = async (
           validUntil
         })
       : createStoreManagementExecutionValidator({
+          accountAddress: address,
           client,
           sessionPrivateKey,
           sessionSignerAddress,
@@ -563,6 +571,7 @@ export const buildStoreManagementPermissionUninstallCalls = async ({
   validUntil: number
 }): Promise<{ calls: SliceAccountClientCall[]; permissionId: Hex }> => {
   const validator = await createStoreManagementExecutionValidator({
+    accountAddress: account,
     client,
     sessionSignerAddress,
     slicerAddress,

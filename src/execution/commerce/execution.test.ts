@@ -200,6 +200,7 @@ describe("Slice management execution client", () => {
       account,
       chainId: 8453,
       expiresAt: now + 3_600,
+      sessionSignerAddress: signer,
       slicerAddress,
       slicerId: 0,
       startsAt: now - 1

@@ -312,6 +312,7 @@ describe("management execution hydration", () => {
         account,
         chainId: 8453,
         expiresAt: 4_070_908_800,
+        sessionSignerAddress: keyPair.signerId,
         slicerAddress,
         slicerId,
         startsAt: 0

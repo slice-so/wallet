@@ -140,7 +140,8 @@ const parseSerializedWalletPolicyParameterRule = (
   if (
     condition !== "equal" &&
     condition !== "greater_than" &&
-    condition !== "less_than_or_equal"
+    condition !== "less_than_or_equal" &&
+    condition !== "not_equal"
   ) {
     throw new Error("Wallet policy parameter condition is unsupported.")
   }
@@ -291,7 +292,8 @@ const grantKindCode = {
 const conditionCode = {
   equal: ParamCondition.EQUAL,
   greater_than: ParamCondition.GREATER_THAN,
-  less_than_or_equal: ParamCondition.LESS_THAN_OR_EQUAL
+  less_than_or_equal: ParamCondition.LESS_THAN_OR_EQUAL,
+  not_equal: ParamCondition.NOT_EQUAL
 } as const satisfies Record<WalletPolicyParameterCondition, ParamCondition>
 
 const policyEncodingParameters = [
@@ -611,7 +613,9 @@ export const assertWalletCallMatchesRule = (
         ? actual.toLowerCase() === expected.toLowerCase()
         : parameterRule.condition === "greater_than"
           ? hexToBigInt(actual) > hexToBigInt(expected)
-          : hexToBigInt(actual) <= hexToBigInt(expected)
+          : parameterRule.condition === "less_than_or_equal"
+            ? hexToBigInt(actual) <= hexToBigInt(expected)
+            : actual.toLowerCase() !== expected.toLowerCase()
     if (!matches) {
       throw new Error("Wallet call parameter is outside the delegated policy.")
     }

@@ -144,7 +144,8 @@ const parseParameterRule = (
   if (
     input.condition !== "equal" &&
     input.condition !== "greater_than" &&
-    input.condition !== "less_than_or_equal"
+    input.condition !== "less_than_or_equal" &&
+    input.condition !== "not_equal"
   ) {
     throw new Error("Unsupported policy parameter condition.")
   }

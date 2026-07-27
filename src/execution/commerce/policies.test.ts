@@ -1,22 +1,38 @@
 import { describe, expect, test } from "bun:test"
-import { productsModuleAbi, slicerAbi } from "@slicekit/abi"
-import { encodeFunctionData, zeroAddress } from "viem"
+import {
+  fundsModuleAbi,
+  productsModuleAbi,
+  sliceCoreAbi,
+  slicerAbi
+} from "@slicekit/abi"
+import { type Address, encodeFunctionData, zeroAddress } from "viem"
 import { assertWalletCallsMatchPolicy } from "../../policy"
-import { getProductsModuleAddress } from "../generated/commerceFacts"
+import {
+  getFundsModuleAddress,
+  getProductsModuleAddress,
+  getSliceCoreAddress
+} from "../generated/commerceFacts"
 import {
   assertSliceStoreManagementPolicyDescriptor,
   createSliceStoreManagementPolicyDescriptor,
   deriveSliceStoreManagementPolicyScope
 } from "./policies"
 
-const account = "0x1111111111111111111111111111111111111111"
-const slicerAddress = "0x2222222222222222222222222222222222222222"
+const account: Address = "0x1111111111111111111111111111111111111111"
+const slicerAddress: Address = "0x2222222222222222222222222222222222222222"
+const sessionSignerAddress =
+  "0x3333333333333333333333333333333333333333" satisfies Address
+const collaboratorAddress =
+  "0x4444444444444444444444444444444444444444" satisfies Address
 const sliceProductsModuleAddress = getProductsModuleAddress(8453)
+const sliceFundsModuleAddress = getFundsModuleAddress(8453)
+const sliceCoreAddress = getSliceCoreAddress(8453)
 
 const policy = createSliceStoreManagementPolicyDescriptor({
   account,
   chainId: 8453,
   expiresAt: 2_000_000_000,
+  sessionSignerAddress,
   slicerAddress,
   slicerId: 2913,
   startsAt: 1_900_000_000
@@ -28,12 +44,15 @@ describe("Slice store-management wallet policy", () => {
       account,
       chainId: 8453,
       expiresAt: 2_000_000_000,
+      sessionSignerAddress,
       slicerAddress,
       slicerId: 0,
       startsAt: 1_900_000_000
     })
 
-    expect(deriveSliceStoreManagementPolicyScope(zeroPolicy)).toEqual({
+    expect(
+      deriveSliceStoreManagementPolicyScope(zeroPolicy, sessionSignerAddress)
+    ).toEqual({
       slicerAddress,
       slicerId: 0
     })
@@ -131,6 +150,98 @@ describe("Slice store-management wallet policy", () => {
     ).not.toThrow()
   })
 
+  test("allows role changes except for the isolated session signer", () => {
+    const setRoles = (grantee: `0x${string}`) => ({
+      data: encodeFunctionData({
+        abi: slicerAbi,
+        functionName: "setRoles",
+        args: [`0x${"01".padStart(64, "0")}`, grantee]
+      }),
+      to: slicerAddress,
+      value: 0n
+    })
+
+    expect(() =>
+      assertWalletCallsMatchPolicy([setRoles(collaboratorAddress)], policy)
+    ).not.toThrow()
+    expect(() =>
+      assertWalletCallsMatchPolicy([setRoles(sessionSignerAddress)], policy)
+    ).toThrow("outside the delegated policy")
+  })
+
+  test("allows zero-value calls that withdraw only to the wallet account", () => {
+    const release = (recipient: `0x${string}`, withdraw: boolean) => ({
+      data: encodeFunctionData({
+        abi: slicerAbi,
+        functionName: "release",
+        args: [recipient, zeroAddress, withdraw]
+      }),
+      to: slicerAddress,
+      value: 0n
+    })
+    const batchWithdraw = (recipient: `0x${string}`) => ({
+      data: encodeFunctionData({
+        abi: fundsModuleAbi,
+        functionName: "batchWithdraw",
+        args: [recipient, [zeroAddress]]
+      }),
+      to: sliceFundsModuleAddress,
+      value: 0n
+    })
+
+    expect(() =>
+      assertWalletCallsMatchPolicy(
+        [release(account, true), batchWithdraw(account)],
+        policy
+      )
+    ).not.toThrow()
+    expect(() =>
+      assertWalletCallsMatchPolicy([release(collaboratorAddress, true)], policy)
+    ).toThrow("outside the delegated policy")
+    expect(() =>
+      assertWalletCallsMatchPolicy([release(account, false)], policy)
+    ).toThrow("outside the delegated policy")
+    expect(() =>
+      assertWalletCallsMatchPolicy([batchWithdraw(collaboratorAddress)], policy)
+    ).toThrow("outside the delegated policy")
+  })
+
+  test("allows SliceCore store creation without attached ETH", () => {
+    expect(() =>
+      assertWalletCallsMatchPolicy(
+        [
+          {
+            data: encodeFunctionData({
+              abi: sliceCoreAbi,
+              functionName: "slice",
+              args: [
+                {
+                  controller: account,
+                  currencies: [],
+                  minimumShares: 1n,
+                  payees: [
+                    {
+                      account,
+                      shares: 1,
+                      transfersAllowedWhileLocked: false
+                    }
+                  ],
+                  releaseTimelock: 0n,
+                  sliceCoreFlags: 0,
+                  slicerFlags: 0,
+                  transferTimelock: 0
+                }
+              ]
+            }),
+            to: sliceCoreAddress,
+            value: 0n
+          }
+        ],
+        policy
+      )
+    ).not.toThrow()
+  })
+
   test("rejects the same selector for a different slicer", () => {
     expect(() =>
       assertWalletCallsMatchPolicy(
@@ -163,6 +274,7 @@ describe("Slice store-management wallet policy", () => {
     expect(() => assertWalletCallsMatchPolicy([call], policy)).toThrow()
     expect(() =>
       assertSliceStoreManagementPolicyDescriptor(policy, {
+        sessionSignerAddress,
         slicerAddress: zeroAddress,
         slicerId: 2913
       })
@@ -170,7 +282,9 @@ describe("Slice store-management wallet policy", () => {
   })
 
   test("derives the exact slicer address and padded slicer id", () => {
-    expect(deriveSliceStoreManagementPolicyScope(policy)).toEqual({
+    expect(
+      deriveSliceStoreManagementPolicyScope(policy, sessionSignerAddress)
+    ).toEqual({
       slicerAddress,
       slicerId: 2913
     })

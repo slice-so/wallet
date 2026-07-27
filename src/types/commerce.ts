@@ -57,6 +57,7 @@ export type CreateSliceStoreManagementPolicyParameters = {
   account: Address
   chainId: number
   expiresAt: number
+  sessionSignerAddress?: Address
   slicerAddress: Address
   slicerId: number
   startsAt?: number

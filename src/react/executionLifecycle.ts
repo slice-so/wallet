@@ -336,6 +336,7 @@ export const useSliceWalletExecutionLifecycle = ({
             account: activeWallet.kernelAccount.address,
             chainId: walletChainId,
             expiresAt: session.expiresAt,
+            sessionSignerAddress: session.signerId,
             slicerAddress,
             slicerId,
             startsAt: session.policy.validAfter

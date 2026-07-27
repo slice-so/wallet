@@ -17,6 +17,7 @@ export type WalletDelegationSignerType = "external" | "generated"
 export type WalletDelegationOperation =
   | "_addCurrencies"
   | "addProduct"
+  | "batchWithdraw"
   | "checkout-sessions:create"
   | "configureProduct"
   | "editProduct"
@@ -24,9 +25,12 @@ export type WalletDelegationOperation =
   | "multicall"
   | "orders:read"
   | "orders:update"
+  | "release"
   | "removeProduct"
+  | "setRoles"
   | "setProductType"
   | "setStoreConfig"
+  | "slice"
 
 export type WalletDelegationRateLimit = { max: number; windowSec: number }
 

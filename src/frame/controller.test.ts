@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { type Address, type Hex, hexToBytes } from "viem"
+import { createSliceStoreManagementPolicyDescriptor } from "../execution/commerce/policies"
 import { verifySliceWalletP256 } from "../p256Server"
 import { createNativeTransferCallRule } from "../policy"
 import type {
@@ -565,21 +566,22 @@ describe("isolated signer-frame controller", () => {
       source: parent.port1
     })
     await connected
-    const policy = {
-      account,
-      calls: [createNativeTransferCallRule({ maximumValue: 0n, recipient })],
-      chainId: 8453,
-      grantKind: "management",
-      validAfter: 100,
-      validUntil: 2_000_000_000,
-      version: 1
-    } as const
     for (const slicerId of [0, 9]) {
       const created = receive(connection.port1)
       connection.port1.postMessage({
         id: `create-${slicerId}`,
         method: "createSession",
-        params: { policy, slicerId },
+        params: {
+          policy: createSliceStoreManagementPolicyDescriptor({
+            account,
+            chainId: 8453,
+            expiresAt: 2_000_000_000,
+            slicerAddress: recipient,
+            slicerId,
+            startsAt: 100
+          }),
+          slicerId
+        },
         version: 1
       } satisfies SliceWalletProtocolValue)
       await created
@@ -835,17 +837,14 @@ describe("isolated signer-frame controller", () => {
       id: "create",
       method: "createSession",
       params: {
-        policy: {
+        policy: createSliceStoreManagementPolicyDescriptor({
           account,
-          calls: [
-            createNativeTransferCallRule({ maximumValue: 0n, recipient })
-          ],
           chainId: 8453,
-          grantKind: "management",
-          validAfter: 90,
-          validUntil: 1_000,
-          version: 1
-        },
+          expiresAt: 1_000,
+          slicerAddress: recipient,
+          slicerId: 7,
+          startsAt: 90
+        }),
         slicerId: 7
       },
       version: 1
