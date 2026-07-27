@@ -48,9 +48,7 @@ const managementSession = {
   expiresAt: "2099-01-01T00:00:00.000Z",
   kind: "store_management",
   permissionId: "0x5678",
-  signerAddress: "0x3333333333333333333333333333333333333333",
-  slicerAddress: "0x4444444444444444444444444444444444444444",
-  slicerId: 0
+  signerAddress: "0x3333333333333333333333333333333333333333"
 } as const satisfies StoredSliceWalletExecutionSession
 
 const managementPending = {
@@ -62,9 +60,7 @@ const managementPending = {
     expiresAt: "2099-01-01T00:00:00.000Z",
     kind: "store_management",
     permissionId: "0x5678",
-    signerAddress: "0x3333333333333333333333333333333333333333",
-    slicerAddress: "0x4444444444444444444444444444444444444444",
-    slicerId: 0
+    signerAddress: "0x3333333333333333333333333333333333333333"
   }
 } as const satisfies StoredSliceWalletPendingReplacement
 
@@ -145,55 +141,50 @@ describe("execution key storage", () => {
     ).rejects.toThrow("Slice Wallet session storage is unavailable.")
   })
 
-  it("keeps committed and pending management records isolated by slicer", async () => {
+  it("keeps one committed and pending management record per account", async () => {
     const secondSession = {
       ...managementSession,
-      delegationId: "management-b",
-      slicerId: 9
+      delegationId: "management-b"
     } satisfies StoredSliceWalletExecutionSession
     const secondPending = {
       ...managementPending,
-      session: { ...managementPending.session, slicerId: 9 }
+      session: {
+        ...managementPending.session,
+        signerAddress: "0x5555555555555555555555555555555555555555"
+      }
     } satisfies StoredSliceWalletPendingReplacement
 
-    await Promise.all([
-      writeStoredExecutionSession(managementSession),
-      writeStoredExecutionSession(secondSession),
-      writeStoredPendingReplacement(managementPending),
-      writeStoredPendingReplacement(secondPending)
-    ])
+    await writeStoredExecutionSession(managementSession)
+    await writeStoredExecutionSession(secondSession)
+    await writeStoredPendingReplacement(managementPending)
+    await writeStoredPendingReplacement(secondPending)
 
     await expect(
-      readStoredExecutionSession(accountAddress, "store_management", 0)
-    ).resolves.toEqual(managementSession)
-    await expect(
-      readStoredExecutionSession(accountAddress, "store_management", 9)
+      readStoredExecutionSession(accountAddress, "store_management")
     ).resolves.toEqual(secondSession)
     await expect(
-      readStoredPendingReplacement(accountAddress, "store_management", 0)
-    ).resolves.toEqual(managementPending)
-    await expect(
-      readStoredPendingReplacement(accountAddress, "store_management", 9)
+      readStoredPendingReplacement(accountAddress, "store_management")
     ).resolves.toEqual(secondPending)
     await expect(
       readStoredManagementExecutionSessions(accountAddress)
     ).resolves.toMatchObject({
       status: "available",
-      values: expect.arrayContaining([managementSession, secondSession])
+      values: [secondSession]
     })
-    await Promise.all([
-      clearStoredExecutionSession(accountAddress, "store_management", 0),
-      clearStoredPendingReplacementStrict(accountAddress, "store_management", 0)
-    ])
+    await clearStoredExecutionSession(accountAddress, "store_management")
+    await clearStoredPendingReplacementStrict(
+      accountAddress,
+      "store_management"
+    )
     await expect(
-      readStoredExecutionSession(accountAddress, "store_management", 9)
-    ).resolves.toEqual(secondSession)
+      readStoredExecutionSession(accountAddress, "store_management")
+    ).resolves.toBeNull()
     await expect(
-      readStoredPendingReplacement(accountAddress, "store_management", 9)
-    ).resolves.toEqual(secondPending)
+      readStoredPendingReplacement(accountAddress, "store_management")
+    ).resolves.toBeNull()
   })
 
-  it("migrates only the legacy management record that identifies the requested slicer", async () => {
+  it("reads legacy account-scoped management storage keys", async () => {
     await writeStoredExecutionSession(session)
     await Promise.all([
       seedStoredValue(
@@ -202,25 +193,16 @@ describe("execution key storage", () => {
       ),
       seedStoredValue(
         `pending:store_management:${accountAddress.toLowerCase()}`,
-        {
-          ...managementPending,
-          session: { ...managementPending.session, slicerId: 9 }
-        }
+        managementPending
       )
     ])
 
     await expect(
-      readStoredExecutionSession(accountAddress, "store_management", 9)
-    ).resolves.toBeNull()
-    await expect(
-      readStoredExecutionSession(accountAddress, "store_management", 0)
+      readStoredExecutionSession(accountAddress, "store_management")
     ).resolves.toEqual(managementSession)
     await expect(
-      readStoredPendingReplacement(accountAddress, "store_management", 0)
-    ).resolves.toBeNull()
-    await expect(
-      readStoredPendingReplacement(accountAddress, "store_management", 9)
-    ).resolves.toMatchObject({ session: { slicerId: 9 } })
+      readStoredPendingReplacement(accountAddress, "store_management")
+    ).resolves.toEqual(managementPending)
     await expect(
       readStoredExecutionSession(accountAddress, "checkout")
     ).resolves.toEqual(session)

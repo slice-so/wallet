@@ -71,8 +71,7 @@ const managementSession = {
   permissionId: getWalletPermissionId(managementPolicy, signerId),
   policy: managementPolicy,
   publicKey: session.publicKey,
-  signerId: session.signerId,
-  slicerId: 0
+  signerId: session.signerId
 } as const
 const managementAuthorization = {
   ...authorization,
@@ -245,13 +244,12 @@ describe("wallet ceremony protocol parser", () => {
     ).toThrow("normalized origin")
   })
 
-  it("binds management bridge records to the challenged store", () => {
+  it("binds management bridge records to the account-wide challenge", () => {
     const challenge = {
       account,
       chainId: 8453,
       grantKind: "management",
       nonce,
-      slicerId: 0,
       type: "slice-wallet:bridge-challenge",
       version: 1
     } as const
@@ -263,12 +261,18 @@ describe("wallet ceremony protocol parser", () => {
       version: 1
     } as const
 
-    expect(
-      parseSliceWalletBridgeRecord(record, challenge).session.slicerId
-    ).toBe(0)
+    expect(parseSliceWalletBridgeRecord(record, challenge).session).toEqual(
+      managementSession
+    )
     expect(() =>
-      parseSliceWalletBridgeRecord(record, { ...challenge, slicerId: 8 })
-    ).toThrow("does not match the ceremony request")
+      parseSliceWalletBridgeRecord(
+        {
+          ...record,
+          session: { ...managementSession, slicerId: 0 }
+        },
+        challenge
+      )
+    ).toThrow("unknown field")
   })
 
   it("accepts complete root requests and rejects parent-provided digests", () => {

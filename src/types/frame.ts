@@ -24,7 +24,6 @@ export type SliceWalletFrameSession = {
   policy: WalletPolicyDescriptor
   publicKey: Hex
   signerId: Address
-  slicerId?: number
 }
 
 export type SliceWalletCheckoutGrant = {
@@ -35,7 +34,7 @@ export type SliceWalletCheckoutGrant = {
 
 export type SliceWalletFrameSessionKey = Pick<
   SliceWalletFrameSession,
-  "account" | "chainId" | "grantKind" | "slicerId"
+  "account" | "chainId" | "grantKind"
 >
 
 export type SliceWalletPermissionAuthorization = {
@@ -181,7 +180,6 @@ export type SliceWalletFrameRequest =
       params: {
         checkout?: SliceWalletCheckoutGrant
         policy: WalletPolicyDescriptor
-        slicerId?: number
       }
       version: 1
     }
@@ -329,7 +327,6 @@ export type SliceWalletBridgeChallenge = {
   chainId: number
   grantKind: WalletGrantKind
   nonce: Hex
-  slicerId?: number
   type: "slice-wallet:bridge-challenge"
   version: 1
 }

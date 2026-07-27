@@ -100,11 +100,10 @@ describe("signer-frame session store", () => {
     ).toBe(first.signerId)
   })
 
-  it("keeps management sessions for two slicers usable in parallel", async () => {
+  it("keeps one management session per account and chain", async () => {
     const first = await generateSliceWalletP256KeyPair()
     const second = await generateSliceWalletP256KeyPair()
     const createSession = (
-      slicerId: number,
       keyPair: Awaited<ReturnType<typeof generateSliceWalletP256KeyPair>>
     ) =>
       ({
@@ -123,39 +122,31 @@ describe("signer-frame session store", () => {
           version: 1
         },
         publicKey: keyPair.publicKeyHex,
-        signerId: keyPair.signerId,
-        slicerId
+        signerId: keyPair.signerId
       }) satisfies SliceWalletFrameSession
-    const firstSession = createSession(7, first)
-    const secondSession = createSession(9, second)
+    const firstSession = createSession(first)
+    const secondSession = createSession(second)
     const store = createSliceWalletMemorySessionStore()
 
-    await Promise.all([
-      store.putPending({
-        appOrigin: "https://shop.example",
-        privateKey: first.privateKey,
-        session: firstSession
-      }),
-      store.putPending({
-        appOrigin: "https://shop.example",
-        privateKey: second.privateKey,
-        session: secondSession
-      })
-    ])
-    await Promise.all([
-      store.commitPending("https://shop.example", firstSession),
-      store.commitPending("https://shop.example", secondSession)
-    ])
+    await store.putPending({
+      appOrigin: "https://shop.example",
+      privateKey: first.privateKey,
+      session: firstSession
+    })
+    await store.commitPending("https://shop.example", firstSession)
+    await store.putPending({
+      appOrigin: "https://shop.example",
+      privateKey: second.privateKey,
+      session: secondSession
+    })
+    await store.commitPending("https://shop.example", secondSession)
 
-    await expect(
-      store.get("https://shop.example", firstSession)
-    ).resolves.toMatchObject({ session: { signerId: first.signerId } })
     await expect(
       store.get("https://shop.example", secondSession)
     ).resolves.toMatchObject({ session: { signerId: second.signerId } })
   })
 
-  it("migrates a legacy frame record only for its policy-bound slicer", async () => {
+  it("reads account-scoped IndexedDB management records without slicer metadata", async () => {
     const indexedDb = new IDBFactory()
     const keyPair = await generateSliceWalletP256KeyPair()
     const legacySession = {
@@ -219,18 +210,9 @@ describe("signer-frame session store", () => {
       store.get("https://shop.example", {
         account,
         chainId: 8453,
-        grantKind: "management",
-        slicerId: 9
+        grantKind: "management"
       })
-    ).resolves.toBeNull()
-    await expect(
-      store.get("https://shop.example", {
-        account,
-        chainId: 8453,
-        grantKind: "management",
-        slicerId: 0
-      })
-    ).resolves.toMatchObject({ session: { slicerId: 0 } })
+    ).resolves.toMatchObject({ session: { grantKind: "management" } })
   })
 
   it("persists connection state by app origin until explicit lock", async () => {

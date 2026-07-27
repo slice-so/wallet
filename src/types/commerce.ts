@@ -58,8 +58,6 @@ export type CreateSliceStoreManagementPolicyParameters = {
   chainId: number
   expiresAt: number
   sessionSignerAddress?: Address
-  slicerAddress: Address
-  slicerId: number
   startsAt?: number
 }
 
@@ -155,8 +153,6 @@ export type SliceWalletManagementExecutionGrantRegistration = {
   previousSessions: readonly SliceWalletExecutionSessionDescriptor[]
   requiresFinalization: boolean
   signerAddress: Address
-  slicerAddress: Address
-  slicerId: number
 }
 export type SliceWalletManagementExecutionClient = {
   createSessionChallenge: (
@@ -170,11 +166,9 @@ export type SliceWalletManagementExecutionClient = {
   ) => Promise<{
     previousSessions: readonly SliceWalletExecutionSessionDescriptor[]
   }>
-  registerAuthorization: (input: {
+  registerAuthorization: (
     authorization: SliceWalletPermissionAuthorization
-    slicerAddress: Address
-    slicerId: number
-  }) => Promise<SliceWalletManagementExecutionGrantRegistration>
+  ) => Promise<SliceWalletManagementExecutionGrantRegistration>
   revokeDelegation: (
     proof: SliceWalletReplacementFinalization
   ) => Promise<{ revoked: true }>

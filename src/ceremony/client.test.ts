@@ -69,8 +69,7 @@ const managementSession = {
   permissionId: getWalletPermissionId(managementPolicy, signerId),
   policy: managementPolicy,
   publicKey,
-  signerId,
-  slicerId: 0
+  signerId
 } as const
 const managementAuthorization = {
   ...authorization,
@@ -176,7 +175,7 @@ const waitForPendingCeremony = async (
 }
 
 describe("authorizeSliceWalletSession", () => {
-  it("addresses management ceremonies with the session store id", async () => {
+  it("addresses management ceremonies without store scope", async () => {
     const harness = createPopupWindow({
       responseForAttempt: () => ({
         authorization: managementAuthorization,
@@ -201,7 +200,7 @@ describe("authorizeSliceWalletSession", () => {
 
     await expect(resultPromise).resolves.toEqual(managementAuthorization)
     const ceremonyUrl = new URL(String(harness.open.mock.calls[0]?.[0]))
-    expect(ceremonyUrl.searchParams.get("slicerId")).toBe("0")
+    expect(ceremonyUrl.searchParams.has("slicerId")).toBe(false)
   })
 
   it("keeps the consent timeout separate from popup readiness", async () => {

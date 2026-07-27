@@ -6,7 +6,10 @@ import {
   slicerAbi
 } from "@slicekit/abi"
 import { type Address, encodeFunctionData, zeroAddress } from "viem"
-import { assertWalletCallsMatchPolicy } from "../../policy"
+import {
+  assertWalletCallsMatchPolicy,
+  walletPolicyWildcardTarget
+} from "../../policy"
 import {
   getFundsModuleAddress,
   getProductsModuleAddress,
@@ -14,8 +17,8 @@ import {
 } from "../generated/commerceFacts"
 import {
   assertSliceStoreManagementPolicyDescriptor,
-  createSliceStoreManagementPolicyDescriptor,
-  deriveSliceStoreManagementPolicyScope
+  bindSliceStoreManagementPolicySigner,
+  createSliceStoreManagementPolicyDescriptor
 } from "./policies"
 
 const account: Address = "0x1111111111111111111111111111111111111111"
@@ -33,32 +36,24 @@ const policy = createSliceStoreManagementPolicyDescriptor({
   chainId: 8453,
   expiresAt: 2_000_000_000,
   sessionSignerAddress,
-  slicerAddress,
-  slicerId: 2913,
   startsAt: 1_900_000_000
 })
 
 describe("Slice store-management wallet policy", () => {
-  test("accepts slicer zero as a valid policy scope", () => {
-    const zeroPolicy = createSliceStoreManagementPolicyDescriptor({
+  test("binds an unbound universal descriptor to its session signer", () => {
+    const unbound = createSliceStoreManagementPolicyDescriptor({
       account,
       chainId: 8453,
       expiresAt: 2_000_000_000,
-      sessionSignerAddress,
-      slicerAddress,
-      slicerId: 0,
       startsAt: 1_900_000_000
     })
 
     expect(
-      deriveSliceStoreManagementPolicyScope(zeroPolicy, sessionSignerAddress)
-    ).toEqual({
-      slicerAddress,
-      slicerId: 0
-    })
+      bindSliceStoreManagementPolicySigner(unbound, sessionSignerAddress)
+    ).toEqual(policy)
   })
 
-  test("accepts an allowlisted zero-value call for the bound slicer", () => {
+  test("accepts an allowlisted zero-value call for any slicer id", () => {
     expect(() =>
       assertWalletCallsMatchPolicy(
         [
@@ -66,7 +61,7 @@ describe("Slice store-management wallet policy", () => {
             data: encodeFunctionData({
               abi: productsModuleAbi,
               functionName: "removeProduct",
-              args: [2913n, 1n]
+              args: [999_999n, 1n]
             }),
             to: sliceProductsModuleAddress,
             value: 0n
@@ -102,7 +97,7 @@ describe("Slice store-management wallet policy", () => {
     ).not.toThrow()
   })
 
-  test("accepts adding currencies on the bound slicer", () => {
+  test("accepts adding currencies on any slicer", () => {
     expect(() =>
       assertWalletCallsMatchPolicy(
         [
@@ -112,7 +107,7 @@ describe("Slice store-management wallet policy", () => {
               functionName: "_addCurrencies",
               args: [[zeroAddress]]
             }),
-            to: slicerAddress,
+            to: collaboratorAddress,
             value: 0n
           }
         ],
@@ -121,7 +116,7 @@ describe("Slice store-management wallet policy", () => {
     ).not.toThrow()
   })
 
-  test("accepts store configuration for the bound slicer", () => {
+  test("accepts store configuration for any slicer id", () => {
     expect(() =>
       assertWalletCallsMatchPolicy(
         [
@@ -130,7 +125,7 @@ describe("Slice store-management wallet policy", () => {
               abi: productsModuleAbi,
               functionName: "setStoreConfig",
               args: [
-                2913n,
+                999_999n,
                 {
                   isClosed: true,
                   productTypeActions: [],
@@ -157,7 +152,7 @@ describe("Slice store-management wallet policy", () => {
         functionName: "setRoles",
         args: [`0x${"01".padStart(64, "0")}`, grantee]
       }),
-      to: slicerAddress,
+      to: collaboratorAddress as Address,
       value: 0n
     })
 
@@ -176,7 +171,7 @@ describe("Slice store-management wallet policy", () => {
         functionName: "release",
         args: [recipient, zeroAddress, withdraw]
       }),
-      to: slicerAddress,
+      to: collaboratorAddress as Address,
       value: 0n
     })
     const batchWithdraw = (recipient: `0x${string}`) => ({
@@ -242,7 +237,7 @@ describe("Slice store-management wallet policy", () => {
     ).not.toThrow()
   })
 
-  test("rejects the same selector for a different slicer", () => {
+  test("accepts the same selector for a different slicer", () => {
     expect(() =>
       assertWalletCallsMatchPolicy(
         [
@@ -258,7 +253,7 @@ describe("Slice store-management wallet policy", () => {
         ],
         policy
       )
-    ).toThrow("outside the delegated policy")
+    ).not.toThrow()
   })
 
   test("rejects value and descriptor substitutions", () => {
@@ -273,20 +268,29 @@ describe("Slice store-management wallet policy", () => {
     }
     expect(() => assertWalletCallsMatchPolicy([call], policy)).toThrow()
     expect(() =>
-      assertSliceStoreManagementPolicyDescriptor(policy, {
-        sessionSignerAddress,
-        slicerAddress: zeroAddress,
-        slicerId: 2913
+      assertSliceStoreManagementPolicyDescriptor({
+        ...policy,
+        calls: policy.calls.map((rule) =>
+          rule.target === walletPolicyWildcardTarget
+            ? { ...rule, valueLimit: 1n }
+            : rule
+        )
       })
-    ).toThrow("unsupported authority")
+    ).toThrow()
   })
 
-  test("derives the exact slicer address and padded slicer id", () => {
-    expect(
-      deriveSliceStoreManagementPolicyScope(policy, sessionSignerAddress)
-    ).toEqual({
-      slicerAddress,
-      slicerId: 2913
-    })
+  test("rejects legacy per-slicer management descriptors", () => {
+    const legacyPolicy = {
+      ...policy,
+      calls: policy.calls.map((rule) =>
+        rule.target === walletPolicyWildcardTarget
+          ? { ...rule, target: slicerAddress }
+          : rule
+      )
+    }
+
+    expect(() =>
+      assertSliceStoreManagementPolicyDescriptor(legacyPolicy)
+    ).toThrow("unsupported authority")
   })
 })

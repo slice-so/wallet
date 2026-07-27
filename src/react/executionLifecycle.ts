@@ -83,7 +83,7 @@ export const useSliceWalletExecutionLifecycle = ({
     SetStateAction<SliceWalletExecutionSession | null>
   >
   setManagementExecutionSession: Dispatch<
-    SetStateAction<Map<number, SliceWalletManagementExecutionSession>>
+    SetStateAction<SliceWalletManagementExecutionSession | null>
   >
   sliceAccountClient: SliceAccountClient | null
   storeManagement: SliceWalletProviderAdapters["storeManagement"]
@@ -145,8 +145,8 @@ export const useSliceWalletExecutionLifecycle = ({
   ])
 
   const clearManagementExecutionSession = useCallback(
-    async (account: `0x${string}`, slicerId: number) => {
-      await clearStoredExecutionSession(account, "store_management", slicerId)
+    async (account: `0x${string}`) => {
+      await clearStoredExecutionSession(account, "store_management")
       try {
         const frameClient = await getFrameClient()
         await frameClient.request({
@@ -154,250 +154,213 @@ export const useSliceWalletExecutionLifecycle = ({
           params: {
             account,
             chainId: walletChainId,
-            grantKind: "management",
-            slicerId
+            grantKind: "management"
           }
         })
       } catch {
         // Parent metadata is still cleared; iframe state can clear later.
       }
-      setManagementExecutionSession((current) => {
-        const next = new Map(current)
-        next.delete(slicerId)
-        return next
-      })
+      setManagementExecutionSession(null)
     },
     [getFrameClient, setManagementExecutionSession, walletChainId]
   )
 
-  const disableManagementExecutionSession = useCallback(
-    async ({
-      slicerAddress,
-      slicerId
-    }: {
-      slicerAddress: `0x${string}`
-      slicerId: number
-    }) => {
-      const activeWallet = activeWalletRef.current
-      if (!activeWallet || !sliceAccountClient) {
-        throw new Error("Unlock your Slice wallet first.")
-      }
-      if (!storeManagement) {
-        throw new Error("1-tap management is not available in this app.")
-      }
-      await managementLifecycle.runMutation({
-        account: activeWallet.kernelAccount.address,
-        slicerId,
-        task: async (control) => {
-          const frameClient = await getFrameClient()
-          const [{ delegation }, frameResult, pendingFrameResult, pendingRead] =
-            await Promise.all([
-              storeManagement.fetchDelegation(slicerId),
-              frameClient.request({
-                method: "getSession",
-                params: {
-                  account: activeWallet.kernelAccount.address,
-                  chainId: walletChainId,
-                  grantKind: "management",
-                  slicerId
-                }
-              }),
-              frameClient.request({
-                method: "getPendingSession",
-                params: {
-                  account: activeWallet.kernelAccount.address,
-                  chainId: walletChainId,
-                  grantKind: "management",
-                  slicerId
-                }
-              }),
-              readStoredPendingReplacementStrict(
-                activeWallet.kernelAccount.address,
-                "store_management",
-                slicerId
-              )
-            ])
-          if (!pendingRead.ok) {
-            throw new SliceWalletEnablementError(
-              "Slice Wallet session storage is unavailable. Retry before disabling 1-tap management.",
-              "preserve-pending"
+  const disableManagementExecutionSession = useCallback(async () => {
+    const activeWallet = activeWalletRef.current
+    if (!activeWallet || !sliceAccountClient) {
+      throw new Error("Unlock your Slice wallet first.")
+    }
+    if (!storeManagement) {
+      throw new Error("1-tap management is not available in this app.")
+    }
+    await managementLifecycle.runMutation({
+      account: activeWallet.kernelAccount.address,
+      task: async (control) => {
+        const frameClient = await getFrameClient()
+        const [{ delegation }, frameResult, pendingFrameResult, pendingRead] =
+          await Promise.all([
+            storeManagement.fetchDelegation(),
+            frameClient.request({
+              method: "getSession",
+              params: {
+                account: activeWallet.kernelAccount.address,
+                chainId: walletChainId,
+                grantKind: "management"
+              }
+            }),
+            frameClient.request({
+              method: "getPendingSession",
+              params: {
+                account: activeWallet.kernelAccount.address,
+                chainId: walletChainId,
+                grantKind: "management"
+              }
+            }),
+            readStoredPendingReplacementStrict(
+              activeWallet.kernelAccount.address,
+              "store_management"
             )
-          }
-          const pendingReplacement = pendingRead.value
-          const registeredPending = isRegisteredManagementReplacement(
-            pendingReplacement
+          ])
+        if (!pendingRead.ok) {
+          throw new SliceWalletEnablementError(
+            "Slice Wallet session storage is unavailable. Retry before disabling 1-tap management.",
+            "preserve-pending"
           )
-            ? pendingReplacement
-            : null
-          const committedSession =
-            frameResult !== null && typeof frameResult === "object"
-              ? parseSliceWalletFrameSession(
-                  frameResult as SliceWalletProtocolValue
-                )
-              : null
-          const pendingTargetMatches =
-            registeredPending !== null &&
-            registeredPending.session.slicerId === slicerId &&
-            registeredPending.session.slicerAddress.toLowerCase() ===
-              slicerAddress.toLowerCase()
-          const committedMatchesPending =
-            registeredPending !== null &&
-            managementFrameMatchesStored(
-              committedSession,
-              registeredPending.session,
-              walletChainId
-            )
-          const preflight = getManagementDisablePreflight({
-            committedMatchesPending,
-            pendingPhase: pendingReplacement?.phase ?? null,
-            pendingReadable: true,
-            targetMatches:
-              pendingReplacement === null ? true : pendingTargetMatches
-          })
-          if (preflight === "blocked") {
-            throw new SliceWalletEnablementError(
-              "A management permission change is still pending. Recover or retry it before disabling.",
-              "preserve-pending"
-            )
-          }
-          if (
-            pendingFrameResult !== null &&
-            typeof pendingFrameResult === "object"
-          ) {
-            throw new SliceWalletEnablementError(
-              "A management permission change is still pending. Recover or retry it before disabling.",
-              "preserve-pending"
-            )
-          }
-          if (
-            (preflight === "reconcile" || preflight === "state-changed") &&
-            registeredPending !== null
-          ) {
-            try {
-              await writeStoredExecutionSessionStrict(registeredPending.session)
-              await clearStoredPendingReplacementStrict(
-                activeWallet.kernelAccount.address,
-                "store_management",
-                slicerId
-              )
-            } catch {
-              throw new SliceWalletEnablementError(
-                "The committed management permission could not be reconciled. Retry before disabling.",
-                "preserve-pending"
-              )
-            }
-          }
-          if (preflight === "state-changed") {
-            throw new SliceWalletEnablementError(
-              "The active management permission changed. Refresh this store and try again.",
-              "hydrate"
-            )
-          }
-          if (delegation === null) {
-            throw new Error(
-              "The management delegation is unavailable; revoke it from Slice ID."
-            )
-          }
-          if (
-            delegation.slicerId !== null &&
-            delegation.slicerId !== slicerId
-          ) {
-            throw new SliceWalletEnablementError(
-              "The active management permission belongs to another store. Refresh and try again.",
-              "hydrate"
-            )
-          }
-          const session = committedSession
-          if (session === null) {
-            throw new Error(
-              "The management permission descriptor is unavailable; revoke it from Slice ID."
-            )
-          }
-          if (
-            delegation.permissionId === null ||
-            delegation.signerPublicKey === null ||
-            delegation.walletPolicy === null ||
-            delegation.permissionId.toLowerCase() !==
-              session.permissionId.toLowerCase() ||
-            delegation.signerAddress.toLowerCase() !==
-              session.signerId.toLowerCase() ||
-            delegation.signerPublicKey.toLowerCase() !==
-              session.publicKey.toLowerCase() ||
-            getWalletPolicyHash(
-              parseSerializedWalletPolicyDescriptor(delegation.walletPolicy)
-            ) !== getWalletPolicyHash(session.policy)
-          ) {
-            throw new SliceWalletEnablementError(
-              "The active management permission changed. Refresh this store and try again.",
-              "hydrate"
-            )
-          }
-          const expectedPolicy = createSliceStoreManagementPolicyDescriptor({
-            account: activeWallet.kernelAccount.address,
-            chainId: walletChainId,
-            expiresAt: session.expiresAt,
-            sessionSignerAddress: session.signerId,
-            slicerAddress,
-            slicerId,
-            startsAt: session.policy.validAfter
-          })
-          if (
-            getWalletPolicyHash(expectedPolicy) !==
-            getWalletPolicyHash(session.policy)
-          ) {
-            throw new SliceWalletEnablementError(
-              "The active management permission changed. Refresh this store and try again.",
-              "hydrate"
-            )
-          }
-          control.assertCurrent()
-          const { calls } = await buildSliceWalletPermissionRevocationCalls({
-            account: activeWallet.kernelAccount.address,
-            client: publicClient,
-            session
-          })
-          control.assertCurrent()
-          const execution = await sliceAccountClient.sendCalls({ calls })
-          const operation = {
-            expectedDisableCallHash: getSliceWalletCallsHash(calls),
-            userOperationHash: execution.executionId
-          }
-          await retrySliceWalletFinalityAction({
-            createProof: () =>
-              createReplacementFinalizationProof({
-                action: "revoke",
-                client: storeManagement.client,
-                delegationId: delegation.delegationId,
-                frameClient,
-                session
-              }),
-            operation,
-            request: async (proof) => {
-              await storeManagement.client.revokeDelegation(proof)
-            }
-          })
-          await clearManagementExecutionSession(
-            activeWallet.kernelAccount.address,
-            slicerId
-          )
-          control.assertCurrent()
-          notifications?.success?.("1-tap management disabled")
         }
-      })
-    },
-    [
-      activeWalletRef,
-      clearManagementExecutionSession,
-      createReplacementFinalizationProof,
-      getFrameClient,
-      managementLifecycle,
-      notifications,
-      publicClient,
-      sliceAccountClient,
-      storeManagement,
-      walletChainId
-    ]
-  )
+        const pendingReplacement = pendingRead.value
+        const registeredPending = isRegisteredManagementReplacement(
+          pendingReplacement
+        )
+          ? pendingReplacement
+          : null
+        const committedSession =
+          frameResult !== null && typeof frameResult === "object"
+            ? parseSliceWalletFrameSession(
+                frameResult as SliceWalletProtocolValue
+              )
+            : null
+        const committedMatchesPending =
+          registeredPending !== null &&
+          managementFrameMatchesStored(
+            committedSession,
+            registeredPending.session,
+            walletChainId
+          )
+        const preflight = getManagementDisablePreflight({
+          committedMatchesPending,
+          pendingPhase: pendingReplacement?.phase ?? null,
+          pendingReadable: true,
+          targetMatches: true
+        })
+        if (preflight === "blocked") {
+          throw new SliceWalletEnablementError(
+            "A management permission change is still pending. Recover or retry it before disabling.",
+            "preserve-pending"
+          )
+        }
+        if (
+          pendingFrameResult !== null &&
+          typeof pendingFrameResult === "object"
+        ) {
+          throw new SliceWalletEnablementError(
+            "A management permission change is still pending. Recover or retry it before disabling.",
+            "preserve-pending"
+          )
+        }
+        if (
+          (preflight === "reconcile" || preflight === "state-changed") &&
+          registeredPending !== null
+        ) {
+          try {
+            await writeStoredExecutionSessionStrict(registeredPending.session)
+            await clearStoredPendingReplacementStrict(
+              activeWallet.kernelAccount.address,
+              "store_management"
+            )
+          } catch {
+            throw new SliceWalletEnablementError(
+              "The committed management permission could not be reconciled. Retry before disabling.",
+              "preserve-pending"
+            )
+          }
+        }
+        if (preflight === "state-changed") {
+          throw new SliceWalletEnablementError(
+            "The active management permission changed. Refresh this store and try again.",
+            "hydrate"
+          )
+        }
+        if (delegation === null) {
+          throw new Error(
+            "The management delegation is unavailable; revoke it from Slice ID."
+          )
+        }
+        const session = committedSession
+        if (session === null) {
+          throw new Error(
+            "The management permission descriptor is unavailable; revoke it from Slice ID."
+          )
+        }
+        if (
+          delegation.permissionId === null ||
+          delegation.signerPublicKey === null ||
+          delegation.walletPolicy === null ||
+          delegation.permissionId.toLowerCase() !==
+            session.permissionId.toLowerCase() ||
+          delegation.signerAddress.toLowerCase() !==
+            session.signerId.toLowerCase() ||
+          delegation.signerPublicKey.toLowerCase() !==
+            session.publicKey.toLowerCase() ||
+          getWalletPolicyHash(
+            parseSerializedWalletPolicyDescriptor(delegation.walletPolicy)
+          ) !== getWalletPolicyHash(session.policy)
+        ) {
+          throw new SliceWalletEnablementError(
+            "The active management permission changed. Refresh this store and try again.",
+            "hydrate"
+          )
+        }
+        const expectedPolicy = createSliceStoreManagementPolicyDescriptor({
+          account: activeWallet.kernelAccount.address,
+          chainId: walletChainId,
+          expiresAt: session.expiresAt,
+          sessionSignerAddress: session.signerId,
+          startsAt: session.policy.validAfter
+        })
+        if (
+          getWalletPolicyHash(expectedPolicy) !==
+          getWalletPolicyHash(session.policy)
+        ) {
+          throw new SliceWalletEnablementError(
+            "The active management permission changed. Refresh this store and try again.",
+            "hydrate"
+          )
+        }
+        control.assertCurrent()
+        const { calls } = await buildSliceWalletPermissionRevocationCalls({
+          account: activeWallet.kernelAccount.address,
+          client: publicClient,
+          session
+        })
+        control.assertCurrent()
+        const execution = await sliceAccountClient.sendCalls({ calls })
+        const operation = {
+          expectedDisableCallHash: getSliceWalletCallsHash(calls),
+          userOperationHash: execution.executionId
+        }
+        await retrySliceWalletFinalityAction({
+          createProof: () =>
+            createReplacementFinalizationProof({
+              action: "revoke",
+              client: storeManagement.client,
+              delegationId: delegation.delegationId,
+              frameClient,
+              session
+            }),
+          operation,
+          request: async (proof) => {
+            await storeManagement.client.revokeDelegation(proof)
+          }
+        })
+        await clearManagementExecutionSession(
+          activeWallet.kernelAccount.address
+        )
+        control.assertCurrent()
+        notifications?.success?.("1-tap management disabled")
+      }
+    })
+  }, [
+    activeWalletRef,
+    clearManagementExecutionSession,
+    createReplacementFinalizationProof,
+    getFrameClient,
+    managementLifecycle,
+    notifications,
+    publicClient,
+    sliceAccountClient,
+    storeManagement,
+    walletChainId
+  ])
 
   return {
     disableManagementExecutionSession,

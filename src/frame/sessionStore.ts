@@ -9,29 +9,13 @@ const objectStoreName = "sessions"
 
 const normalizeOrigin = (origin: string) => new URL(origin).origin
 
-const getLegacyRecordKey = (
-  appOrigin: string,
-  key: SliceWalletFrameSessionKey
-) =>
+const getRecordKey = (appOrigin: string, key: SliceWalletFrameSessionKey) =>
   [
     normalizeOrigin(appOrigin),
     key.account.toLowerCase(),
     key.chainId,
     key.grantKind
   ].join(":")
-
-const getRecordKey = (appOrigin: string, key: SliceWalletFrameSessionKey) => {
-  const base = getLegacyRecordKey(appOrigin, key)
-  if (key.grantKind !== "management") return base
-  if (
-    key.slicerId === undefined ||
-    !Number.isSafeInteger(key.slicerId) ||
-    key.slicerId < 0
-  ) {
-    throw new Error("Management session keys require a non-negative slicer id.")
-  }
-  return `${base}:${key.slicerId}`
-}
 
 const getPendingRecordKey = (
   appOrigin: string,
@@ -43,32 +27,6 @@ const getAccountUnlockKey = (appOrigin: string, account: string) =>
 
 type PersistedSession = SliceWalletStoredSession & { id: string }
 type PersistedAccountUnlock = { id: string; unlocked: true }
-
-const getStoredManagementSlicerId = (record: SliceWalletStoredSession) => {
-  if (
-    record.session.slicerId !== undefined &&
-    Number.isSafeInteger(record.session.slicerId) &&
-    record.session.slicerId >= 0
-  ) {
-    return record.session.slicerId
-  }
-  const values = new Set(
-    record.session.policy.calls.flatMap((call) =>
-      call.parameterRules.flatMap((rule) =>
-        rule.offset === 0 &&
-        rule.condition === "equal" &&
-        rule.params.length === 1
-          ? rule.params
-          : []
-      )
-    )
-  )
-  if (values.size !== 1) return null
-  const [value] = values
-  if (value === undefined) return null
-  const slicerId = Number(BigInt(value))
-  return Number.isSafeInteger(slicerId) && slicerId >= 0 ? slicerId : null
-}
 
 const readPersistedSession = async ({
   appOrigin,
@@ -87,27 +45,7 @@ const readPersistedSession = async ({
   const direct = (await requestResult(store.get(targetKey))) as
     | PersistedSession
     | undefined
-  if (direct !== undefined || key.grantKind !== "management") return direct
-
-  const legacyBase = getLegacyRecordKey(appOrigin, key)
-  const legacyKey = pending ? `${legacyBase}:pending` : legacyBase
-  const legacy = (await requestResult(store.get(legacyKey))) as
-    | PersistedSession
-    | undefined
-  if (
-    legacy === undefined ||
-    getStoredManagementSlicerId(legacy) !== key.slicerId
-  ) {
-    return undefined
-  }
-  const migrated = {
-    ...legacy,
-    id: targetKey,
-    session: { ...legacy.session, slicerId: key.slicerId }
-  } satisfies PersistedSession
-  store.put(migrated)
-  store.delete(legacyKey)
-  return migrated
+  return direct
 }
 
 const requestResult = <T>(request: IDBRequest<T>) =>
@@ -166,25 +104,7 @@ const readMemoryRecord = ({
     ? getPendingRecordKey(appOrigin, key)
     : getRecordKey(appOrigin, key)
   const direct = records.get(targetKey)
-  if (direct !== undefined || key.grantKind !== "management") {
-    return direct ?? null
-  }
-  const legacyBase = getLegacyRecordKey(appOrigin, key)
-  const legacyKey = pending ? `${legacyBase}:pending` : legacyBase
-  const legacy = records.get(legacyKey)
-  if (
-    legacy === undefined ||
-    getStoredManagementSlicerId(legacy) !== key.slicerId
-  ) {
-    return null
-  }
-  const migrated = {
-    ...legacy,
-    session: { ...legacy.session, slicerId: key.slicerId }
-  }
-  records.set(targetKey, migrated)
-  records.delete(legacyKey)
-  return migrated
+  return direct ?? null
 }
 
 export const createSliceWalletIndexedDbSessionStore = (

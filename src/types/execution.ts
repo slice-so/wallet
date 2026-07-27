@@ -30,7 +30,7 @@ export type CreateSliceExecutionAccountParameters =
           }) => Promise<Hex>
           mode: "checkout"
         }
-      | { mode: "store_management"; slicerAddress: Address }
+      | { mode: "store_management"; startsAt: number }
     )
 
 export type BuildSliceExecutionEnableTypedDataParameters =

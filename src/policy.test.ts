@@ -1,5 +1,11 @@
 import { describe, expect, it } from "bun:test"
-import { type Address, encodeFunctionData, erc20Abi } from "viem"
+import {
+  type Address,
+  encodeFunctionData,
+  erc20Abi,
+  toFunctionSelector,
+  zeroAddress
+} from "viem"
 import {
   assertWalletCallsMatchPolicy,
   createErc20ApproveCallRule,
@@ -9,7 +15,8 @@ import {
   encodeWalletPolicyDescriptor,
   getWalletPermissionId,
   getWalletPermissionValidAfter,
-  toWalletPermissionPolicies
+  toWalletPermissionPolicies,
+  walletPolicyWildcardTarget
 } from "./policy"
 import type { WalletPolicyDescriptor } from "./types"
 
@@ -174,5 +181,67 @@ describe("normalized wallet policies", () => {
         validUntil: 200
       })
     ).toThrow("validity")
+  })
+
+  it("matches wildcard targets and prefers exact-target rules", () => {
+    const transferSelector = toFunctionSelector("transfer(address,uint256)")
+    const policy = descriptor([
+      createErc20TransferCallRule({
+        maximumAmount: 100n,
+        recipient,
+        token
+      }),
+      {
+        parameterRules: [],
+        selector: transferSelector,
+        target: walletPolicyWildcardTarget,
+        valueLimit: 0n
+      }
+    ])
+    const transfer = (target: Address, to: Address) => ({
+      data: encodeFunctionData({
+        abi: erc20Abi,
+        functionName: "transfer",
+        args: [to, 1n]
+      }),
+      to: target
+    })
+
+    expect(() =>
+      assertWalletCallsMatchPolicy(
+        [transfer(otherRecipient, otherRecipient)],
+        policy
+      )
+    ).not.toThrow()
+    expect(() =>
+      assertWalletCallsMatchPolicy([transfer(token, otherRecipient)], policy)
+    ).toThrow("parameter")
+  })
+
+  it("rejects unsafe wildcard native and value-bearing rules", () => {
+    expect(() =>
+      encodeWalletPolicyDescriptor(
+        descriptor([
+          {
+            parameterRules: [],
+            selector: "0x00000000",
+            target: zeroAddress,
+            valueLimit: 0n
+          }
+        ])
+      )
+    ).toThrow("native transfers")
+    expect(() =>
+      encodeWalletPolicyDescriptor(
+        descriptor([
+          {
+            parameterRules: [],
+            selector: toFunctionSelector("transfer(address,uint256)"),
+            target: zeroAddress,
+            valueLimit: 1n
+          }
+        ])
+      )
+    ).toThrow("zero value")
   })
 })

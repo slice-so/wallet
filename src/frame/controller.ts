@@ -9,8 +9,8 @@ import {
 import { getUserOperationHash } from "viem/account-abstraction"
 import { sliceWalletDefaultRpId, sliceWalletEntryPoint } from "../constants"
 import {
-  bindSliceStoreManagementPolicySigner,
-  deriveSliceStoreManagementPolicyScope
+  assertSliceStoreManagementPolicyDescriptor,
+  bindSliceStoreManagementPolicySigner
 } from "../execution/commerce/policies"
 import { assertSliceWalletExecutionSafety } from "../executionSafety"
 import {
@@ -65,16 +65,8 @@ const isBridgeChallenge = (
     return false
   const input = value as { readonly [key: string]: SliceWalletProtocolValue }
   const grantKind = input.grantKind
-  const slicerId = input.slicerId
-  const managementKeyValid =
-    grantKind === "management"
-      ? Object.keys(input).length === 7 &&
-        typeof slicerId === "number" &&
-        Number.isSafeInteger(slicerId) &&
-        slicerId >= 0
-      : Object.keys(input).length === 6 && slicerId === undefined
   return (
-    managementKeyValid &&
+    Object.keys(input).length === 6 &&
     input.type === "slice-wallet:bridge-challenge" &&
     input.version === 1 &&
     typeof input.account === "string" &&
@@ -258,13 +250,7 @@ export const attachSliceWalletSignerFrame = ({
             )
           : requestedPolicy
       if (policy.grantKind === "management") {
-        const scope = deriveSliceStoreManagementPolicyScope(
-          policy,
-          keyPair.signerId
-        )
-        if (request.params.slicerId !== scope.slicerId) {
-          throw new Error("Wallet management session scope is invalid.")
-        }
+        assertSliceStoreManagementPolicyDescriptor(policy)
       }
       const session: SliceWalletFrameSession = {
         account: policy.account,
@@ -277,10 +263,7 @@ export const attachSliceWalletSignerFrame = ({
         permissionId: getWalletPermissionId(policy, keyPair.signerId),
         policy,
         publicKey: keyPair.publicKeyHex,
-        signerId: keyPair.signerId,
-        ...(request.params.slicerId === undefined
-          ? {}
-          : { slicerId: request.params.slicerId })
+        signerId: keyPair.signerId
       }
       await sessionStore.putPending({
         appOrigin: parentOrigin,

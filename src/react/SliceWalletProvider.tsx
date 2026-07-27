@@ -127,9 +127,8 @@ export function SliceWalletProvider({
   const [hasStoredCredential, setHasStoredCredential] = useState(false)
   const [executionSession, setExecutionSession] =
     useState<SliceWalletExecutionSession | null>(null)
-  const [managementExecutionSessions, setManagementExecutionSession] = useState<
-    Map<number, SliceWalletManagementExecutionSession>
-  >(() => new Map())
+  const [managementExecutionSession, setManagementExecutionSession] =
+    useState<SliceWalletManagementExecutionSession | null>(null)
   const [recovery, setRecovery] = useState<SliceWalletRecoverySnapshot | null>(
     null
   )
@@ -195,13 +194,7 @@ export function SliceWalletProvider({
       chainId: walletChain.id,
       hydrate: (account, control) =>
         managementHydrationTaskRef.current(account, control),
-      onIdentityChange: (slicerId) =>
-        setManagementExecutionSession((current) => {
-          if (slicerId === undefined) return new Map()
-          const next = new Map(current)
-          next.delete(slicerId)
-          return next
-        }),
+      onIdentityChange: () => setManagementExecutionSession(null),
       onMutation: (message) => broadcastManagementMutationRef.current?.(message)
     })
   }
@@ -327,7 +320,7 @@ export function SliceWalletProvider({
     }
     if (connectedSliceAccount !== null) return
     setExecutionSession(null)
-    setManagementExecutionSession(new Map())
+    setManagementExecutionSession(null)
   }, [connectedSliceAccount, getFrameClient, managementLifecycle])
 
   useEffect(() => {
@@ -351,8 +344,6 @@ export function SliceWalletProvider({
         typeof message !== "object" ||
         typeof message.sourceId !== "string" ||
         typeof message.chainId !== "number" ||
-        !Number.isSafeInteger(message.slicerId) ||
-        message.slicerId < 0 ||
         (message.outcome !== "error" && message.outcome !== "success") ||
         typeof message.account !== "string" ||
         !isAddress(message.account) ||
@@ -365,10 +356,7 @@ export function SliceWalletProvider({
       ) {
         return
       }
-      managementLifecycle.handleExternalMutation(
-        message.account,
-        message.slicerId
-      )
+      managementLifecycle.handleExternalMutation(message.account)
     }
     channel.addEventListener("message", handleMessage)
     return () => {
@@ -381,12 +369,12 @@ export function SliceWalletProvider({
   const pendingCeremony = featurePendingCeremony ?? connectorPendingCeremony
 
   const getManagementExecutionSession = useCallback(
-    (slicerId: number) => managementExecutionSessions.get(slicerId) ?? null,
-    [managementExecutionSessions]
+    () => managementExecutionSession,
+    [managementExecutionSession]
   )
   const getStoreCreationExecutionSession = useCallback(
-    () => managementExecutionSessions.values().next().value ?? null,
-    [managementExecutionSessions]
+    () => managementExecutionSession,
+    [managementExecutionSession]
   )
 
   const getConnectorProvider = useCallback(async () => {

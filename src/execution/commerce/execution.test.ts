@@ -193,16 +193,12 @@ describe("Slice checkout execution client", () => {
 })
 
 describe("Slice management execution client", () => {
-  it("forwards only the root-authorized P-256 grant for the selected slicer", async () => {
-    const slicerAddress =
-      "0x5000000000000000000000000000000000000005" as Address
+  it("forwards only the root-authorized account-wide P-256 grant", async () => {
     const managementPolicy = createSliceStoreManagementPolicyDescriptor({
       account,
       chainId: 8453,
       expiresAt: now + 3_600,
       sessionSignerAddress: signer,
-      slicerAddress,
-      slicerId: 0,
       startsAt: now - 1
     })
     const managementPermissionId = getWalletPermissionId(
@@ -228,8 +224,7 @@ describe("Slice management execution client", () => {
         permissionId: managementPermissionId,
         policy: managementPolicy,
         publicKey,
-        signerId: signer,
-        slicerId: 0
+        signerId: signer
       }
     } satisfies SliceWalletPermissionAuthorization
     let requestBody = ""
@@ -245,17 +240,11 @@ describe("Slice management execution client", () => {
           permissionId: managementPermissionId,
           previousSessions: [],
           requiresFinalization: false,
-          signerAddress: signer,
-          slicerAddress,
-          slicerId: 0
+          signerAddress: signer
         })
       }
     })
-    await client.registerAuthorization({
-      authorization: managementAuthorization,
-      slicerAddress,
-      slicerId: 0
-    })
+    await client.registerAuthorization(managementAuthorization)
     const body = JSON.parse(requestBody) as {
       accountIndex: number
       enableSignature: Hex
@@ -264,7 +253,6 @@ describe("Slice management execution client", () => {
       rootCredentialIdHash: Hex
       rootPublicKey: Hex
       signerScheme: string
-      slicerId: number
     }
     expect(body).toMatchObject({
       accountIndex: 2,
@@ -272,9 +260,10 @@ describe("Slice management execution client", () => {
       enableSignature: "0x01",
       rootCredentialIdHash: rootCredential.credentialIdHash,
       rootPublicKey: rootCredential.publicKey,
-      signerScheme: "p256",
-      slicerId: 0
+      signerScheme: "p256"
     })
+    expect("slicerId" in body).toBe(false)
+    expect("slicerAddress" in body).toBe(false)
     expect(body.privateKey).toBeUndefined()
   })
 })
