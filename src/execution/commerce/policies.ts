@@ -17,6 +17,7 @@ import {
 } from "viem"
 import {
   createPositiveAmountRule,
+  getWalletPermissionValidAfter,
   getWalletPolicyHash,
   normalizeWalletPolicyDescriptor,
   toWalletPermissionPolicies,
@@ -50,14 +51,6 @@ export const sliceStoreManagementOperations = [
   "configureProduct",
   "_addCurrencies"
 ] as const
-
-const walletPermissionActivationSkewSeconds = 300
-
-const getWalletPermissionValidAfter = () =>
-  Math.max(
-    0,
-    Math.floor(Date.now() / 1_000) - walletPermissionActivationSkewSeconds
-  )
 
 const getSelector = ({
   abi,

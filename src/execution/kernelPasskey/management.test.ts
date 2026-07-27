@@ -39,6 +39,12 @@ describe("store management permission policies", () => {
     expect(
       kernelPolicies.map((policy) => policy.getPolicyInfoInBytes())
     ).toEqual(descriptorPolicies.map((policy) => policy.getPolicyInfoInBytes()))
+    expect({
+      policyData: kernelPolicies.map((policy) => policy.getPolicyData()),
+      policyInfoInBytes: kernelPolicies.map((policy) =>
+        policy.getPolicyInfoInBytes()
+      )
+    }).toMatchSnapshot()
   })
 
   it("keeps wildcard slicer calls zero-value and pins sensitive arguments", () => {
