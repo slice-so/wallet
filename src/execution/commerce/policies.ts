@@ -1,24 +1,29 @@
 import {
+  fundsModuleAbi,
   productsModuleAbi,
   registryProductActionAbi,
+  sliceCoreAbi,
   slicerAbi
 } from "@slicekit/abi"
 import {
   type Abi,
   type AbiFunction,
   type Address,
-  hexToBigInt,
   maxUint256,
   pad,
+  slice,
   toFunctionSelector,
   toHex
 } from "viem"
 import {
   createPositiveAmountRule,
+  getWalletPermissionValidAfter,
   getWalletPolicyHash,
   normalizeWalletPolicyDescriptor,
+  toWalletPermissionPolicies,
   type WalletPolicyCallRule,
-  type WalletPolicyDescriptor
+  type WalletPolicyDescriptor,
+  walletPolicyWildcardTarget
 } from "../../policy"
 import type {
   CreateSliceCheckoutPolicyParameters,
@@ -26,27 +31,26 @@ import type {
 } from "../../types/commerce"
 import {
   generatedHookAddressList,
-  getProductsModuleAddress
+  getFundsModuleAddress,
+  getProductsModuleAddress,
+  getSliceCoreAddress
 } from "../generated/commerceFacts"
 
 export const sliceStoreManagementOperations = [
+  "batchWithdraw",
   "addProduct",
   "editProduct",
   "editProductMetadata",
+  "multicall",
+  "release",
   "removeProduct",
+  "setRoles",
   "setProductType",
   "setStoreConfig",
+  "slice",
   "configureProduct",
   "_addCurrencies"
 ] as const
-
-const walletPermissionActivationSkewSeconds = 300
-
-const getWalletPermissionValidAfter = () =>
-  Math.max(
-    0,
-    Math.floor(Date.now() / 1_000) - walletPermissionActivationSkewSeconds
-  )
 
 const getSelector = ({
   abi,
@@ -76,11 +80,37 @@ const addCurrenciesSelector = getSelector({
   abi: slicerAbi,
   functionName: "_addCurrencies"
 })
+const multicallSelector = getSelector({
+  abi: productsModuleAbi,
+  functionName: "multicall"
+})
+const setRolesSelector = getSelector({
+  abi: slicerAbi,
+  functionName: "setRoles"
+})
+const releaseSelector = getSelector({
+  abi: slicerAbi,
+  functionName: "release"
+})
+const batchWithdrawSelector = getSelector({
+  abi: fundsModuleAbi,
+  functionName: "batchWithdraw"
+})
+const sliceSelector = getSelector({
+  abi: sliceCoreAbi,
+  functionName: "slice"
+})
 
 const productManagementSelectors = sliceStoreManagementOperations
   .filter(
     (operation) =>
-      operation !== "configureProduct" && operation !== "_addCurrencies"
+      operation !== "batchWithdraw" &&
+      operation !== "configureProduct" &&
+      operation !== "_addCurrencies" &&
+      operation !== "multicall" &&
+      operation !== "release" &&
+      operation !== "setRoles" &&
+      operation !== "slice"
   )
   .map((functionName) => getSelector({ abi: productsModuleAbi, functionName }))
 
@@ -176,32 +206,29 @@ export const createSliceStoreManagementPolicyDescriptor = ({
   account,
   chainId,
   expiresAt,
-  slicerAddress,
-  slicerId,
+  sessionSignerAddress,
   startsAt = getWalletPermissionValidAfter()
 }: CreateSliceStoreManagementPolicyParameters): WalletPolicyDescriptor => {
-  if (!Number.isSafeInteger(slicerId) || slicerId < 0) {
-    throw new Error(
-      "Store management policies require a non-negative slicer id."
-    )
-  }
   const productsModuleAddress = getProductsModuleAddress(chainId)
-  const slicerIdRule = {
-    condition: "equal" as const,
-    offset: 0,
-    params: [pad(toHex(slicerId), { size: 32 })]
-  }
+  const fundsModuleAddress = getFundsModuleAddress(chainId)
+  const sliceCoreAddress = getSliceCoreAddress(chainId)
   return {
     account,
     calls: [
       ...productManagementSelectors.map((selector) => ({
-        parameterRules: [slicerIdRule],
+        parameterRules: [],
         selector,
         target: productsModuleAddress,
         valueLimit: 0n
       })),
+      {
+        parameterRules: [],
+        selector: multicallSelector,
+        target: productsModuleAddress,
+        valueLimit: 0n
+      },
       ...generatedHookAddresses.map((target) => ({
-        parameterRules: [slicerIdRule],
+        parameterRules: [],
         selector: configureProductSelector,
         target,
         valueLimit: 0n
@@ -209,7 +236,57 @@ export const createSliceStoreManagementPolicyDescriptor = ({
       {
         parameterRules: [],
         selector: addCurrenciesSelector,
-        target: slicerAddress,
+        target: walletPolicyWildcardTarget,
+        valueLimit: 0n
+      },
+      {
+        parameterRules:
+          sessionSignerAddress === undefined
+            ? []
+            : [
+                {
+                  condition: "not_equal" as const,
+                  offset: 32,
+                  params: [pad(sessionSignerAddress, { size: 32 })]
+                }
+              ],
+        selector: setRolesSelector,
+        target: walletPolicyWildcardTarget,
+        valueLimit: 0n
+      },
+      {
+        parameterRules: [
+          {
+            condition: "equal",
+            offset: 0,
+            params: [pad(account, { size: 32 })]
+          },
+          {
+            condition: "equal",
+            offset: 64,
+            params: [pad(toHex(1), { size: 32 })]
+          }
+        ],
+        selector: releaseSelector,
+        target: walletPolicyWildcardTarget,
+        valueLimit: 0n
+      },
+      {
+        parameterRules: [
+          {
+            condition: "equal",
+            offset: 0,
+            params: [pad(account, { size: 32 })]
+          }
+        ],
+        selector: batchWithdrawSelector,
+        target: fundsModuleAddress,
+        valueLimit: 0n
+      },
+      {
+        parameterRules: [],
+        selector: sliceSelector,
+        target: sliceCoreAddress,
         valueLimit: 0n
       }
     ],
@@ -222,25 +299,29 @@ export const createSliceStoreManagementPolicyDescriptor = ({
 }
 
 export const assertSliceStoreManagementPolicyDescriptor = (
-  descriptor: WalletPolicyDescriptor,
-  {
-    slicerAddress,
-    slicerId
-  }: Pick<
-    CreateSliceStoreManagementPolicyParameters,
-    "slicerAddress" | "slicerId"
-  >
+  descriptor: WalletPolicyDescriptor
 ) => {
   const normalized = normalizeWalletPolicyDescriptor(descriptor)
   if (normalized.grantKind !== "management") {
     throw new Error("Expected a store-management wallet policy.")
   }
+  const setRolesCall = normalized.calls.find(
+    (call) =>
+      call.selector === setRolesSelector &&
+      call.target === walletPolicyWildcardTarget
+  )
+  const signerRule = setRolesCall?.parameterRules[0]
+  const sessionSignerAddress =
+    signerRule?.condition === "not_equal" &&
+    signerRule.offset === 32 &&
+    signerRule.params.length === 1
+      ? (slice(signerRule.params[0], 12, 32) as Address)
+      : undefined
   const expected = createSliceStoreManagementPolicyDescriptor({
     account: normalized.account,
     chainId: normalized.chainId,
     expiresAt: normalized.validUntil,
-    slicerAddress,
-    slicerId,
+    sessionSignerAddress,
     startsAt: normalized.validAfter
   })
   if (getWalletPolicyHash(normalized) !== getWalletPolicyHash(expected)) {
@@ -249,43 +330,33 @@ export const assertSliceStoreManagementPolicyDescriptor = (
   return normalized
 }
 
-export const deriveSliceStoreManagementPolicyScope = (
-  descriptor: WalletPolicyDescriptor
+export const bindSliceStoreManagementPolicySigner = (
+  descriptor: WalletPolicyDescriptor,
+  sessionSignerAddress: Address
 ) => {
-  const normalized = normalizeWalletPolicyDescriptor(descriptor)
-  if (normalized.grantKind !== "management") {
-    throw new Error("Expected a store-management wallet policy.")
-  }
-  const slicerCall = normalized.calls.find(
-    (call) =>
-      call.selector === addCurrenciesSelector &&
-      call.parameterRules.length === 0
-  )
-  const slicerIdValues = new Set(
-    normalized.calls.flatMap((call) =>
-      call.parameterRules.flatMap((rule) =>
-        rule.offset === 0 &&
-        rule.condition === "equal" &&
-        rule.params.length === 1
-          ? rule.params
-          : []
-      )
-    )
-  )
-  if (slicerCall === undefined || slicerIdValues.size !== 1) {
-    throw new Error("Store-management policy scope is invalid.")
-  }
-  const [slicerIdValue] = slicerIdValues
-  if (slicerIdValue === undefined) {
-    throw new Error("Store-management policy scope is invalid.")
-  }
-  const slicerId = Number(hexToBigInt(slicerIdValue))
-  if (!Number.isSafeInteger(slicerId) || slicerId < 0) {
-    throw new Error("Store-management policy slicer id is invalid.")
-  }
-  assertSliceStoreManagementPolicyDescriptor(normalized, {
-    slicerAddress: slicerCall.target,
-    slicerId
+  const normalized = assertSliceStoreManagementPolicyDescriptor(descriptor)
+  const unbound = createSliceStoreManagementPolicyDescriptor({
+    account: normalized.account,
+    chainId: normalized.chainId,
+    expiresAt: normalized.validUntil,
+    startsAt: normalized.validAfter
   })
-  return { slicerAddress: slicerCall.target, slicerId }
+  if (getWalletPolicyHash(normalized) !== getWalletPolicyHash(unbound)) {
+    throw new Error("Store-management policy is already signer-bound.")
+  }
+
+  return createSliceStoreManagementPolicyDescriptor({
+    account: normalized.account,
+    chainId: normalized.chainId,
+    expiresAt: normalized.validUntil,
+    sessionSignerAddress,
+    startsAt: normalized.validAfter
+  })
 }
+
+export const createSliceStoreManagementPermissionPolicies = (
+  parameters: CreateSliceStoreManagementPolicyParameters
+) =>
+  toWalletPermissionPolicies(
+    createSliceStoreManagementPolicyDescriptor(parameters)
+  )

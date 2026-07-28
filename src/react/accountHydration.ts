@@ -97,6 +97,16 @@ export const shouldCommitActivation = ({
   connectedAccount !== null &&
   isAddressEqual(builtAddress, connectedAccount)
 
+export const shouldLockReplacedSliceAccount = ({
+  connectedAccount,
+  previousAccount
+}: {
+  connectedAccount: Address | null
+  previousAccount: Address
+}) =>
+  connectedAccount !== null &&
+  !isAddressEqual(previousAccount, connectedAccount)
+
 export const useSliceWalletAccountHydration = ({
   activeWalletRef,
   ceremonyBroker,

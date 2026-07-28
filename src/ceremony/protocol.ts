@@ -252,7 +252,7 @@ export const parseSliceWalletFrameSession = (
       "publicKey",
       "signerId"
     ],
-    ["checkout", "slicerId"]
+    ["checkout"]
   )
   const account = addressValue(input.account, "Session account")
   const chainId = integerValue(input.chainId, "Session chain id")
@@ -269,20 +269,8 @@ export const parseSliceWalletFrameSession = (
     input.checkout === undefined
       ? undefined
       : parseCheckoutGrant(input.checkout)
-  const slicerId =
-    input.slicerId === undefined
-      ? undefined
-      : integerValue(input.slicerId, "Session slicer id")
   if ((grantKind === "checkout") !== (checkout !== undefined)) {
     throw new Error("Checkout session metadata does not match its grant kind.")
-  }
-  if (
-    (grantKind === "management" && (slicerId === undefined || slicerId < 0)) ||
-    (grantKind !== "management" && slicerId !== undefined)
-  ) {
-    throw new Error(
-      "Management session metadata requires a non-negative slicer id."
-    )
   }
   if (
     policy.account.toLowerCase() !== account.toLowerCase() ||
@@ -305,8 +293,7 @@ export const parseSliceWalletFrameSession = (
     permissionId,
     policy,
     publicKey,
-    signerId,
-    ...(slicerId === undefined ? {} : { slicerId })
+    signerId
   }
 }
 
@@ -775,8 +762,7 @@ export const parseSliceWalletBridgeRecord = (
   if (
     session.account.toLowerCase() !== challenge.account.toLowerCase() ||
     session.chainId !== challenge.chainId ||
-    session.grantKind !== challenge.grantKind ||
-    session.slicerId !== challenge.slicerId
+    session.grantKind !== challenge.grantKind
   ) {
     throw new Error("Signer bridge record does not match the ceremony request.")
   }

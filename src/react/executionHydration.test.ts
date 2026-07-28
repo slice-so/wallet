@@ -22,9 +22,7 @@ const stored = {
   kind: "store_management",
   permissionId:
     "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  signerAddress: "0x0000000000000000000000000000000000000002",
-  slicerAddress: "0x0000000000000000000000000000000000000003",
-  slicerId: 7
+  signerAddress: "0x0000000000000000000000000000000000000002"
 } satisfies StoredSliceWalletExecutionSession
 const frameSession = {
   account,
@@ -67,7 +65,6 @@ describe("management execution hydration", () => {
         account,
         activate: async () => undefined,
         chainId: 8453,
-        slicerId: stored.slicerId,
         clearStoredSession: async () => {
           cleared += 1
         },
@@ -81,7 +78,6 @@ describe("management execution hydration", () => {
             signerAddress: stored.signerAddress,
             signerPublicKey: null,
             signerScheme: "p256",
-            slicerId: 7,
             walletPolicy: null
           }
         }),
@@ -115,7 +111,6 @@ describe("management execution hydration", () => {
         account,
         activate: async () => undefined,
         chainId: 8453,
-        slicerId: stored.slicerId,
         clearStoredSession: async () => {
           cleared += 1
         },
@@ -149,7 +144,6 @@ describe("management execution hydration", () => {
         account,
         activate: async () => undefined,
         chainId: 8453,
-        slicerId: stored.slicerId,
         clearStoredSession: async () => {
           cleared += 1
         },
@@ -193,7 +187,6 @@ describe("management execution hydration", () => {
         account,
         activate: async () => undefined,
         chainId: 8453,
-        slicerId: stored.slicerId,
         clearStoredSession: async () => {
           cleared += 1
         },
@@ -235,7 +228,6 @@ describe("management execution hydration", () => {
         account,
         activate: async () => undefined,
         chainId: 8453,
-        slicerId: stored.slicerId,
         clearStoredSession: async () => {
           cleared += 1
         },
@@ -249,7 +241,6 @@ describe("management execution hydration", () => {
             signerAddress: stored.signerAddress,
             signerPublicKey: "0x1234",
             signerScheme: "p256",
-            slicerId: 9,
             walletPolicy: {
               account,
               calls: [],
@@ -283,7 +274,6 @@ describe("management execution hydration", () => {
         account,
         activate: async () => undefined,
         chainId: 8453,
-        slicerId: stored.slicerId,
         control,
         fetchDelegation: async () => ({ delegation: null }),
         getFrameClient: async () =>
@@ -302,91 +292,71 @@ describe("management execution hydration", () => {
     })
   })
 
-  test("hydrates two stored management sessions without replacing either", async () => {
-    const createFixture = async (
-      slicerId: number,
-      slicerAddress: `0x${string}`
-    ) => {
-      const keyPair = await generateSliceWalletP256KeyPair()
-      const policy = createSliceStoreManagementPolicyDescriptor({
-        account,
-        chainId: 8453,
-        expiresAt: 4_070_908_800,
-        slicerAddress,
-        slicerId,
-        startsAt: 0
-      })
-      const session = {
-        account,
-        chainId: 8453,
-        expiresAt: policy.validUntil,
-        grantKind: "management",
-        permissionId: getWalletPermissionId(policy, keyPair.signerId),
-        policy,
-        publicKey: keyPair.publicKeyHex,
-        signerId: keyPair.signerId,
-        slicerId
-      } satisfies SliceWalletFrameSession
-      const storedSession = {
-        accountAddress: account,
-        delegationId: `delegation-${slicerId}`,
-        enableSignature: "0x12",
-        expiresAt: "2099-01-01T00:00:00.000Z",
-        kind: "store_management",
-        permissionId: session.permissionId,
-        signerAddress: session.signerId,
-        slicerAddress,
-        slicerId
-      } satisfies StoredSliceWalletExecutionSession
-      return { session, storedSession }
-    }
-    const fixtures = await Promise.all([
-      createFixture(7, "0x0000000000000000000000000000000000000007"),
-      createFixture(9, "0x0000000000000000000000000000000000000009")
-    ])
-    const activated: number[] = []
+  test("hydrates the account-wide stored management session", async () => {
+    const keyPair = await generateSliceWalletP256KeyPair()
+    const policy = createSliceStoreManagementPolicyDescriptor({
+      account,
+      chainId: 8453,
+      expiresAt: 4_070_908_800,
+      sessionSignerAddress: keyPair.signerId,
+      startsAt: 0
+    })
+    const session = {
+      account,
+      chainId: 8453,
+      expiresAt: policy.validUntil,
+      grantKind: "management",
+      permissionId: getWalletPermissionId(policy, keyPair.signerId),
+      policy,
+      publicKey: keyPair.publicKeyHex,
+      signerId: keyPair.signerId
+    } satisfies SliceWalletFrameSession
+    const storedSession = {
+      accountAddress: account,
+      delegationId: "delegation",
+      enableSignature: "0x12",
+      expiresAt: "2099-01-01T00:00:00.000Z",
+      kind: "store_management",
+      permissionId: session.permissionId,
+      signerAddress: session.signerId
+    } satisfies StoredSliceWalletExecutionSession
+    let activated = false
 
-    await Promise.all(
-      fixtures.map(({ session, storedSession }) =>
-        hydrateStoredManagementExecutionSession({
-          account,
-          activate: async ({ stored: activatedSession }) => {
-            activated.push(activatedSession.slicerId)
-          },
-          chainId: 8453,
-          control: {
-            assertCurrent: () => undefined,
-            markError: () => undefined,
-            markStorageUnavailable: () => undefined
-          },
-          fetchDelegation: async (slicerId) => ({
-            delegation: {
-              appOrigin: "https://example.com",
-              delegationId: storedSession.delegationId,
-              expiresAt: storedSession.expiresAt,
-              permissionId: session.permissionId,
-              signerAddress: session.signerId,
-              signerPublicKey: session.publicKey,
-              signerScheme: "p256",
-              slicerId,
-              walletPolicy: serializeWalletPolicyDescriptor(session.policy)
-            }
-          }),
-          getFrameClient: async () =>
-            ({
-              destroy: () => undefined,
-              request: async () => session
-            }) as SliceWalletSignerFrameClient,
-          readStoredSession: async () => ({
-            status: "found",
-            value: storedSession
-          }),
-          setSessionNull: () => undefined,
-          slicerId: storedSession.slicerId
-        })
-      )
-    )
+    await hydrateStoredManagementExecutionSession({
+      account,
+      activate: async () => {
+        activated = true
+      },
+      chainId: 8453,
+      control: {
+        assertCurrent: () => undefined,
+        markError: () => undefined,
+        markStorageUnavailable: () => undefined
+      },
+      fetchDelegation: async () => ({
+        delegation: {
+          appOrigin: "https://example.com",
+          delegationId: storedSession.delegationId,
+          expiresAt: storedSession.expiresAt,
+          permissionId: session.permissionId,
+          signerAddress: session.signerId,
+          signerPublicKey: session.publicKey,
+          signerScheme: "p256",
+          walletPolicy: serializeWalletPolicyDescriptor(session.policy)
+        }
+      }),
+      getFrameClient: async () =>
+        ({
+          destroy: () => undefined,
+          request: async () => session
+        }) as SliceWalletSignerFrameClient,
+      readStoredSession: async () => ({
+        status: "found",
+        value: storedSession
+      }),
+      setSessionNull: () => undefined
+    })
 
-    expect(activated.sort()).toEqual([7, 9])
+    expect(activated).toBe(true)
   })
 })

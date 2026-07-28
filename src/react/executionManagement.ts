@@ -1,7 +1,6 @@
 "use client"
 
 import { useCallback } from "react"
-import type { Address } from "viem"
 import { createSliceStoreManagementPolicyDescriptor } from "../execution"
 import {
   authorizeSliceWalletSession,
@@ -39,7 +38,6 @@ import {
   isRegisteredManagementReplacement,
   loadManagementReplacementState,
   managementFrameMatchesStored,
-  managementSessionTargetsMatch,
   parseManagementFrameSession,
   rejectRevokedManagementPermission,
   runManagementCommitPhase,
@@ -87,426 +85,375 @@ export const useSliceWalletManagementEnablement = ({
   storeManagement: SliceWalletProviderAdapters["storeManagement"]
   walletChainId: number
 }) =>
-  useCallback(
-    async ({
-      slicerAddress,
-      slicerId
-    }: {
-      slicerAddress: Address
-      slicerId: number
-    }) => {
-      const activeWallet = activeWalletRef.current
-      if (!activeWallet || !sliceAccountClient) {
-        throw new Error("Unlock your Slice wallet first.")
-      }
-      if (!storeManagement) {
-        throw new Error("1-tap management is not available in this app.")
-      }
-      const { credential, kernelAccount } = activeWallet
+  useCallback(async () => {
+    const activeWallet = activeWalletRef.current
+    if (!activeWallet || !sliceAccountClient) {
+      throw new Error("Unlock your Slice wallet first.")
+    }
+    if (!storeManagement) {
+      throw new Error("1-tap management is not available in this app.")
+    }
+    const { credential, kernelAccount } = activeWallet
 
-      await managementLifecycle.runMutation({
-        account: kernelAccount.address,
-        slicerId,
-        task: async (control) => {
-          const frameClient = await getFrameClient()
-          let { committed, pending, replacement } =
-            await loadManagementReplacementState({
+    await managementLifecycle.runMutation({
+      account: kernelAccount.address,
+      task: async (control) => {
+        const frameClient = await getFrameClient()
+        let { committed, pending, replacement } =
+          await loadManagementReplacementState({
+            account: kernelAccount.address,
+            chainId: walletChainId,
+            frameClient
+          })
+        if (pending !== null && pending.expiresAt <= Date.now() / 1_000) {
+          await frameClient.request({
+            method: "discardSession",
+            params: {
               account: kernelAccount.address,
               chainId: walletChainId,
-              frameClient,
-              slicerId
-            })
-          if (pending !== null && pending.expiresAt <= Date.now() / 1_000) {
-            await frameClient.request({
-              method: "discardSession",
-              params: {
-                account: kernelAccount.address,
-                chainId: walletChainId,
-                grantKind: "management",
-                slicerId
-              }
-            })
-            await clearStoredPendingReplacementStrict(
-              kernelAccount.address,
-              "store_management",
-              slicerId
-            )
-            pending = null
-            replacement = null
-          }
+              grantKind: "management"
+            }
+          })
+          await clearStoredPendingReplacementStrict(
+            kernelAccount.address,
+            "store_management"
+          )
+          pending = null
+          replacement = null
+        }
 
-          const registered = isRegisteredManagementReplacement(replacement)
-            ? replacement
-            : null
-          const targetMatches =
+        const registered = isRegisteredManagementReplacement(replacement)
+          ? replacement
+          : null
+        const pendingMatchesRegistered =
+          registered !== null &&
+          managementFrameMatchesStored(
+            pending,
+            registered.session,
+            walletChainId
+          )
+        const action = classifyManagementPendingAction({
+          hasMatchingCommittedFrame:
             registered !== null &&
-            managementSessionTargetsMatch(
+            managementFrameMatchesStored(
+              committed,
               registered.session,
-              slicerId,
-              slicerAddress
-            )
-          if (registered !== null && !targetMatches) {
+              walletChainId
+            ),
+          hasPendingFrame: pending !== null,
+          pendingPhase: replacement?.phase ?? null,
+          pendingMatchesRegistered
+        })
+
+        if (action === "discard-orphan") {
+          await frameClient.request({
+            method: "discardSession",
+            params: {
+              account: kernelAccount.address,
+              chainId: walletChainId,
+              grantKind: "management"
+            }
+          })
+          pending = null
+        } else if (action === "ambiguous") {
+          throw new SliceWalletEnablementError(
+            "A pending management registration must be recovered from Slice ID before retrying.",
+            "preserve-pending"
+          )
+        }
+
+        if (action === "resume" || action === "complete-bookkeeping") {
+          if (registered === null) {
             throw new SliceWalletEnablementError(
               "Invalid pending management replacement state.",
               "preserve-pending"
             )
           }
-          const pendingMatchesRegistered =
-            registered !== null &&
-            managementFrameMatchesStored(
-              pending,
-              registered.session,
-              walletChainId
-            )
-          const action = classifyManagementPendingAction({
-            hasMatchingCommittedFrame:
-              registered !== null &&
-              managementFrameMatchesStored(
-                committed,
-                registered.session,
-                walletChainId
-              ),
-            hasPendingFrame: pending !== null,
-            pendingPhase: replacement?.phase ?? null,
-            pendingMatchesRegistered
-          })
-
-          if (action === "discard-orphan") {
-            await frameClient.request({
-              method: "discardSession",
-              params: {
-                account: kernelAccount.address,
-                chainId: walletChainId,
-                grantKind: "management",
-                slicerId
-              }
-            })
-            pending = null
-          } else if (action === "ambiguous") {
+          const resumeSession = pendingMatchesRegistered ? pending : committed
+          if (resumeSession === null) {
             throw new SliceWalletEnablementError(
-              "A pending management registration must be recovered from Slice ID before retrying.",
+              "The pending management session cannot be reconciled on this device.",
               "preserve-pending"
             )
           }
-
-          if (action === "resume" || action === "complete-bookkeeping") {
-            if (registered === null) {
-              throw new SliceWalletEnablementError(
-                "Invalid pending management replacement state.",
-                "preserve-pending"
-              )
-            }
-            const resumeSession = pendingMatchesRegistered ? pending : committed
-            if (resumeSession === null) {
-              throw new SliceWalletEnablementError(
-                "The pending management session cannot be reconciled on this device.",
-                "preserve-pending"
-              )
-            }
-            if (pending !== null) {
-              try {
-                await finalizeRegisteredReplacement({
-                  client: storeManagement.client,
-                  delegationId: registered.session.delegationId,
-                  frameClient,
-                  previousSessions: registered.previousSessions,
-                  session: resumeSession
-                })
-              } catch (caught) {
-                const error =
-                  caught instanceof Error
-                    ? caught
-                    : new Error("Slice Wallet replacement recovery failed.")
-                if (!isSliceWalletDelegationNotFoundError(error)) throw error
-                await frameClient
-                  .request({
-                    method: "discardSession",
-                    params: {
-                      account: kernelAccount.address,
-                      chainId: walletChainId,
-                      grantKind: "management",
-                      slicerId
-                    }
-                  })
-                  .catch(() => undefined)
-                await clearStoredPendingReplacementStrict(
-                  kernelAccount.address,
-                  "store_management",
-                  slicerId
-                )
-                rejectRevokedManagementPermission()
-              }
-            }
-            await runManagementCommitPhase({
-              activate: () =>
-                activateManagementExecutionSession({
-                  assertCurrent: control.assertCurrent,
-                  credential,
-                  kernelAccount,
-                  session: resumeSession,
-                  stored: registered.session
-                }),
-              assertCurrent: control.assertCurrent,
-              clearPending: () =>
-                clearStoredPendingReplacementStrict(
-                  kernelAccount.address,
-                  "store_management",
-                  slicerId
-                ),
-              commit:
-                pending === null
-                  ? async () => undefined
-                  : async () => {
-                      await frameClient.request({
-                        method: "commitSession",
-                        params: {
-                          account: resumeSession.account,
-                          chainId: resumeSession.chainId,
-                          grantKind: resumeSession.grantKind,
-                          slicerId
-                        }
-                      })
-                    },
-              persist: () =>
-                writeStoredExecutionSessionStrict(registered.session),
-              probeCommitted: async () => {
-                const result = await frameClient.request({
-                  method: "getSession",
+          if (pending !== null) {
+            try {
+              await finalizeRegisteredReplacement({
+                client: storeManagement.client,
+                delegationId: registered.session.delegationId,
+                frameClient,
+                previousSessions: registered.previousSessions,
+                session: resumeSession
+              })
+            } catch (caught) {
+              const error =
+                caught instanceof Error
+                  ? caught
+                  : new Error("Slice Wallet replacement recovery failed.")
+              if (!isSliceWalletDelegationNotFoundError(error)) throw error
+              await frameClient
+                .request({
+                  method: "discardSession",
                   params: {
                     account: kernelAccount.address,
                     chainId: walletChainId,
-                    grantKind: "management",
-                    slicerId
+                    grantKind: "management"
                   }
                 })
-                return managementFrameMatchesStored(
-                  parseManagementFrameSession(
-                    result !== null && typeof result === "object"
-                      ? result
-                      : null
-                  ),
-                  registered.session,
-                  walletChainId
-                )
-              }
-            })
-            notifications?.success?.("1-tap management enabled")
-            return
+                .catch(() => undefined)
+              await clearStoredPendingReplacementStrict(
+                kernelAccount.address,
+                "store_management"
+              )
+              rejectRevokedManagementPermission()
+            }
           }
-
-          control.assertCurrent()
-          const expiresAtDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000)
-          const policy = createSliceStoreManagementPolicyDescriptor({
-            account: kernelAccount.address,
-            chainId: walletChainId,
-            expiresAt: Math.floor(expiresAtDate.getTime() / 1_000),
-            slicerAddress,
-            slicerId
-          })
-          const created = await frameClient.request({
-            method: "createSession",
-            params: { policy, slicerId }
-          })
-          if (created === null || typeof created !== "object") {
-            throw new Error(
-              "Slice Wallet signer did not create a management session."
-            )
-          }
-          const session = parseSliceWalletFrameSession(
-            created as SliceWalletProtocolValue
-          )
-          let authorization: SliceWalletPermissionAuthorization | null = null
-          let registrationCompleted = false
-          let registeredMetadataPersisted = false
-          let registrationSent = false
-          try {
-            authorization = await authorizeSliceWalletSession({
-              ceremonyBroker,
-              ceremonyMode,
-              document,
-              idOrigin: normalizedIdOrigin,
-              session,
-              window
-            })
-            control.assertCurrent()
-            await writeStoredPendingReplacementStrict({
-              phase: "registering",
-              previousSessions: [],
-              session: {
-                accountAddress: kernelAccount.address,
-                enableSignature: authorization.enableSignature,
-                expiresAt: new Date(session.expiresAt * 1_000).toISOString(),
-                kind: "store_management",
-                permissionId: session.permissionId,
-                signerAddress: session.signerId,
-                slicerAddress,
-                slicerId
-              }
-            })
-            const registration = await runManagementRegistrationPhase({
-              assertCurrent: control.assertCurrent,
-              finalize: async (result) => {
-                if (!result.registration.requiresFinalization) return
-                await finalizeRegisteredReplacement({
-                  client: storeManagement.client,
-                  delegationId: result.registration.delegationId,
-                  frameClient,
-                  previousSessions: result.registration.previousSessions,
-                  session
-                })
-              },
-              persistRegistered: async (result) => {
-                await writeStoredPendingReplacementStrict(result.replacement)
-                registeredMetadataPersisted = true
-              },
-              register: async () => {
-                registrationSent = true
-                const result =
-                  await storeManagement.client.registerAuthorization({
-                    authorization:
-                      authorization as SliceWalletPermissionAuthorization,
-                    slicerAddress,
-                    slicerId
-                  })
-                registrationCompleted = true
-                const stored = {
-                  accountAddress: kernelAccount.address,
-                  delegationId: result.delegationId,
-                  enableSignature: (
-                    authorization as SliceWalletPermissionAuthorization
-                  ).enableSignature,
-                  expiresAt: result.expiresAt,
-                  kind: "store_management",
-                  permissionId: result.permissionId,
-                  signerAddress: result.signerAddress,
-                  slicerAddress,
-                  slicerId
-                } satisfies StoredSliceWalletExecutionSession
-                return {
-                  registration: result,
-                  replacement: {
-                    phase: "registered",
-                    previousSessions: result.previousSessions,
-                    session: stored
-                  } satisfies StoredSliceWalletRegisteredReplacement,
-                  stored
+          await runManagementCommitPhase({
+            activate: () =>
+              activateManagementExecutionSession({
+                assertCurrent: control.assertCurrent,
+                credential,
+                kernelAccount,
+                session: resumeSession,
+                stored: registered.session
+              }),
+            assertCurrent: control.assertCurrent,
+            clearPending: () =>
+              clearStoredPendingReplacementStrict(
+                kernelAccount.address,
+                "store_management"
+              ),
+            commit:
+              pending === null
+                ? async () => undefined
+                : async () => {
+                    await frameClient.request({
+                      method: "commitSession",
+                      params: {
+                        account: resumeSession.account,
+                        chainId: resumeSession.chainId,
+                        grantKind: resumeSession.grantKind
+                      }
+                    })
+                  },
+            persist: () =>
+              writeStoredExecutionSessionStrict(registered.session),
+            probeCommitted: async () => {
+              const result = await frameClient.request({
+                method: "getSession",
+                params: {
+                  account: kernelAccount.address,
+                  chainId: walletChainId,
+                  grantKind: "management"
                 }
-              }
-            })
-            await runManagementCommitPhase({
-              activate: () =>
-                activateManagementExecutionSession({
-                  assertCurrent: control.assertCurrent,
-                  credential,
-                  kernelAccount,
-                  session,
-                  stored: registration.stored
-                }),
-              assertCurrent: control.assertCurrent,
-              clearPending: () =>
-                clearStoredPendingReplacementStrict(
-                  kernelAccount.address,
-                  "store_management",
-                  slicerId
+              })
+              return managementFrameMatchesStored(
+                parseManagementFrameSession(
+                  result !== null && typeof result === "object" ? result : null
                 ),
-              commit: async () => {
-                await frameClient.request({
-                  method: "commitSession",
+                registered.session,
+                walletChainId
+              )
+            }
+          })
+          notifications?.success?.("1-tap management enabled")
+          return
+        }
+
+        control.assertCurrent()
+        const expiresAtDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000)
+        const policy = createSliceStoreManagementPolicyDescriptor({
+          account: kernelAccount.address,
+          chainId: walletChainId,
+          expiresAt: Math.floor(expiresAtDate.getTime() / 1_000)
+        })
+        const created = await frameClient.request({
+          method: "createSession",
+          params: { policy }
+        })
+        if (created === null || typeof created !== "object") {
+          throw new Error(
+            "Slice Wallet signer did not create a management session."
+          )
+        }
+        const session = parseSliceWalletFrameSession(
+          created as SliceWalletProtocolValue
+        )
+        let authorization: SliceWalletPermissionAuthorization | null = null
+        let registrationCompleted = false
+        let registeredMetadataPersisted = false
+        let registrationSent = false
+        try {
+          authorization = await authorizeSliceWalletSession({
+            ceremonyBroker,
+            ceremonyMode,
+            document,
+            idOrigin: normalizedIdOrigin,
+            session,
+            window
+          })
+          control.assertCurrent()
+          await writeStoredPendingReplacementStrict({
+            phase: "registering",
+            previousSessions: [],
+            session: {
+              accountAddress: kernelAccount.address,
+              enableSignature: authorization.enableSignature,
+              expiresAt: new Date(session.expiresAt * 1_000).toISOString(),
+              kind: "store_management",
+              permissionId: session.permissionId,
+              signerAddress: session.signerId
+            }
+          })
+          const registration = await runManagementRegistrationPhase({
+            assertCurrent: control.assertCurrent,
+            finalize: async (result) => {
+              if (!result.registration.requiresFinalization) return
+              await finalizeRegisteredReplacement({
+                client: storeManagement.client,
+                delegationId: result.registration.delegationId,
+                frameClient,
+                previousSessions: result.registration.previousSessions,
+                session
+              })
+            },
+            persistRegistered: async (result) => {
+              await writeStoredPendingReplacementStrict(result.replacement)
+              registeredMetadataPersisted = true
+            },
+            register: async () => {
+              registrationSent = true
+              const result = await storeManagement.client.registerAuthorization(
+                authorization as SliceWalletPermissionAuthorization
+              )
+              registrationCompleted = true
+              const stored = {
+                accountAddress: kernelAccount.address,
+                delegationId: result.delegationId,
+                enableSignature: (
+                  authorization as SliceWalletPermissionAuthorization
+                ).enableSignature,
+                expiresAt: result.expiresAt,
+                kind: "store_management",
+                permissionId: result.permissionId,
+                signerAddress: result.signerAddress
+              } satisfies StoredSliceWalletExecutionSession
+              return {
+                registration: result,
+                replacement: {
+                  phase: "registered",
+                  previousSessions: result.previousSessions,
+                  session: stored
+                } satisfies StoredSliceWalletRegisteredReplacement,
+                stored
+              }
+            }
+          })
+          await runManagementCommitPhase({
+            activate: () =>
+              activateManagementExecutionSession({
+                assertCurrent: control.assertCurrent,
+                credential,
+                kernelAccount,
+                session,
+                stored: registration.stored
+              }),
+            assertCurrent: control.assertCurrent,
+            clearPending: () =>
+              clearStoredPendingReplacementStrict(
+                kernelAccount.address,
+                "store_management"
+              ),
+            commit: async () => {
+              await frameClient.request({
+                method: "commitSession",
+                params: {
+                  account: session.account,
+                  chainId: session.chainId,
+                  grantKind: session.grantKind
+                }
+              })
+            },
+            persist: () =>
+              writeStoredExecutionSessionStrict(registration.stored),
+            probeCommitted: async () => {
+              const result = await frameClient.request({
+                method: "getSession",
+                params: {
+                  account: kernelAccount.address,
+                  chainId: walletChainId,
+                  grantKind: "management"
+                }
+              })
+              return managementFrameMatchesStored(
+                parseManagementFrameSession(
+                  result !== null && typeof result === "object" ? result : null
+                ),
+                registration.stored,
+                walletChainId
+              )
+            }
+          })
+        } catch (caught) {
+          if (!registrationSent) {
+            await Promise.all([
+              frameClient
+                .request({
+                  method: "discardSession",
                   params: {
                     account: session.account,
                     chainId: session.chainId,
-                    grantKind: session.grantKind,
-                    slicerId
+                    grantKind: "management"
                   }
                 })
-              },
-              persist: () =>
-                writeStoredExecutionSessionStrict(registration.stored),
-              probeCommitted: async () => {
-                const result = await frameClient.request({
-                  method: "getSession",
-                  params: {
-                    account: kernelAccount.address,
-                    chainId: walletChainId,
-                    grantKind: "management",
-                    slicerId
-                  }
-                })
-                return managementFrameMatchesStored(
-                  parseManagementFrameSession(
-                    result !== null && typeof result === "object"
-                      ? result
-                      : null
-                  ),
-                  registration.stored,
-                  walletChainId
-                )
-              }
-            })
-          } catch (caught) {
-            if (!registrationSent) {
-              await Promise.all([
-                frameClient
-                  .request({
-                    method: "discardSession",
-                    params: {
-                      account: session.account,
-                      chainId: session.chainId,
-                      grantKind: "management",
-                      slicerId
-                    }
-                  })
-                  .catch(() => undefined),
-                clearStoredPendingReplacement(
-                  kernelAccount.address,
-                  "store_management",
-                  slicerId
-                )
-              ])
-              throw new SliceWalletEnablementError(
-                caught instanceof Error
-                  ? caught.message
-                  : "Unable to enable 1-tap management.",
-                getEnablementRecoveryMode({
-                  bookkeepingComplete: false,
-                  pendingPhase: null
-                })
+                .catch(() => undefined),
+              clearStoredPendingReplacement(
+                kernelAccount.address,
+                "store_management"
               )
-            }
-            if (caught instanceof SliceWalletEnablementError) throw caught
-            if (registrationCompleted && registeredMetadataPersisted) {
-              throw new SliceWalletEnablementError(
-                "The registered management permission is pending. Retry to continue reconciliation.",
-                getEnablementRecoveryMode({
-                  bookkeepingComplete: false,
-                  pendingPhase: "registered"
-                })
-              )
-            }
+            ])
             throw new SliceWalletEnablementError(
-              "The management registration outcome must be recovered from Slice ID before retrying.",
+              caught instanceof Error
+                ? caught.message
+                : "Unable to enable 1-tap management.",
               getEnablementRecoveryMode({
                 bookkeepingComplete: false,
-                pendingPhase: "registering"
+                pendingPhase: null
               })
             )
           }
-          notifications?.success?.("1-tap management enabled")
+          if (caught instanceof SliceWalletEnablementError) throw caught
+          if (registrationCompleted && registeredMetadataPersisted) {
+            throw new SliceWalletEnablementError(
+              "The registered management permission is pending. Retry to continue reconciliation.",
+              getEnablementRecoveryMode({
+                bookkeepingComplete: false,
+                pendingPhase: "registered"
+              })
+            )
+          }
+          throw new SliceWalletEnablementError(
+            "The management registration outcome must be recovered from Slice ID before retrying.",
+            getEnablementRecoveryMode({
+              bookkeepingComplete: false,
+              pendingPhase: "registering"
+            })
+          )
         }
-      })
-    },
-    [
-      activeWalletRef,
-      activateManagementExecutionSession,
-      ceremonyBroker,
-      ceremonyMode,
-      finalizeRegisteredReplacement,
-      getFrameClient,
-      managementLifecycle,
-      normalizedIdOrigin,
-      notifications,
-      sliceAccountClient,
-      storeManagement,
-      walletChainId
-    ]
-  )
+        notifications?.success?.("1-tap management enabled")
+      }
+    })
+  }, [
+    activeWalletRef,
+    activateManagementExecutionSession,
+    ceremonyBroker,
+    ceremonyMode,
+    finalizeRegisteredReplacement,
+    getFrameClient,
+    managementLifecycle,
+    normalizedIdOrigin,
+    notifications,
+    sliceAccountClient,
+    storeManagement,
+    walletChainId
+  ])

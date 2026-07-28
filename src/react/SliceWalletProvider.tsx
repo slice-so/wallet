@@ -18,7 +18,7 @@ import {
   isAddressEqual
 } from "viem"
 import { anvil } from "viem/chains"
-import { useConnection } from "wagmi"
+import { useConnection, useConnectionEffect } from "wagmi"
 import {
   type createSliceWalletCeremonyKernelAccount,
   getSliceWalletChainManifest
@@ -41,7 +41,10 @@ import type {
   SliceWalletStatus
 } from "../types/react"
 import { sliceWalletConnectorId } from "../wagmi"
-import { useSliceWalletAccountHydration } from "./accountHydration"
+import {
+  shouldLockReplacedSliceAccount,
+  useSliceWalletAccountHydration
+} from "./accountHydration"
 import {
   useSliceWalletCeremonyActions,
   useSliceWalletCeremonyConnection
@@ -110,6 +113,12 @@ export function SliceWalletProvider({
     connection.connector.id === sliceWalletConnectorId
       ? connection.address
       : null
+  const [sessionAccount, setSessionAccount] = useState<Address | null>(() =>
+    connection.address !== undefined &&
+    connection.connector?.id === sliceWalletConnectorId
+      ? connection.address
+      : null
+  )
   const [pendingAction, setPendingAction] =
     useState<SliceWalletPendingAction>(null)
   const [error, setError] = useState<string | null>(null)
@@ -118,9 +127,8 @@ export function SliceWalletProvider({
   const [hasStoredCredential, setHasStoredCredential] = useState(false)
   const [executionSession, setExecutionSession] =
     useState<SliceWalletExecutionSession | null>(null)
-  const [managementExecutionSessions, setManagementExecutionSession] = useState<
-    Map<number, SliceWalletManagementExecutionSession>
-  >(() => new Map())
+  const [managementExecutionSession, setManagementExecutionSession] =
+    useState<SliceWalletManagementExecutionSession | null>(null)
   const [recovery, setRecovery] = useState<SliceWalletRecoverySnapshot | null>(
     null
   )
@@ -131,8 +139,20 @@ export function SliceWalletProvider({
     },
     [notifications]
   )
+  // Reconnection temporarily hides the active account. Preserve the API
+  // session until Wagmi reports a real established disconnect.
+  useConnectionEffect({
+    config: wagmiConfig,
+    onDisconnect() {
+      setSessionAccount(null)
+    }
+  })
+  useEffect(() => {
+    if (connection.status !== "connected") return
+    setSessionAccount(connectedSliceAccount)
+  }, [connectedSliceAccount, connection.status])
   const sessionIntegration = useSliceWalletSessionIntegration({
-    account: connectedSliceAccount,
+    account: sessionAccount,
     ...(sessionConfig === undefined
       ? {}
       : {
@@ -174,13 +194,7 @@ export function SliceWalletProvider({
       chainId: walletChain.id,
       hydrate: (account, control) =>
         managementHydrationTaskRef.current(account, control),
-      onIdentityChange: (slicerId) =>
-        setManagementExecutionSession((current) => {
-          if (slicerId === undefined) return new Map()
-          const next = new Map(current)
-          next.delete(slicerId)
-          return next
-        }),
+      onIdentityChange: () => setManagementExecutionSession(null),
       onMutation: (message) => broadcastManagementMutationRef.current?.(message)
     })
   }
@@ -286,10 +300,14 @@ export function SliceWalletProvider({
     const previousAccount = previousSliceAccountRef.current
     previousSliceAccountRef.current = connectedSliceAccount
     managementLifecycle.setAccount(connectedSliceAccount)
+    // Explicit disconnect locking belongs to the connector runtime. This path
+    // only locks a signer when a different Slice account replaces it.
     if (
       previousAccount !== null &&
-      (connectedSliceAccount === null ||
-        !isAddressEqual(previousAccount, connectedSliceAccount))
+      shouldLockReplacedSliceAccount({
+        connectedAccount: connectedSliceAccount,
+        previousAccount
+      })
     ) {
       void getFrameClient()
         .then((frameClient) =>
@@ -302,7 +320,7 @@ export function SliceWalletProvider({
     }
     if (connectedSliceAccount !== null) return
     setExecutionSession(null)
-    setManagementExecutionSession(new Map())
+    setManagementExecutionSession(null)
   }, [connectedSliceAccount, getFrameClient, managementLifecycle])
 
   useEffect(() => {
@@ -326,8 +344,6 @@ export function SliceWalletProvider({
         typeof message !== "object" ||
         typeof message.sourceId !== "string" ||
         typeof message.chainId !== "number" ||
-        !Number.isSafeInteger(message.slicerId) ||
-        message.slicerId < 0 ||
         (message.outcome !== "error" && message.outcome !== "success") ||
         typeof message.account !== "string" ||
         !isAddress(message.account) ||
@@ -340,10 +356,7 @@ export function SliceWalletProvider({
       ) {
         return
       }
-      managementLifecycle.handleExternalMutation(
-        message.account,
-        message.slicerId
-      )
+      managementLifecycle.handleExternalMutation(message.account)
     }
     channel.addEventListener("message", handleMessage)
     return () => {
@@ -356,8 +369,12 @@ export function SliceWalletProvider({
   const pendingCeremony = featurePendingCeremony ?? connectorPendingCeremony
 
   const getManagementExecutionSession = useCallback(
-    (slicerId: number) => managementExecutionSessions.get(slicerId) ?? null,
-    [managementExecutionSessions]
+    () => managementExecutionSession,
+    [managementExecutionSession]
+  )
+  const getStoreCreationExecutionSession = useCallback(
+    () => managementExecutionSession,
+    [managementExecutionSession]
   )
 
   const getConnectorProvider = useCallback(async () => {
@@ -513,6 +530,7 @@ export function SliceWalletProvider({
       hasStoredCredential,
       loginWallet,
       getManagementExecutionSession,
+      getStoreCreationExecutionSession,
       managementHydration,
       pendingAction,
       pendingCeremony,
@@ -542,6 +560,7 @@ export function SliceWalletProvider({
       hasStoredCredential,
       loginWallet,
       getManagementExecutionSession,
+      getStoreCreationExecutionSession,
       managementHydration,
       pendingAction,
       pendingCeremony,

@@ -14,6 +14,10 @@ import {
   sliceWalletDefaultRpId,
   sliceWalletEntryPoint
 } from "../constants"
+import {
+  assertSliceStoreManagementPolicyDescriptor,
+  bindSliceStoreManagementPolicySigner
+} from "../execution/commerce/policies"
 import { assertSliceWalletExecutionSafety } from "../executionSafety"
 import {
   encodeSliceWalletSyntheticWebAuthnSignature,
@@ -74,16 +78,8 @@ const isBridgeChallenge = (
     return false
   const input = value as { readonly [key: string]: SliceWalletProtocolValue }
   const grantKind = input.grantKind
-  const slicerId = input.slicerId
-  const managementKeyValid =
-    grantKind === "management"
-      ? Object.keys(input).length === 7 &&
-        typeof slicerId === "number" &&
-        Number.isSafeInteger(slicerId) &&
-        slicerId >= 0
-      : Object.keys(input).length === 6 && slicerId === undefined
   return (
-    managementKeyValid &&
+    Object.keys(input).length === 6 &&
     input.type === "slice-wallet:bridge-challenge" &&
     input.version === 1 &&
     typeof input.account === "string" &&
@@ -330,16 +326,26 @@ export const attachSliceWalletSignerFrame = ({
     if (parentOrigin === null) throw new Error("Wallet frame is not connected.")
 
     if (request.method === "createSession") {
-      const policy = request.params.policy
-      if (policy.validUntil <= now())
+      const requestedPolicy = request.params.policy
+      if (requestedPolicy.validUntil <= now())
         throw new Error("Wallet policy is already expired.")
       if (
-        policy.grantKind === "generic" &&
-        policy.validUntil - now() > maximumBrowserGenericGrantTtlSec
+        requestedPolicy.grantKind === "generic" &&
+        requestedPolicy.validUntil - now() > maximumBrowserGenericGrantTtlSec
       ) {
         throw new Error("Generic wallet policy exceeds the maximum lifetime.")
       }
       const keyPair = await generateSliceWalletP256KeyPair(cryptoImpl)
+      const policy =
+        requestedPolicy.grantKind === "management"
+          ? bindSliceStoreManagementPolicySigner(
+              requestedPolicy,
+              keyPair.signerId
+            )
+          : requestedPolicy
+      if (policy.grantKind === "management") {
+        assertSliceStoreManagementPolicyDescriptor(policy)
+      }
       const session: SliceWalletFrameSession = {
         account: policy.account,
         chainId: policy.chainId,
@@ -351,10 +357,7 @@ export const attachSliceWalletSignerFrame = ({
         permissionId: getWalletPermissionId(policy, keyPair.signerId),
         policy,
         publicKey: keyPair.publicKeyHex,
-        signerId: keyPair.signerId,
-        ...(request.params.slicerId === undefined
-          ? {}
-          : { slicerId: request.params.slicerId })
+        signerId: keyPair.signerId
       }
       await sessionStore.putPending({
         appOrigin: parentOrigin,
@@ -766,8 +769,7 @@ export const attachSliceWalletSignerFrame = ({
               request.session.account.toLowerCase() !==
                 parsedSession.account.toLowerCase() ||
               request.session.chainId !== parsedSession.chainId ||
-              request.session.grantKind !== parsedSession.grantKind ||
-              request.session.slicerId !== parsedSession.slicerId
+              request.session.grantKind !== parsedSession.grantKind
             ) {
               throw new Error(
                 "Bridge registration proof does not match the pending generic session."

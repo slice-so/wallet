@@ -18,7 +18,8 @@ import {
   maxUint256,
   pad,
   slice,
-  toFunctionSelector
+  toFunctionSelector,
+  zeroAddress
 } from "viem"
 import { maximumBrowserGenericGrantTtlSec } from "./constants"
 import type {
@@ -51,6 +52,8 @@ type SerializedWalletPolicyParameterRule =
   SerializedWalletPolicyDescriptor["calls"][number]["parameterRules"][number]
 
 const walletPermissionActivationSkewSeconds = 300
+
+export const walletPolicyWildcardTarget = zeroAddress
 
 export const getWalletPermissionValidAfter = (nowMs = Date.now()) =>
   Math.max(0, Math.floor(nowMs / 1_000) - walletPermissionActivationSkewSeconds)
@@ -141,7 +144,8 @@ const parseSerializedWalletPolicyParameterRule = (
   if (
     condition !== "equal" &&
     condition !== "greater_than" &&
-    condition !== "less_than_or_equal"
+    condition !== "less_than_or_equal" &&
+    condition !== "not_equal"
   ) {
     throw new Error("Wallet policy parameter condition is unsupported.")
   }
@@ -292,7 +296,8 @@ const grantKindCode = {
 const conditionCode = {
   equal: ParamCondition.EQUAL,
   greater_than: ParamCondition.GREATER_THAN,
-  less_than_or_equal: ParamCondition.LESS_THAN_OR_EQUAL
+  less_than_or_equal: ParamCondition.LESS_THAN_OR_EQUAL,
+  not_equal: ParamCondition.NOT_EQUAL
 } as const satisfies Record<WalletPolicyParameterCondition, ParamCondition>
 
 const policyEncodingParameters = [
@@ -456,6 +461,20 @@ export const normalizeWalletPolicyDescriptor = (
       valueLimit: call.valueLimit
     }))
     .sort(compareCallRules)
+
+  for (const call of calls) {
+    if (!isAddressEqual(call.target, walletPolicyWildcardTarget)) continue
+    if (call.selector === "0x00000000") {
+      throw new Error(
+        "Wallet policy wildcard targets cannot authorize native transfers."
+      )
+    }
+    if (call.valueLimit !== 0n) {
+      throw new Error(
+        "Wallet policy wildcard targets require a zero value limit."
+      )
+    }
+  }
 
   const callKeys = calls.map(
     (call) => `${call.target.toLowerCase()}:${call.selector.toLowerCase()}`
@@ -666,7 +685,11 @@ export const assertWalletCallMatchesRule = (
   rule: WalletPolicyCallRule
 ) => {
   const value = call.value ?? 0n
-  if (!isAddressEqual(call.to, rule.target) || value > rule.valueLimit) {
+  if (
+    (!isAddressEqual(call.to, rule.target) &&
+      !isAddressEqual(rule.target, walletPolicyWildcardTarget)) ||
+    value > rule.valueLimit
+  ) {
     throw new Error("Wallet call is outside the delegated policy.")
   }
 
@@ -693,7 +716,9 @@ export const assertWalletCallMatchesRule = (
         ? actual.toLowerCase() === expected.toLowerCase()
         : parameterRule.condition === "greater_than"
           ? hexToBigInt(actual) > hexToBigInt(expected)
-          : hexToBigInt(actual) <= hexToBigInt(expected)
+          : parameterRule.condition === "less_than_or_equal"
+            ? hexToBigInt(actual) <= hexToBigInt(expected)
+            : actual.toLowerCase() !== expected.toLowerCase()
     if (!matches) {
       throw new Error("Wallet call parameter is outside the delegated policy.")
     }
@@ -707,12 +732,19 @@ export const assertWalletCallsMatchPolicy = (
   const normalized = normalizeWalletPolicyDescriptor(descriptor)
   if (calls.length === 0) throw new Error("Wallet operation contains no calls.")
   for (const call of calls) {
-    const matchingRule = normalized.calls.find(
-      (rule) =>
-        isAddressEqual(call.to, rule.target) &&
-        (call.data ?? "0x").slice(0, 10).toLowerCase() ===
-          (rule.selector === "0x00000000" ? "0x" : rule.selector.toLowerCase())
+    const selector = (call.data ?? "0x").slice(0, 10).toLowerCase()
+    const selectorMatches = (rule: WalletPolicyCallRule) =>
+      selector ===
+      (rule.selector === "0x00000000" ? "0x" : rule.selector.toLowerCase())
+    const exactRule = normalized.calls.find(
+      (rule) => isAddressEqual(call.to, rule.target) && selectorMatches(rule)
     )
+    const wildcardRule = normalized.calls.find(
+      (rule) =>
+        isAddressEqual(rule.target, walletPolicyWildcardTarget) &&
+        selectorMatches(rule)
+    )
+    const matchingRule = exactRule ?? wildcardRule
     if (matchingRule === undefined) {
       throw new Error("Wallet call is not present in the delegated policy.")
     }

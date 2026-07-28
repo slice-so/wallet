@@ -41,14 +41,13 @@ export type SliceWalletManagementMutationBroadcast = {
   account: Address
   chainId: number
   outcome: "error" | "success"
-  slicerId: number
   sourceId: string
 }
 
 export type SliceWalletManagementLifecycle = {
   getAccount: () => Address | null
   getSnapshot: () => SliceWalletManagementHydrationSnapshot
-  handleExternalMutation: (account: Address, slicerId: number) => void
+  handleExternalMutation: (account: Address) => void
   markHydrationError: (
     account: Address,
     error: SliceWalletManagementHydrationError
@@ -61,7 +60,6 @@ export type SliceWalletManagementLifecycle = {
   ) => Promise<void>
   runMutation: <Result>(input: {
     account: Address
-    slicerId: number
     task: (control: SliceWalletManagementLifecycleControl) => Promise<Result>
   }) => Promise<Result>
   setAccount: (account: Address | null) => void
@@ -103,7 +101,6 @@ export type SliceWalletManagementDelegationSnapshot = {
   signerAddress: Address
   signerPublicKey: Hex | null
   signerScheme: "eoa" | "p256"
-  slicerId: number | null
   walletPolicy: SerializedWalletPolicyDescriptor | null
 }
 
@@ -113,8 +110,6 @@ export type SliceWalletManagementDelegationState = {
 
 export type SliceWalletManagementExecutionSession = {
   expiresAt: Date
-  slicerAddress: Address
-  slicerId: number
   sliceAccountClient: SliceAccountClient
 }
 
@@ -133,8 +128,6 @@ export type StoredSliceWalletExecutionSession = {
     }
   | {
       kind: "store_management"
-      slicerAddress: Address
-      slicerId: number
     }
 )
 
@@ -198,10 +191,8 @@ export type SliceWalletCheckoutExecutionAdapters = {
 
 export type SliceWalletManagementExecutionAdapters = {
   client: SliceWalletManagementExecutionClient
-  fetchDelegation: (
-    slicerId: number
-  ) => Promise<SliceWalletManagementDelegationState>
-  revokeDelegation: (slicerId: number) => Promise<{ revoked: number }>
+  fetchDelegation: () => Promise<SliceWalletManagementDelegationState>
+  revokeDelegation: () => Promise<{ revoked: number }>
 }
 
 export type SliceWalletProviderAdapters = {
@@ -255,23 +246,16 @@ export type SliceWalletContextValue = {
   executionSession: SliceWalletExecutionSession | null
   hasStoredCredential: boolean
   loginWallet: () => Promise<boolean>
-  getManagementExecutionSession: (
-    slicerId: number
-  ) => SliceWalletManagementExecutionSession | null
+  getManagementExecutionSession: () => SliceWalletManagementExecutionSession | null
+  getStoreCreationExecutionSession: () => SliceWalletManagementExecutionSession | null
   managementHydration: SliceWalletManagementHydrationSnapshot
   pendingAction: SliceWalletPendingAction
   pendingCeremony: SliceWalletPendingCeremony | null
   recovery: SliceWalletRecoverySnapshot | null
   recoveryPendingAction: SliceWalletRecoveryPendingAction
   refreshExecutionAllowance: () => Promise<void>
-  disableManagementExecutionSession: (input: {
-    slicerAddress: Address
-    slicerId: number
-  }) => Promise<void>
-  enableManagementExecutionSession: (input: {
-    slicerAddress: Address
-    slicerId: number
-  }) => Promise<void>
+  disableManagementExecutionSession: () => Promise<void>
+  enableManagementExecutionSession: () => Promise<void>
   refreshRecovery: () => Promise<void>
   retryManagementHydration: () => Promise<void>
   signInWallet: () => Promise<void>

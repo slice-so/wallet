@@ -28,18 +28,16 @@ type StoredManagementSession = Extract<
 const clearManagementFrameSession = async ({
   account,
   chainId,
-  frameClient,
-  slicerId
+  frameClient
 }: {
   account: Address
   chainId: number
   frameClient: SliceWalletSignerFrameClient
-  slicerId: number
 }) => {
   await frameClient
     .request({
       method: "clearSession",
-      params: { account, chainId, grantKind: "management", slicerId }
+      params: { account, chainId, grantKind: "management" }
     })
     .catch(() => undefined)
 }
@@ -53,8 +51,7 @@ export const hydrateStoredManagementExecutionSession = async ({
   fetchDelegation,
   getFrameClient,
   readStoredSession = readStoredExecutionSessionResult,
-  setSessionNull,
-  slicerId
+  setSessionNull
 }: {
   account: Address
   activate: (input: {
@@ -70,13 +67,8 @@ export const hydrateStoredManagementExecutionSession = async ({
   getFrameClient: () => Promise<SliceWalletSignerFrameClient>
   readStoredSession?: typeof readStoredExecutionSessionResult
   setSessionNull: () => void
-  slicerId: number
 }) => {
-  const storedResult = await readStoredSession(
-    account,
-    "store_management",
-    slicerId
-  )
+  const storedResult = await readStoredSession(account, "store_management")
   control.assertCurrent()
 
   if (storedResult.status === "unavailable") {
@@ -87,7 +79,7 @@ export const hydrateStoredManagementExecutionSession = async ({
   if (storedResult.status === "missing") {
     let activeDelegationExists = false
     try {
-      const { delegation } = await fetchDelegation(slicerId)
+      const { delegation } = await fetchDelegation()
       activeDelegationExists =
         delegation !== null &&
         delegation.signerScheme === "p256" &&
@@ -108,22 +100,20 @@ export const hydrateStoredManagementExecutionSession = async ({
     control.assertCurrent()
     setSessionNull()
     if (storedResult.status === "found") {
-      await clearStoredSession(account, "store_management", slicerId)
+      await clearStoredSession(account, "store_management")
     }
     if (frameClient !== undefined) {
       await clearManagementFrameSession({
         account,
         chainId,
-        frameClient,
-        slicerId
+        frameClient
       })
     } else {
       try {
         await clearManagementFrameSession({
           account,
           chainId,
-          frameClient: await getFrameClient(),
-          slicerId
+          frameClient: await getFrameClient()
         })
       } catch {
         // The invalid local record is already gone; repair can replace the frame.
@@ -150,9 +140,9 @@ export const hydrateStoredManagementExecutionSession = async ({
     const results = await Promise.all([
       frameClient.request({
         method: "getSession",
-        params: { account, chainId, grantKind: "management", slicerId }
+        params: { account, chainId, grantKind: "management" }
       }),
-      fetchDelegation(slicerId)
+      fetchDelegation()
     ])
     frameResult = results[0]
     delegation = results[1].delegation
@@ -170,8 +160,7 @@ export const hydrateStoredManagementExecutionSession = async ({
     delegation.signerScheme !== "p256" ||
     delegation.permissionId === null ||
     delegation.signerPublicKey === null ||
-    delegation.walletPolicy === null ||
-    delegation.slicerId !== stored.slicerId
+    delegation.walletPolicy === null
   ) {
     await clearInvalidSession(frameClient)
     return
@@ -187,8 +176,7 @@ export const hydrateStoredManagementExecutionSession = async ({
       account,
       chainId,
       expiresAt: session.expiresAt,
-      slicerAddress: stored.slicerAddress,
-      slicerId: stored.slicerId,
+      sessionSignerAddress: session.signerId,
       startsAt: session.policy.validAfter
     })
     if (

@@ -21,24 +21,22 @@ export const parseManagementFrameSession = (value: object | null) =>
 export const loadManagementReplacementState = async ({
   account,
   chainId,
-  frameClient,
-  slicerId
+  frameClient
 }: {
   account: Address
   chainId: number
   frameClient: SliceWalletSignerFrameClient
-  slicerId: number
 }) => {
   const [pendingValue, committedValue, replacementRead] = await Promise.all([
     frameClient.request({
       method: "getPendingSession",
-      params: { account, chainId, grantKind: "management", slicerId }
+      params: { account, chainId, grantKind: "management" }
     }),
     frameClient.request({
       method: "getSession",
-      params: { account, chainId, grantKind: "management", slicerId }
+      params: { account, chainId, grantKind: "management" }
     }),
-    readStoredPendingReplacementStrict(account, "store_management", slicerId)
+    readStoredPendingReplacementStrict(account, "store_management")
   ])
   if (!replacementRead.ok) {
     throw new SliceWalletEnablementError(
@@ -72,7 +70,6 @@ export const managementFrameMatchesStored = (
   frame !== null &&
   frame.chainId === chainId &&
   frame.grantKind === "management" &&
-  frame.slicerId === stored.slicerId &&
   frame.account.toLowerCase() === stored.accountAddress.toLowerCase() &&
   frame.permissionId.toLowerCase() === stored.permissionId.toLowerCase() &&
   frame.signerId.toLowerCase() === stored.signerAddress.toLowerCase() &&
@@ -82,8 +79,7 @@ export const managementFrameMatchesStored = (
         account: stored.accountAddress,
         chainId,
         expiresAt: frame.expiresAt,
-        slicerAddress: stored.slicerAddress,
-        slicerId: stored.slicerId,
+        sessionSignerAddress: stored.signerAddress,
         startsAt: frame.policy.validAfter
       })
     )
@@ -260,14 +256,3 @@ export const runManagementCommitPhase = async ({
   }
   assertCurrent()
 }
-
-export const managementSessionTargetsMatch = (
-  session: Extract<
-    StoredSliceWalletExecutionSession,
-    { kind: "store_management" }
-  >,
-  slicerId: number,
-  slicerAddress: string
-) =>
-  session.slicerId === slicerId &&
-  session.slicerAddress.toLowerCase() === slicerAddress.toLowerCase()

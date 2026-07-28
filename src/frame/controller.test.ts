@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { type Address, type Hex, hexToBytes } from "viem"
+import { createSliceStoreManagementPolicyDescriptor } from "../execution/commerce/policies"
 import { verifySliceWalletP256 } from "../p256Server"
 import { createNativeTransferCallRule, getWalletPolicyHash } from "../policy"
 import type {
@@ -56,16 +57,11 @@ class MemorySessionStore implements SliceWalletSessionStore {
       account: Address
       chainId: number
       grantKind: string
-      slicerId?: number
     }
   ) {
-    return [
-      origin,
-      session.account,
-      session.chainId,
-      session.grantKind,
-      session.slicerId ?? ""
-    ].join(":")
+    return [origin, session.account, session.chainId, session.grantKind].join(
+      ":"
+    )
   }
 
   async delete(
@@ -623,7 +619,7 @@ describe("isolated signer-frame controller", () => {
     detachSecond()
   })
 
-  test("answers a management bridge challenge with only that store session", async () => {
+  test("answers an account-wide management bridge challenge and rejects slicer scope", async () => {
     const parent = new MessageChannel()
     const window = new MockMessageWindow(parent.port1)
     const store = new MemorySessionStore()
@@ -643,28 +639,24 @@ describe("isolated signer-frame controller", () => {
       source: parent.port1
     })
     await connected
-    const policy = {
-      account,
-      calls: [createNativeTransferCallRule({ maximumValue: 0n, recipient })],
-      chainId: 8453,
-      grantKind: "management",
-      validAfter: 100,
-      validUntil: 2_000_000_000,
+    const created = receive(connection.port1)
+    connection.port1.postMessage({
+      id: "create-management",
+      method: "createSession",
+      params: {
+        policy: createSliceStoreManagementPolicyDescriptor({
+          account,
+          chainId: 8453,
+          expiresAt: 2_000_000_000,
+          startsAt: 100
+        })
+      },
       version: 1
-    } as const
-    for (const slicerId of [0, 9]) {
-      const created = receive(connection.port1)
-      connection.port1.postMessage({
-        id: `create-${slicerId}`,
-        method: "createSession",
-        params: { policy, slicerId },
-        version: 1
-      } satisfies SliceWalletProtocolValue)
-      await created
-    }
+    } satisfies SliceWalletProtocolValue)
+    await created
 
-    const trusted = new MessageChannel()
-    const trustedResponse = receive(trusted.port1)
+    const scoped = new MessageChannel()
+    const scopedResponse = receive(scoped.port1, 25)
     window.dispatch({
       data: {
         account,
@@ -676,16 +668,13 @@ describe("isolated signer-frame controller", () => {
         version: 1
       },
       origin: "https://id.slice.so",
-      ports: [trusted.port2],
+      ports: [scoped.port2],
       source: parent.port1
     })
-    expect(await trustedResponse).toMatchObject({
-      session: { slicerId: 0 },
-      type: "slice-wallet:bridge-record"
-    })
+    expect(await scopedResponse).toBeNull()
 
-    const missingStore = new MessageChannel()
-    const missingStoreResponse = receive(missingStore.port1, 25)
+    const trusted = new MessageChannel()
+    const trustedResponse = receive(trusted.port1)
     window.dispatch({
       data: {
         account,
@@ -696,10 +685,13 @@ describe("isolated signer-frame controller", () => {
         version: 1
       },
       origin: "https://id.slice.so",
-      ports: [missingStore.port2],
+      ports: [trusted.port2],
       source: parent.port1
     })
-    expect(await missingStoreResponse).toBeNull()
+    expect(await trustedResponse).toMatchObject({
+      session: { account, chainId: 8453, grantKind: "management" },
+      type: "slice-wallet:bridge-record"
+    })
     detach()
   })
 
@@ -913,18 +905,12 @@ describe("isolated signer-frame controller", () => {
       id: "create",
       method: "createSession",
       params: {
-        policy: {
+        policy: createSliceStoreManagementPolicyDescriptor({
           account,
-          calls: [
-            createNativeTransferCallRule({ maximumValue: 0n, recipient })
-          ],
           chainId: 8453,
-          grantKind: "management",
-          validAfter: 90,
-          validUntil: 1_000,
-          version: 1
-        },
-        slicerId: 7
+          expiresAt: 1_000,
+          startsAt: 90
+        })
       },
       version: 1
     } satisfies SliceWalletProtocolValue)
@@ -942,8 +928,7 @@ describe("isolated signer-frame controller", () => {
         session: {
           account,
           chainId: 8453,
-          grantKind: "management",
-          slicerId: 7
+          grantKind: "management"
         }
       },
       version: 1
@@ -961,8 +946,7 @@ describe("isolated signer-frame controller", () => {
       params: {
         account,
         chainId: 8453,
-        grantKind: "management",
-        slicerId: 7
+        grantKind: "management"
       },
       version: 1
     } satisfies SliceWalletProtocolValue)
@@ -980,8 +964,7 @@ describe("isolated signer-frame controller", () => {
         session: {
           account,
           chainId: 8453,
-          grantKind: "management",
-          slicerId: 7
+          grantKind: "management"
         }
       },
       version: 1

@@ -568,12 +568,7 @@ export const createSliceWalletManagementExecutionClient = ({
         }
       )
     ),
-  registerAuthorization: async ({ authorization, slicerAddress, slicerId }) => {
-    if (!Number.isSafeInteger(slicerId) || slicerId < 0) {
-      throw new Error(
-        "Slice management grant requires a non-negative slicer id."
-      )
-    }
+  registerAuthorization: async (authorization) => {
     const { executionGrant, session } =
       assertManagementAuthorization(authorization)
     const registration =
@@ -604,9 +599,7 @@ export const createSliceWalletManagementExecutionClient = ({
               enableSignature: authorization.enableSignature,
               signerId: session.signerId,
               signerProof: executionGrant.signerProof,
-              signerScheme: "p256",
-              slicerAddress,
-              slicerId
+              signerScheme: "p256"
             }),
             headers: { "content-type": "application/json" },
             method: "POST"
@@ -620,16 +613,10 @@ export const createSliceWalletManagementExecutionClient = ({
       !isHex(registration.permissionId, { strict: true }) ||
       hexToBytes(registration.permissionId).length !== 4 ||
       !isAddress(registration.signerAddress) ||
-      !isAddress(registration.slicerAddress) ||
-      !Number.isSafeInteger(registration.slicerId) ||
-      registration.slicerId < 0 ||
       registration.permissionId.toLowerCase() !==
         session.permissionId.toLowerCase() ||
       registration.signerAddress.toLowerCase() !==
         session.signerId.toLowerCase() ||
-      registration.slicerAddress.toLowerCase() !==
-        slicerAddress.toLowerCase() ||
-      registration.slicerId !== slicerId ||
       !isValidRegistrationLifecycle(registration)
     ) {
       throw new Error(

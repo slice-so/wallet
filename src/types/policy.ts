@@ -6,6 +6,7 @@ export type WalletPolicyParameterCondition =
   | "equal"
   | "greater_than"
   | "less_than_or_equal"
+  | "not_equal"
 
 export type WalletPolicyParameterRule = {
   condition: WalletPolicyParameterCondition

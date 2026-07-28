@@ -116,23 +116,12 @@ const parseSessionKey = (
   value: SliceWalletProtocolValue
 ): SliceWalletFrameSessionKey => {
   const input = record(value, "Session key")
-  assertKeys(input, ["account", "chainId", "grantKind"], ["slicerId"])
+  assertKeys(input, ["account", "chainId", "grantKind"])
   const grantKind = grantKindValue(input.grantKind)
-  const slicerId =
-    input.slicerId === undefined
-      ? undefined
-      : integerValue(input.slicerId, "Session slicer id")
-  if (
-    (grantKind === "management" && (slicerId === undefined || slicerId < 0)) ||
-    (grantKind !== "management" && slicerId !== undefined)
-  ) {
-    throw new Error("Management session keys require a non-negative slicer id.")
-  }
   return {
     account: addressValue(input.account, "Session account"),
     chainId: integerValue(input.chainId, "Session chain id"),
-    grantKind,
-    ...(slicerId === undefined ? {} : { slicerId })
+    grantKind
   }
 }
 
@@ -144,7 +133,8 @@ const parseParameterRule = (
   if (
     input.condition !== "equal" &&
     input.condition !== "greater_than" &&
-    input.condition !== "less_than_or_equal"
+    input.condition !== "less_than_or_equal" &&
+    input.condition !== "not_equal"
   ) {
     throw new Error("Unsupported policy parameter condition.")
   }
@@ -287,35 +277,23 @@ export const parseSliceWalletFrameRequest = (
   const params = record(input.params, "Request parameters")
 
   if (method === "createSession") {
-    assertKeys(params, ["policy"], ["checkout", "slicerId"])
+    assertKeys(params, ["policy"], ["checkout"])
     const policy = parseSliceWalletPolicyDescriptor(params.policy)
     const checkout =
       params.checkout === undefined
         ? undefined
         : parseCheckoutGrant(params.checkout)
-    const slicerId =
-      params.slicerId === undefined
-        ? undefined
-        : integerValue(params.slicerId, "Session slicer id")
     if ((policy.grantKind === "checkout") !== (checkout !== undefined)) {
       throw new Error(
         "Checkout policy and checkout grant metadata must be provided together."
       )
-    }
-    if (
-      (policy.grantKind === "management" &&
-        (slicerId === undefined || slicerId < 0)) ||
-      (policy.grantKind !== "management" && slicerId !== undefined)
-    ) {
-      throw new Error("Management sessions require a non-negative slicer id.")
     }
     return {
       id,
       method,
       params: {
         ...(checkout === undefined ? {} : { checkout }),
-        policy,
-        ...(slicerId === undefined ? {} : { slicerId })
+        policy
       },
       version: 1
     }
