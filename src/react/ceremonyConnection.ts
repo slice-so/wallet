@@ -20,7 +20,6 @@ import type {
   SliceWalletPendingAction
 } from "../types/react"
 import { sliceWalletConnectorId } from "../wagmi"
-import type { useSliceWalletSessionIntegration } from "./sessionIntegration"
 
 type RootAccount = Awaited<
   ReturnType<typeof createSliceWalletCeremonyKernelAccount>
@@ -96,7 +95,6 @@ export const useSliceWalletCeremonyActions = ({
   managementLifecycle,
   managementEnabled,
   notifications,
-  sessionIntegration,
   setError,
   setPendingAction,
   wagmiConfig,
@@ -111,7 +109,6 @@ export const useSliceWalletCeremonyActions = ({
   managementLifecycle: SliceWalletManagementLifecycle
   managementEnabled: boolean
   notifications?: SliceWalletNotifications
-  sessionIntegration: ReturnType<typeof useSliceWalletSessionIntegration>
   setError: (value: string | null) => void
   setPendingAction: (value: SliceWalletPendingAction) => void
   wagmiConfig: Config
@@ -175,7 +172,6 @@ export const useSliceWalletCeremonyActions = ({
     if (!activeWallet) throw new Error("Unlock your Slice wallet first.")
     try {
       await (await getSliceProvider()).requestSession()
-      await sessionIntegration.refresh()
       if (managementEnabled) {
         await managementLifecycle.retryHydration(
           activeWallet.kernelAccount.address
@@ -196,7 +192,6 @@ export const useSliceWalletCeremonyActions = ({
     managementEnabled,
     managementLifecycle,
     notifications,
-    sessionIntegration,
     setError
   ])
 

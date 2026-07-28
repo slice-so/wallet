@@ -139,7 +139,6 @@ describe("Slice wallet account session coordination", () => {
       fetch: registryFetch,
       idOrigin: "https://id.slice.so",
       session: {
-        audience: "https://api.slice.test",
         prepare: () => new Promise(() => undefined)
       },
       timeoutMs: 100,
@@ -166,7 +165,6 @@ describe("Slice wallet account session coordination", () => {
       fetch: registryFetch,
       idOrigin: "https://id.slice.so",
       session: {
-        audience: "https://api.slice.test",
         prepare: async () => {
           throw new Error("nonce service unavailable")
         }
@@ -198,10 +196,10 @@ describe("Slice wallet account session coordination", () => {
       fetch: registryFetch,
       idOrigin: "https://id.slice.so",
       session: {
-        audience: "https://api.slice.test",
         prepare: async () => {
           await Bun.sleep(15)
           return {
+            claims: {},
             nonce: "abcdefghijklmnop",
             pendingId: "pending",
             sessionSigner: "0x4444444444444444444444444444444444444444"

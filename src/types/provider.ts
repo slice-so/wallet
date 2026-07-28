@@ -80,13 +80,10 @@ export type SliceWalletParameters = {
   }
   idOrigin?: string
   session?: {
-    audience: string
     onSession?: (
       result: SliceWalletCeremonySessionResult | undefined
     ) => void | Promise<void>
     prepare: NonNullable<SliceWalletSessionConnectInput["prepare"]>
-    scopes?: readonly string[]
-    ttlSeconds?: number
   }
   transports?: Readonly<Record<number, SliceWalletTransportOverrides>>
 }

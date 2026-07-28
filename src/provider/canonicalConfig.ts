@@ -24,7 +24,7 @@ const isLoopbackOrigin = (value: string) => {
   }
 }
 
-const isOrigin = (value: string) => {
+const _isOrigin = (value: string) => {
   try {
     return new URL(value).origin === value
   } catch {
@@ -215,25 +215,11 @@ export const resolveCanonicalSliceWalletConfig = (
       session === null ||
       Array.isArray(session) ||
       Object.keys(session).some(
-        (key) =>
-          ![
-            "audience",
-            "onSession",
-            "prepare",
-            "scopes",
-            "ttlSeconds"
-          ].includes(key)
+        (key) => !["onSession", "prepare"].includes(key)
       ) ||
-      typeof session.audience !== "string" ||
-      !isOrigin(session.audience) ||
       typeof session.prepare !== "function" ||
       (session.onSession !== undefined &&
-        typeof session.onSession !== "function") ||
-      (session.scopes !== undefined &&
-        (!Array.isArray(session.scopes) ||
-          session.scopes.some((scope) => typeof scope !== "string"))) ||
-      (session.ttlSeconds !== undefined &&
-        (!Number.isSafeInteger(session.ttlSeconds) || session.ttlSeconds <= 0)))
+        typeof session.onSession !== "function"))
   ) {
     throw invalidProviderRequest("Slice Wallet session config is invalid.")
   }

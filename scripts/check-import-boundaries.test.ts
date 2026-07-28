@@ -9,7 +9,7 @@ const packageRoot = resolve(import.meta.dir, "..")
 const sourceRoot = resolve(packageRoot, "src")
 
 describe("Slice wallet import boundaries", () => {
-  it("keeps the production source tree independent from Slice packages", async () => {
+  it("keeps the production source tree within its package boundaries", async () => {
     expect(await checkSliceWalletImportBoundaries()).toEqual([])
   })
 
@@ -19,6 +19,7 @@ describe("Slice wallet import boundaries", () => {
       packageRoot,
       sourceRoot,
       sourceText: [
+        'import type { WalletDelegationScope } from "@slicekit/delegation-contract/types"',
         'import "@slicekit/abi"',
         'export * from "@slice/indexer-shared"',
         'const external = import("../../outside")',

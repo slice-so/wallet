@@ -183,8 +183,9 @@ export type SliceWalletManagementExecutionClient = {
   ) => Promise<{ revoked: true }>
 }
 
-export type SliceWalletOwnerPermissionDescriptor =
-  | { kind: "api_only" }
-  | { kind: "p256"; session: SliceWalletExecutionSessionDescriptor }
+export type SliceWalletOwnerPermissionDescriptor = {
+  kind: "p256"
+  session: SliceWalletExecutionSessionDescriptor
+}
 
 export type SliceCommercePolicyDescriptor = WalletPolicyDescriptor

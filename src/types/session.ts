@@ -1,26 +1,17 @@
 import type { Address, Hex } from "viem"
+import type { SliceWalletProtocolValue } from "./frame"
 
 export type SliceWalletPreparedSession = {
-  audience: string
+  claims: SliceWalletProtocolValue
   nonce?: string
   pendingId?: string
-  scopes?: readonly string[]
   sessionSigner: Address
-  ttlSeconds?: number
 }
 
 export type SliceWalletSessionConnectInput = {
-  audience: string
-  prepare?: () => Promise<
-    Omit<SliceWalletPreparedSession, "audience" | "scopes" | "ttlSeconds">
-  >
-  prepared?: Omit<
-    SliceWalletPreparedSession,
-    "audience" | "scopes" | "ttlSeconds"
-  >
-  scopes?: readonly string[]
+  prepare?: () => Promise<SliceWalletPreparedSession>
+  prepared?: SliceWalletPreparedSession
   signal?: AbortSignal
-  ttlSeconds?: number
 }
 
 export type SliceWalletCeremonySessionRequestMessage =
@@ -53,27 +44,6 @@ export type SliceWalletCeremonySessionResult =
   | {
       status: "cancelled" | "preparation_failed" | "timed_out"
     }
-
-export type SliceWalletSessionSnapshot = {
-  account: Address
-  audience: string
-  chainId: number
-  expiresAt: string
-  sessionSigner: Address
-}
-
-export type SliceWalletSessionAdapter = {
-  complete: (
-    result: Extract<SliceWalletCeremonySessionResult, { status: "granted" }>
-  ) => Promise<SliceWalletSessionSnapshot>
-  end: () => Promise<void>
-  fetch: () => Promise<SliceWalletSessionSnapshot | null>
-  prepare: () => Promise<{
-    nonce?: string
-    pendingId?: string
-    sessionSigner: Address
-  }>
-}
 
 export type SliceWalletSessionConnectResult = {
   account: Address

@@ -119,14 +119,7 @@ export const sliceWalletConnector = (parameters: SliceWalletProviderConfig) => {
           parameters.session === undefined || isReconnecting === true
             ? null
             : getProvider().connectWithSession({
-                audience: parameters.session.audience,
-                prepare: parameters.session.prepare,
-                ...(parameters.session.scopes === undefined
-                  ? {}
-                  : { scopes: parameters.session.scopes }),
-                ...(parameters.session.ttlSeconds === undefined
-                  ? {}
-                  : { ttlSeconds: parameters.session.ttlSeconds })
+                prepare: parameters.session.prepare
               })
         const sessionResult = await sessionPromise
         if (sessionResult !== null) {

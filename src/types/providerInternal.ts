@@ -28,13 +28,10 @@ export type SliceWalletProviderConfig = {
   idOrigin: string
   requireAdmittedChain?: boolean
   session?: {
-    audience: string
     onSession?: (
       result: SliceWalletCeremonySessionResult | undefined
     ) => void | Promise<void>
     prepare: NonNullable<SliceWalletSessionConnectInput["prepare"]>
-    scopes?: readonly string[]
-    ttlSeconds?: number
   }
   storage?: Storage
   window?: Window

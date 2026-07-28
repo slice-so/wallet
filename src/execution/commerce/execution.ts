@@ -1,3 +1,7 @@
+import {
+  walletDelegationExecutionScope,
+  walletDelegationStoreManagementScope
+} from "@slicekit/delegation-contract"
 import { type Address, type Hex, hexToBytes, isAddress, isHex } from "viem"
 import { getSliceWalletP256SignerId } from "../../p256Server"
 import {
@@ -19,10 +23,6 @@ import type {
   SliceWalletPermissionAuthorization
 } from "../../types/frame"
 import type { SliceWalletCheckoutCoSignerClient } from "../../types/permission"
-import {
-  walletDelegationExecutionScope,
-  walletDelegationStoreManagementScope
-} from "./delegationScopes"
 
 export class SliceWalletExecutionRequestError extends Error {
   constructor(

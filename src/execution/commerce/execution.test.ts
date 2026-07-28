@@ -1,12 +1,12 @@
 import { describe, expect, it } from "bun:test"
+import {
+  walletDelegationExecutionScope,
+  walletDelegationStoreManagementScope
+} from "@slicekit/delegation-contract"
 import type { Address, Hex } from "viem"
 import { getSliceWalletP256SignerId } from "../../p256Server"
 import { getWalletPermissionId } from "../../policy"
 import type { SliceWalletPermissionAuthorization } from "../../types/frame"
-import {
-  walletDelegationExecutionScope,
-  walletDelegationStoreManagementScope
-} from "./delegationScopes"
 import {
   createSliceWalletCheckoutExecutionClient,
   createSliceWalletManagementExecutionClient

@@ -53,12 +53,7 @@ export const parseSliceWalletCeremonySessionRequestMessage = (
   }
   assertKeys(input, ["request", "status", "type", "version"])
   const request = record(input.request, "Prepared session request")
-  assertKeys(
-    request,
-    ["audience", "sessionSigner"],
-    ["nonce", "pendingId", "scopes", "ttlSeconds"]
-  )
-  const audience = originValue(request.audience, "Session audience")
+  assertKeys(request, ["claims", "sessionSigner"], ["nonce", "pendingId"])
   const sessionSigner = addressValue(request.sessionSigner, "Session signer")
   const nonce =
     request.nonce === undefined
@@ -68,38 +63,18 @@ export const parseSliceWalletCeremonySessionRequestMessage = (
     request.pendingId === undefined
       ? undefined
       : stringValue(request.pendingId, "Pending session id")
-  const ttlSeconds =
-    request.ttlSeconds === undefined
-      ? undefined
-      : integerValue(request.ttlSeconds, "Session TTL")
   if (
     (nonce !== undefined && !/^[A-Za-z0-9_-]{16,256}$/.test(nonce)) ||
-    (pendingId !== undefined && !/^[A-Za-z0-9_-]{1,64}$/.test(pendingId)) ||
-    (ttlSeconds !== undefined &&
-      (ttlSeconds <= 0 || ttlSeconds > 30 * 24 * 60 * 60)) ||
-    (request.scopes !== undefined &&
-      (!Array.isArray(request.scopes) || request.scopes.length > 16))
+    (pendingId !== undefined && !/^[A-Za-z0-9_-]{1,64}$/.test(pendingId))
   ) {
     throw new Error("Prepared session request is invalid.")
   }
-  const scopes = request.scopes?.map((scope) => {
-    const value = stringValue(scope, "Session scope")
-    if (!/^[a-z0-9][a-z0-9_.:-]{0,63}$/.test(value)) {
-      throw new Error("Session scope is invalid.")
-    }
-    return value
-  })
-  if (scopes !== undefined && new Set(scopes).size !== scopes.length) {
-    throw new Error("Session scopes must be unique.")
-  }
   return {
     request: {
-      audience,
+      claims: request.claims,
       ...(nonce === undefined ? {} : { nonce }),
       ...(pendingId === undefined ? {} : { pendingId }),
-      ...(scopes === undefined ? {} : { scopes }),
-      sessionSigner,
-      ...(ttlSeconds === undefined ? {} : { ttlSeconds })
+      sessionSigner
     },
     status,
     type: input.type,

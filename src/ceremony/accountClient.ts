@@ -138,14 +138,7 @@ const runSliceWalletAccountCeremony = async ({
           version: 1
         } satisfies SliceWalletCeremonySessionRequestMessage)
       } else {
-        const preparedRequest = {
-          audience: new URL(session.audience).origin,
-          ...preparation,
-          ...(session.scopes === undefined ? {} : { scopes: session.scopes }),
-          ...(session.ttlSeconds === undefined
-            ? {}
-            : { ttlSeconds: session.ttlSeconds })
-        }
+        const preparedRequest = preparation
         preparedSession = preparedRequest
         port.postMessage({
           request: preparedRequest,

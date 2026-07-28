@@ -118,16 +118,6 @@
       "import": "./dist/esm/server.js",
       "default": "./dist/esm/server.js"
     },
-    "./session": {
-      "development": {
-        "types": "./src/session.ts",
-        "import": "./src/session.ts",
-        "default": "./src/session.ts"
-      },
-      "types": "./dist/esm/session.d.ts",
-      "import": "./dist/esm/session.js",
-      "default": "./dist/esm/session.js"
-    },
     "./wagmi": {
       "development": {
         "types": "./src/wagmi.ts",
@@ -162,7 +152,7 @@
   },
   "dependencies": {
     "@slicekit/abi": "workspace:*",
-    "@slicekit/erc8128": "workspace:*",
+    "@slicekit/delegation-contract": "workspace:*",
     "@zerodev/ecdsa-validator": "^5.4.9",
     "@zerodev/permissions": "5.6.3",
     "@zerodev/sdk": "5.5.10",

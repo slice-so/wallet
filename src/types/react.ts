@@ -10,10 +10,6 @@ import type {
 } from "./commerce"
 import type { SliceWalletPendingCeremony } from "./pendingCeremony"
 import type { SerializedWalletPolicyDescriptor } from "./policy"
-import type {
-  SliceWalletSessionAdapter,
-  SliceWalletSessionSnapshot
-} from "./session"
 
 export type SliceWalletStatus = "error" | "idle" | "loading" | "ready"
 export type SliceWalletPendingAction = "create" | "login" | null
@@ -224,12 +220,6 @@ export type SliceWalletProviderProps = {
   notifications?: SliceWalletNotifications
   preferredChainId: number
   wagmiConfig: Config
-  session?: {
-    adapter: SliceWalletSessionAdapter
-    audience: string
-    scopes?: readonly string[]
-    ttlSeconds?: number
-  }
 }
 
 export type SliceWalletContextValue = {
@@ -260,9 +250,5 @@ export type SliceWalletContextValue = {
   retryManagementHydration: () => Promise<void>
   signInWallet: () => Promise<void>
   switchAccount: () => Promise<boolean>
-  retrySession: () => Promise<void>
-  session: SliceWalletSessionSnapshot | null
-  sessionError: string | null
-  signOutSession: () => Promise<void>
   status: SliceWalletStatus
 }

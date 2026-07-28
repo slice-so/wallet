@@ -1,6 +1,7 @@
 import { type Address, type Hex, isAddress, isHex, numberToHex } from "viem"
 import { getSliceWalletChainPolicy } from "../chains"
 import type {
+  SliceWalletProtocolValue,
   SliceWalletProvider,
   SliceWalletProviderEventMap,
   SliceWalletProviderRequestArguments,
@@ -51,6 +52,16 @@ type ProviderRuntime = Omit<
 }
 type ProviderDependencies = {
   createRuntime?: (config: SliceWalletProviderConfig) => ProviderRuntime
+}
+
+const isProtocolValue = (
+  value: SliceWalletProviderValue
+): value is SliceWalletProtocolValue => {
+  if (Array.isArray(value)) return value.every(isProtocolValue)
+  if (typeof value !== "object" || value === null) return true
+  return Object.values(value).every(
+    (entry) => entry !== undefined && isProtocolValue(entry)
+  )
 }
 
 const paramsArray = (
@@ -174,19 +185,16 @@ const parseWalletConnect = (
         Object.keys(sessionCapability).some(
           (key) =>
             ![
-              "audience",
+              "claims",
               "nonce",
               "optional",
               "pendingId",
-              "scopes",
-              "sessionSigner",
-              "ttlSeconds"
+              "sessionSigner"
             ].includes(key)
         ) ||
         sessionCapability.optional !== true ||
-        typeof sessionCapability.audience !== "string" ||
-        new URL(sessionCapability.audience).origin !==
-          sessionCapability.audience ||
+        sessionCapability.claims === undefined ||
+        !isProtocolValue(sessionCapability.claims) ||
         typeof sessionCapability.sessionSigner !== "string" ||
         !isAddress(sessionCapability.sessionSigner) ||
         (sessionCapability.nonce !== undefined &&
@@ -194,28 +202,15 @@ const parseWalletConnect = (
             !/^[A-Za-z0-9_-]{16,256}$/.test(sessionCapability.nonce))) ||
         (sessionCapability.pendingId !== undefined &&
           (typeof sessionCapability.pendingId !== "string" ||
-            !/^[A-Za-z0-9_-]{1,64}$/.test(sessionCapability.pendingId))) ||
-        (sessionCapability.ttlSeconds !== undefined &&
-          (typeof sessionCapability.ttlSeconds !== "number" ||
-            !Number.isInteger(sessionCapability.ttlSeconds) ||
-            sessionCapability.ttlSeconds <= 0 ||
-            sessionCapability.ttlSeconds > 30 * 24 * 60 * 60)) ||
-        (sessionCapability.scopes !== undefined &&
-          (!Array.isArray(sessionCapability.scopes) ||
-            sessionCapability.scopes.length > 16 ||
-            sessionCapability.scopes.some(
-              (scope) =>
-                typeof scope !== "string" ||
-                !/^[a-z0-9][a-z0-9_.:-]{0,63}$/.test(scope)
-            )))
+            !/^[A-Za-z0-9_-]{1,64}$/.test(sessionCapability.pendingId)))
       ) {
         throw invalidProviderRequest(
           "wallet_connect session capability is invalid."
         )
       }
       session = {
-        audience: sessionCapability.audience,
         prepared: {
+          claims: sessionCapability.claims,
           ...(sessionCapability.nonce === undefined
             ? {}
             : { nonce: sessionCapability.nonce }),
@@ -223,13 +218,7 @@ const parseWalletConnect = (
             ? {}
             : { pendingId: sessionCapability.pendingId }),
           sessionSigner: sessionCapability.sessionSigner
-        },
-        ...(sessionCapability.scopes === undefined
-          ? {}
-          : { scopes: sessionCapability.scopes as readonly string[] }),
-        ...(sessionCapability.ttlSeconds === undefined
-          ? {}
-          : { ttlSeconds: sessionCapability.ttlSeconds })
+        }
       }
       continue
     }

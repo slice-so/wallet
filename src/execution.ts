@@ -1,5 +1,4 @@
 export * from "./execution/commerce"
-export * from "./execution/commerce/delegationScopes"
 export * from "./execution/kernelPasskey"
 export * from "./execution/utils/sliceAccountClient"
 export * from "./execution/utils/sliceBundler"

@@ -18,7 +18,7 @@ import {
   isAddressEqual
 } from "viem"
 import { anvil } from "viem/chains"
-import { useConnection, useConnectionEffect } from "wagmi"
+import { useConnection } from "wagmi"
 import {
   type createSliceWalletCeremonyKernelAccount,
   getSliceWalletChainManifest
@@ -59,7 +59,6 @@ import {
   IDLE_MANAGEMENT_HYDRATION_SNAPSHOT,
   shouldHandleManagementMutation
 } from "./managementLifecycle"
-import { useSliceWalletSessionIntegration } from "./sessionIntegration"
 
 export { defaultExecutionAllowanceUsdMicros } from "./executionCheckout"
 
@@ -74,7 +73,6 @@ export function SliceWalletProvider({
   idOrigin,
   notifications,
   preferredChainId,
-  session: sessionConfig,
   wagmiConfig
 }: SliceWalletProviderProps) {
   const checkoutExecution = capabilities?.checkoutExecution
@@ -113,12 +111,6 @@ export function SliceWalletProvider({
     connection.connector.id === sliceWalletConnectorId
       ? connection.address
       : null
-  const [sessionAccount, setSessionAccount] = useState<Address | null>(() =>
-    connection.address !== undefined &&
-    connection.connector?.id === sliceWalletConnectorId
-      ? connection.address
-      : null
-  )
   const [pendingAction, setPendingAction] =
     useState<SliceWalletPendingAction>(null)
   const [error, setError] = useState<string | null>(null)
@@ -132,36 +124,6 @@ export function SliceWalletProvider({
   const [recovery, setRecovery] = useState<SliceWalletRecoverySnapshot | null>(
     null
   )
-  const warnSession = useCallback(
-    (message: string) => {
-      console.warn("[slice-wallet]", message)
-      notifications?.error?.(message)
-    },
-    [notifications]
-  )
-  // Reconnection temporarily hides the active account. Preserve the API
-  // session until Wagmi reports a real established disconnect.
-  useConnectionEffect({
-    config: wagmiConfig,
-    onDisconnect() {
-      setSessionAccount(null)
-    }
-  })
-  useEffect(() => {
-    if (connection.status !== "connected") return
-    setSessionAccount(connectedSliceAccount)
-  }, [connectedSliceAccount, connection.status])
-  const sessionIntegration = useSliceWalletSessionIntegration({
-    account: sessionAccount,
-    ...(sessionConfig === undefined
-      ? {}
-      : {
-          adapter: sessionConfig.adapter,
-          audience: sessionConfig.audience
-        }),
-    chainId: walletChain.id,
-    warn: warnSession
-  })
   const [recoveryPendingAction, setRecoveryPendingAction] =
     useState<SliceWalletRecoveryPendingAction>(null)
   const {
@@ -268,7 +230,6 @@ export function SliceWalletProvider({
       managementLifecycle,
       managementEnabled: storeManagement !== undefined,
       notifications,
-      sessionIntegration,
       setError,
       setPendingAction,
       wagmiConfig,
@@ -541,10 +502,6 @@ export function SliceWalletProvider({
       retryManagementHydration,
       signInWallet,
       switchAccount,
-      retrySession: signInWallet,
-      session: sessionIntegration.session,
-      sessionError: sessionIntegration.sessionError,
-      signOutSession: sessionIntegration.revoke,
       status
     }),
     [
@@ -571,7 +528,6 @@ export function SliceWalletProvider({
       retryManagementHydration,
       signInWallet,
       switchAccount,
-      sessionIntegration,
       status
     ]
   )

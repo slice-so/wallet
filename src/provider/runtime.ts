@@ -922,14 +922,7 @@ const createSliceWalletChainRuntime = (
       fetch: fetchImpl,
       idOrigin,
       session: {
-        audience: config.session.audience,
-        prepare: config.session.prepare,
-        ...(config.session.scopes === undefined
-          ? {}
-          : { scopes: config.session.scopes }),
-        ...(config.session.ttlSeconds === undefined
-          ? {}
-          : { ttlSeconds: config.session.ttlSeconds })
+        prepare: config.session.prepare
       },
       window: browserWindow
     })
