@@ -25,7 +25,8 @@ import {
 } from "../src/permissionAccount"
 import {
   createNativeTransferCallRule,
-  getWalletPermissionId
+  getWalletPermissionId,
+  getWalletPermissionValidAfter
 } from "../src/policy"
 import { buildRecoveryPermissionInitConfig } from "../src/recovery"
 import { createSliceWalletRegisteredKernelAccount } from "../src/rootValidator"
@@ -94,10 +95,11 @@ const results = await Promise.all(
     const validUntil = Math.floor(Date.now() / 1_000) + 3_600
     const policy = {
       account: account.address,
-      calls: [createNativeTransferCallRule({ maximumValue: 0n, recipient })],
+      calls: [createNativeTransferCallRule({ maximumValue: 1n, recipient })],
       chainId,
       grantKind: "generic",
-      validAfter: 0,
+      rateLimit: { count: 1, intervalSec: 3_600 },
+      validAfter: getWalletPermissionValidAfter(),
       validUntil,
       version: 1
     } as const

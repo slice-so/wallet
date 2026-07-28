@@ -60,7 +60,7 @@ export const readStoredExecutionSessionResult = async (
   kind: StoredSliceWalletExecutionSession["kind"]
 ): Promise<
   | { status: "found"; value: StoredSliceWalletExecutionSession }
-  | { status: "invalid" }
+  | { reason: "expired" | "malformed"; status: "invalid" }
   | { status: "missing" }
   | { status: "unavailable" }
 > => {
@@ -84,11 +84,11 @@ export const readStoredExecutionSessionResult = async (
       (session.kind === "checkout" && !isAddress(session.coSignerAddress))
     ) {
       await clearStoredExecutionSession(accountAddress, kind)
-      return { status: "invalid" }
+      return { reason: "malformed", status: "invalid" }
     }
     if (new Date(session.expiresAt) <= new Date()) {
       await clearStoredExecutionSession(accountAddress, kind)
-      return { status: "invalid" }
+      return { reason: "expired", status: "invalid" }
     }
 
     return { status: "found", value: session }

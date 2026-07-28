@@ -8,6 +8,7 @@ import {
   clearStoredExecutionSession,
   clearStoredPendingReplacementStrict,
   readStoredExecutionSession,
+  readStoredExecutionSessionResult,
   readStoredManagementExecutionSessions,
   readStoredPendingReplacement,
   writeStoredExecutionSession,
@@ -182,6 +183,26 @@ describe("execution key storage", () => {
     await expect(
       readStoredPendingReplacement(accountAddress, "store_management")
     ).resolves.toBeNull()
+  })
+
+  it("distinguishes expired sessions from malformed local state", async () => {
+    const key = `store_management:${accountAddress.toLowerCase()}`
+    await writeStoredExecutionSession(managementSession)
+    await seedStoredValue(key, {
+      ...managementSession,
+      expiresAt: "2020-01-01T00:00:00.000Z"
+    })
+    await expect(
+      readStoredExecutionSessionResult(accountAddress, "store_management")
+    ).resolves.toEqual({ reason: "expired", status: "invalid" })
+
+    await seedStoredValue(key, {
+      ...managementSession,
+      privateKey: "must-not-be-stored"
+    })
+    await expect(
+      readStoredExecutionSessionResult(accountAddress, "store_management")
+    ).resolves.toEqual({ reason: "malformed", status: "invalid" })
   })
 
   it("reads legacy account-scoped management storage keys", async () => {

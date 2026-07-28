@@ -94,9 +94,13 @@ export const hydrateStoredManagementExecutionSession = async ({
     return
   }
 
-  const clearInvalidSession = async (
+  const clearLocalSession = async ({
+    frameClient,
+    markInvalid = true
+  }: {
     frameClient?: SliceWalletSignerFrameClient
-  ) => {
+    markInvalid?: boolean
+  } = {}) => {
     control.assertCurrent()
     setSessionNull()
     if (storedResult.status === "found") {
@@ -119,15 +123,17 @@ export const hydrateStoredManagementExecutionSession = async ({
         // The invalid local record is already gone; repair can replace the frame.
       }
     }
-    control.markError("session-invalid")
+    if (markInvalid) control.markError("session-invalid")
   }
 
   if (storedResult.status === "invalid") {
-    await clearInvalidSession()
+    await clearLocalSession({
+      markInvalid: storedResult.reason !== "expired"
+    })
     return
   }
   if (storedResult.value.kind !== "store_management") {
-    await clearInvalidSession()
+    await clearLocalSession()
     return
   }
 
@@ -153,16 +159,19 @@ export const hydrateStoredManagementExecutionSession = async ({
     return
   }
 
+  if (delegation === null) {
+    await clearLocalSession({ frameClient, markInvalid: false })
+    return
+  }
   if (
     frameResult === null ||
     typeof frameResult !== "object" ||
-    delegation === null ||
     delegation.signerScheme !== "p256" ||
     delegation.permissionId === null ||
     delegation.signerPublicKey === null ||
     delegation.walletPolicy === null
   ) {
-    await clearInvalidSession(frameClient)
+    await clearLocalSession({ frameClient })
     return
   }
 
@@ -193,11 +202,11 @@ export const hydrateStoredManagementExecutionSession = async ({
         session.permissionId.toLowerCase() ||
       stored.signerAddress.toLowerCase() !== session.signerId.toLowerCase()
     ) {
-      await clearInvalidSession(frameClient)
+      await clearLocalSession({ frameClient })
       return
     }
   } catch {
-    await clearInvalidSession(frameClient)
+    await clearLocalSession({ frameClient })
     return
   }
 

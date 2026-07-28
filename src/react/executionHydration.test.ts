@@ -266,7 +266,7 @@ describe("management execution hydration", () => {
     })
   })
 
-  test("reports validity cleanup performed while reading stored state", async () => {
+  test("settles an expired local session cleanly for root routing", async () => {
     const lifecycle = createControl()
 
     await lifecycle.runHydration(account, (control) =>
@@ -281,13 +281,52 @@ describe("management execution hydration", () => {
             destroy: () => undefined,
             request: async () => null
           }) as SliceWalletSignerFrameClient,
-        readStoredSession: async () => ({ status: "invalid" }),
+        readStoredSession: async () => ({
+          reason: "expired",
+          status: "invalid"
+        }),
         setSessionNull: () => undefined
       })
     )
 
     expect(lifecycle.getSnapshot()).toEqual({
-      error: "session-invalid",
+      error: null,
+      status: "settled"
+    })
+  })
+
+  test("clears a stored session cleanly when its delegation was revoked", async () => {
+    let cleared = 0
+    let frameClears = 0
+    const lifecycle = createControl()
+    const frameClient = {
+      destroy: () => undefined,
+      request: async (request) => {
+        if (request.method === "clearSession") frameClears += 1
+        return request.method === "getSession" ? frameSession : null
+      }
+    } as SliceWalletSignerFrameClient
+
+    await lifecycle.runHydration(account, (control) =>
+      hydrateStoredManagementExecutionSession({
+        account,
+        activate: async () => undefined,
+        chainId: 8453,
+        clearStoredSession: async () => {
+          cleared += 1
+        },
+        control,
+        fetchDelegation: async () => ({ delegation: null }),
+        getFrameClient: async () => frameClient,
+        readStoredSession: async () => ({ status: "found", value: stored }),
+        setSessionNull: () => undefined
+      })
+    )
+
+    expect(cleared).toBe(1)
+    expect(frameClears).toBe(1)
+    expect(lifecycle.getSnapshot()).toEqual({
+      error: null,
       status: "settled"
     })
   })
