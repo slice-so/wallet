@@ -6,10 +6,10 @@ import { resolve } from "node:path"
 import deployments from "../../contracts/wallet/deployments/addresses.json"
 import policy from "../config/chains.policy.json"
 import {
+  hasAdmittedManagementAuthority,
   hasCompleteSliceWalletAdmissionEvidence,
   hasVerifiedCheckoutAuthorityDeployment,
-  hasVerifiedGenericAuthorityDeployment,
-  hasVerifiedManagementAuthorityDeployment
+  hasVerifiedGenericAuthorityDeployment
 } from "./lib/chainAdmission"
 
 const outputPath = resolve(import.meta.dir, "../src/chains.ts")
@@ -89,8 +89,10 @@ const entries = chainIds.map((chainId) => {
     hasVerifiedGenericAuthorityDeployment(deployment)
   const checkoutAuthorityAdmitted =
     hasVerifiedCheckoutAuthorityDeployment(deployment)
-  const managementAuthorityAdmitted =
-    hasVerifiedManagementAuthorityDeployment(deployment)
+  const managementAuthorityAdmitted = hasAdmittedManagementAuthority(
+    deployment,
+    policyChain.managementValidationStorageReadsAllowed
+  )
 
   return {
     admitted,

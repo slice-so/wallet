@@ -30,7 +30,8 @@
         "defaultPath": "self-funded-or-request-paymaster",
         "sliceSponsorshipForExternalOrigins": false,
         "sponsoredSecurityOperations": []
-      }
+      },
+      "managementValidationStorageReadsAllowed": false
     },
     "10": {
       "chain": {
@@ -61,7 +62,8 @@
         "defaultPath": "self-funded-or-request-paymaster",
         "sliceSponsorshipForExternalOrigins": false,
         "sponsoredSecurityOperations": []
-      }
+      },
+      "managementValidationStorageReadsAllowed": false
     },
     "8453": {
       "chain": {
@@ -97,7 +99,8 @@
           "recovery-cancel",
           "session-install"
         ]
-      }
+      },
+      "managementValidationStorageReadsAllowed": false
     },
     "42161": {
       "chain": {
@@ -128,7 +131,8 @@
         "defaultPath": "self-funded-or-request-paymaster",
         "sliceSponsorshipForExternalOrigins": false,
         "sponsoredSecurityOperations": []
-      }
+      },
+      "managementValidationStorageReadsAllowed": false
     }
   }
 }

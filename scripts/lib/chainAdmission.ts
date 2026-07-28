@@ -75,3 +75,10 @@ export const hasVerifiedManagementAuthorityDeployment = (
 ) =>
   hasCompleteSliceWalletAdmissionEvidence(deployment) &&
   hasExactRuntime(deployment.contracts.slicerRegistryPolicy)
+
+export const hasAdmittedManagementAuthority = (
+  deployment: AdmissionEvidence,
+  validationStorageReadsAllowed: boolean
+) =>
+  validationStorageReadsAllowed &&
+  hasVerifiedManagementAuthorityDeployment(deployment)

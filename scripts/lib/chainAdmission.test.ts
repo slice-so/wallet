@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test"
 import {
+  hasAdmittedManagementAuthority,
   hasCompleteSliceWalletAdmissionEvidence,
   hasVerifiedManagementAuthorityDeployment
 } from "./chainAdmission"
@@ -127,5 +128,18 @@ describe("wallet chain admission evidence", () => {
         }
       })
     ).toBe(true)
+  })
+
+  it("requires explicit bundler support for management validation storage reads", () => {
+    const deployment = {
+      ...completeEvidence,
+      contracts: {
+        ...completeEvidence.contracts,
+        slicerRegistryPolicy: exactRuntime
+      }
+    }
+
+    expect(hasAdmittedManagementAuthority(deployment, false)).toBe(false)
+    expect(hasAdmittedManagementAuthority(deployment, true)).toBe(true)
   })
 })
