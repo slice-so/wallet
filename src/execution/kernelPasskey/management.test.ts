@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test"
 import { ParamCondition } from "@zerodev/permissions/policies"
 import { toFunctionSelector, zeroAddress } from "viem"
 import { base } from "viem/chains"
+import { sliceWalletKernelAddresses } from "../../constants"
 import { toWalletPermissionPolicies } from "../../policy"
 import {
   createSliceStoreManagementPermissionPolicies,
@@ -39,6 +40,11 @@ describe("store management permission policies", () => {
     expect(
       kernelPolicies.map((policy) => policy.getPolicyInfoInBytes())
     ).toEqual(descriptorPolicies.map((policy) => policy.getPolicyInfoInBytes()))
+    expect(kernelPolicies).toHaveLength(3)
+    expect(kernelPolicies[1]?.policyParams).toMatchObject({
+      policyAddress: sliceWalletKernelAddresses.slicerRegistryPolicy,
+      type: "sudo"
+    })
     expect({
       policyData: kernelPolicies.map((policy) => policy.getPolicyData()),
       policyInfoInBytes: kernelPolicies.map((policy) =>

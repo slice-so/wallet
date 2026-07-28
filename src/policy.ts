@@ -5,6 +5,7 @@ import {
   ParamCondition,
   toCallPolicy,
   toRateLimitPolicy,
+  toSudoPolicy,
   toTimestampPolicy
 } from "@zerodev/permissions/policies"
 import {
@@ -21,7 +22,10 @@ import {
   toFunctionSelector,
   zeroAddress
 } from "viem"
-import { maximumBrowserGenericGrantTtlSec } from "./constants"
+import {
+  maximumBrowserGenericGrantTtlSec,
+  sliceWalletKernelAddresses
+} from "./constants"
 import type {
   SerializedWalletPolicyDescriptor,
   WalletCall,
@@ -559,12 +563,26 @@ export const toWalletPermissionPolicies = (
         valueLimit: call.valueLimit
       })),
       policyVersion: CallPolicyVersion.V0_0_5
-    }),
+    })
+  ]
+
+  if (normalized.grantKind === "management") {
+    // ZeroDev's Policy type has no custom-policy discriminant. The sudo shape
+    // provides the standard no-config Kernel policy encoding for this address;
+    // the deployed module still enforces Slicer registry membership.
+    policies.push(
+      toSudoPolicy({
+        policyAddress: sliceWalletKernelAddresses.slicerRegistryPolicy
+      })
+    )
+  }
+
+  policies.push(
     toTimestampPolicy({
       validAfter: normalized.validAfter,
       validUntil: normalized.validUntil
     })
-  ]
+  )
 
   if (normalized.rateLimit !== undefined) {
     policies.push(

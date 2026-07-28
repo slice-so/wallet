@@ -8,7 +8,10 @@ import {
   sliceWalletDevelopmentChainIds,
   sliceWalletSupportedChainIds
 } from "./chains"
-import { sliceKernelWeightedP256SignerAddress } from "./execution/utils/sliceKernelAddresses"
+import {
+  sliceKernelSlicerRegistryPolicyAddress,
+  sliceKernelWeightedP256SignerAddress
+} from "./execution/utils/sliceKernelAddresses"
 
 describe("Slice Wallet chain manifest", () => {
   test("deep-freezes generated security and operational metadata", () => {
@@ -34,7 +37,8 @@ describe("Slice Wallet chain manifest", () => {
 
     expect(base.authorityAdmission).toEqual({
       checkout: false,
-      generic: true
+      generic: true,
+      management: false
     })
     expect(base.contracts.timestampPolicy.deployedRuntimeCodeHash).toBe(
       base.contracts.timestampPolicy.expectedRuntimeCodeHash
@@ -45,6 +49,9 @@ describe("Slice Wallet chain manifest", () => {
     expect(base.contracts.weightedP256Signer.deployedRuntimeCodeHash).toBeNull()
     expect(base.contracts.weightedP256Signer.address).toBe(
       sliceKernelWeightedP256SignerAddress
+    )
+    expect(base.contracts.slicerRegistryPolicy.address).toBe(
+      sliceKernelSlicerRegistryPolicyAddress
     )
     expect(() =>
       assertSliceWalletAuthorityDeployment({
@@ -58,6 +65,14 @@ describe("Slice Wallet chain manifest", () => {
         chainId: 8453
       })
     ).toThrow("Slice Wallet checkout authority is not verified on chain 8453.")
+    expect(() =>
+      assertSliceWalletAuthorityDeployment({
+        authority: "management",
+        chainId: 8453
+      })
+    ).toThrow(
+      "Slice Wallet management authority is not verified on chain 8453."
+    )
   })
 
   test("exposes only chains with complete admission evidence", () => {
@@ -75,7 +90,8 @@ describe("Slice Wallet chain manifest", () => {
 
     expect(local.authorityAdmission).toEqual({
       checkout: true,
-      generic: true
+      generic: true,
+      management: true
     })
     expect(local.contracts.weightedP256Signer.deployedRuntimeCodeHash).toBe(
       local.contracts.weightedP256Signer.expectedRuntimeCodeHash
@@ -87,6 +103,12 @@ describe("Slice Wallet chain manifest", () => {
     expect(() =>
       assertSliceWalletAuthorityDeployment({
         authority: "checkout",
+        chainId: anvil.id
+      })
+    ).not.toThrow()
+    expect(() =>
+      assertSliceWalletAuthorityDeployment({
+        authority: "management",
         chainId: anvil.id
       })
     ).not.toThrow()

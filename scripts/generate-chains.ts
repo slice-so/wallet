@@ -8,7 +8,8 @@ import policy from "../config/chains.policy.json"
 import {
   hasCompleteSliceWalletAdmissionEvidence,
   hasVerifiedCheckoutAuthorityDeployment,
-  hasVerifiedGenericAuthorityDeployment
+  hasVerifiedGenericAuthorityDeployment,
+  hasVerifiedManagementAuthorityDeployment
 } from "./lib/chainAdmission"
 
 const outputPath = resolve(import.meta.dir, "../src/chains.ts")
@@ -33,6 +34,7 @@ const pinnedAddressContractNames = [
   "kernelMetaFactory",
   "p256Verifier",
   "rateLimitPolicy",
+  "slicerRegistryPolicy",
   "sudoPolicy",
   "timelockPolicy",
   "timestampPolicy",
@@ -87,12 +89,15 @@ const entries = chainIds.map((chainId) => {
     hasVerifiedGenericAuthorityDeployment(deployment)
   const checkoutAuthorityAdmitted =
     hasVerifiedCheckoutAuthorityDeployment(deployment)
+  const managementAuthorityAdmitted =
+    hasVerifiedManagementAuthorityDeployment(deployment)
 
   return {
     admitted,
     authorityAdmission: {
       checkout: checkoutAuthorityAdmitted,
-      generic: genericAuthorityAdmitted
+      generic: genericAuthorityAdmitted,
+      management: managementAuthorityAdmitted
     },
     chain: {
       blockExplorers: {
@@ -179,7 +184,7 @@ if (canonicalDevelopmentManifest === undefined) {
 const developmentManifest = freezeManifest({
   ...canonicalDevelopmentManifest,
   admitted: true,
-  authorityAdmission: { checkout: true, generic: true },
+  authorityAdmission: { checkout: true, generic: true, management: true },
   chain: {
     ...canonicalDevelopmentManifest.chain,
     blockExplorers: {

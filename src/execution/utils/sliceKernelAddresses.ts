@@ -23,3 +23,6 @@ export const sliceKernelWeightedP256SignerAddress =
 
 export const sliceKernelTimelockPolicyAddress =
   "0x7f66B69270f96EC6793c545742CCBbBe028Be3f6" as const satisfies Address
+
+export const sliceKernelSlicerRegistryPolicyAddress =
+  "0xbDbE8205C0044fD06d49a674ce6C7d956BF2B72a" as const satisfies Address

@@ -18,6 +18,7 @@ export const sliceWalletKernelAddresses = {
   implementation: baseManifest.contracts.kernelImplementation.address,
   metaFactory: baseManifest.contracts.kernelMetaFactory.address,
   p256Verifier: baseManifest.contracts.p256Verifier.address,
+  slicerRegistryPolicy: baseManifest.contracts.slicerRegistryPolicy.address,
   sudoPolicy: baseManifest.contracts.sudoPolicy.address,
   timelockPolicy: baseManifest.contracts.timelockPolicy.address,
   webAuthnRootValidator: baseManifest.contracts.webAuthnRootValidator.address,

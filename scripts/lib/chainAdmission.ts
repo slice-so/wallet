@@ -33,6 +33,7 @@ const baseWalletContractNames = [
 
 const authoritySpecificContractNames = new Set([
   "rateLimitPolicy",
+  "slicerRegistryPolicy",
   "weightedP256Signer"
 ])
 
@@ -68,3 +69,9 @@ export const hasVerifiedCheckoutAuthorityDeployment = (
 ) =>
   hasCompleteSliceWalletAdmissionEvidence(deployment) &&
   hasExactRuntime(deployment.contracts.weightedP256Signer)
+
+export const hasVerifiedManagementAuthorityDeployment = (
+  deployment: AdmissionEvidence
+) =>
+  hasCompleteSliceWalletAdmissionEvidence(deployment) &&
+  hasExactRuntime(deployment.contracts.slicerRegistryPolicy)

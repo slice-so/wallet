@@ -186,21 +186,41 @@ describe("normalized wallet policies", () => {
     ).toThrow("validity")
   })
 
-  it("matches wildcard targets and prefers exact-target rules", () => {
+  it("rejects wildcard targets in generic permissions", () => {
     const transferSelector = toFunctionSelector("transfer(address,uint256)")
-    const policy = descriptor([
-      createErc20TransferCallRule({
-        maximumAmount: 100n,
-        recipient,
-        token
-      }),
-      {
-        parameterRules: [],
-        selector: transferSelector,
-        target: walletPolicyWildcardTarget,
-        valueLimit: 0n
-      }
-    ])
+    expect(() =>
+      encodeWalletPolicyDescriptor(
+        descriptor([
+          {
+            parameterRules: [],
+            selector: transferSelector,
+            target: walletPolicyWildcardTarget,
+            valueLimit: 0n
+          }
+        ])
+      )
+    ).toThrow("Generic")
+  })
+
+  it("prefers exact-target rules over management wildcard rules", () => {
+    const transferSelector = toFunctionSelector("transfer(address,uint256)")
+    const policy: WalletPolicyDescriptor = {
+      ...descriptor([
+        createErc20TransferCallRule({
+          maximumAmount: 100n,
+          recipient,
+          token
+        }),
+        {
+          parameterRules: [],
+          selector: transferSelector,
+          target: walletPolicyWildcardTarget,
+          valueLimit: 0n
+        }
+      ]),
+      grantKind: "management",
+      rateLimit: undefined
+    }
     const transfer = (target: Address, to: Address) => ({
       data: encodeFunctionData({
         abi: erc20Abi,

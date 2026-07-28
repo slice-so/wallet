@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback } from "react"
+import { assertSliceWalletAuthorityDeployment } from "../chains"
 import { createSliceStoreManagementPolicyDescriptor } from "../execution"
 import {
   authorizeSliceWalletSession,
@@ -93,6 +94,10 @@ export const useSliceWalletManagementEnablement = ({
     if (!storeManagement) {
       throw new Error("1-tap management is not available in this app.")
     }
+    assertSliceWalletAuthorityDeployment({
+      authority: "management",
+      chainId: walletChainId
+    })
     const { credential, kernelAccount } = activeWallet
 
     await managementLifecycle.runMutation({

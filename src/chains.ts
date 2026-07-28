@@ -61,7 +61,8 @@ const manifests = [
     admitted: true,
     authorityAdmission: {
       checkout: false,
-      generic: true
+      generic: true,
+      management: false
     },
     chain: {
       blockExplorers: {
@@ -200,6 +201,12 @@ const manifests = [
           "0x54fa75c9eee444ae33dd03ce10e7ee988b8c7adc4e3f75b224ad9ef8091ca852",
         expectedRuntimeCodeHash:
           "0x54fa75c9eee444ae33dd03ce10e7ee988b8c7adc4e3f75b224ad9ef8091ca852"
+      },
+      slicerRegistryPolicy: {
+        address: "0xbDbE8205C0044fD06d49a674ce6C7d956BF2B72a",
+        deployedRuntimeCodeHash: null,
+        expectedRuntimeCodeHash:
+          "0xf055385573964d1fe49bd14f696fa2396da4c7eabeed4e59ed077431db865945"
       }
     },
     defaultTransports: {
@@ -228,7 +235,8 @@ const manifests = [
     admitted: true,
     authorityAdmission: {
       checkout: false,
-      generic: true
+      generic: true,
+      management: false
     },
     chain: {
       blockExplorers: {
@@ -367,6 +375,12 @@ const manifests = [
           "0x54fa75c9eee444ae33dd03ce10e7ee988b8c7adc4e3f75b224ad9ef8091ca852",
         expectedRuntimeCodeHash:
           "0x54fa75c9eee444ae33dd03ce10e7ee988b8c7adc4e3f75b224ad9ef8091ca852"
+      },
+      slicerRegistryPolicy: {
+        address: "0xbDbE8205C0044fD06d49a674ce6C7d956BF2B72a",
+        deployedRuntimeCodeHash: null,
+        expectedRuntimeCodeHash:
+          "0xf055385573964d1fe49bd14f696fa2396da4c7eabeed4e59ed077431db865945"
       }
     },
     defaultTransports: {
@@ -395,7 +409,8 @@ const manifests = [
     admitted: true,
     authorityAdmission: {
       checkout: false,
-      generic: true
+      generic: true,
+      management: false
     },
     chain: {
       blockExplorers: {
@@ -534,6 +549,12 @@ const manifests = [
           "0x54fa75c9eee444ae33dd03ce10e7ee988b8c7adc4e3f75b224ad9ef8091ca852",
         expectedRuntimeCodeHash:
           "0x54fa75c9eee444ae33dd03ce10e7ee988b8c7adc4e3f75b224ad9ef8091ca852"
+      },
+      slicerRegistryPolicy: {
+        address: "0xbDbE8205C0044fD06d49a674ce6C7d956BF2B72a",
+        deployedRuntimeCodeHash: null,
+        expectedRuntimeCodeHash:
+          "0xf055385573964d1fe49bd14f696fa2396da4c7eabeed4e59ed077431db865945"
       }
     },
     defaultTransports: {
@@ -567,7 +588,8 @@ const manifests = [
     admitted: true,
     authorityAdmission: {
       checkout: false,
-      generic: true
+      generic: true,
+      management: false
     },
     chain: {
       blockExplorers: {
@@ -706,6 +728,12 @@ const manifests = [
           "0x54fa75c9eee444ae33dd03ce10e7ee988b8c7adc4e3f75b224ad9ef8091ca852",
         expectedRuntimeCodeHash:
           "0x54fa75c9eee444ae33dd03ce10e7ee988b8c7adc4e3f75b224ad9ef8091ca852"
+      },
+      slicerRegistryPolicy: {
+        address: "0xbDbE8205C0044fD06d49a674ce6C7d956BF2B72a",
+        deployedRuntimeCodeHash: null,
+        expectedRuntimeCodeHash:
+          "0xf055385573964d1fe49bd14f696fa2396da4c7eabeed4e59ed077431db865945"
       }
     },
     defaultTransports: {
@@ -747,7 +775,7 @@ if (canonicalDevelopmentManifest === undefined) {
 const developmentManifest = freezeManifest({
   ...canonicalDevelopmentManifest,
   admitted: true,
-  authorityAdmission: { checkout: true, generic: true },
+  authorityAdmission: { checkout: true, generic: true, management: true },
   chain: {
     ...canonicalDevelopmentManifest.chain,
     blockExplorers: {

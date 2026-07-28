@@ -20,6 +20,7 @@ export type SliceWalletContractDeployments = {
   readonly kernelMetaFactory: SliceWalletContractDeployment
   readonly p256Verifier: SliceWalletContractDeployment
   readonly rateLimitPolicy: SliceWalletContractDeployment
+  readonly slicerRegistryPolicy: SliceWalletContractDeployment
   readonly soladyP256Verifier: SliceWalletContractDeployment
   readonly sudoPolicy: SliceWalletContractDeployment
   readonly timelockPolicy: SliceWalletContractDeployment
@@ -32,7 +33,7 @@ export type SliceWalletContractDeployments = {
   }
 }
 
-export type SliceWalletAuthorityKind = "checkout" | "generic"
+export type SliceWalletAuthorityKind = "checkout" | "generic" | "management"
 
 export type SliceWalletExecutionSafetyEnvelope = {
   readonly maxCallGasLimit: bigint
@@ -62,6 +63,7 @@ export type SliceWalletChainManifest = {
   readonly authorityAdmission: {
     readonly checkout: boolean
     readonly generic: boolean
+    readonly management: boolean
   }
   readonly chain: Chain
   readonly contracts: SliceWalletContractDeployments

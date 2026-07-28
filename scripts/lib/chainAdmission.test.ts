@@ -1,5 +1,8 @@
 import { describe, expect, it } from "bun:test"
-import { hasCompleteSliceWalletAdmissionEvidence } from "./chainAdmission"
+import {
+  hasCompleteSliceWalletAdmissionEvidence,
+  hasVerifiedManagementAuthorityDeployment
+} from "./chainAdmission"
 
 const exactRuntime = {
   deployedRuntimeCodeHash: "0x1234",
@@ -109,5 +112,20 @@ describe("wallet chain admission evidence", () => {
         }
       })
     ).toBe(false)
+  })
+
+  it("admits management only with the exact registry-policy runtime", () => {
+    expect(hasVerifiedManagementAuthorityDeployment(completeEvidence)).toBe(
+      false
+    )
+    expect(
+      hasVerifiedManagementAuthorityDeployment({
+        ...completeEvidence,
+        contracts: {
+          ...completeEvidence.contracts,
+          slicerRegistryPolicy: exactRuntime
+        }
+      })
+    ).toBe(true)
   })
 })

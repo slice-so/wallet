@@ -155,7 +155,7 @@ export const createSliceWalletIndexedDbSessionStore = (
   },
   get: async (appOrigin, key) => {
     const database = await openDatabase(indexedDb)
-    const transaction = database.transaction(objectStoreName, "readwrite")
+    const transaction = database.transaction(objectStoreName, "readonly")
     const record = await readPersistedSession({
       appOrigin,
       key,
@@ -168,7 +168,7 @@ export const createSliceWalletIndexedDbSessionStore = (
   },
   getPending: async (appOrigin, key) => {
     const database = await openDatabase(indexedDb)
-    const transaction = database.transaction(objectStoreName, "readwrite")
+    const transaction = database.transaction(objectStoreName, "readonly")
     const record = await readPersistedSession({
       appOrigin,
       key,

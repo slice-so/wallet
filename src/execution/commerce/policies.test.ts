@@ -72,7 +72,7 @@ describe("Slice store-management wallet policy", () => {
     ).not.toThrow()
   })
 
-  test("accepts ProductsModule multicall for batched management calls", () => {
+  test("rejects ProductsModule delegatecall multicall", () => {
     const setProductType = encodeFunctionData({
       abi: productsModuleAbi,
       functionName: "setProductType",
@@ -94,7 +94,7 @@ describe("Slice store-management wallet policy", () => {
         ],
         policy
       )
-    ).not.toThrow()
+    ).toThrow("not present")
   })
 
   test("accepts adding currencies on any slicer", () => {

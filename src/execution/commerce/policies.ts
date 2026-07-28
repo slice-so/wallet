@@ -41,7 +41,6 @@ export const sliceStoreManagementOperations = [
   "addProduct",
   "editProduct",
   "editProductMetadata",
-  "multicall",
   "release",
   "removeProduct",
   "setRoles",
@@ -80,10 +79,6 @@ const addCurrenciesSelector = getSelector({
   abi: slicerAbi,
   functionName: "_addCurrencies"
 })
-const multicallSelector = getSelector({
-  abi: productsModuleAbi,
-  functionName: "multicall"
-})
 const setRolesSelector = getSelector({
   abi: slicerAbi,
   functionName: "setRoles"
@@ -107,7 +102,6 @@ const productManagementSelectors = sliceStoreManagementOperations
       operation !== "batchWithdraw" &&
       operation !== "configureProduct" &&
       operation !== "_addCurrencies" &&
-      operation !== "multicall" &&
       operation !== "release" &&
       operation !== "setRoles" &&
       operation !== "slice"
@@ -221,12 +215,6 @@ export const createSliceStoreManagementPolicyDescriptor = ({
         target: productsModuleAddress,
         valueLimit: 0n
       })),
-      {
-        parameterRules: [],
-        selector: multicallSelector,
-        target: productsModuleAddress,
-        valueLimit: 0n
-      },
       ...generatedHookAddresses.map((target) => ({
         parameterRules: [],
         selector: configureProductSelector,
