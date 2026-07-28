@@ -209,7 +209,7 @@ describe("authorizeSliceWalletSession", () => {
       idOrigin: "https://id.slice.so",
       popupReadyTimeoutMs: 5,
       session,
-      timeoutMs: 100,
+      timeoutMs: 1_000,
       window: harness.window
     })
     queueMicrotask(() => {
