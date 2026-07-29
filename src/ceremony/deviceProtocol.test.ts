@@ -46,10 +46,15 @@ describe("device ceremony protocol", () => {
         credentialIdHash,
         nonce,
         permissionId: "0x12345678",
+        revocationNotified: false,
         type: "slice-wallet:ceremony-device",
         userOperationHash: `0x${"44".repeat(32)}`,
         version: 1
       })
-    ).toMatchObject({ action: "promote", credentialIdHash })
+    ).toMatchObject({
+      action: "promote",
+      credentialIdHash,
+      revocationNotified: false
+    })
   })
 })

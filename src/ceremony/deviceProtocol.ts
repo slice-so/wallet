@@ -24,8 +24,9 @@ export const parseSliceWalletCeremonyDeviceResponse = (
     }
     return response
   }
+  const hasRevocationNotified = Object.hasOwn(value, "revocationNotified")
   if (
-    Object.keys(value).length !== 9 ||
+    Object.keys(value).length !== (hasRevocationNotified ? 10 : 9) ||
     value.version !== 1 ||
     (value.action !== "add" &&
       value.action !== "promote" &&
@@ -44,6 +45,9 @@ export const parseSliceWalletCeremonyDeviceResponse = (
     typeof value.permissionId !== "string" ||
     !isHex(value.permissionId, { strict: true }) ||
     hexToBytes(value.permissionId).length !== 4 ||
+    (hasRevocationNotified &&
+      (value.action !== "promote" ||
+        typeof value.revocationNotified !== "boolean")) ||
     (value.userOperationHash !== null &&
       (typeof value.userOperationHash !== "string" ||
         !isHex(value.userOperationHash, { strict: true }) ||
@@ -58,6 +62,9 @@ export const parseSliceWalletCeremonyDeviceResponse = (
     credentialIdHash: value.credentialIdHash as Hex,
     nonce: value.nonce as Hex,
     permissionId: value.permissionId as Hex,
+    ...(hasRevocationNotified
+      ? { revocationNotified: value.revocationNotified as boolean }
+      : {}),
     type: "slice-wallet:ceremony-device",
     userOperationHash: value.userOperationHash as Hex | null,
     version: 1

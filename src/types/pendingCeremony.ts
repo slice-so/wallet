@@ -50,6 +50,7 @@ export type SliceWalletCeremonyContinuationResult =
       credentialIdHash: Hex
       nonce: Hex
       permissionId: Hex
+      revocationNotified?: boolean
       type: "slice-wallet:ceremony-device"
       userOperationHash: Hex | null
       version: 1
