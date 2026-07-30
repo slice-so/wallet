@@ -40,8 +40,10 @@ import {
 } from "./slicePaymasterAbis"
 import {
   isAcceptedSliceIdSecurityOperationUserOperation,
+  isAcceptedSliceIdUserFundedRegistryOperationUserOperation,
   isAcceptedSliceRecoveryCancellationUserOperation,
   isAcceptedSliceWalletSenderUserOperation,
+  sliceIdAuthorizationRevocationRegistryAddress,
   sliceKernelBaseV33SenderCode
 } from "./sliceUserOperationPolicy"
 
@@ -1278,6 +1280,106 @@ describe("Slice ID security-operation policy", () => {
           target: arbitraryTargetAddress
         })
       )
+    ).toBe(false)
+  })
+})
+
+describe("Slice ID user-funded revocation policy", () => {
+  const registryAbi = [
+    {
+      inputs: [{ name: "authorizationId", type: "bytes32" }],
+      name: "revoke",
+      outputs: [],
+      stateMutability: "nonpayable",
+      type: "function"
+    },
+    {
+      inputs: [],
+      name: "invalidateAll",
+      outputs: [],
+      stateMutability: "nonpayable",
+      type: "function"
+    },
+    {
+      inputs: [
+        { name: "root", type: "address" },
+        { name: "authorizationId", type: "bytes32" },
+        { name: "nonce", type: "uint256" },
+        { name: "deadline", type: "uint256" },
+        { name: "signature", type: "bytes" }
+      ],
+      name: "revokeFor",
+      outputs: [],
+      stateMutability: "nonpayable",
+      type: "function"
+    }
+  ] as const
+  const revokeData = encodeFunctionData({
+    abi: registryAbi,
+    args: [zeroHash],
+    functionName: "revoke"
+  })
+  const accepts = ({
+    callData = encodeErc7579ExecuteBatch([
+      {
+        data: revokeData,
+        target: sliceIdAuthorizationRevocationRegistryAddress
+      }
+    ]),
+    chainId = base.id,
+    nonce = rootValidationNonce
+  }: {
+    callData?: Hex
+    chainId?: number
+    nonce?: Hex
+  } = {}) =>
+    isAcceptedSliceIdUserFundedRegistryOperationUserOperation({
+      chainId,
+      userOperation: createBundlerUserOperation(callData, { nonce })
+    })
+
+  it("accepts only root-validated registry calls on the authority chain", () => {
+    expect(accepts()).toBe(true)
+    expect(accepts({ chainId: 10 })).toBe(false)
+    expect(accepts({ nonce: permissionValidationNonce })).toBe(false)
+  })
+
+  it("rejects relayed, mixed, and oversized batches", () => {
+    const revokeFor = encodeFunctionData({
+      abi: registryAbi,
+      args: [sender, zeroHash, 0n, 1n, "0x"],
+      functionName: "revokeFor"
+    })
+    expect(
+      accepts({
+        callData: encodeErc7579ExecuteBatch([
+          {
+            data: revokeFor,
+            target: sliceIdAuthorizationRevocationRegistryAddress
+          }
+        ])
+      })
+    ).toBe(false)
+    expect(
+      accepts({
+        callData: encodeErc7579ExecuteBatch([
+          {
+            data: revokeData,
+            target: sliceIdAuthorizationRevocationRegistryAddress
+          },
+          { data: "0x", target: arbitraryTargetAddress }
+        ])
+      })
+    ).toBe(false)
+    expect(
+      accepts({
+        callData: encodeErc7579ExecuteBatch(
+          Array.from({ length: 11 }, () => ({
+            data: revokeData,
+            target: sliceIdAuthorizationRevocationRegistryAddress
+          }))
+        )
+      })
     ).toBe(false)
   })
 })

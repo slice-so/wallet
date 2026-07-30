@@ -77,6 +77,25 @@ const eip7702AuthorizationQuantityFields = [
 ] as const
 
 const eip7702FactoryMarker = "0x7702" as const
+export const sliceIdAuthorizationRevocationRegistryAddress =
+  "0xcbb146a830d93a9371145b5cc962719543f3bb1b" as const satisfies Address
+const sliceIdRevocationChainIds = [8453, 31337] as const
+const authorizationRevocationRegistryWriteAbi = [
+  {
+    inputs: [{ name: "authorizationId", type: "bytes32" }],
+    name: "revoke",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
+  },
+  {
+    inputs: [],
+    name: "invalidateAll",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
+  }
+] as const
 const kernelMetaFactoryAbi = [
   {
     inputs: [
@@ -870,6 +889,57 @@ export const isAcceptedSliceIdSecurityOperationUserOperation = ({
         sender: userOperation.sender
       }) === "account"
   )
+}
+
+/**
+ * Narrow forwarding policy for user-funded Slice ID revocation operations.
+ * The paymaster deliberately does not use this predicate.
+ */
+export const isAcceptedSliceIdUserFundedRegistryOperationUserOperation = ({
+  chainId,
+  userOperation
+}: {
+  chainId: string | number
+  userOperation: SliceUserOperation
+}) => {
+  const parsedChainId = parseSliceChainId(chainId)
+  if (
+    parsedChainId === null ||
+    !sliceIdRevocationChainIds.includes(
+      parsedChainId as (typeof sliceIdRevocationChainIds)[number]
+    )
+  ) {
+    return false
+  }
+  const nonce = parseUserOperationNonce(userOperation.nonce)
+  if (nonce === null || !isKernelRootValidationNonce(nonce)) return false
+
+  const calls = getSliceSmartAccountCalls(userOperation.callData)
+  if (!calls?.length || calls.length > maxAcceptedSliceCallsPerBatch) {
+    return false
+  }
+
+  return calls.every((call) => {
+    if (
+      call.value !== 0n ||
+      call.target.toLowerCase() !==
+        sliceIdAuthorizationRevocationRegistryAddress.toLowerCase()
+    ) {
+      return false
+    }
+    try {
+      const decoded = decodeFunctionData({
+        abi: authorizationRevocationRegistryWriteAbi,
+        data: call.data
+      })
+      return (
+        decoded.functionName === "revoke" ||
+        decoded.functionName === "invalidateAll"
+      )
+    } catch {
+      return false
+    }
+  })
 }
 
 /**
