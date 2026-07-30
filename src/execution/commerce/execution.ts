@@ -1,6 +1,6 @@
 import {
-  walletDelegationExecutionScope,
-  walletDelegationStoreManagementScope
+  walletExecutionPermissionExecutionScope,
+  walletExecutionPermissionStoreManagementScope
 } from "@slicekit/delegation-contract"
 import { type Address, type Hex, hexToBytes, isAddress, isHex } from "viem"
 import { getSliceWalletP256SignerId } from "../../p256Server"
@@ -184,7 +184,7 @@ const assertCheckoutAuthorization = (
     session.checkout === undefined ||
     executionGrant === undefined ||
     executionGrant.scopes.length !== 1 ||
-    executionGrant.scopes[0] !== walletDelegationExecutionScope
+    executionGrant.scopes[0] !== walletExecutionPermissionExecutionScope
   ) {
     throw new Error("Slice checkout authorization is incomplete.")
   }
@@ -200,7 +200,7 @@ const assertManagementAuthorization = (
     session.checkout !== undefined ||
     executionGrant === undefined ||
     executionGrant.scopes.length !== 1 ||
-    executionGrant.scopes[0] !== walletDelegationStoreManagementScope
+    executionGrant.scopes[0] !== walletExecutionPermissionStoreManagementScope
   ) {
     throw new Error("Slice management authorization is incomplete.")
   }

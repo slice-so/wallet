@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test"
 import {
-  walletDelegationExecutionScope,
-  walletDelegationStoreManagementScope
+  walletExecutionPermissionExecutionScope,
+  walletExecutionPermissionStoreManagementScope
 } from "@slicekit/delegation-contract"
 import type { Address, Hex } from "viem"
 import { getSliceWalletP256SignerId } from "../../p256Server"
@@ -41,7 +41,7 @@ const authorization = {
   executionGrant: {
     expiresAt: policy.validUntil,
     nonce: `0x${"22".repeat(32)}` as Hex,
-    scopes: [walletDelegationExecutionScope],
+    scopes: [walletExecutionPermissionExecutionScope],
     signerProof: `0x${"44".repeat(64)}` as Hex
   },
   rootCredential,
@@ -222,7 +222,7 @@ describe("Slice management execution client", () => {
       executionGrant: {
         expiresAt: managementPolicy.validUntil,
         nonce: `0x${"22".repeat(32)}` as Hex,
-        scopes: [walletDelegationStoreManagementScope],
+        scopes: [walletExecutionPermissionStoreManagementScope],
         signerProof: `0x${"44".repeat(64)}` as Hex
       },
       rootCredential,

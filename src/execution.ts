@@ -42,12 +42,12 @@ export type {
   SliceBundlerUserOperationAuthorizer
 } from "./types/bundler"
 export type * from "./types/commerce"
-export type * from "./types/delegation"
 export type {
   BuildSliceExecutionEnableTypedDataParameters,
   CreateSliceExecutionAccountParameters,
   SliceExecutionUserOperation
 } from "./types/execution"
+export type * from "./types/executionPermission"
 export type {
   JsonObject,
   JsonPrimitive,
