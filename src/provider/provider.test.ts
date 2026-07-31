@@ -287,21 +287,24 @@ describe("Slice Wallet provider dispatch", () => {
     expect(optional.createGrant).not.toHaveBeenCalled()
   })
 
-  test("accepts only closed pre-prepared wallet_connect session scalars", async () => {
+  test("accepts only closed pre-prepared wallet_connect session claims", async () => {
     const { provider, runtime } = createProvider()
     const sessionSigner = "0x0000000000000000000000000000000000000002" as const
+    const claims = {
+      audience: "https://api.example",
+      scopes: ["orders:read"],
+      ttlSeconds: 60
+    } as const
     expect(
       await request(provider, "wallet_connect", [
         {
           capabilities: {
             session: {
-              audience: "https://api.example",
+              claims,
               nonce: "abcdefghijklmnop",
               optional: true,
               pendingId: "pending-id",
-              scopes: ["orders:read"],
-              sessionSigner,
-              ttlSeconds: 60
+              sessionSigner
             }
           },
           version: "1"
@@ -309,23 +312,37 @@ describe("Slice Wallet provider dispatch", () => {
       ])
     ).toEqual({ accounts: [{ address: account, capabilities: {} }] })
     expect(runtime.connectWithSession).toHaveBeenCalledWith({
-      audience: "https://api.example",
       prepared: {
+        claims,
         nonce: "abcdefghijklmnop",
         pendingId: "pending-id",
         sessionSigner
-      },
-      scopes: ["orders:read"],
-      ttlSeconds: 60
+      }
     })
     await expectRpcError(
       request(provider, "wallet_connect", [
         {
           capabilities: {
             session: {
-              audience: "https://api.example",
+              claims,
               optional: true,
               pendingId: "a".repeat(65),
+              sessionSigner
+            }
+          },
+          version: "1"
+        }
+      ]),
+      -32602
+    )
+    await expectRpcError(
+      request(provider, "wallet_connect", [
+        {
+          capabilities: {
+            session: {
+              audience: "https://api.example",
+              claims,
+              optional: true,
               sessionSigner
             }
           },
