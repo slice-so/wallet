@@ -1190,7 +1190,7 @@ const createSliceWalletChainRuntime = (
       rebroadcastAttempts:
         phase === "prepared" ? 0 : rotation.rebroadcastAttempts,
       replacement: rotation.replacement,
-      version: 4 as const
+      version: 1 as const
     }
     if (phase === "prepared") {
       return persistRotation({ ...base, phase })
@@ -1999,7 +1999,7 @@ const createSliceWalletChainRuntime = (
               permissions,
               session
             }),
-            version: 4
+            version: 1
           } satisfies StoredGenericGrantRotation
           try {
             rotation = persistRotation(prepared)

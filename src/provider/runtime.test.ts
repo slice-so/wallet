@@ -202,7 +202,7 @@ const createRotation = (
   predecessor: createRotationGrant(`0x04${"55".repeat(64)}`),
   rebroadcastAttempts: 0,
   replacement: createRotationGrant(`0x04${"66".repeat(64)}`),
-  version: 4
+  version: 1
 })
 
 const createInstallation = (
@@ -250,7 +250,7 @@ const updateRotationPhase = (
     predecessor: rest.predecessor,
     rebroadcastAttempts: phase === "prepared" ? 0 : rest.rebroadcastAttempts,
     replacement: rest.replacement,
-    version: 4 as const
+    version: 1 as const
   }
   if (phase === "prepared") return { ...base, phase }
   if (phase === "submitted" || phase === "transport-pending") {
@@ -1171,7 +1171,7 @@ describe("generic grant replacement ordering", () => {
       predecessor: pending.predecessor,
       rebroadcastAttempts: 0,
       replacement: pending.replacement,
-      version: 4
+      version: 1
     })
   })
 

@@ -232,7 +232,7 @@ export const formatSliceWalletExecutionGrantMessage = ({
   ].join("\n")
 }
 
-const coSignDomain = keccak256(stringToHex("Slice Wallet Checkout Co-sign v2"))
+const coSignDomain = keccak256(stringToHex("Slice Wallet Checkout Co-sign v1"))
 const sessionRequestDomain = keccak256(
   stringToHex("Slice Wallet Execution Session Request v1")
 )

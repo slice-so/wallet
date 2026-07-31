@@ -76,7 +76,7 @@ export type SliceWalletCeremonyAccountMessage = {
   }
   session?: SliceWalletCeremonySessionResult
   type: "slice-wallet:ceremony-account"
-  version: 2
+  version: 1
 }
 
 export type SliceWalletCeremonyAccountResponse =

@@ -41,7 +41,7 @@ export type SliceWalletCeremonyContinuationResult =
         signerAddress: Address
       }
       type: "slice-wallet:ceremony-account"
-      version: 2
+      version: 1
     }
   | {
       account: Address

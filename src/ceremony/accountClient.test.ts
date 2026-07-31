@@ -46,7 +46,7 @@ const createWindow = (
           nonce,
           session,
           type: "slice-wallet:ceremony-account",
-          version: 2
+          version: 1
         })
       const reject = () =>
         port.postMessage({

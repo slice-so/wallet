@@ -455,7 +455,7 @@ export const parseSliceWalletCeremonyAccountMessage = (
     ["account", "accountIndex", "credentialIdHash", "nonce", "type", "version"],
     ["recovery", "session"]
   )
-  if (input.type !== "slice-wallet:ceremony-account" || input.version !== 2) {
+  if (input.type !== "slice-wallet:ceremony-account" || input.version !== 1) {
     throw new Error("Ceremony account response is invalid.")
   }
   let recovery: SliceWalletCeremonyAccountMessage["recovery"]
@@ -531,7 +531,7 @@ export const parseSliceWalletCeremonyAccountMessage = (
     ...(recovery === undefined ? {} : { recovery }),
     ...(session === undefined ? {} : { session }),
     type: "slice-wallet:ceremony-account",
-    version: 2
+    version: 1
   }
 }
 

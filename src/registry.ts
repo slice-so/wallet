@@ -57,7 +57,7 @@ export const formatSliceWalletExistingCredentialAuthorization = ({
       ? "Authorize this credential as a root-equivalent device for the existing wallet."
       : "Authorize this credential as a root for the existing wallet.",
     "",
-    "Version: 2",
+    "Version: 1",
     `Account: ${accountAddress.toLowerCase()}`,
     `Chain ID: ${chainId}`,
     `Credential ID Hash: ${credentialIdHash}`,
@@ -246,7 +246,7 @@ export const getSliceWalletRegistryProofChallenge = ({
   keccak256(
     stringToHex(
       [
-        "Slice Wallet Credential Registration v3",
+        "Slice Wallet Credential Registration v1",
         registrationKind,
         String(chainId),
         challenge,

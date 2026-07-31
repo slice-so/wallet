@@ -19,7 +19,7 @@ const base = {
 describe("registry proof challenge commitment", () => {
   test("is deterministic for identical inputs", () => {
     expect(getSliceWalletRegistryProofChallenge(base)).toBe(
-      getSliceWalletRegistryProofChallenge(base)
+      "0x95cdbcfd6543bc8080f2a158e60d63dd16378cdcd31f910a58f403b760c0a6f8"
     )
   })
 
@@ -112,12 +112,12 @@ describe("existing-account registry authorization", () => {
       factoryVersion: "0.3.3",
       publicKey: base.publicKey
     } as const
-    expect(
-      formatSliceWalletExistingCredentialAuthorization({
-        ...input,
-        chainId: 8453
-      })
-    ).not.toBe(
+    const message = formatSliceWalletExistingCredentialAuthorization({
+      ...input,
+      chainId: 8453
+    })
+    expect(message).toContain("Version: 1")
+    expect(message).not.toBe(
       formatSliceWalletExistingCredentialAuthorization({
         ...input,
         chainId: 10
