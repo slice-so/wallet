@@ -33,4 +33,15 @@ describe("Slice wallet import boundaries", () => {
       'src/nested/fixture.ts imports internal Slice package "@slicekit/common"'
     ])
   })
+
+  it("allows the shared delegation contract in exported wallet types", () => {
+    expect(
+      getSliceWalletSourceImportBoundaryViolations({
+        filePath: resolve(sourceRoot, "types/session.ts"),
+        packageRoot,
+        sourceRoot,
+        sourceText: 'import type { DelegationGrant } from "@slicekit/erc8128"'
+      })
+    ).toEqual([])
+  })
 })

@@ -1,11 +1,6 @@
+import type { DelegationGrant } from "@slicekit/erc8128"
 import type { Address, Hex } from "viem"
 import type { SliceWalletProtocolValue } from "./frame"
-
-export type SliceWalletDelegationGrantArtifact = {
-  fieldValue: string
-  grantSignatureInput: string
-  grantSignatureB64: string
-}
 
 export type SliceWalletPreparedSession = {
   claims: SliceWalletProtocolValue
@@ -41,7 +36,7 @@ export type SliceWalletCeremonySessionRequestMessage =
 export type SliceWalletCeremonySessionResult =
   | {
       expiresAt: string
-      grant: SliceWalletDelegationGrantArtifact
+      grant: DelegationGrant
       pendingId?: string
       sessionSigner: Address
       status: "granted"
