@@ -819,7 +819,7 @@ export const attachSliceWalletSignerFrame = ({
               "Bridge grant proof does not match the wallet session."
             )
           }
-          const grantMessage = formatSliceWalletExecutionGrantMessage({
+          const executionGrantText = formatSliceWalletExecutionGrantMessage({
             appOrigin: bridgedParentOrigin,
             expiresAt: request.expiresAt,
             nonce: request.nonce,
@@ -830,7 +830,7 @@ export const attachSliceWalletSignerFrame = ({
             signature: await signSliceWalletP256({
               cryptoImpl,
               key: session.privateKey,
-              message: stringToBytes(grantMessage)
+              message: stringToBytes(executionGrantText)
             }),
             type: "slice-wallet:bridge-grant-proof",
             version: 1

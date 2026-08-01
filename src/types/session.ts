@@ -1,9 +1,15 @@
 import type { Address, Hex } from "viem"
 import type { SliceWalletProtocolValue } from "./frame"
 
+export type SliceWalletDelegationGrantArtifact = {
+  fieldValue: string
+  grantSignatureInput: string
+  grantSignatureB64: string
+}
+
 export type SliceWalletPreparedSession = {
   claims: SliceWalletProtocolValue
-  nonce?: string
+  authorizationId?: Hex
   pendingId?: string
   sessionSigner: Address
 }
@@ -35,10 +41,9 @@ export type SliceWalletCeremonySessionRequestMessage =
 export type SliceWalletCeremonySessionResult =
   | {
       expiresAt: string
-      grantMessage: string
+      grant: SliceWalletDelegationGrantArtifact
       pendingId?: string
       sessionSigner: Address
-      signature: Hex
       status: "granted"
     }
   | {

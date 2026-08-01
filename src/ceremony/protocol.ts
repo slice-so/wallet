@@ -53,26 +53,27 @@ export const parseSliceWalletCeremonySessionRequestMessage = (
   }
   assertKeys(input, ["request", "status", "type", "version"])
   const request = record(input.request, "Prepared session request")
-  assertKeys(request, ["claims", "sessionSigner"], ["nonce", "pendingId"])
+  assertKeys(
+    request,
+    ["claims", "sessionSigner"],
+    ["authorizationId", "pendingId"]
+  )
   const sessionSigner = addressValue(request.sessionSigner, "Session signer")
-  const nonce =
-    request.nonce === undefined
+  const authorizationId =
+    request.authorizationId === undefined
       ? undefined
-      : stringValue(request.nonce, "Session nonce")
+      : hexValue(request.authorizationId, "Authorization id", 32)
   const pendingId =
     request.pendingId === undefined
       ? undefined
       : stringValue(request.pendingId, "Pending session id")
-  if (
-    (nonce !== undefined && !/^[A-Za-z0-9_-]{16,256}$/.test(nonce)) ||
-    (pendingId !== undefined && !/^[A-Za-z0-9_-]{1,64}$/.test(pendingId))
-  ) {
+  if (pendingId !== undefined && !/^[A-Za-z0-9_-]{1,64}$/.test(pendingId)) {
     throw new Error("Prepared session request is invalid.")
   }
   return {
     request: {
       claims: request.claims,
-      ...(nonce === undefined ? {} : { nonce }),
+      ...(authorizationId === undefined ? {} : { authorizationId }),
       ...(pendingId === undefined ? {} : { pendingId }),
       sessionSigner
     },
@@ -481,7 +482,7 @@ export const parseSliceWalletCeremonyAccountMessage = (
     if (status === "granted") {
       assertKeys(
         sessionInput,
-        ["expiresAt", "grantMessage", "sessionSigner", "signature", "status"],
+        ["expiresAt", "grant", "sessionSigner", "status"],
         ["pendingId"]
       )
       const pendingId =
@@ -494,15 +495,30 @@ export const parseSliceWalletCeremonyAccountMessage = (
       ) {
         throw new Error("Pending session id is invalid.")
       }
+      const grantInput = record(sessionInput.grant, "Session grant")
+      assertKeys(grantInput, [
+        "fieldValue",
+        "grantSignatureB64",
+        "grantSignatureInput"
+      ])
       session = {
         expiresAt: stringValue(sessionInput.expiresAt, "Session expiry"),
-        grantMessage: stringValue(sessionInput.grantMessage, "Session grant"),
+        grant: {
+          fieldValue: stringValue(grantInput.fieldValue, "Delegation field"),
+          grantSignatureInput: stringValue(
+            grantInput.grantSignatureInput,
+            "Grant Signature-Input"
+          ),
+          grantSignatureB64: stringValue(
+            grantInput.grantSignatureB64,
+            "Grant signature"
+          )
+        },
         ...(pendingId === undefined ? {} : { pendingId }),
         sessionSigner: addressValue(
           sessionInput.sessionSigner,
           "Session signer"
         ),
-        signature: hexValue(sessionInput.signature, "Session signature"),
         status
       }
     } else {

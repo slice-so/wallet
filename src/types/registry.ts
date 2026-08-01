@@ -1,4 +1,5 @@
 import type { Address, Hex } from "viem"
+import type { SliceWalletDelegationGrantArtifact } from "./session"
 
 export type SliceWalletCredentialRegistrationKind =
   | "device"
@@ -47,7 +48,7 @@ export type RegisterSliceWalletCredentialInput = {
   recoverySignerAddress?: Address
   registrationKind: SliceWalletCredentialRegistrationKind
   rootSignature?: Hex
-  sessionGrantMessage?: string
+  sessionGrant?: SliceWalletDelegationGrantArtifact
 }
 
 export type SliceWalletCredentialListChallenge = {
