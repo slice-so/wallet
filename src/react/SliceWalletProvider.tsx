@@ -17,8 +17,9 @@ import {
   isAddress,
   isAddressEqual
 } from "viem"
-import { anvil } from "viem/chains"
-import { useConnection } from "wagmi"
+import { anvil, base } from "viem/chains"
+import { useConfig, useConnection } from "wagmi"
+import { createSliceWalletCheckoutExecutionClient } from "../execution/commerce/execution"
 import {
   type createSliceWalletCeremonyKernelAccount,
   getSliceWalletChainManifest
@@ -65,44 +66,41 @@ export { defaultExecutionAllowanceUsdMicros } from "./executionCheckout"
 const SliceWalletContext = createContext<SliceWalletContextValue | null>(null)
 
 export function SliceWalletProvider({
-  adapters,
-  alchemyId,
-  capabilities,
-  ceremonyMode = "popup",
+  adapters = {},
+  ceremonyMode = "auto",
   children,
-  idOrigin,
-  notifications,
-  preferredChainId,
-  wagmiConfig
+  notifications
 }: SliceWalletProviderProps) {
-  const checkoutExecution = capabilities?.checkoutExecution
-    ? adapters.checkoutExecution
-    : undefined
-  const fetchWalletRecovery = capabilities?.recovery
-    ? adapters.fetchWalletRecovery
-    : undefined
-  const storeManagement = capabilities?.storeManagement
-    ? adapters.storeManagement
-    : undefined
+  const defaultCheckoutExecution = useMemo(
+    () => ({ client: createSliceWalletCheckoutExecutionClient() }),
+    []
+  )
+  const checkoutExecution =
+    adapters.checkoutExecution ?? defaultCheckoutExecution
+  const fetchWalletRecovery = adapters.fetchWalletRecovery
+  const storeManagement = adapters.storeManagement
+  const wagmiConfig = useConfig()
+  const usesLocalSliceChain =
+    !wagmiConfig.chains.some((chain) => chain.id === base.id) &&
+    wagmiConfig.chains.some((chain) => chain.id === anvil.id)
   const walletChain = useMemo(
     () =>
-      preferredChainId === anvil.id
-        ? anvil
-        : getSliceWalletChainManifest(preferredChainId).chain,
-    [preferredChainId]
+      usesLocalSliceChain ? anvil : getSliceWalletChainManifest(base.id).chain,
+    [usesLocalSliceChain]
   )
-  const normalizedIdOrigin = useMemo(() => new URL(idOrigin).origin, [idOrigin])
+  const normalizedIdOrigin =
+    walletChain.id === anvil.id
+      ? "http://localhost:3003"
+      : "https://id.slice.so"
   const publicClient = useMemo(
     () =>
       createPublicClient({
         chain: walletChain,
         transport: http(
-          walletChain.id === 31_337
-            ? "http://localhost:8545"
-            : `https://base-mainnet.g.alchemy.com/v2/${alchemyId}`
+          getSliceWalletChainManifest(walletChain.id).defaultTransports.rpcUrl
         )
       }),
-    [alchemyId, walletChain]
+    [walletChain]
   )
   const [status, setStatus] = useState<SliceWalletStatus>("loading")
   const connection = useConnection({ config: wagmiConfig })

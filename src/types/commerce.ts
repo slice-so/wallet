@@ -128,7 +128,6 @@ export type SliceWalletReplacementFinalization =
     userOperationHash?: Hex
   }
 export type CreateSliceWalletCheckoutExecutionClientParameters = {
-  apiUrl: string
   fetch?: SliceWalletExecutionFetch
 }
 export type SliceWalletCheckoutExecutionClient =

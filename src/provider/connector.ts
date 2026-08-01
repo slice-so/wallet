@@ -1,20 +1,46 @@
 import { createConnector } from "@wagmi/core"
 import { type Address, isAddress } from "viem"
-import type { SliceWalletProvider, SliceWalletProviderValue } from "../types"
+import { sliceWalletChainManifests } from "../chains"
+import type {
+  SliceWalletParameters,
+  SliceWalletProvider,
+  SliceWalletProviderValue
+} from "../types"
 import type { SliceWalletProviderConfig } from "../types/providerInternal"
+import { resolveCanonicalSliceWalletConfig } from "./canonicalConfig"
 import {
   announceSliceWalletProvider,
   sliceWalletProviderIcon
 } from "./discovery"
 import { createSliceWalletProviderInternal } from "./provider"
 
-export const sliceWalletConnector = (parameters: SliceWalletProviderConfig) => {
+type SliceWalletConnectorRuntime = Pick<
+  SliceWalletProviderConfig,
+  "document" | "fetch" | "requireAdmittedChain" | "storage" | "window"
+>
+
+export const sliceWalletConnector = (
+  parameters: SliceWalletParameters,
+  runtime: SliceWalletConnectorRuntime = {}
+) => {
   let provider: SliceWalletProvider | null = null
   let stopAnnouncement: (() => void) | null = null
 
   return createConnector<SliceWalletProvider>((config) => {
+    const inheritedChainIds = config.chains
+      .map((chain) => chain.id)
+      .filter(
+        (chainId) => sliceWalletChainManifests[chainId]?.admitted === true
+      )
+    const providerConfig = {
+      ...resolveCanonicalSliceWalletConfig({
+        ...parameters,
+        chainIds: parameters.chainIds ?? inheritedChainIds
+      }),
+      ...runtime
+    }
     const getProvider = () => {
-      provider ??= createSliceWalletProviderInternal(parameters)
+      provider ??= createSliceWalletProviderInternal(providerConfig)
       return provider
     }
 
@@ -86,12 +112,12 @@ export const sliceWalletConnector = (parameters: SliceWalletProviderConfig) => {
       type: "injected",
       async setup() {
         const walletProvider = getProvider()
-        if (parameters.announce === true && stopAnnouncement === null) {
+        if (providerConfig.announce === true && stopAnnouncement === null) {
           stopAnnouncement = announceSliceWalletProvider({
             provider: walletProvider,
-            ...(parameters.window === undefined
+            ...(providerConfig.window === undefined
               ? {}
-              : { window: parameters.window })
+              : { window: providerConfig.window })
           })
         }
         walletProvider.on("accountsChanged", (accounts) =>
@@ -116,21 +142,21 @@ export const sliceWalletConnector = (parameters: SliceWalletProviderConfig) => {
         }
         await switchPromise
         const sessionPromise =
-          parameters.session === undefined || isReconnecting === true
+          providerConfig.session === undefined || isReconnecting === true
             ? null
             : getProvider().connectWithSession({
-                prepare: parameters.session.prepare
+                prepare: providerConfig.session.prepare
               })
         const sessionResult = await sessionPromise
         if (sessionResult !== null) {
-          await parameters.session?.onSession?.(sessionResult.session)
+          await providerConfig.session?.onSession?.(sessionResult.session)
         }
         let grantedPermission: SliceWalletProviderValue | undefined
         let accounts: readonly Address[]
         if (
           sessionResult === null &&
           isReconnecting !== true &&
-          parameters.grantPermissions !== undefined
+          providerConfig.grantPermissions !== undefined
         ) {
           const { account, capabilities } = parseConnectResult(
             await getProvider().request({
@@ -138,7 +164,7 @@ export const sliceWalletConnector = (parameters: SliceWalletProviderConfig) => {
               params: [
                 {
                   capabilities: {
-                    grantPermissions: parameters.grantPermissions
+                    grantPermissions: providerConfig.grantPermissions
                   },
                   version: "1"
                 }
@@ -161,20 +187,20 @@ export const sliceWalletConnector = (parameters: SliceWalletProviderConfig) => {
               : [sessionResult.account]
           if (
             sessionResult !== null &&
-            parameters.grantPermissions !== undefined
+            providerConfig.grantPermissions !== undefined
           ) {
             try {
               grantedPermission = await getProvider().request({
                 method: "wallet_grantPermissions",
                 params: [
                   {
-                    expiry: parameters.grantPermissions.expiry,
-                    permissions: parameters.grantPermissions.permissions
+                    expiry: providerConfig.grantPermissions.expiry,
+                    permissions: providerConfig.grantPermissions.permissions
                   }
                 ]
               })
             } catch (error) {
-              if (parameters.grantPermissions.optional !== true) {
+              if (providerConfig.grantPermissions.optional !== true) {
                 await getProvider()
                   .request({ method: "wallet_disconnect" })
                   .catch(() => undefined)
@@ -231,7 +257,9 @@ export const sliceWalletConnector = (parameters: SliceWalletProviderConfig) => {
         )
         if (
           chain === undefined ||
-          !parameters.chains.some((candidate) => candidate.chain.id === chainId)
+          !providerConfig.chains.some(
+            (candidate) => candidate.chain.id === chainId
+          )
         ) {
           throw new Error("Slice Wallet is not configured for that chain.")
         }

@@ -65,7 +65,6 @@ describe("Slice checkout execution client", () => {
   it("requests co-signer configuration for the selected chain", async () => {
     let requestUrl = ""
     const client = createSliceWalletCheckoutExecutionClient({
-      apiUrl: "https://api.example",
       fetch: async (input) => {
         requestUrl = input.toString()
         return Response.json({ coSignerAddress: coSigner })
@@ -97,7 +96,6 @@ describe("Slice checkout execution client", () => {
       )
     }
     const client = createSliceWalletCheckoutExecutionClient({
-      apiUrl: "https://api.example",
       fetch: fetchImpl
     })
 
@@ -153,7 +151,6 @@ describe("Slice checkout execution client", () => {
       })
     }
     const client = createSliceWalletCheckoutExecutionClient({
-      apiUrl: "https://api.example",
       fetch: fetchImpl
     })
     const challenge = await client.createChallenge("delegation-1")
@@ -185,7 +182,6 @@ describe("Slice checkout execution client", () => {
 
   it("surfaces a non-final replacement so the caller can renew its proof", async () => {
     const client = createSliceWalletCheckoutExecutionClient({
-      apiUrl: "https://api.example",
       fetch: async () =>
         Response.json({ error: "revocation_not_final" }, { status: 409 })
     })
@@ -239,7 +235,6 @@ describe("Slice management execution client", () => {
     } satisfies SliceWalletPermissionAuthorization
     let requestBody = ""
     const client = createSliceWalletManagementExecutionClient({
-      apiUrl: "https://api.example",
       fetch: async (_input, init) => {
         requestBody = String(init?.body ?? "")
         return Response.json({

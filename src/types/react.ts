@@ -1,4 +1,3 @@
-import type { Config } from "@wagmi/core"
 import type { ReactNode } from "react"
 import type { Address, Hex } from "viem"
 import type { SliceAccountClient } from "./accountClient"
@@ -199,27 +198,16 @@ export type SliceWalletProviderAdapters = {
   storeManagement?: SliceWalletManagementExecutionAdapters
 }
 
-export type SliceWalletCapabilities = {
-  checkoutExecution?: boolean
-  recovery?: boolean
-  storeManagement?: boolean
-}
-
 export type SliceWalletNotifications = {
   error?: (message: string) => void
   success?: (message: string) => void
 }
 
 export type SliceWalletProviderProps = {
-  adapters: SliceWalletProviderAdapters
-  alchemyId: string
-  capabilities?: SliceWalletCapabilities
+  adapters?: SliceWalletProviderAdapters
   ceremonyMode?: SliceWalletCeremonyMode
   children: ReactNode
-  idOrigin: string
   notifications?: SliceWalletNotifications
-  preferredChainId: number
-  wagmiConfig: Config
 }
 
 export type SliceWalletContextValue = {

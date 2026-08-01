@@ -24,6 +24,8 @@ import type {
 } from "../../types/frame"
 import type { SliceWalletCheckoutCoSignerClient } from "../../types/permission"
 
+const sliceApiOrigin = "https://api.slice.so"
+
 export class SliceWalletExecutionRequestError extends Error {
   constructor(
     readonly status: number,
@@ -258,10 +260,9 @@ const stringifyUserOperation = (value: object) =>
   )
 
 export const createSliceWalletCheckoutExecutionClient = ({
-  apiUrl,
   fetch: fetchImpl = fetch
-}: CreateSliceWalletCheckoutExecutionClientParameters): SliceWalletCheckoutExecutionClient => {
-  const endpoint = (path: string) => new URL(path, apiUrl)
+}: CreateSliceWalletCheckoutExecutionClientParameters = {}): SliceWalletCheckoutExecutionClient => {
+  const endpoint = (path: string) => new URL(path, sliceApiOrigin)
 
   const createChallenge: SliceWalletCheckoutCoSignerClient["createChallenge"] =
     async (delegationId) => {
@@ -505,16 +506,15 @@ export const createSliceWalletCheckoutExecutionClient = ({
 }
 
 export const createSliceWalletManagementExecutionClient = ({
-  apiUrl,
   fetch: fetchImpl = fetch
-}: CreateSliceWalletCheckoutExecutionClientParameters): SliceWalletManagementExecutionClient => ({
+}: CreateSliceWalletCheckoutExecutionClientParameters = {}): SliceWalletManagementExecutionClient => ({
   createSessionChallenge: async (delegationId) =>
     parseSessionChallenge(
       await readJson<{ challenge: string; expiresAt: number }>(
         await fetchImpl(
           new URL(
             `/wallet-delegations/execution/p256/${encodeURIComponent(delegationId)}/session/challenge`,
-            apiUrl
+            sliceApiOrigin
           ),
           { method: "POST" }
         )
@@ -527,7 +527,7 @@ export const createSliceWalletManagementExecutionClient = ({
       await fetchImpl(
         new URL(
           `/wallet-delegations/execution/p256/${encodeURIComponent(proof.delegationId)}/session`,
-          apiUrl
+          sliceApiOrigin
         ),
         {
           body: JSON.stringify({
@@ -548,7 +548,7 @@ export const createSliceWalletManagementExecutionClient = ({
       await fetchImpl(
         new URL(
           `/wallet-delegations/execution/p256/${encodeURIComponent(proof.delegationId)}/session`,
-          apiUrl
+          sliceApiOrigin
         ),
         {
           body: JSON.stringify({
@@ -574,7 +574,7 @@ export const createSliceWalletManagementExecutionClient = ({
     const registration =
       await readJson<SliceWalletManagementExecutionGrantRegistration>(
         await fetchImpl(
-          new URL("/wallet-delegations/execution/p256/grant", apiUrl),
+          new URL("/wallet-delegations/execution/p256/grant", sliceApiOrigin),
           {
             body: JSON.stringify({
               accountAddress: session.account,
@@ -630,7 +630,7 @@ export const createSliceWalletManagementExecutionClient = ({
       await fetchImpl(
         new URL(
           `/wallet-delegations/execution/p256/${encodeURIComponent(proof.delegationId)}/session`,
-          apiUrl
+          sliceApiOrigin
         ),
         {
           body: JSON.stringify({
