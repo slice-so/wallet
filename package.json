@@ -153,7 +153,6 @@
   },
   "dependencies": {
     "@slicekit/abi": "workspace:*",
-    "@slicekit/delegation-contract": "workspace:*",
     "@zerodev/ecdsa-validator": "^5.4.9",
     "@zerodev/permissions": "5.6.3",
     "@zerodev/sdk": "5.5.10",

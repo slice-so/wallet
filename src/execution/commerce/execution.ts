@@ -1,8 +1,8 @@
+import { type Address, type Hex, hexToBytes, isAddress, isHex } from "viem"
 import {
   walletExecutionPermissionExecutionScope,
   walletExecutionPermissionStoreManagementScope
-} from "@slicekit/delegation-contract"
-import { type Address, type Hex, hexToBytes, isAddress, isHex } from "viem"
+} from "../../executionPermission"
 import { getSliceWalletP256SignerId } from "../../p256Server"
 import {
   getWalletPermissionId,

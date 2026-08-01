@@ -1,9 +1,9 @@
 import { describe, expect, it } from "bun:test"
+import type { Address, Hex } from "viem"
 import {
   walletExecutionPermissionExecutionScope,
   walletExecutionPermissionStoreManagementScope
-} from "@slicekit/delegation-contract"
-import type { Address, Hex } from "viem"
+} from "../../executionPermission"
 import { getSliceWalletP256SignerId } from "../../p256Server"
 import { getWalletPermissionId } from "../../policy"
 import type { SliceWalletPermissionAuthorization } from "../../types/frame"

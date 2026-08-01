@@ -10,6 +10,7 @@ export * from "./execution/utils/slicePermissionErrors"
 export * from "./execution/utils/sliceSmartAccountCalls"
 export * from "./execution/utils/sliceUserOperationLimits"
 export * from "./execution/utils/sliceUserOperationPolicy"
+export * from "./executionPermission"
 export type {
   CreateSliceKernelPasskeyAccountParameters,
   CreateSliceKernelPasskeyBundlerClient,

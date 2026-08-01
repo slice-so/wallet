@@ -19,7 +19,6 @@ describe("Slice wallet import boundaries", () => {
       packageRoot,
       sourceRoot,
       sourceText: [
-        'import type { WalletDelegationScope } from "@slicekit/delegation-contract/types"',
         'import "@slicekit/abi"',
         'export * from "@slice/indexer-shared"',
         'const external = import("../../outside")',

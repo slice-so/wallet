@@ -1,10 +1,14 @@
+import type {
+  walletExecutionPermissionScopeValues,
+  walletExecutionPermissionStatusValues
+} from "../executionPermission"
 import type { SerializedWalletPolicyDescriptor } from "./policy"
 
+export type WalletExecutionPermissionScope =
+  (typeof walletExecutionPermissionScopeValues)[number]
+
 export type WalletExecutionPermissionStatus =
-  | "active"
-  | "pending"
-  | "revoked"
-  | "expired"
+  (typeof walletExecutionPermissionStatusValues)[number]
 
 export type WalletExecutionPermissionPolicy = {
   allowedOperations: string[]
