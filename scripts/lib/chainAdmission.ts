@@ -31,7 +31,8 @@ const baseWalletContractNames = [
   "weightedEcdsaSigner"
 ] as const
 
-const authoritySpecificContractNames = new Set([
+const optionalContractNames = new Set([
+  "erc6492BootstrapFactory",
   "rateLimitPolicy",
   "slicerRegistryPolicy",
   "weightedP256Signer"
@@ -51,7 +52,7 @@ export const hasCompleteSliceWalletAdmissionEvidence = (
   ) &&
   Object.entries(deployment.contracts).every(
     ([name, contract]) =>
-      authoritySpecificContractNames.has(name) || hasExactRuntime(contract)
+      optionalContractNames.has(name) || hasExactRuntime(contract)
   ) &&
   deployment.verification.factoryStakerApproved &&
   deployment.verification.p256CanaryPassed &&

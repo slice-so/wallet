@@ -10,6 +10,7 @@ export type SliceWalletContractDeployment = {
 export type SliceWalletContractDeployments = {
   readonly callPolicy: SliceWalletContractDeployment
   readonly ecdsaSigner: SliceWalletContractDeployment
+  readonly erc6492BootstrapFactory: SliceWalletContractDeployment
   readonly entryPoint: SliceWalletContractDeployment & {
     readonly version: "0.7"
   }

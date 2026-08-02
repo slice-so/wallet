@@ -19,6 +19,7 @@ import {
   sliceWalletKernelAddresses,
   sliceWalletKernelVersion
 } from "./constants"
+import { compactSliceWalletErc6492Signature } from "./erc6492Bootstrap"
 import { assertSliceWalletExecutionSafety } from "./executionSafety"
 import type {
   CreateSliceWalletRegisteredKernelAccountParameters,
@@ -328,7 +329,7 @@ export const createSliceWalletRegisteredKernelAccount = async ({
     credential,
     ...(rootSigner === undefined ? {} : { rootSigner })
   })
-  return createKernelAccount(client, {
+  const account = await createKernelAccount(client, {
     ...(address === undefined ? {} : { address }),
     accountImplementationAddress: sliceWalletKernelAddresses.implementation,
     entryPoint: sliceWalletEntryPoint,
@@ -340,6 +341,21 @@ export const createSliceWalletRegisteredKernelAccount = async ({
     plugins: { sudo: rootValidator },
     useMetaFactory: true
   })
+  const compact = (signature: Hex) =>
+    compactSliceWalletErc6492Signature({ chainId, signature })
+  const signMessage = account.signMessage.bind(account)
+  const signTypedData = account.signTypedData.bind(
+    account
+  ) as typeof account.signTypedData
+  account.signMessage = async (parameters) =>
+    compact(await signMessage(parameters))
+  account.signTypedData = async (parameters) =>
+    compact(await signTypedData(parameters))
+  if (account.sign !== undefined) {
+    const sign = account.sign.bind(account)
+    account.sign = async (parameters) => compact(await sign(parameters))
+  }
+  return account
 }
 
 export const getSliceWalletRegisteredKernelAccountAddress = async (

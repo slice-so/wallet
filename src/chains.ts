@@ -85,6 +85,12 @@ const manifests = [
       }
     },
     contracts: {
+      erc6492BootstrapFactory: {
+        address: "0x377E11216A60603Cc187a6B363783fF3A86A41a9",
+        deployedRuntimeCodeHash: null,
+        expectedRuntimeCodeHash:
+          "0x394b2488e23e673c7883ce545e46dadbcf8d52c6a33a43bbf51263aaf8b94a99"
+      },
       entryPoint: {
         address: "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
         deployedRuntimeCodeHash:
@@ -259,6 +265,12 @@ const manifests = [
       }
     },
     contracts: {
+      erc6492BootstrapFactory: {
+        address: "0x377E11216A60603Cc187a6B363783fF3A86A41a9",
+        deployedRuntimeCodeHash: null,
+        expectedRuntimeCodeHash:
+          "0x394b2488e23e673c7883ce545e46dadbcf8d52c6a33a43bbf51263aaf8b94a99"
+      },
       entryPoint: {
         address: "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
         deployedRuntimeCodeHash:
@@ -433,6 +445,12 @@ const manifests = [
       }
     },
     contracts: {
+      erc6492BootstrapFactory: {
+        address: "0x377E11216A60603Cc187a6B363783fF3A86A41a9",
+        deployedRuntimeCodeHash: null,
+        expectedRuntimeCodeHash:
+          "0x394b2488e23e673c7883ce545e46dadbcf8d52c6a33a43bbf51263aaf8b94a99"
+      },
       entryPoint: {
         address: "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
         deployedRuntimeCodeHash:
@@ -612,6 +630,12 @@ const manifests = [
       }
     },
     contracts: {
+      erc6492BootstrapFactory: {
+        address: "0x377E11216A60603Cc187a6B363783fF3A86A41a9",
+        deployedRuntimeCodeHash: null,
+        expectedRuntimeCodeHash:
+          "0x394b2488e23e673c7883ce545e46dadbcf8d52c6a33a43bbf51263aaf8b94a99"
+      },
       entryPoint: {
         address: "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
         deployedRuntimeCodeHash:

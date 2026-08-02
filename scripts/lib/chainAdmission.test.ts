@@ -115,6 +115,21 @@ describe("wallet chain admission evidence", () => {
     ).toBe(false)
   })
 
+  it("does not make the proof-size optimization a wallet admission requirement", () => {
+    expect(
+      hasCompleteSliceWalletAdmissionEvidence({
+        ...completeEvidence,
+        contracts: {
+          ...completeEvidence.contracts,
+          erc6492BootstrapFactory: {
+            deployedRuntimeCodeHash: null,
+            expectedRuntimeCodeHash: "0x1234"
+          }
+        }
+      })
+    ).toBe(true)
+  })
+
   it("admits management only with the exact registry-policy runtime", () => {
     expect(hasVerifiedManagementAuthorityDeployment(completeEvidence)).toBe(
       false

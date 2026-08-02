@@ -28,6 +28,7 @@ const chainIds = Object.keys(policy.chains).sort(
 const pinnedAddressContractNames = [
   "callPolicy",
   "ecdsaSigner",
+  "erc6492BootstrapFactory",
   "entryPoint",
   "kernelFactory",
   "kernelImplementation",

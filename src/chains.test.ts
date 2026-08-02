@@ -47,6 +47,9 @@ describe("Slice Wallet chain manifest", () => {
       base.contracts.rateLimitPolicy.expectedRuntimeCodeHash
     )
     expect(base.contracts.weightedP256Signer.deployedRuntimeCodeHash).toBeNull()
+    expect(
+      base.contracts.erc6492BootstrapFactory.deployedRuntimeCodeHash
+    ).toBeNull()
     expect(base.contracts.weightedP256Signer.address).toBe(
       sliceKernelWeightedP256SignerAddress
     )
@@ -96,6 +99,9 @@ describe("Slice Wallet chain manifest", () => {
     expect(local.contracts.weightedP256Signer.deployedRuntimeCodeHash).toBe(
       local.contracts.weightedP256Signer.expectedRuntimeCodeHash
     )
+    expect(
+      local.contracts.erc6492BootstrapFactory.deployedRuntimeCodeHash
+    ).toBe(local.contracts.erc6492BootstrapFactory.expectedRuntimeCodeHash)
     expect(local.defaultTransports).toEqual({
       bundlerUrl: "http://127.0.0.1:4337",
       rpcUrl: "http://127.0.0.1:8545"

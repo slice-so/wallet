@@ -6,12 +6,15 @@ import {
   decodeFunctionData,
   defineChain,
   getContractAddress,
-  keccak256
+  hexToBytes,
+  keccak256,
+  parseErc6492Signature
 } from "viem"
 import {
   predictSliceWalletKernelAccountAddress,
   sliceWalletKernelProxyInitCodeHash
 } from "./accountPrediction"
+import { sliceWalletKernelAddresses } from "./constants"
 import { buildRecoveryPermissionInitConfig } from "./recovery"
 import { createSliceWalletRegisteredKernelAccount } from "./rootValidator"
 
@@ -112,5 +115,52 @@ describe("Slice wallet offline account prediction", () => {
 
     expect(account.address).toBe(predicted)
     expect(actual).toBe(predicted)
+  })
+
+  it("keeps UserOperation deployment canonical while compacting recovery proofs", async () => {
+    const chainId = 31337
+    const client = createPublicClient({
+      chain: defineChain({
+        id: chainId,
+        name: "Offline Anvil",
+        nativeCurrency: { decimals: 18, name: "Ether", symbol: "ETH" },
+        rpcUrls: { default: { http: ["http://127.0.0.1"] } }
+      }),
+      transport: custom({
+        async request({ method }) {
+          if (method === "eth_getCode") return "0x"
+          throw new Error(`Unexpected RPC request: ${method}`)
+        }
+      })
+    })
+    const recovery = await buildRecoveryPermissionInitConfig({
+      client,
+      recoverySignerAddress: parameters.recoverySignerAddress
+    })
+    const predicted = await predictSliceWalletKernelAccountAddress({
+      ...parameters,
+      chainId
+    })
+    const account = await createSliceWalletRegisteredKernelAccount({
+      address: predicted,
+      chainId,
+      client,
+      credential: parameters.credential,
+      initConfig: recovery.initConfig,
+      rootSigner: async () => `0x${"22".repeat(512)}`
+    })
+
+    const factoryArgs = await account.getFactoryArgs()
+    const signature = await account.signMessage({ message: "compact proof" })
+    const parsed = parseErc6492Signature(signature)
+
+    expect(factoryArgs.factory).toBe(sliceWalletKernelAddresses.metaFactory)
+    expect(hexToBytes(factoryArgs.factoryData ?? "0x").length).toBeGreaterThan(
+      2_000
+    )
+    expect(parsed.address).toBe(
+      sliceWalletKernelAddresses.erc6492BootstrapFactory
+    )
+    expect(hexToBytes(signature).length).toBeLessThan(1_600)
   })
 })

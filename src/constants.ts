@@ -14,6 +14,8 @@ export const sliceWalletEntryPoint = {
 export const sliceWalletKernelAddresses = {
   callPolicyV005: baseManifest.contracts.callPolicy.address,
   ecdsaSigner: baseManifest.contracts.ecdsaSigner.address,
+  erc6492BootstrapFactory:
+    baseManifest.contracts.erc6492BootstrapFactory.address,
   factory: baseManifest.contracts.kernelFactory.address,
   implementation: baseManifest.contracts.kernelImplementation.address,
   metaFactory: baseManifest.contracts.kernelMetaFactory.address,
