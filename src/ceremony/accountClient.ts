@@ -93,8 +93,7 @@ const runSliceWalletAccountCeremony = async ({
     if (session === undefined) {
       port.postMessage({
         status: "none",
-        type: "slice-wallet:ceremony-session-request",
-        version: 1
+        type: "slice-wallet:ceremony-session-request"
       } satisfies SliceWalletCeremonySessionRequestMessage)
     } else {
       if (
@@ -107,8 +106,7 @@ const runSliceWalletAccountCeremony = async ({
       }
       port.postMessage({
         status: "preparing",
-        type: "slice-wallet:ceremony-session-request",
-        version: 1
+        type: "slice-wallet:ceremony-session-request"
       } satisfies SliceWalletCeremonySessionRequestMessage)
       const preparationPromise = (async () => {
         try {
@@ -134,8 +132,7 @@ const runSliceWalletAccountCeremony = async ({
       if (preparation === undefined || session.signal?.aborted === true) {
         port.postMessage({
           status: "preparation_failed",
-          type: "slice-wallet:ceremony-session-request",
-          version: 1
+          type: "slice-wallet:ceremony-session-request"
         } satisfies SliceWalletCeremonySessionRequestMessage)
       } else {
         const preparedRequest = preparation
@@ -143,8 +140,7 @@ const runSliceWalletAccountCeremony = async ({
         port.postMessage({
           request: preparedRequest,
           status: "prepared",
-          type: "slice-wallet:ceremony-session-request",
-          version: 1
+          type: "slice-wallet:ceremony-session-request"
         } satisfies SliceWalletCeremonySessionRequestMessage)
       }
     }

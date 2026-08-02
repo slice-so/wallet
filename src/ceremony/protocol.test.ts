@@ -9,6 +9,7 @@ import {
   parseSliceWalletCeremonyAccountResponse,
   parseSliceWalletCeremonyResponse,
   parseSliceWalletCeremonyRootSignRequest,
+  parseSliceWalletCeremonySessionRequestMessage,
   parseSliceWalletPermissionAuthorization
 } from "./protocol"
 
@@ -84,6 +85,25 @@ const managementAuthorization = {
 } as const satisfies SliceWalletProtocolValue
 
 describe("wallet ceremony protocol parser", () => {
+  it("uses one unversioned session-delegation request shape", () => {
+    expect(
+      parseSliceWalletCeremonySessionRequestMessage({
+        status: "preparing",
+        type: "slice-wallet:ceremony-session-request"
+      })
+    ).toEqual({
+      status: "preparing",
+      type: "slice-wallet:ceremony-session-request"
+    })
+    expect(() =>
+      parseSliceWalletCeremonySessionRequestMessage({
+        status: "preparing",
+        type: "slice-wallet:ceremony-session-request",
+        version: 1
+      })
+    ).toThrow("unknown field")
+  })
+
   it("accepts a terminal account cancellation response", () => {
     expect(
       parseSliceWalletCeremonyAccountResponse({

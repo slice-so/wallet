@@ -34,10 +34,7 @@ export const parseSliceWalletCeremonySessionRequestMessage = (
 ): SliceWalletCeremonySessionRequestMessage => {
   const input = record(value, "Ceremony session request")
   const status = stringValue(input.status, "Ceremony session request status")
-  if (
-    input.type !== "slice-wallet:ceremony-session-request" ||
-    input.version !== 1
-  ) {
+  if (input.type !== "slice-wallet:ceremony-session-request") {
     throw new Error("Ceremony session request is invalid.")
   }
   if (
@@ -45,13 +42,13 @@ export const parseSliceWalletCeremonySessionRequestMessage = (
     status === "preparing" ||
     status === "preparation_failed"
   ) {
-    assertKeys(input, ["status", "type", "version"])
-    return { status, type: input.type, version: 1 }
+    assertKeys(input, ["status", "type"])
+    return { status, type: input.type }
   }
   if (status !== "prepared") {
     throw new Error("Ceremony session request status is invalid.")
   }
-  assertKeys(input, ["request", "status", "type", "version"])
+  assertKeys(input, ["request", "status", "type"])
   const request = record(input.request, "Prepared session request")
   assertKeys(
     request,
@@ -78,8 +75,7 @@ export const parseSliceWalletCeremonySessionRequestMessage = (
       sessionSigner
     },
     status,
-    type: input.type,
-    version: 1
+    type: input.type
   }
 }
 
@@ -482,7 +478,7 @@ export const parseSliceWalletCeremonyAccountMessage = (
     if (status === "granted") {
       assertKeys(
         sessionInput,
-        ["expiresAt", "grant", "sessionSigner", "status"],
+        ["delegation", "expiresAt", "sessionSigner", "status"],
         ["pendingId"]
       )
       const pendingId =
@@ -495,22 +491,28 @@ export const parseSliceWalletCeremonyAccountMessage = (
       ) {
         throw new Error("Pending session id is invalid.")
       }
-      const grantInput = record(sessionInput.grant, "Session grant")
-      assertKeys(grantInput, [
+      const delegationInput = record(
+        sessionInput.delegation,
+        "Session delegation"
+      )
+      assertKeys(delegationInput, [
         "fieldValue",
         "grantSignatureB64",
         "grantSignatureInput"
       ])
       session = {
         expiresAt: stringValue(sessionInput.expiresAt, "Session expiry"),
-        grant: {
-          fieldValue: stringValue(grantInput.fieldValue, "Delegation field"),
+        delegation: {
+          fieldValue: stringValue(
+            delegationInput.fieldValue,
+            "Delegation field"
+          ),
           grantSignatureInput: stringValue(
-            grantInput.grantSignatureInput,
+            delegationInput.grantSignatureInput,
             "Grant Signature-Input"
           ),
           grantSignatureB64: stringValue(
-            grantInput.grantSignatureB64,
+            delegationInput.grantSignatureB64,
             "Grant signature"
           )
         },

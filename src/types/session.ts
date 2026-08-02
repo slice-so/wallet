@@ -19,24 +19,21 @@ export type SliceWalletCeremonySessionRequestMessage =
   | {
       status: "none" | "preparing"
       type: "slice-wallet:ceremony-session-request"
-      version: 1
     }
   | {
       request: SliceWalletPreparedSession
       status: "prepared"
       type: "slice-wallet:ceremony-session-request"
-      version: 1
     }
   | {
       status: "preparation_failed"
       type: "slice-wallet:ceremony-session-request"
-      version: 1
     }
 
 export type SliceWalletCeremonySessionResult =
   | {
       expiresAt: string
-      grant: DelegationGrant
+      delegation: DelegationGrant
       pendingId?: string
       sessionSigner: Address
       status: "granted"
