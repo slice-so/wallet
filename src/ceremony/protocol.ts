@@ -117,6 +117,15 @@ const integerValue = (value: SliceWalletProtocolValue, label: string) => {
   return value
 }
 
+const nonNegativeIntegerValue = (
+  value: SliceWalletProtocolValue,
+  label: string
+) => {
+  const parsed = integerValue(value, label)
+  if (parsed < 0) throw new Error(`${label} must not be negative.`)
+  return parsed
+}
+
 const booleanValue = (value: SliceWalletProtocolValue, label: string) => {
   if (typeof value !== "boolean") throw new Error(`${label} must be Boolean.`)
   return value
@@ -501,7 +510,10 @@ export const parseSliceWalletCeremonyAccountMessage = (
         "Session delegation"
       )
       assertKeys(delegationInput, ["links"])
-      if (!Array.isArray(delegationInput.links)) {
+      if (
+        !Array.isArray(delegationInput.links) ||
+        delegationInput.links.length === 0
+      ) {
         throw new Error("Session delegation links are invalid.")
       }
       session = {
@@ -541,10 +553,19 @@ export const parseSliceWalletCeremonyAccountMessage = (
                   stringValue(entry, "Delegation audience")
                 ),
                 id: hexValue(grant.id, "Delegation id", 32),
-                epoch: integerValue(grant.epoch, "Delegation epoch"),
-                created: integerValue(grant.created, "Delegation creation"),
-                expires: integerValue(grant.expires, "Delegation expiry"),
-                maxAge: integerValue(grant.maxAge, "Delegation maximum age"),
+                epoch: nonNegativeIntegerValue(grant.epoch, "Delegation epoch"),
+                created: nonNegativeIntegerValue(
+                  grant.created,
+                  "Delegation creation"
+                ),
+                expires: nonNegativeIntegerValue(
+                  grant.expires,
+                  "Delegation expiry"
+                ),
+                maxAge: nonNegativeIntegerValue(
+                  grant.maxAge,
+                  "Delegation maximum age"
+                ),
                 delegateIsEOA: booleanValue(
                   grant.delegateIsEOA,
                   "Delegation EOA statement"
