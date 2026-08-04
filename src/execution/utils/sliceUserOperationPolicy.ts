@@ -78,8 +78,8 @@ const eip7702AuthorizationQuantityFields = [
 
 const eip7702FactoryMarker = "0x7702" as const
 export const sliceIdAuthorizationRevocationRegistryAddress =
-  "0xcbb146a830d93a9371145b5cc962719543f3bb1b" as const satisfies Address
-const sliceIdRevocationChainIds = [8453, 31337] as const
+  "0xd612f3577d139cfb41e440b1a77e644eacb54c13" as const satisfies Address
+const sliceIdRevocationChainIds = [31337] as const
 const authorizationRevocationRegistryWriteAbi = [
   {
     inputs: [{ name: "authorizationId", type: "bytes32" }],
@@ -90,8 +90,8 @@ const authorizationRevocationRegistryWriteAbi = [
   },
   {
     inputs: [],
-    name: "invalidateAll",
-    outputs: [],
+    name: "advanceEpoch",
+    outputs: [{ name: "newEpoch", type: "uint64" }],
     stateMutability: "nonpayable",
     type: "function"
   }
@@ -934,7 +934,7 @@ export const isAcceptedSliceIdUserFundedRegistryOperationUserOperation = ({
       })
       return (
         decoded.functionName === "revoke" ||
-        decoded.functionName === "invalidateAll"
+        decoded.functionName === "advanceEpoch"
       )
     } catch {
       return false

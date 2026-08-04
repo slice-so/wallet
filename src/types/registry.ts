@@ -1,4 +1,4 @@
-import type { DelegationGrant } from "@slicekit/erc8128"
+import type { DelegationChain } from "@slicekit/erc8128"
 import type { Address, Hex } from "viem"
 
 export type SliceWalletCredentialRegistrationKind =
@@ -48,7 +48,7 @@ export type RegisterSliceWalletCredentialInput = {
   recoverySignerAddress?: Address
   registrationKind: SliceWalletCredentialRegistrationKind
   rootSignature?: Hex
-  sessionDelegation?: DelegationGrant
+  sessionDelegation?: DelegationChain
 }
 
 export type SliceWalletCredentialListChallenge = {

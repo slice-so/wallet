@@ -1295,8 +1295,8 @@ describe("Slice ID user-funded revocation policy", () => {
     },
     {
       inputs: [],
-      name: "invalidateAll",
-      outputs: [],
+      name: "advanceEpoch",
+      outputs: [{ name: "newEpoch", type: "uint64" }],
       stateMutability: "nonpayable",
       type: "function"
     },
@@ -1304,11 +1304,9 @@ describe("Slice ID user-funded revocation policy", () => {
       inputs: [
         { name: "root", type: "address" },
         { name: "authorizationId", type: "bytes32" },
-        { name: "nonce", type: "uint256" },
-        { name: "deadline", type: "uint256" },
         { name: "signature", type: "bytes" }
       ],
-      name: "revokeFor",
+      name: "revokeBySig",
       outputs: [],
       stateMutability: "nonpayable",
       type: "function"
@@ -1326,7 +1324,7 @@ describe("Slice ID user-funded revocation policy", () => {
         target: sliceIdAuthorizationRevocationRegistryAddress
       }
     ]),
-    chainId = base.id,
+    chainId = 31_337,
     nonce = rootValidationNonce
   }: {
     callData?: Hex
@@ -1340,21 +1338,22 @@ describe("Slice ID user-funded revocation policy", () => {
 
   it("accepts only root-validated registry calls on the authority chain", () => {
     expect(accepts()).toBe(true)
+    expect(accepts({ chainId: base.id })).toBe(false)
     expect(accepts({ chainId: 10 })).toBe(false)
     expect(accepts({ nonce: permissionValidationNonce })).toBe(false)
   })
 
   it("rejects relayed, mixed, and oversized batches", () => {
-    const revokeFor = encodeFunctionData({
+    const revokeBySig = encodeFunctionData({
       abi: registryAbi,
-      args: [sender, zeroHash, 0n, 1n, "0x"],
-      functionName: "revokeFor"
+      args: [sender, zeroHash, "0x"],
+      functionName: "revokeBySig"
     })
     expect(
       accepts({
         callData: encodeErc7579ExecuteBatch([
           {
-            data: revokeFor,
+            data: revokeBySig,
             target: sliceIdAuthorizationRevocationRegistryAddress
           }
         ])

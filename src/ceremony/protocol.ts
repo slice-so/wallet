@@ -117,6 +117,11 @@ const integerValue = (value: SliceWalletProtocolValue, label: string) => {
   return value
 }
 
+const booleanValue = (value: SliceWalletProtocolValue, label: string) => {
+  if (typeof value !== "boolean") throw new Error(`${label} must be Boolean.`)
+  return value
+}
+
 const hexValue = (
   value: SliceWalletProtocolValue,
   label: string,
@@ -495,26 +500,70 @@ export const parseSliceWalletCeremonyAccountMessage = (
         sessionInput.delegation,
         "Session delegation"
       )
-      assertKeys(delegationInput, [
-        "fieldValue",
-        "grantSignatureB64",
-        "grantSignatureInput"
-      ])
+      assertKeys(delegationInput, ["links"])
+      if (!Array.isArray(delegationInput.links)) {
+        throw new Error("Session delegation links are invalid.")
+      }
       session = {
         expiresAt: stringValue(sessionInput.expiresAt, "Session expiry"),
         delegation: {
-          fieldValue: stringValue(
-            delegationInput.fieldValue,
-            "Delegation field"
-          ),
-          grantSignatureInput: stringValue(
-            delegationInput.grantSignatureInput,
-            "Grant Signature-Input"
-          ),
-          grantSignatureB64: stringValue(
-            delegationInput.grantSignatureB64,
-            "Grant signature"
-          )
+          links: delegationInput.links.map((value) => {
+            const link = record(value, "Delegation link")
+            assertKeys(link, ["grant", "signature"])
+            const grant = record(link.grant, "Delegation grant")
+            assertKeys(grant, [
+              "allowReplayable",
+              "aud",
+              "components",
+              "created",
+              "delegate",
+              "delegateIsEOA",
+              "epoch",
+              "expires",
+              "id",
+              "maxAge",
+              "parent",
+              "root",
+              "scope"
+            ])
+            if (
+              !Array.isArray(grant.aud) ||
+              !Array.isArray(grant.components) ||
+              !Array.isArray(grant.scope)
+            ) {
+              throw new Error("Delegation grant arrays are invalid.")
+            }
+            return {
+              grant: {
+                root: stringValue(grant.root, "Delegation root"),
+                delegate: stringValue(grant.delegate, "Delegation delegate"),
+                aud: grant.aud.map((entry) =>
+                  stringValue(entry, "Delegation audience")
+                ),
+                id: hexValue(grant.id, "Delegation id", 32),
+                epoch: integerValue(grant.epoch, "Delegation epoch"),
+                created: integerValue(grant.created, "Delegation creation"),
+                expires: integerValue(grant.expires, "Delegation expiry"),
+                maxAge: integerValue(grant.maxAge, "Delegation maximum age"),
+                delegateIsEOA: booleanValue(
+                  grant.delegateIsEOA,
+                  "Delegation EOA statement"
+                ),
+                allowReplayable: booleanValue(
+                  grant.allowReplayable,
+                  "Delegation replay permission"
+                ),
+                components: grant.components.map((entry) =>
+                  stringValue(entry, "Delegation component")
+                ),
+                scope: grant.scope.map((entry) =>
+                  stringValue(entry, "Delegation scope")
+                ),
+                parent: hexValue(grant.parent, "Delegation parent", 32)
+              },
+              signature: hexValue(link.signature, "Delegation signature")
+            }
+          })
         },
         ...(pendingId === undefined ? {} : { pendingId }),
         sessionSigner: addressValue(
