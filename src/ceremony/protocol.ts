@@ -524,63 +524,67 @@ export const parseSliceWalletCeremonyAccountMessage = (
             assertKeys(link, ["grant", "signature"])
             const grant = record(link.grant, "Delegation grant")
             assertKeys(grant, [
-              "allowReplayable",
-              "aud",
-              "components",
-              "created",
+              "audiences",
               "delegate",
               "delegateIsEOA",
               "epoch",
-              "expires",
               "id",
-              "maxAge",
-              "parent",
-              "root",
-              "scope"
+              "issuer",
+              "maxRequestValiditySeconds",
+              "parentGrantHash",
+              "permissions",
+              "requiredComponents",
+              "requireNonReplayable",
+              "validAfter",
+              "validUntil"
             ])
             if (
-              !Array.isArray(grant.aud) ||
-              !Array.isArray(grant.components) ||
-              !Array.isArray(grant.scope)
+              !Array.isArray(grant.audiences) ||
+              !Array.isArray(grant.requiredComponents) ||
+              !Array.isArray(grant.permissions)
             ) {
               throw new Error("Delegation grant arrays are invalid.")
             }
             return {
               grant: {
-                root: stringValue(grant.root, "Delegation root"),
+                issuer: stringValue(grant.issuer, "Delegation issuer"),
                 delegate: stringValue(grant.delegate, "Delegation delegate"),
-                aud: grant.aud.map((entry) =>
+                audiences: grant.audiences.map((entry) =>
                   stringValue(entry, "Delegation audience")
                 ),
                 id: hexValue(grant.id, "Delegation id", 32),
                 epoch: nonNegativeIntegerValue(grant.epoch, "Delegation epoch"),
-                created: nonNegativeIntegerValue(
-                  grant.created,
-                  "Delegation creation"
+                validAfter: nonNegativeIntegerValue(
+                  grant.validAfter,
+                  "Delegation validity start"
                 ),
-                expires: nonNegativeIntegerValue(
-                  grant.expires,
-                  "Delegation expiry"
+                validUntil: nonNegativeIntegerValue(
+                  grant.validUntil,
+                  "Delegation validity end"
                 ),
-                maxAge: nonNegativeIntegerValue(
-                  grant.maxAge,
-                  "Delegation maximum age"
+                maxRequestValiditySeconds: nonNegativeIntegerValue(
+                  grant.maxRequestValiditySeconds,
+                  "Delegation maximum request validity"
                 ),
                 delegateIsEOA: booleanValue(
                   grant.delegateIsEOA,
                   "Delegation EOA statement"
                 ),
-                allowReplayable: booleanValue(
-                  grant.allowReplayable,
-                  "Delegation replay permission"
+                requireNonReplayable: booleanValue(
+                  grant.requireNonReplayable,
+                  "Delegation non-replayable requirement"
                 ),
-                components: grant.components.map((entry) =>
+                requiredComponents: grant.requiredComponents.map((entry) =>
                   stringValue(entry, "Delegation component")
                 ),
-                scope: grant.scope.map((entry) =>
-                  stringValue(entry, "Delegation scope")
+                permissions: grant.permissions.map((entry) =>
+                  stringValue(entry, "Delegation permission")
                 ),
-                parent: hexValue(grant.parent, "Delegation parent", 32)
+                parentGrantHash: hexValue(
+                  grant.parentGrantHash,
+                  "Delegation parent grant hash",
+                  32
+                )
               },
               signature: hexValue(link.signature, "Delegation signature")
             }

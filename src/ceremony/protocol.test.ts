@@ -96,19 +96,19 @@ describe("wallet ceremony protocol parser", () => {
           links: [
             {
               grant: {
-                allowReplayable: false,
-                aud: ["https://shop.example"],
-                components: [],
-                created: 100,
+                audiences: ["https://shop.example"],
                 delegate: `eip155:8453:${coSigner.toLowerCase()}`,
                 delegateIsEOA: true,
                 epoch: 0,
-                expires: 200,
                 id: `0x${"77".repeat(32)}`,
-                maxAge: 60,
-                parent: `0x${"00".repeat(32)}`,
-                root: `eip155:8453:${account.toLowerCase()}`,
-                scope: []
+                issuer: `eip155:8453:${account.toLowerCase()}`,
+                maxRequestValiditySeconds: 60,
+                parentGrantHash: `0x${"00".repeat(32)}`,
+                permissions: [],
+                requiredComponents: [],
+                requireNonReplayable: true,
+                validAfter: 100,
+                validUntil: 200
               },
               signature: `0x${"88".repeat(65)}`
             }
@@ -169,7 +169,12 @@ describe("wallet ceremony protocol parser", () => {
       "links are invalid"
     )
 
-    for (const field of ["epoch", "created", "expires", "maxAge"] as const) {
+    for (const field of [
+      "epoch",
+      "validAfter",
+      "validUntil",
+      "maxRequestValiditySeconds"
+    ] as const) {
       const negative = grantedSessionMessage()
       negative.session.delegation.links[0].grant[field] = -1
       expect(() => parseSliceWalletCeremonyAccountResponse(negative)).toThrow(
