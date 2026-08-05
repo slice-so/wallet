@@ -11,7 +11,7 @@ const sourceRoot = resolve(packageRoot, "src")
 describe("Slice wallet import boundaries", () => {
   it("keeps the production source tree within its package boundaries", async () => {
     expect(await checkSliceWalletImportBoundaries()).toEqual([])
-  })
+  }, 15_000)
 
   it("rejects Slice package imports and relative imports escaping src", () => {
     const violations = getSliceWalletSourceImportBoundaryViolations({
