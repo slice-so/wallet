@@ -11,6 +11,7 @@ import {
   encodeFunctionData,
   type Hex,
   isAddress,
+  isAddressEqual,
   isHex,
   pad,
   parseAbiParameters,
@@ -19,6 +20,8 @@ import {
   zeroAddress
 } from "viem"
 import type { UserOperation } from "viem/account-abstraction"
+import { getCode, multicall } from "viem/actions"
+import { getAction } from "viem/utils"
 import {
   sliceWalletEntryPoint,
   sliceWalletKernelAddresses,
@@ -53,6 +56,23 @@ const kernelExecuteSelector = toFunctionSelector({
 
 const permissionValidatorType = "0x02" satisfies Hex
 const kernelPermissionLifecycleAbi = [
+  {
+    inputs: [],
+    name: "currentNonce",
+    outputs: [{ name: "", type: "uint32" }],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [
+      { name: "vId", type: "bytes21" },
+      { name: "selector", type: "bytes4" }
+    ],
+    name: "isAllowedSelector",
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view",
+    type: "function"
+  },
   {
     inputs: [
       { name: "vId", type: "bytes21" },
@@ -92,6 +112,22 @@ const kernelPermissionLifecycleAbi = [
     name: "uninstallValidation",
     outputs: [],
     stateMutability: "payable",
+    type: "function"
+  },
+  {
+    inputs: [{ name: "vId", type: "bytes21" }],
+    name: "validationConfig",
+    outputs: [
+      {
+        components: [
+          { name: "nonce", type: "uint32" },
+          { name: "hook", type: "address" }
+        ],
+        name: "",
+        type: "tuple"
+      }
+    ],
+    stateMutability: "view",
     type: "function"
   }
 ] as const
@@ -490,12 +526,10 @@ export const buildSliceWalletPermissionUninstallCalls = async ({
 export const buildSliceWalletPermissionRevocationCalls = async ({
   account,
   client,
-  includeUninstall,
   session
 }: {
   account: Address
   client: KernelSmartAccountImplementation["client"]
-  includeUninstall?: boolean
   session: SliceWalletFrameSession
 }) => {
   const validator = await createPermissionValidator({
@@ -505,6 +539,53 @@ export const buildSliceWalletPermissionRevocationCalls = async ({
   })
   const permissionId = validator.getIdentifier()
   const validationId = toExecutionValidationId(permissionId)
+  let currentNonce: number
+  let validationConfig: { hook: Address; nonce: number }
+  let selectorAllowed: boolean
+  try {
+    ;[currentNonce, validationConfig, selectorAllowed] = await getAction(
+      client,
+      multicall,
+      "multicall"
+    )({
+      allowFailure: false,
+      contracts: [
+        {
+          abi: kernelPermissionLifecycleAbi,
+          address: account,
+          functionName: "currentNonce"
+        },
+        {
+          abi: kernelPermissionLifecycleAbi,
+          address: account,
+          args: [validationId],
+          functionName: "validationConfig"
+        },
+        {
+          abi: kernelPermissionLifecycleAbi,
+          address: account,
+          args: [validationId, kernelExecuteSelector],
+          functionName: "isAllowedSelector"
+        }
+      ]
+    })
+  } catch (error) {
+    const code = await getAction(
+      client,
+      getCode,
+      "getCode"
+    )({
+      address: account
+    })
+    if (code !== undefined && code !== "0x") throw error
+    // Kernel initializes its validation nonce to one when this counterfactual
+    // account is deployed by the revocation UserOperation.
+    currentNonce = 1
+    validationConfig = { hook: zeroAddress, nonce: 0 }
+    selectorAllowed = false
+  }
+  const installed = !isAddressEqual(validationConfig.hook, zeroAddress)
+  const revoked = validationConfig.nonce > 0 && !installed && !selectorAllowed
   const checkpoint = {
     data: encodeFunctionData({
       abi: kernelPermissionLifecycleAbi,
@@ -514,28 +595,87 @@ export const buildSliceWalletPermissionRevocationCalls = async ({
     to: account,
     value: 0n
   }
-  const shouldUninstall =
-    includeUninstall ??
-    (await validator.isEnabled(account, kernelExecuteSelector))
-  if (!shouldUninstall) {
-    return { calls: [checkpoint], permissionId }
-  }
   const validationData = await validator.getEnableData(account)
-  return {
-    calls: [
-      checkpoint,
-      {
-        data: encodeFunctionData({
-          abi: kernelPermissionLifecycleAbi,
-          args: [validationId, validationData, "0x"],
-          functionName: "uninstallValidation"
-        }),
-        to: account,
-        value: 0n
-      }
-    ],
-    permissionId
+  const uninstall = {
+    data: encodeFunctionData({
+      abi: kernelPermissionLifecycleAbi,
+      args: [validationId, validationData, "0x"],
+      functionName: "uninstallValidation"
+    }),
+    to: account,
+    value: 0n
   }
+  const installNonce =
+    validationConfig.nonce > 0
+      ? validationConfig.nonce
+      : validationConfig.nonce === currentNonce
+        ? currentNonce + 1
+        : currentNonce
+  const install = {
+    data: encodeFunctionData({
+      abi: kernelPermissionLifecycleAbi,
+      args: [
+        [validationId],
+        [{ hook: zeroAddress, nonce: installNonce }],
+        [validationData],
+        ["0x"]
+      ],
+      functionName: "installValidations"
+    }),
+    to: account,
+    value: 0n
+  }
+  const alternatives = {
+    burn: [install, checkpoint, uninstall],
+    checkpoint: [checkpoint],
+    uninstall: [checkpoint, uninstall]
+  } as const
+  let calls: readonly { data: Hex; to: Address; value: bigint }[]
+  if (installed) {
+    calls = alternatives.uninstall
+  } else if (validationConfig.nonce === 0) {
+    // A lazy permission that has never executed still has a reusable root
+    // enable signature. Install and uninstall it atomically so Kernel records
+    // the permission nonce and that old proof can never reinstall it.
+    calls = alternatives.burn
+  } else {
+    calls = alternatives.checkpoint
+  }
+  return { alternatives, calls, permissionId, revoked }
+}
+
+export const areSliceWalletPermissionRevocationCalls = ({
+  calls,
+  revocations
+}: {
+  calls: readonly { data?: Hex; to: Address; value?: bigint }[]
+  revocations: readonly Awaited<
+    ReturnType<typeof buildSliceWalletPermissionRevocationCalls>
+  >[]
+}) => {
+  let offset = 0
+  for (const { alternatives } of revocations) {
+    const matching = [
+      alternatives.burn,
+      alternatives.uninstall,
+      alternatives.checkpoint
+    ].find(
+      (candidate) =>
+        candidate.length <= calls.length - offset &&
+        candidate.every((expected, index) => {
+          const received = calls[offset + index]
+          return (
+            received !== undefined &&
+            isAddressEqual(received.to, expected.to) &&
+            received.data?.toLowerCase() === expected.data.toLowerCase() &&
+            (received.value ?? 0n) === expected.value
+          )
+        })
+    )
+    if (matching === undefined) return false
+    offset += matching.length
+  }
+  return offset === calls.length
 }
 
 export const buildSliceWalletPermissionInstallCalls = async ({

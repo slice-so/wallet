@@ -34,6 +34,7 @@ export {
   verifySliceWalletP256
 } from "./p256Server"
 export {
+  areSliceWalletPermissionRevocationCalls,
   buildSliceWalletPermissionEnableTypedData,
   buildSliceWalletPermissionRevocationCalls
 } from "./permissionAccount"

@@ -3,7 +3,8 @@ import type { Hex } from "viem"
 import {
   formatSliceWalletCredentialListAuthorization,
   formatSliceWalletExistingCredentialAuthorization,
-  getSliceWalletRegistryProofChallenge
+  getSliceWalletRegistryProofChallenge,
+  SliceWalletRegistryRequestError
 } from "./registry"
 
 const base = {
@@ -122,6 +123,28 @@ describe("existing-account registry authorization", () => {
         ...input,
         chainId: 10
       })
+    )
+  })
+})
+
+describe("registry request failures", () => {
+  test("surfaces a structured registry reason without discarding the body", () => {
+    const body = JSON.stringify({ error: "invalid_session_authorization" })
+    const error = new SliceWalletRegistryRequestError(400, body)
+
+    expect(error.message).toBe(
+      "Slice wallet registry request failed with status 400 (invalid_session_authorization)."
+    )
+    expect(error.responseBody).toBe(body)
+  })
+
+  test("surfaces validation messages returned by the registry", () => {
+    const body = JSON.stringify({
+      error: { message: "Credential registration payload is invalid." }
+    })
+
+    expect(new SliceWalletRegistryRequestError(400, body).message).toBe(
+      "Slice wallet registry request failed with status 400 (Credential registration payload is invalid.)."
     )
   })
 })

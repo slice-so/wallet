@@ -91,7 +91,20 @@ export class SliceWalletRegistryRequestError extends Error {
     readonly status: number,
     readonly responseBody: string
   ) {
-    super(`Slice wallet registry request failed with status ${status}.`)
+    let reason = ""
+    try {
+      const parsed = JSON.parse(responseBody) as {
+        error?: string | { message?: string }
+      }
+      const errorReason =
+        typeof parsed.error === "string" ? parsed.error : parsed.error?.message
+      if (errorReason !== undefined) reason = ` (${errorReason})`
+    } catch {
+      // The response body remains available to callers for non-JSON failures.
+    }
+    super(
+      `Slice wallet registry request failed with status ${status}${reason}.`
+    )
   }
 }
 
