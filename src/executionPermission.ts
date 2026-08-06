@@ -3,11 +3,16 @@ export const walletExecutionPermissionScopeValues = [
   "wallet_execution"
 ] as const
 
+export const walletExecutionPermissionKindValues = [
+  "checkout",
+  "management"
+] as const
+
 export const walletExecutionPermissionStatusValues = [
   "active",
   "pending",
   "revoked",
-  "expired"
+  "abandoned"
 ] as const
 
 export const walletExecutionPermissionExecutionScope = "wallet_execution"
