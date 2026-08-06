@@ -21,6 +21,12 @@ export type SliceBundlerUpstreamErrorClassifier = (error: {
   data?: JsonValue
   message: string
 }) => SliceBundlerRetryReason | null
+export type SliceBundlerRpcUrlParameters = {
+  bundlerRpcUrl?: string
+  cdpApiKey?: string
+  chainId?: number
+  serializedBundlerRpcUrls?: string
+}
 export type SliceBundlerRequestOptions = {
   acceptedSenderCode?: readonly SliceAcceptedSenderCode[]
   authorizeUserOperation?: SliceBundlerUserOperationAuthorizer

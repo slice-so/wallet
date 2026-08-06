@@ -13,7 +13,7 @@ import {
   zeroHash
 } from "viem"
 import { entryPoint07Address } from "viem/account-abstraction"
-import { base } from "viem/chains"
+import { anvil, base } from "viem/chains"
 import type {
   SliceSenderAccountSnapshot,
   SliceUserOperation
@@ -313,9 +313,38 @@ describe("slice bundler", () => {
     })
   })
 
-  it("resolves the CDP bundler URL from the API key", () => {
+  it("resolves bundler URLs through the shared environment policy", () => {
     expect(getSliceBundlerRpcUrl({ cdpApiKey })).toBe(bundlerUrl)
     expect(getSliceBundlerRpcUrl({ cdpApiKey: "  " })).toBeNull()
+    expect(getSliceBundlerRpcUrl({ chainId: 31_337 })).toBe(
+      "http://localhost:4337"
+    )
+    expect(
+      getSliceBundlerRpcUrl({
+        cdpApiKey,
+        chainId: 10,
+        serializedBundlerRpcUrls: JSON.stringify({
+          10: "https://optimism-bundler.example/rpc"
+        })
+      })
+    ).toBe("https://optimism-bundler.example/rpc")
+    expect(
+      getSliceBundlerRpcUrl({
+        bundlerRpcUrl: "https://custom-bundler.example/rpc",
+        cdpApiKey,
+        chainId: 8453
+      })
+    ).toBe("https://custom-bundler.example/rpc")
+    expect(getSliceBundlerRpcUrl({ cdpApiKey, chainId: 10 })).toBeNull()
+    expect(() =>
+      getSliceBundlerRpcUrl({
+        cdpApiKey,
+        chainId: 10,
+        serializedBundlerRpcUrls: JSON.stringify({
+          10: "http://remote-bundler.example"
+        })
+      })
+    ).toThrow("Slice bundler RPC URL is not permitted.")
     expect(getSliceBundlerApiUrl("https://shop.test")).toBe(
       "https://shop.test/api/bundler"
     )
@@ -406,6 +435,37 @@ describe("slice bundler", () => {
     }
   })
 
+  it("admits local checkout calls only when the caller configures the development chain", async () => {
+    const callData = encodeSmartWalletExecute({
+      target: productsModuleAddress,
+      data: encodeSetProductType()
+    })
+    const fetchBundler = mock(async (input: RequestInfo | URL) => {
+      expect(input).toBe("http://localhost:4337")
+      return Response.json({
+        jsonrpc: "2.0",
+        id: 1,
+        result: userOperationHash
+      })
+    })
+    const response = await handleTestBundlerRequest(
+      new Request("https://shop.test/api/bundler", {
+        body: JSON.stringify(
+          createBundlerBody("eth_sendUserOperation", callData)
+        ),
+        method: "POST"
+      }),
+      {
+        acceptedChainIds: [anvil.id],
+        chainId: anvil.id,
+        fetchBundler
+      }
+    )
+
+    expect(response.status).toBe(200)
+    expect(fetchBundler).toHaveBeenCalledTimes(1)
+  })
+
   it("passes the configured chain to the public-wallet authorizer", async () => {
     const authorizeUserOperation = mock(async () => true)
     const callData = encodeSmartWalletExecute({
@@ -421,6 +481,7 @@ describe("slice bundler", () => {
       }),
       {
         authorizeUserOperation,
+        bundlerRpcUrl: "https://optimism-bundler.example/rpc",
         cdpApiKey,
         chainId: 10,
         fetchBundler: mock(async () =>

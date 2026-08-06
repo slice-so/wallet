@@ -38,6 +38,7 @@ export type {
 export type {
   SliceBundlerRequestOptions,
   SliceBundlerRetryReason,
+  SliceBundlerRpcUrlParameters,
   SliceBundlerUpstreamErrorClassifier,
   SliceBundlerUserOperationAuthorizationInput,
   SliceBundlerUserOperationAuthorizer
