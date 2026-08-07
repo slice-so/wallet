@@ -204,9 +204,9 @@ const manifests = [
       timelockPolicy: {
         address: "0xA60CEe306BB822E2375cd47BdF76BA54F601754A",
         deployedRuntimeCodeHash:
-          "0x54fa75c9eee444ae33dd03ce10e7ee988b8c7adc4e3f75b224ad9ef8091ca852",
+          "0x916329f95ecb10a3c18bab13155697cbb481161bf8b24acada52461e87e8e3b6",
         expectedRuntimeCodeHash:
-          "0x54fa75c9eee444ae33dd03ce10e7ee988b8c7adc4e3f75b224ad9ef8091ca852"
+          "0x916329f95ecb10a3c18bab13155697cbb481161bf8b24acada52461e87e8e3b6"
       },
       slicerRegistryPolicy: {
         address: "0x0e894B496Ad5fdc99c6Bd4C5651f807E1dDE4D0c",
@@ -384,9 +384,9 @@ const manifests = [
       timelockPolicy: {
         address: "0xA60CEe306BB822E2375cd47BdF76BA54F601754A",
         deployedRuntimeCodeHash:
-          "0x54fa75c9eee444ae33dd03ce10e7ee988b8c7adc4e3f75b224ad9ef8091ca852",
+          "0x916329f95ecb10a3c18bab13155697cbb481161bf8b24acada52461e87e8e3b6",
         expectedRuntimeCodeHash:
-          "0x54fa75c9eee444ae33dd03ce10e7ee988b8c7adc4e3f75b224ad9ef8091ca852"
+          "0x916329f95ecb10a3c18bab13155697cbb481161bf8b24acada52461e87e8e3b6"
       },
       slicerRegistryPolicy: {
         address: "0x0e894B496Ad5fdc99c6Bd4C5651f807E1dDE4D0c",
@@ -564,9 +564,9 @@ const manifests = [
       timelockPolicy: {
         address: "0xA60CEe306BB822E2375cd47BdF76BA54F601754A",
         deployedRuntimeCodeHash:
-          "0x54fa75c9eee444ae33dd03ce10e7ee988b8c7adc4e3f75b224ad9ef8091ca852",
+          "0x916329f95ecb10a3c18bab13155697cbb481161bf8b24acada52461e87e8e3b6",
         expectedRuntimeCodeHash:
-          "0x54fa75c9eee444ae33dd03ce10e7ee988b8c7adc4e3f75b224ad9ef8091ca852"
+          "0x916329f95ecb10a3c18bab13155697cbb481161bf8b24acada52461e87e8e3b6"
       },
       slicerRegistryPolicy: {
         address: "0x0e894B496Ad5fdc99c6Bd4C5651f807E1dDE4D0c",
@@ -749,9 +749,9 @@ const manifests = [
       timelockPolicy: {
         address: "0xA60CEe306BB822E2375cd47BdF76BA54F601754A",
         deployedRuntimeCodeHash:
-          "0x54fa75c9eee444ae33dd03ce10e7ee988b8c7adc4e3f75b224ad9ef8091ca852",
+          "0x916329f95ecb10a3c18bab13155697cbb481161bf8b24acada52461e87e8e3b6",
         expectedRuntimeCodeHash:
-          "0x54fa75c9eee444ae33dd03ce10e7ee988b8c7adc4e3f75b224ad9ef8091ca852"
+          "0x916329f95ecb10a3c18bab13155697cbb481161bf8b24acada52461e87e8e3b6"
       },
       slicerRegistryPolicy: {
         address: "0x0e894B496Ad5fdc99c6Bd4C5651f807E1dDE4D0c",
