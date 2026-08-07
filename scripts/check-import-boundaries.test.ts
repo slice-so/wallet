@@ -44,4 +44,16 @@ describe("Slice wallet import boundaries", () => {
       })
     ).toEqual([])
   })
+
+  it("allows canonical ERC-8128 runtime constants in the execution layer", () => {
+    expect(
+      getSliceWalletSourceImportBoundaryViolations({
+        filePath: resolve(sourceRoot, "execution/policy.ts"),
+        packageRoot,
+        sourceRoot,
+        sourceText:
+          'import { ERC8128_REVOCATION_REGISTRY_ADDRESS } from "@slicekit/erc8128"'
+      })
+    ).toEqual([])
+  })
 })

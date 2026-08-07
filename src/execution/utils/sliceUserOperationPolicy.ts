@@ -1,5 +1,6 @@
 /** ERC-4337 envelope adapter over the decision core in sliceCallPolicy.ts. */
 
+import { ERC8128_REVOCATION_REGISTRY_ADDRESS } from "@slicekit/erc8128"
 import {
   type Address,
   decodeFunctionData,
@@ -78,8 +79,8 @@ const eip7702AuthorizationQuantityFields = [
 
 const eip7702FactoryMarker = "0x7702" as const
 export const sliceIdAuthorizationRevocationRegistryAddress =
-  "0x85a19cf4b058ea0faeb64bc0ef5c0765fea65b6a" as const satisfies Address
-const sliceIdRevocationChainIds = [31337] as const
+  ERC8128_REVOCATION_REGISTRY_ADDRESS satisfies Address
+const sliceIdRevocationChainIds = [1, 8453, 31337] as const
 const authorizationRevocationRegistryWriteAbi = [
   {
     inputs: [{ name: "authorizationId", type: "bytes32" }],

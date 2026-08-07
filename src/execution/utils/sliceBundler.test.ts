@@ -1399,7 +1399,8 @@ describe("Slice ID user-funded revocation policy", () => {
 
   it("accepts only root-validated registry calls on the authority chain", () => {
     expect(accepts()).toBe(true)
-    expect(accepts({ chainId: base.id })).toBe(false)
+    expect(accepts({ chainId: 1 })).toBe(true)
+    expect(accepts({ chainId: base.id })).toBe(true)
     expect(accepts({ chainId: 10 })).toBe(false)
     expect(accepts({ nonce: permissionValidationNonce })).toBe(false)
   })

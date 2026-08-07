@@ -54,7 +54,7 @@ export const getSliceWalletSourceImportBoundaryViolations = ({
 
   const checkSpecifier = (specifier: string) => {
     if (specifier === "@slicekit/abi" && isExecution) return
-    if (specifier === "@slicekit/erc8128" && isTypes) return
+    if (specifier === "@slicekit/erc8128" && (isExecution || isTypes)) return
     if (
       isExecution &&
       (specifier === "react" || specifier.startsWith("react/"))
