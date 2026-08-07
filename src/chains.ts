@@ -202,7 +202,7 @@ const manifests = [
         version: "1"
       },
       timelockPolicy: {
-        address: "0x7f66B69270f96EC6793c545742CCBbBe028Be3f6",
+        address: "0xA60CEe306BB822E2375cd47BdF76BA54F601754A",
         deployedRuntimeCodeHash:
           "0x54fa75c9eee444ae33dd03ce10e7ee988b8c7adc4e3f75b224ad9ef8091ca852",
         expectedRuntimeCodeHash:
@@ -382,7 +382,7 @@ const manifests = [
         version: "1"
       },
       timelockPolicy: {
-        address: "0x7f66B69270f96EC6793c545742CCBbBe028Be3f6",
+        address: "0xA60CEe306BB822E2375cd47BdF76BA54F601754A",
         deployedRuntimeCodeHash:
           "0x54fa75c9eee444ae33dd03ce10e7ee988b8c7adc4e3f75b224ad9ef8091ca852",
         expectedRuntimeCodeHash:
@@ -562,7 +562,7 @@ const manifests = [
         version: "1"
       },
       timelockPolicy: {
-        address: "0x7f66B69270f96EC6793c545742CCBbBe028Be3f6",
+        address: "0xA60CEe306BB822E2375cd47BdF76BA54F601754A",
         deployedRuntimeCodeHash:
           "0x54fa75c9eee444ae33dd03ce10e7ee988b8c7adc4e3f75b224ad9ef8091ca852",
         expectedRuntimeCodeHash:
@@ -747,7 +747,7 @@ const manifests = [
         version: "1"
       },
       timelockPolicy: {
-        address: "0x7f66B69270f96EC6793c545742CCBbBe028Be3f6",
+        address: "0xA60CEe306BB822E2375cd47BdF76BA54F601754A",
         deployedRuntimeCodeHash:
           "0x54fa75c9eee444ae33dd03ce10e7ee988b8c7adc4e3f75b224ad9ef8091ca852",
         expectedRuntimeCodeHash:
