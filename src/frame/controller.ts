@@ -14,10 +14,7 @@ import {
   sliceWalletDefaultRpId,
   sliceWalletEntryPoint
 } from "../constants"
-import {
-  assertSliceStoreManagementPolicyDescriptor,
-  bindSliceStoreManagementPolicySigner
-} from "../execution/commerce/policies"
+import { assertSliceStoreManagementPolicyDescriptor } from "../execution/commerce/policies"
 import { assertSliceWalletExecutionSafety } from "../executionSafety"
 import {
   encodeSliceWalletSyntheticWebAuthnSignature,
@@ -336,13 +333,7 @@ export const attachSliceWalletSignerFrame = ({
         throw new Error("Generic wallet policy exceeds the maximum lifetime.")
       }
       const keyPair = await generateSliceWalletP256KeyPair(cryptoImpl)
-      const policy =
-        requestedPolicy.grantKind === "management"
-          ? bindSliceStoreManagementPolicySigner(
-              requestedPolicy,
-              keyPair.signerId
-            )
-          : requestedPolicy
+      const policy = requestedPolicy
       if (policy.grantKind === "management") {
         assertSliceStoreManagementPolicyDescriptor(policy)
       }

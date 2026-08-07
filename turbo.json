@@ -1,6 +1,9 @@
 {
   "extends": ["//"],
   "tasks": {
+    "test": {
+      "dependsOn": ["test:inputs", "test:e2e:two-chain"]
+    },
     "admit:canary": {
       "cache": false,
       "env": [

@@ -373,7 +373,6 @@ const createStoreManagementExecutionValidator = async ({
         account: accountAddress,
         chainId: getClientChainId(client),
         expiresAt: validUntil,
-        sessionSignerAddress,
         startsAt
       })
     ],

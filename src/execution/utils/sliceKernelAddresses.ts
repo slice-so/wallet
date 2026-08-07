@@ -25,4 +25,4 @@ export const sliceKernelTimelockPolicyAddress =
   "0x7f66B69270f96EC6793c545742CCBbBe028Be3f6" as const satisfies Address
 
 export const sliceKernelSlicerRegistryPolicyAddress =
-  "0xbDbE8205C0044fD06d49a674ce6C7d956BF2B72a" as const satisfies Address
+  "0x0e894B496Ad5fdc99c6Bd4C5651f807E1dDE4D0c" as const satisfies Address

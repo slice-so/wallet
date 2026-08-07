@@ -209,10 +209,10 @@ const manifests = [
           "0x54fa75c9eee444ae33dd03ce10e7ee988b8c7adc4e3f75b224ad9ef8091ca852"
       },
       slicerRegistryPolicy: {
-        address: "0xbDbE8205C0044fD06d49a674ce6C7d956BF2B72a",
+        address: "0x0e894B496Ad5fdc99c6Bd4C5651f807E1dDE4D0c",
         deployedRuntimeCodeHash: null,
         expectedRuntimeCodeHash:
-          "0xf055385573964d1fe49bd14f696fa2396da4c7eabeed4e59ed077431db865945"
+          "0xf29877ffde74aa096cc69578728a7a38d4d7c081e3808cef526c8d7ff771cb7f"
       }
     },
     defaultTransports: {
@@ -389,10 +389,10 @@ const manifests = [
           "0x54fa75c9eee444ae33dd03ce10e7ee988b8c7adc4e3f75b224ad9ef8091ca852"
       },
       slicerRegistryPolicy: {
-        address: "0xbDbE8205C0044fD06d49a674ce6C7d956BF2B72a",
+        address: "0x0e894B496Ad5fdc99c6Bd4C5651f807E1dDE4D0c",
         deployedRuntimeCodeHash: null,
         expectedRuntimeCodeHash:
-          "0xf055385573964d1fe49bd14f696fa2396da4c7eabeed4e59ed077431db865945"
+          "0xf29877ffde74aa096cc69578728a7a38d4d7c081e3808cef526c8d7ff771cb7f"
       }
     },
     defaultTransports: {
@@ -569,10 +569,10 @@ const manifests = [
           "0x54fa75c9eee444ae33dd03ce10e7ee988b8c7adc4e3f75b224ad9ef8091ca852"
       },
       slicerRegistryPolicy: {
-        address: "0xbDbE8205C0044fD06d49a674ce6C7d956BF2B72a",
+        address: "0x0e894B496Ad5fdc99c6Bd4C5651f807E1dDE4D0c",
         deployedRuntimeCodeHash: null,
         expectedRuntimeCodeHash:
-          "0xf055385573964d1fe49bd14f696fa2396da4c7eabeed4e59ed077431db865945"
+          "0xf29877ffde74aa096cc69578728a7a38d4d7c081e3808cef526c8d7ff771cb7f"
       }
     },
     defaultTransports: {
@@ -754,10 +754,10 @@ const manifests = [
           "0x54fa75c9eee444ae33dd03ce10e7ee988b8c7adc4e3f75b224ad9ef8091ca852"
       },
       slicerRegistryPolicy: {
-        address: "0xbDbE8205C0044fD06d49a674ce6C7d956BF2B72a",
+        address: "0x0e894B496Ad5fdc99c6Bd4C5651f807E1dDE4D0c",
         deployedRuntimeCodeHash: null,
         expectedRuntimeCodeHash:
-          "0xf055385573964d1fe49bd14f696fa2396da4c7eabeed4e59ed077431db865945"
+          "0xf29877ffde74aa096cc69578728a7a38d4d7c081e3808cef526c8d7ff771cb7f"
       }
     },
     defaultTransports: {

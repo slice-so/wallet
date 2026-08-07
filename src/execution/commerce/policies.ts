@@ -11,7 +11,6 @@ import {
   type Address,
   maxUint256,
   pad,
-  slice,
   toFunctionSelector,
   toHex
 } from "viem"
@@ -43,7 +42,6 @@ export const sliceStoreManagementOperations = [
   "editProductMetadata",
   "release",
   "removeProduct",
-  "setRoles",
   "setProductType",
   "setStoreConfig",
   "slice",
@@ -79,10 +77,6 @@ const addCurrenciesSelector = getSelector({
   abi: slicerAbi,
   functionName: "_addCurrencies"
 })
-const setRolesSelector = getSelector({
-  abi: slicerAbi,
-  functionName: "setRoles"
-})
 const releaseSelector = getSelector({
   abi: slicerAbi,
   functionName: "release"
@@ -103,7 +97,6 @@ const productManagementSelectors = sliceStoreManagementOperations
       operation !== "configureProduct" &&
       operation !== "_addCurrencies" &&
       operation !== "release" &&
-      operation !== "setRoles" &&
       operation !== "slice"
   )
   .map((functionName) => getSelector({ abi: productsModuleAbi, functionName }))
@@ -200,7 +193,6 @@ export const createSliceStoreManagementPolicyDescriptor = ({
   account,
   chainId,
   expiresAt,
-  sessionSignerAddress,
   startsAt = getWalletPermissionValidAfter()
 }: CreateSliceStoreManagementPolicyParameters): WalletPolicyDescriptor => {
   const productsModuleAddress = getProductsModuleAddress(chainId)
@@ -224,21 +216,6 @@ export const createSliceStoreManagementPolicyDescriptor = ({
       {
         parameterRules: [],
         selector: addCurrenciesSelector,
-        target: walletPolicyWildcardTarget,
-        valueLimit: 0n
-      },
-      {
-        parameterRules:
-          sessionSignerAddress === undefined
-            ? []
-            : [
-                {
-                  condition: "not_equal" as const,
-                  offset: 32,
-                  params: [pad(sessionSignerAddress, { size: 32 })]
-                }
-              ],
-        selector: setRolesSelector,
         target: walletPolicyWildcardTarget,
         valueLimit: 0n
       },
@@ -293,53 +270,16 @@ export const assertSliceStoreManagementPolicyDescriptor = (
   if (normalized.grantKind !== "management") {
     throw new Error("Expected a store-management wallet policy.")
   }
-  const setRolesCall = normalized.calls.find(
-    (call) =>
-      call.selector === setRolesSelector &&
-      call.target === walletPolicyWildcardTarget
-  )
-  const signerRule = setRolesCall?.parameterRules[0]
-  const sessionSignerAddress =
-    signerRule?.condition === "not_equal" &&
-    signerRule.offset === 32 &&
-    signerRule.params.length === 1
-      ? (slice(signerRule.params[0], 12, 32) as Address)
-      : undefined
   const expected = createSliceStoreManagementPolicyDescriptor({
     account: normalized.account,
     chainId: normalized.chainId,
     expiresAt: normalized.validUntil,
-    sessionSignerAddress,
     startsAt: normalized.validAfter
   })
   if (getWalletPolicyHash(normalized) !== getWalletPolicyHash(expected)) {
     throw new Error("Store-management policy contains unsupported authority.")
   }
   return normalized
-}
-
-export const bindSliceStoreManagementPolicySigner = (
-  descriptor: WalletPolicyDescriptor,
-  sessionSignerAddress: Address
-) => {
-  const normalized = assertSliceStoreManagementPolicyDescriptor(descriptor)
-  const unbound = createSliceStoreManagementPolicyDescriptor({
-    account: normalized.account,
-    chainId: normalized.chainId,
-    expiresAt: normalized.validUntil,
-    startsAt: normalized.validAfter
-  })
-  if (getWalletPolicyHash(normalized) !== getWalletPolicyHash(unbound)) {
-    throw new Error("Store-management policy is already signer-bound.")
-  }
-
-  return createSliceStoreManagementPolicyDescriptor({
-    account: normalized.account,
-    chainId: normalized.chainId,
-    expiresAt: normalized.validUntil,
-    sessionSignerAddress,
-    startsAt: normalized.validAfter
-  })
 }
 
 export const createSliceStoreManagementPermissionPolicies = (

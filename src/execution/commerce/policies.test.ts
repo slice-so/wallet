@@ -17,14 +17,11 @@ import {
 } from "../generated/commerceFacts"
 import {
   assertSliceStoreManagementPolicyDescriptor,
-  bindSliceStoreManagementPolicySigner,
   createSliceStoreManagementPolicyDescriptor
 } from "./policies"
 
 const account: Address = "0x1111111111111111111111111111111111111111"
 const slicerAddress: Address = "0x2222222222222222222222222222222222222222"
-const sessionSignerAddress =
-  "0x3333333333333333333333333333333333333333" satisfies Address
 const collaboratorAddress =
   "0x4444444444444444444444444444444444444444" satisfies Address
 const sliceProductsModuleAddress = getProductsModuleAddress(8453)
@@ -35,24 +32,10 @@ const policy = createSliceStoreManagementPolicyDescriptor({
   account,
   chainId: 8453,
   expiresAt: 2_000_000_000,
-  sessionSignerAddress,
   startsAt: 1_900_000_000
 })
 
 describe("Slice store-management wallet policy", () => {
-  test("binds an unbound universal descriptor to its session signer", () => {
-    const unbound = createSliceStoreManagementPolicyDescriptor({
-      account,
-      chainId: 8453,
-      expiresAt: 2_000_000_000,
-      startsAt: 1_900_000_000
-    })
-
-    expect(
-      bindSliceStoreManagementPolicySigner(unbound, sessionSignerAddress)
-    ).toEqual(policy)
-  })
-
   test("accepts an allowlisted zero-value call for any slicer id", () => {
     expect(() =>
       assertWalletCallsMatchPolicy(
@@ -145,23 +128,40 @@ describe("Slice store-management wallet policy", () => {
     ).not.toThrow()
   })
 
-  test("allows role changes except for the isolated session signer", () => {
-    const setRoles = (grantee: `0x${string}`) => ({
-      data: encodeFunctionData({
+  test("rejects every role mutation", () => {
+    const mask = `0x${"02".padStart(64, "0")}` as `0x${string}`
+    const roleMutations = [
+      encodeFunctionData({
+        abi: slicerAbi,
+        functionName: "grantRoles",
+        args: [mask, collaboratorAddress]
+      }),
+      encodeFunctionData({
+        abi: slicerAbi,
+        functionName: "revokeRoles",
+        args: [mask, collaboratorAddress]
+      }),
+      encodeFunctionData({
         abi: slicerAbi,
         functionName: "setRoles",
-        args: [`0x${"01".padStart(64, "0")}`, grantee]
+        args: [mask, collaboratorAddress]
       }),
+      encodeFunctionData({
+        abi: slicerAbi,
+        functionName: "renounceRoles",
+        args: [mask]
+      })
+    ].map((data) => ({
+      data,
       to: collaboratorAddress as Address,
       value: 0n
-    })
+    }))
 
-    expect(() =>
-      assertWalletCallsMatchPolicy([setRoles(collaboratorAddress)], policy)
-    ).not.toThrow()
-    expect(() =>
-      assertWalletCallsMatchPolicy([setRoles(sessionSignerAddress)], policy)
-    ).toThrow("outside the delegated policy")
+    for (const roleMutation of roleMutations) {
+      expect(() =>
+        assertWalletCallsMatchPolicy([roleMutation], policy)
+      ).toThrow("not present in the delegated policy")
+    }
   })
 
   test("allows zero-value calls that withdraw only to the wallet account", () => {
