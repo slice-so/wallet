@@ -78,7 +78,7 @@ const eip7702AuthorizationQuantityFields = [
 
 const eip7702FactoryMarker = "0x7702" as const
 export const sliceIdAuthorizationRevocationRegistryAddress =
-  "0x9704977001344568d2bfcf39ac569699cf34482e" as const satisfies Address
+  "0x85a19cf4b058ea0faeb64bc0ef5c0765fea65b6a" as const satisfies Address
 const sliceIdRevocationChainIds = [31337] as const
 const authorizationRevocationRegistryWriteAbi = [
   {
