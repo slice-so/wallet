@@ -12,15 +12,13 @@ import {
   parseEventLogs,
   zeroAddress
 } from "viem"
+import {
+  getAlchemyRpcUrl,
+  type SupportedWalletDeploymentChainId,
+  supportedWalletDeploymentChainIds
+} from "../../../scripts/lib/alchemyRpc"
 import deployments from "../../contracts/wallet/deployments/addresses.json"
 import policy from "../config/chains.policy.json"
-
-const rpcEnvironmentVariables = {
-  1: "RPC_URL_ETHEREUM",
-  10: "RPC_URL_OP",
-  8453: "RPC_URL_BASE",
-  42161: "RPC_URL_ARBITRUM"
-} as const
 
 const entryPointNonceAbi = [
   {
@@ -106,19 +104,21 @@ if (chainPolicy === undefined) {
   )
 }
 
-const rpcEnvironmentVariable =
-  rpcEnvironmentVariables[
-    requestedChainId as keyof typeof rpcEnvironmentVariables
-  ]
-if (rpcEnvironmentVariable === undefined) {
-  throw new Error(
-    `No verification RPC environment variable is configured for ${requestedChainId}.`
+if (
+  !supportedWalletDeploymentChainIds.includes(
+    requestedChainId as SupportedWalletDeploymentChainId
   )
+) {
+  throw new Error(`No verification RPC is configured for ${requestedChainId}.`)
 }
-const rpcUrl = process.env[rpcEnvironmentVariable]
-if (rpcUrl === undefined || rpcUrl.length === 0) {
-  throw new Error(`${rpcEnvironmentVariable} is required.`)
+const alchemyId = process.env.SLICEGLOBAL_INTERNAL_ALCHEMY_ID
+if (alchemyId === undefined || alchemyId.length === 0) {
+  throw new Error("SLICEGLOBAL_INTERNAL_ALCHEMY_ID is required.")
 }
+const rpcUrl = getAlchemyRpcUrl(
+  requestedChainId as SupportedWalletDeploymentChainId,
+  alchemyId
+)
 
 const client = createPublicClient({ transport: http(rpcUrl) })
 const failures: string[] = []
@@ -134,37 +134,36 @@ assert(
 const verifiedAtBlock = await client.getBlockNumber()
 
 const observedRuntimeCodeHashes: Record<string, Hex | null> = {}
-for (const [name, contract] of Object.entries(deployment.contracts)) {
+for (const [name, contract] of Object.entries(deployments.contracts)) {
   const code = await client.getCode({ address: getAddress(contract.address) })
   const observedHash =
     code === undefined || code === "0x" ? null : keccak256(code)
   observedRuntimeCodeHashes[name] = observedHash
   assert(observedHash !== null, `${name} has no runtime code.`)
   assert(
-    observedHash === contract.expectedRuntimeCodeHash,
-    `${name} runtime hash is ${observedHash ?? "missing"}; expected ${contract.expectedRuntimeCodeHash}.`
-  )
-  assert(
-    contract.deployedRuntimeCodeHash === observedHash,
-    `${name} deployment facts do not record the observed runtime hash.`
+    observedHash ===
+      deployment.runtimeCodeHashes[
+        name as keyof typeof deployment.runtimeCodeHashes
+      ],
+    `${name} runtime hash is ${observedHash ?? "missing"}; the chain facts record ${deployment.runtimeCodeHashes[name as keyof typeof deployment.runtimeCodeHashes] ?? "missing"}.`
   )
 }
 
 assert(
-  deployment.contracts.entryPoint.version === "0.7",
+  deployments.contracts.entryPoint.version === "0.7",
   "The admitted EntryPoint version must be 0.7."
 )
 await client.readContract({
   abi: entryPointNonceAbi,
-  address: getAddress(deployment.contracts.entryPoint.address),
+  address: getAddress(deployments.contracts.entryPoint.address),
   args: [zeroAddress, 0n],
   functionName: "getNonce"
 })
 
 const factoryStakerApproved = await client.readContract({
   abi: factoryStakerAbi,
-  address: getAddress(deployment.contracts.kernelMetaFactory.address),
-  args: [getAddress(deployment.contracts.kernelFactory.address)],
+  address: getAddress(deployments.contracts.kernelMetaFactory.address),
+  args: [getAddress(deployments.contracts.kernelFactory.address)],
   functionName: "approved"
 })
 assert(factoryStakerApproved, "Kernel FactoryStaker approval is missing.")
@@ -192,24 +191,24 @@ const rip7212Available =
 const daimoVerifierPassed =
   isSuccessfulP256Result(
     await callP256Verifier(
-      getAddress(deployment.contracts.p256Verifier.address)
+      getAddress(deployments.contracts.p256Verifier.address)
     )
   ) &&
   isRejectedP256Result(
     await callP256Verifier(
-      getAddress(deployment.contracts.p256Verifier.address),
+      getAddress(deployments.contracts.p256Verifier.address),
       invalidP256CanaryInput
     )
   )
 const soladyVerifierPassed =
   isSuccessfulP256Result(
     await callP256Verifier(
-      getAddress(deployment.contracts.soladyP256Verifier.address)
+      getAddress(deployments.contracts.soladyP256Verifier.address)
     )
   ) &&
   isRejectedP256Result(
     await callP256Verifier(
-      getAddress(deployment.contracts.soladyP256Verifier.address),
+      getAddress(deployments.contracts.soladyP256Verifier.address),
       invalidP256CanaryInput
     )
   )
@@ -250,7 +249,7 @@ if (userOperationCanary !== null) {
   assert(receipt.status === "success", "The canary transaction reverted.")
   assert(
     transaction.to?.toLowerCase() ===
-      deployment.contracts.entryPoint.address.toLowerCase(),
+      deployments.contracts.entryPoint.address.toLowerCase(),
     "The canary transaction was not submitted through the pinned EntryPoint."
   )
 
@@ -307,7 +306,7 @@ if (userOperationCanary !== null) {
       : getAddress(`0x${implementationWord.slice(-40)}`)
   assert(
     implementation?.toLowerCase() ===
-      deployment.contracts.kernelImplementation.address.toLowerCase(),
+      deployments.contracts.kernelImplementation.address.toLowerCase(),
     "The canary account does not point at the pinned Kernel implementation."
   )
 }

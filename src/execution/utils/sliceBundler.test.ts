@@ -1401,7 +1401,9 @@ describe("Slice ID user-funded revocation policy", () => {
     expect(accepts()).toBe(true)
     expect(accepts({ chainId: 1 })).toBe(true)
     expect(accepts({ chainId: base.id })).toBe(true)
-    expect(accepts({ chainId: 10 })).toBe(false)
+    expect(accepts({ chainId: 10 })).toBe(true)
+    expect(accepts({ chainId: 42161 })).toBe(true)
+    expect(accepts({ chainId: 137 })).toBe(false)
     expect(accepts({ nonce: permissionValidationNonce })).toBe(false)
   })
 

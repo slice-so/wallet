@@ -80,7 +80,7 @@ const eip7702AuthorizationQuantityFields = [
 const eip7702FactoryMarker = "0x7702" as const
 export const sliceIdAuthorizationRevocationRegistryAddress =
   ERC8128_REVOCATION_REGISTRY_ADDRESS satisfies Address
-const sliceIdRevocationChainIds = [1, 8453, 31337] as const
+const sliceIdRevocationChainIds = [1, 10, 8453, 42161, 31337] as const
 const authorizationRevocationRegistryWriteAbi = [
   {
     inputs: [{ name: "authorizationId", type: "bytes32" }],

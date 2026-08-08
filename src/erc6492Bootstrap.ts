@@ -6,7 +6,10 @@ import {
   parseErc6492Signature,
   serializeErc6492Signature
 } from "viem"
-import { getSliceWalletChainPolicy } from "./chains"
+import {
+  getSliceWalletChainPolicy,
+  sliceWalletDevelopmentChainIds
+} from "./chains"
 import { sliceWalletKernelAddresses } from "./constants"
 
 const bootstrapFactoryAbi = [
@@ -71,8 +74,9 @@ const hasVerifiedBootstrapFactory = (chainId: number) => {
   const deployment =
     getSliceWalletChainPolicy(chainId).contracts.erc6492BootstrapFactory
   return (
-    deployment.deployedRuntimeCodeHash !== null &&
-    deployment.deployedRuntimeCodeHash === deployment.expectedRuntimeCodeHash
+    sliceWalletDevelopmentChainIds.includes(
+      chainId as (typeof sliceWalletDevelopmentChainIds)[number]
+    ) || deployment.runtimeCodeHash !== null
   )
 }
 

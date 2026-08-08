@@ -1,10 +1,5 @@
-type AdmissionContractEvidence = {
-  deployedRuntimeCodeHash: string | null
-  expectedRuntimeCodeHash: string
-}
-
 type AdmissionEvidence = {
-  contracts: Readonly<Record<string, AdmissionContractEvidence>>
+  runtimeCodeHashes: Readonly<Record<string, string | null>>
   status: string
   verification: {
     factoryStakerApproved: boolean
@@ -31,29 +26,15 @@ const baseWalletContractNames = [
   "weightedEcdsaSigner"
 ] as const
 
-const optionalContractNames = new Set([
-  "erc6492BootstrapFactory",
-  "rateLimitPolicy",
-  "slicerRegistryPolicy",
-  "weightedP256Signer"
-])
-
-const hasExactRuntime = (contract: AdmissionContractEvidence | undefined) =>
-  contract !== undefined &&
-  contract.deployedRuntimeCodeHash !== null &&
-  contract.deployedRuntimeCodeHash === contract.expectedRuntimeCodeHash
+const hasRuntime = (deployment: AdmissionEvidence, contractName: string) =>
+  deployment.runtimeCodeHashes[contractName] !== undefined &&
+  deployment.runtimeCodeHashes[contractName] !== null
 
 export const hasCompleteSliceWalletAdmissionEvidence = (
   deployment: AdmissionEvidence
 ) =>
   deployment.status === "admitted" &&
-  baseWalletContractNames.every((name) =>
-    hasExactRuntime(deployment.contracts[name])
-  ) &&
-  Object.entries(deployment.contracts).every(
-    ([name, contract]) =>
-      optionalContractNames.has(name) || hasExactRuntime(contract)
-  ) &&
+  baseWalletContractNames.every((name) => hasRuntime(deployment, name)) &&
   deployment.verification.factoryStakerApproved &&
   deployment.verification.p256CanaryPassed &&
   deployment.verification.userOperationCanary !== null &&
@@ -63,19 +44,19 @@ export const hasVerifiedGenericAuthorityDeployment = (
   deployment: AdmissionEvidence
 ) =>
   hasCompleteSliceWalletAdmissionEvidence(deployment) &&
-  hasExactRuntime(deployment.contracts.rateLimitPolicy)
+  hasRuntime(deployment, "rateLimitPolicy")
 
 export const hasVerifiedCheckoutAuthorityDeployment = (
   deployment: AdmissionEvidence
 ) =>
   hasCompleteSliceWalletAdmissionEvidence(deployment) &&
-  hasExactRuntime(deployment.contracts.weightedP256Signer)
+  hasRuntime(deployment, "weightedP256Signer")
 
 export const hasVerifiedManagementAuthorityDeployment = (
   deployment: AdmissionEvidence
 ) =>
   hasCompleteSliceWalletAdmissionEvidence(deployment) &&
-  hasExactRuntime(deployment.contracts.slicerRegistryPolicy)
+  hasRuntime(deployment, "slicerRegistryPolicy")
 
 export const hasAdmittedManagementAuthority = (
   deployment: AdmissionEvidence,

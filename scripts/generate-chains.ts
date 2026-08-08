@@ -15,55 +15,20 @@ import {
 const outputPath = resolve(import.meta.dir, "../src/chains.ts")
 const checkOnly = process.argv.includes("--check")
 
-if (deployments.version !== 1 || policy.version !== 1) {
+if (deployments.version !== 2 || policy.version !== 1) {
   throw new Error("Unsupported Slice wallet chain input version.")
 }
 
-const chainIds = Object.keys(policy.chains).sort(
+const chainIds = deployments.supportedChainIds
+  .map(String)
+  .sort((first, second) => Number(first) - Number(second))
+const policyChainIds = Object.keys(policy.chains).sort(
   (first, second) => Number(first) - Number(second)
 )
-
-// Runtime helpers still encode these canonical CREATE2 addresses directly.
-// Fail generation before a differing chain can ever be admitted silently.
-const pinnedAddressContractNames = [
-  "callPolicy",
-  "ecdsaSigner",
-  "erc6492BootstrapFactory",
-  "entryPoint",
-  "kernelFactory",
-  "kernelImplementation",
-  "kernelMetaFactory",
-  "p256Verifier",
-  "rateLimitPolicy",
-  "slicerRegistryPolicy",
-  "sudoPolicy",
-  "timelockPolicy",
-  "timestampPolicy",
-  "webAuthnRootValidator",
-  "webAuthnSigner",
-  "weightedEcdsaSigner",
-  "weightedP256Signer"
-] as const
-const canonicalDeployment = deployments.chains["8453"]
-
-if (canonicalDeployment === undefined) {
-  throw new Error("The canonical Base deployment facts are missing.")
-}
-
-for (const chainId of chainIds) {
-  const deployment =
-    deployments.chains[chainId as keyof typeof deployments.chains]
-  if (deployment === undefined) continue
-  for (const contractName of pinnedAddressContractNames) {
-    if (
-      deployment.contracts[contractName].address.toLowerCase() !==
-      canonicalDeployment.contracts[contractName].address.toLowerCase()
-    ) {
-      throw new Error(
-        `${contractName} on chain ${chainId} differs from the canonical address used by cross-chain account encoding.`
-      )
-    }
-  }
+if (chainIds.join(",") !== policyChainIds.join(",")) {
+  throw new Error(
+    "Wallet deployment supportedChainIds and chain policy must match."
+  )
 }
 
 const entries = chainIds.map((chainId) => {
@@ -74,17 +39,6 @@ const entries = chainIds.map((chainId) => {
     throw new Error(`Missing deployment facts for wallet chain ${chainId}.`)
   }
 
-  const contracts = Object.fromEntries(
-    Object.entries(deployment.contracts).map(([name, contract]) => [
-      name,
-      {
-        address: contract.address,
-        deployedRuntimeCodeHash: contract.deployedRuntimeCodeHash,
-        expectedRuntimeCodeHash: contract.expectedRuntimeCodeHash,
-        ...("version" in contract ? { version: contract.version } : {})
-      }
-    ])
-  )
   const admitted = hasCompleteSliceWalletAdmissionEvidence(deployment)
   const genericAuthorityAdmitted =
     hasVerifiedGenericAuthorityDeployment(deployment)
@@ -116,20 +70,35 @@ const entries = chainIds.map((chainId) => {
         default: { http: [policyChain.defaultTransports.rpcUrl] }
       }
     },
-    contracts,
     defaultTransports: policyChain.defaultTransports,
     executionSafety: policyChain.executionSafety,
     funding: policyChain.funding,
-    rip7212Available: deployment.verification.rip7212Available
+    rip7212Available: deployment.verification.rip7212Available,
+    runtimeCodeHashes: deployment.runtimeCodeHashes
   }
 })
+
+const contractNames = Object.keys(deployments.contracts)
+if (contractNames.some((name) => !/^[A-Za-z_$][\w$]*$/.test(name))) {
+  throw new Error("Wallet deployment contract names must be identifiers.")
+}
+const contractEntries = contractNames
+  .map(
+    (name) => `  ${name}: {
+    ...canonicalContracts.${name},
+    runtimeCodeHash: runtimeCodeHashes.${name} ?? null
+  }`
+  )
+  .join(",\n")
 
 const generated = `// Auto-generated from contracts deployment facts and wallet chain policy.
 // Run: bun run generate:chains
 
+import type { Hex } from "viem"
 import type {
   SliceWalletAuthorityKind,
-  SliceWalletChainManifest
+  SliceWalletChainManifest,
+  SliceWalletContractDeployments
 } from "./types/chains"
 
 const parseBigIntFields = (manifest: Omit<SliceWalletChainManifest, "executionSafety"> & {
@@ -170,13 +139,23 @@ const freezeManifest = (manifest: SliceWalletChainManifest) => {
   return Object.freeze(manifest)
 }
 
-const manifests = ${JSON.stringify(entries, null, 2)} as const
+const canonicalContracts = ${JSON.stringify(deployments.contracts, null, 2)} as const
+const deployments = ${JSON.stringify(entries, null, 2)} as const
+
+const buildContracts = (
+  runtimeCodeHashes: Readonly<Record<keyof typeof canonicalContracts, Hex | null>>
+) => ({
+${contractEntries}
+}) satisfies SliceWalletContractDeployments
 
 const productionManifests = Object.fromEntries(
-  manifests.map((manifest) => [
-    manifest.chain.id,
-    freezeManifest(parseBigIntFields(manifest))
-  ])
+  deployments.map(({ runtimeCodeHashes, ...deployment }) => {
+    const manifest = {
+      ...deployment,
+      contracts: buildContracts(runtimeCodeHashes)
+    }
+    return [manifest.chain.id, freezeManifest(parseBigIntFields(manifest))]
+  })
 ) as Readonly<Record<number, SliceWalletChainManifest>>
 
 const canonicalDevelopmentManifest = productionManifests[8453]
@@ -201,10 +180,7 @@ const developmentManifest = freezeManifest({
     Object.entries(canonicalDevelopmentManifest.contracts).map(
       ([name, contract]) => [
         name,
-        {
-          ...contract,
-          deployedRuntimeCodeHash: contract.expectedRuntimeCodeHash
-        }
+        { ...contract }
       ]
     )
   ) as SliceWalletChainManifest["contracts"],
@@ -221,9 +197,9 @@ export const sliceWalletChainManifests = Object.freeze({
 } as Readonly<Record<number, SliceWalletChainManifest>>)
 
 export const sliceWalletSupportedChainIds = Object.freeze(
-  manifests
-    .filter((manifest) => manifest.admitted)
-    .map((manifest) => manifest.chain.id)
+  deployments
+    .filter((deployment) => deployment.admitted)
+    .map((deployment) => deployment.chain.id)
 )
 
 export const sliceWalletDevelopmentChainIds = Object.freeze(

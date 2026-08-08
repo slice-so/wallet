@@ -5,27 +5,22 @@ import {
   hasVerifiedManagementAuthorityDeployment
 } from "./chainAdmission"
 
-const exactRuntime = {
-  deployedRuntimeCodeHash: "0x1234",
-  expectedRuntimeCodeHash: "0x1234"
-} as const
-
 const completeEvidence = {
-  contracts: {
-    callPolicy: exactRuntime,
-    ecdsaSigner: exactRuntime,
-    entryPoint: exactRuntime,
-    kernelFactory: exactRuntime,
-    kernelImplementation: exactRuntime,
-    kernelMetaFactory: exactRuntime,
-    p256Verifier: exactRuntime,
-    soladyP256Verifier: exactRuntime,
-    sudoPolicy: exactRuntime,
-    timelockPolicy: exactRuntime,
-    timestampPolicy: exactRuntime,
-    webAuthnRootValidator: exactRuntime,
-    webAuthnSigner: exactRuntime,
-    weightedEcdsaSigner: exactRuntime
+  runtimeCodeHashes: {
+    callPolicy: "0x1234",
+    ecdsaSigner: "0x1234",
+    entryPoint: "0x1234",
+    kernelFactory: "0x1234",
+    kernelImplementation: "0x1234",
+    kernelMetaFactory: "0x1234",
+    p256Verifier: "0x1234",
+    soladyP256Verifier: "0x1234",
+    sudoPolicy: "0x1234",
+    timelockPolicy: "0x1234",
+    timestampPolicy: "0x1234",
+    webAuthnRootValidator: "0x1234",
+    webAuthnSigner: "0x1234",
+    weightedEcdsaSigner: "0x1234"
   },
   status: "admitted",
   verification: {
@@ -37,38 +32,23 @@ const completeEvidence = {
 } as const
 
 describe("wallet chain admission evidence", () => {
-  it("fails closed for incomplete or mismatched evidence", () => {
+  it("fails closed for incomplete evidence", () => {
     expect(hasCompleteSliceWalletAdmissionEvidence(completeEvidence)).toBe(true)
     expect(
       hasCompleteSliceWalletAdmissionEvidence({
         ...completeEvidence,
-        contracts: {
-          ...completeEvidence.contracts,
-          entryPoint: {
-            deployedRuntimeCodeHash: "0xabcd",
-            expectedRuntimeCodeHash: "0x1234"
-          }
+        runtimeCodeHashes: {
+          ...completeEvidence.runtimeCodeHashes,
+          entryPoint: null
         }
       })
     ).toBe(false)
     const { entryPoint: _entryPoint, ...missingRequiredContract } =
-      completeEvidence.contracts
+      completeEvidence.runtimeCodeHashes
     expect(
       hasCompleteSliceWalletAdmissionEvidence({
         ...completeEvidence,
-        contracts: missingRequiredContract
-      })
-    ).toBe(false)
-    expect(
-      hasCompleteSliceWalletAdmissionEvidence({
-        ...completeEvidence,
-        contracts: {
-          ...completeEvidence.contracts,
-          futureWalletContract: {
-            deployedRuntimeCodeHash: null,
-            expectedRuntimeCodeHash: "0x1234"
-          }
-        }
+        runtimeCodeHashes: missingRequiredContract
       })
     ).toBe(false)
     expect(
@@ -119,27 +99,24 @@ describe("wallet chain admission evidence", () => {
     expect(
       hasCompleteSliceWalletAdmissionEvidence({
         ...completeEvidence,
-        contracts: {
-          ...completeEvidence.contracts,
-          erc6492BootstrapFactory: {
-            deployedRuntimeCodeHash: null,
-            expectedRuntimeCodeHash: "0x1234"
-          }
+        runtimeCodeHashes: {
+          ...completeEvidence.runtimeCodeHashes,
+          erc6492BootstrapFactory: null
         }
       })
     ).toBe(true)
   })
 
-  it("admits management only with the exact registry-policy runtime", () => {
+  it("admits management only with a recorded registry-policy runtime", () => {
     expect(hasVerifiedManagementAuthorityDeployment(completeEvidence)).toBe(
       false
     )
     expect(
       hasVerifiedManagementAuthorityDeployment({
         ...completeEvidence,
-        contracts: {
-          ...completeEvidence.contracts,
-          slicerRegistryPolicy: exactRuntime
+        runtimeCodeHashes: {
+          ...completeEvidence.runtimeCodeHashes,
+          slicerRegistryPolicy: "0x1234"
         }
       })
     ).toBe(true)
@@ -148,9 +125,9 @@ describe("wallet chain admission evidence", () => {
   it("requires explicit bundler support for management validation storage reads", () => {
     const deployment = {
       ...completeEvidence,
-      contracts: {
-        ...completeEvidence.contracts,
-        slicerRegistryPolicy: exactRuntime
+      runtimeCodeHashes: {
+        ...completeEvidence.runtimeCodeHashes,
+        slicerRegistryPolicy: "0x1234"
       }
     }
 

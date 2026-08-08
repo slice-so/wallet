@@ -6,13 +6,7 @@
     },
     "admit:canary": {
       "cache": false,
-      "env": [
-        "PRIVATE_KEY",
-        "RPC_URL_ARBITRUM",
-        "RPC_URL_BASE",
-        "RPC_URL_ETHEREUM",
-        "RPC_URL_OP"
-      ]
+      "env": ["PRIVATE_KEY", "SLICEGLOBAL_INTERNAL_ALCHEMY_ID"]
     },
     "build": {
       "dependsOn": ["^build", "@slice/contracts#wallet-deployments:inputs"],

@@ -2,8 +2,7 @@ import type { Address, Chain, Hex } from "viem"
 
 export type SliceWalletContractDeployment = {
   readonly address: Address
-  readonly deployedRuntimeCodeHash: Hex | null
-  readonly expectedRuntimeCodeHash: Hex
+  readonly runtimeCodeHash: Hex | null
   readonly version?: string
 }
 

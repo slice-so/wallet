@@ -16,6 +16,11 @@ import {
   type UserOperation
 } from "viem/account-abstraction"
 import { privateKeyToAccount } from "viem/accounts"
+import {
+  getAlchemyRpcUrl,
+  type SupportedWalletDeploymentChainId,
+  supportedWalletDeploymentChainIds
+} from "../../../scripts/lib/alchemyRpc"
 import { createSliceWalletKernelAccount } from "../src/account"
 import { getSliceWalletChainPolicy } from "../src/chains"
 import { canaryCredential, canaryGetFn, canaryRpId } from "./lib/canaryWebAuthn"
@@ -27,27 +32,28 @@ const callGasLimit = 500_000n
 const preVerificationGas = 120_000n
 const verificationGasLimit = 1_500_000n
 
-const rpcEnvironmentVariables: Readonly<Record<number, string>> = {
-  1: "RPC_URL_ETHEREUM",
-  10: "RPC_URL_OP",
-  8453: "RPC_URL_BASE",
-  42161: "RPC_URL_ARBITRUM"
-}
 const chainId = Number(process.argv[2] ?? 8453)
 if (!Number.isSafeInteger(chainId) || chainId <= 0) {
   throw new Error("Pass a positive integer wallet chain id.")
 }
 const manifest = getSliceWalletChainPolicy(chainId)
 const chain = manifest.chain
-const rpcEnvironmentVariable = rpcEnvironmentVariables[chainId]
-if (rpcEnvironmentVariable === undefined) {
+if (
+  !supportedWalletDeploymentChainIds.includes(
+    chainId as SupportedWalletDeploymentChainId
+  )
+) {
   throw new Error(`No canary RPC is configured for chain ${chainId}.`)
 }
-const rpcUrl = process.env[rpcEnvironmentVariable]
+const alchemyId = process.env.SLICEGLOBAL_INTERNAL_ALCHEMY_ID
 const privateKey = process.env.PRIVATE_KEY
-if (rpcUrl === undefined || rpcUrl.length === 0) {
-  throw new Error(`${rpcEnvironmentVariable} is required.`)
+if (alchemyId === undefined || alchemyId.length === 0) {
+  throw new Error("SLICEGLOBAL_INTERNAL_ALCHEMY_ID is required.")
 }
+const rpcUrl = getAlchemyRpcUrl(
+  chainId as SupportedWalletDeploymentChainId,
+  alchemyId
+)
 if (privateKey === undefined || !/^0x[0-9a-fA-F]{64}$/.test(privateKey)) {
   throw new Error("PRIVATE_KEY must be a 32-byte hex private key.")
 }
