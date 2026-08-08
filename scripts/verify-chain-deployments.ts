@@ -12,13 +12,10 @@ import {
   parseEventLogs,
   zeroAddress
 } from "viem"
-import {
-  getAlchemyRpcUrl,
-  type SupportedWalletDeploymentChainId,
-  supportedWalletDeploymentChainIds
-} from "../../../scripts/lib/alchemyRpc"
+import { getAlchemyRpcUrl } from "../../../scripts/lib/alchemyRpc"
 import deployments from "../../contracts/wallet/deployments/addresses.json"
 import policy from "../config/chains.policy.json"
+import { sliceWalletSupportedChainIds } from "../src/chains"
 
 const entryPointNonceAbi = [
   {
@@ -105,8 +102,8 @@ if (chainPolicy === undefined) {
 }
 
 if (
-  !supportedWalletDeploymentChainIds.includes(
-    requestedChainId as SupportedWalletDeploymentChainId
+  !sliceWalletSupportedChainIds.includes(
+    requestedChainId as (typeof sliceWalletSupportedChainIds)[number]
   )
 ) {
   throw new Error(`No verification RPC is configured for ${requestedChainId}.`)
@@ -115,10 +112,7 @@ const alchemyId = process.env.SLICEGLOBAL_INTERNAL_ALCHEMY_ID
 if (alchemyId === undefined || alchemyId.length === 0) {
   throw new Error("SLICEGLOBAL_INTERNAL_ALCHEMY_ID is required.")
 }
-const rpcUrl = getAlchemyRpcUrl(
-  requestedChainId as SupportedWalletDeploymentChainId,
-  alchemyId
-)
+const rpcUrl = getAlchemyRpcUrl(requestedChainId, alchemyId)
 
 const client = createPublicClient({ transport: http(rpcUrl) })
 const failures: string[] = []
@@ -139,7 +133,6 @@ for (const [name, contract] of Object.entries(deployments.contracts)) {
   const observedHash =
     code === undefined || code === "0x" ? null : keccak256(code)
   observedRuntimeCodeHashes[name] = observedHash
-  assert(observedHash !== null, `${name} has no runtime code.`)
   assert(
     observedHash ===
       deployment.runtimeCodeHashes[

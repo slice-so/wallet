@@ -9,7 +9,7 @@ type AdmissionEvidence = {
   }
 }
 
-const baseWalletContractNames = [
+const requiredWalletContractNames = [
   "callPolicy",
   "ecdsaSigner",
   "entryPoint",
@@ -22,8 +22,7 @@ const baseWalletContractNames = [
   "timelockPolicy",
   "timestampPolicy",
   "webAuthnRootValidator",
-  "webAuthnSigner",
-  "weightedEcdsaSigner"
+  "webAuthnSigner"
 ] as const
 
 const hasRuntime = (deployment: AdmissionEvidence, contractName: string) =>
@@ -34,7 +33,7 @@ export const hasCompleteSliceWalletAdmissionEvidence = (
   deployment: AdmissionEvidence
 ) =>
   deployment.status === "admitted" &&
-  baseWalletContractNames.every((name) => hasRuntime(deployment, name)) &&
+  requiredWalletContractNames.every((name) => hasRuntime(deployment, name)) &&
   deployment.verification.factoryStakerApproved &&
   deployment.verification.p256CanaryPassed &&
   deployment.verification.userOperationCanary !== null &&

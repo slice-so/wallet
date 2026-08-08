@@ -16,13 +16,12 @@ import {
   type UserOperation
 } from "viem/account-abstraction"
 import { privateKeyToAccount } from "viem/accounts"
-import {
-  getAlchemyRpcUrl,
-  type SupportedWalletDeploymentChainId,
-  supportedWalletDeploymentChainIds
-} from "../../../scripts/lib/alchemyRpc"
+import { getAlchemyRpcUrl } from "../../../scripts/lib/alchemyRpc"
 import { createSliceWalletKernelAccount } from "../src/account"
-import { getSliceWalletChainPolicy } from "../src/chains"
+import {
+  getSliceWalletChainPolicy,
+  sliceWalletSupportedChainIds
+} from "../src/chains"
 import { canaryCredential, canaryGetFn, canaryRpId } from "./lib/canaryWebAuthn"
 
 const canaryRecipient =
@@ -39,8 +38,8 @@ if (!Number.isSafeInteger(chainId) || chainId <= 0) {
 const manifest = getSliceWalletChainPolicy(chainId)
 const chain = manifest.chain
 if (
-  !supportedWalletDeploymentChainIds.includes(
-    chainId as SupportedWalletDeploymentChainId
+  !sliceWalletSupportedChainIds.includes(
+    chainId as (typeof sliceWalletSupportedChainIds)[number]
   )
 ) {
   throw new Error(`No canary RPC is configured for chain ${chainId}.`)
@@ -50,10 +49,7 @@ const privateKey = process.env.PRIVATE_KEY
 if (alchemyId === undefined || alchemyId.length === 0) {
   throw new Error("SLICEGLOBAL_INTERNAL_ALCHEMY_ID is required.")
 }
-const rpcUrl = getAlchemyRpcUrl(
-  chainId as SupportedWalletDeploymentChainId,
-  alchemyId
-)
+const rpcUrl = getAlchemyRpcUrl(chainId, alchemyId)
 if (privateKey === undefined || !/^0x[0-9a-fA-F]{64}$/.test(privateKey)) {
   throw new Error("PRIVATE_KEY must be a 32-byte hex private key.")
 }

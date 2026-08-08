@@ -167,13 +167,14 @@ export const useSliceWalletAccountHydration = ({
     try {
       setRecovery(
         await fetchWalletRecovery({
-          address: activeWallet.kernelAccount.address
+          address: activeWallet.kernelAccount.address,
+          chainId: walletChain.id
         })
       )
     } catch {
       setRecovery(null)
     }
-  }, [activeWalletRef, fetchWalletRecovery, setRecovery])
+  }, [activeWalletRef, fetchWalletRecovery, setRecovery, walletChain.id])
 
   const buildCredentialActivation = useCallback(
     async (credential: SliceWalletCredentialRecord) => {

@@ -193,6 +193,7 @@ export type SliceWalletManagementExecutionAdapters = {
 export type SliceWalletProviderAdapters = {
   fetchWalletRecovery?: (input: {
     address: Address
+    chainId: number
   }) => Promise<SliceWalletRecoverySnapshot>
   checkoutExecution?: SliceWalletCheckoutExecutionAdapters
   storeManagement?: SliceWalletManagementExecutionAdapters

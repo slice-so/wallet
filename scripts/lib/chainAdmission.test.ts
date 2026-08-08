@@ -107,6 +107,17 @@ describe("wallet chain admission evidence", () => {
     ).toBe(true)
   })
 
+  it("does not require the Base-only weighted ECDSA signer", () => {
+    const { weightedEcdsaSigner: _weightedEcdsaSigner, ...genericEvidence } =
+      completeEvidence.runtimeCodeHashes
+    expect(
+      hasCompleteSliceWalletAdmissionEvidence({
+        ...completeEvidence,
+        runtimeCodeHashes: genericEvidence
+      })
+    ).toBe(true)
+  })
+
   it("admits management only with a recorded registry-policy runtime", () => {
     expect(hasVerifiedManagementAuthorityDeployment(completeEvidence)).toBe(
       false
