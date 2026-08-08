@@ -60,7 +60,7 @@ const freezeManifest = (manifest: SliceWalletChainManifest) => {
 
 const canonicalContracts = {
   erc6492BootstrapFactory: {
-    address: "0x377E11216A60603Cc187a6B363783fF3A86A41a9"
+    address: "0x1FA2C4816a9d7eef852A896E534DF23c9BD5a173"
   },
   entryPoint: {
     address: "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
@@ -107,24 +107,27 @@ const canonicalContracts = {
     address: "0x000000000000D01eA45F9eFD5c54f037Fa57Ea1a"
   },
   weightedEcdsaSigner: {
-    address: "0x45fC7d684683773DDA5bE3b3ba0a7997EccFdb0a"
+    address: "0xB555Fb2951A52C6D7156Fbd1F6573F7eb7aDc363"
   },
   weightedP256Signer: {
-    address: "0xe9c0dBa15040D8B20a94D5bCA18382496B277485",
+    address: "0x5b8EC08F8e6eafc4dbF95E171EAbb137174b82f1",
     version: "1"
   },
   timelockPolicy: {
-    address: "0xA60CEe306BB822E2375cd47BdF76BA54F601754A"
+    address: "0x030546170A5B6d11f14612D309EA61BD718365c8"
   },
   slicerRegistryPolicy: {
-    address: "0x0e894B496Ad5fdc99c6Bd4C5651f807E1dDE4D0c"
+    address: "0x3eE2795eeE0570594f6d0a74234712930E5a2F0f"
+  },
+  authorizationRevocationRegistry: {
+    address: "0xB2A9330825D6AabBf7Cc7004Bc0916291C3322AD"
   }
 } as const
 const deployments = [
   {
     admitted: true,
     authorityAdmission: {
-      checkout: false,
+      checkout: true,
       generic: true,
       management: false
     },
@@ -170,7 +173,8 @@ const deployments = [
     },
     rip7212Available: true,
     runtimeCodeHashes: {
-      erc6492BootstrapFactory: null,
+      erc6492BootstrapFactory:
+        "0x210e6b98bd952531031dcdc0b0d7f33405686e95af26bd317fef1da6c61b96b4",
       entryPoint:
         "0x8db5ff695839d655407cc8490bb7a5d82337a86a6b39c3f0258aa6c3b582fc58",
       kernelFactory:
@@ -198,17 +202,21 @@ const deployments = [
       soladyP256Verifier:
         "0x9933b3f70809361dcfebe1f731b129890454cc29af5b32840dcae92400a8826b",
       weightedEcdsaSigner:
-        "0xf86faf7bdc6657af2c9cfe4ab7d966434c7534803d102f802c68faeeafd04254",
-      weightedP256Signer: null,
+        "0xcc5510774c8eedb9a2001cc7bb9eed9343f5ba285c184656d62b71f094c6c076",
+      weightedP256Signer:
+        "0x3497bb26d46d0856d92d1a0f3e5aaeebc696b497b583f2235b9b1a5557e1c483",
       timelockPolicy:
-        "0x916329f95ecb10a3c18bab13155697cbb481161bf8b24acada52461e87e8e3b6",
-      slicerRegistryPolicy: null
+        "0x7f50edc1acbb3fd5013040472364885be07828d738a119ee015a18383d37e476",
+      slicerRegistryPolicy:
+        "0x22991f881ef61d0c3fe5768a1988651594d9ea84ccaa3778e2247ca69c436fc0",
+      authorizationRevocationRegistry:
+        "0x5a93f9fbc9de24c9d2b5fe7e9fd81ac3b59a8bb6919977a844c24227b7d58804"
     }
   },
   {
     admitted: true,
     authorityAdmission: {
-      checkout: false,
+      checkout: true,
       generic: true,
       management: false
     },
@@ -254,7 +262,8 @@ const deployments = [
     },
     rip7212Available: true,
     runtimeCodeHashes: {
-      erc6492BootstrapFactory: null,
+      erc6492BootstrapFactory:
+        "0x210e6b98bd952531031dcdc0b0d7f33405686e95af26bd317fef1da6c61b96b4",
       entryPoint:
         "0x8db5ff695839d655407cc8490bb7a5d82337a86a6b39c3f0258aa6c3b582fc58",
       kernelFactory:
@@ -282,17 +291,21 @@ const deployments = [
       soladyP256Verifier:
         "0x9933b3f70809361dcfebe1f731b129890454cc29af5b32840dcae92400a8826b",
       weightedEcdsaSigner:
-        "0xe519f84c3f2c9ef1638b500fced1257b705f6d412b2adaedf6cc7f17fb39f9ed",
-      weightedP256Signer: null,
+        "0xb648be3025607dd4c27e5f402b00827065c397494785a54e88ca2ab023633494",
+      weightedP256Signer:
+        "0x0d93c27b2e497fdda498a97287f85eecbe6cdb1c4b88d60b34f47d27ac8c66e2",
       timelockPolicy:
-        "0x916329f95ecb10a3c18bab13155697cbb481161bf8b24acada52461e87e8e3b6",
-      slicerRegistryPolicy: null
+        "0x7f50edc1acbb3fd5013040472364885be07828d738a119ee015a18383d37e476",
+      slicerRegistryPolicy:
+        "0x22991f881ef61d0c3fe5768a1988651594d9ea84ccaa3778e2247ca69c436fc0",
+      authorizationRevocationRegistry:
+        "0x5a93f9fbc9de24c9d2b5fe7e9fd81ac3b59a8bb6919977a844c24227b7d58804"
     }
   },
   {
     admitted: true,
     authorityAdmission: {
-      checkout: false,
+      checkout: true,
       generic: true,
       management: false
     },
@@ -343,7 +356,8 @@ const deployments = [
     },
     rip7212Available: true,
     runtimeCodeHashes: {
-      erc6492BootstrapFactory: null,
+      erc6492BootstrapFactory:
+        "0x210e6b98bd952531031dcdc0b0d7f33405686e95af26bd317fef1da6c61b96b4",
       entryPoint:
         "0x8db5ff695839d655407cc8490bb7a5d82337a86a6b39c3f0258aa6c3b582fc58",
       kernelFactory:
@@ -371,17 +385,21 @@ const deployments = [
       soladyP256Verifier:
         "0x9933b3f70809361dcfebe1f731b129890454cc29af5b32840dcae92400a8826b",
       weightedEcdsaSigner:
-        "0xd9dea77190cbc2104d2ecd8beab745196d3c5a01fe7b0ba49ee5b3b6c9a90be2",
-      weightedP256Signer: null,
+        "0x7d4fdb782c0f4e1b7bf6449bae7a32436892c457b3def1383c4f98d61eb30c40",
+      weightedP256Signer:
+        "0x7368c7060603c3fd2610d4f18cdf68bf24a160a9a4fdcffc2242cc25f90d456b",
       timelockPolicy:
-        "0x916329f95ecb10a3c18bab13155697cbb481161bf8b24acada52461e87e8e3b6",
-      slicerRegistryPolicy: null
+        "0x7f50edc1acbb3fd5013040472364885be07828d738a119ee015a18383d37e476",
+      slicerRegistryPolicy:
+        "0x22991f881ef61d0c3fe5768a1988651594d9ea84ccaa3778e2247ca69c436fc0",
+      authorizationRevocationRegistry:
+        "0x5a93f9fbc9de24c9d2b5fe7e9fd81ac3b59a8bb6919977a844c24227b7d58804"
     }
   },
   {
     admitted: true,
     authorityAdmission: {
-      checkout: false,
+      checkout: true,
       generic: true,
       management: false
     },
@@ -427,7 +445,8 @@ const deployments = [
     },
     rip7212Available: true,
     runtimeCodeHashes: {
-      erc6492BootstrapFactory: null,
+      erc6492BootstrapFactory:
+        "0x210e6b98bd952531031dcdc0b0d7f33405686e95af26bd317fef1da6c61b96b4",
       entryPoint:
         "0x8db5ff695839d655407cc8490bb7a5d82337a86a6b39c3f0258aa6c3b582fc58",
       kernelFactory:
@@ -455,11 +474,15 @@ const deployments = [
       soladyP256Verifier:
         "0x9933b3f70809361dcfebe1f731b129890454cc29af5b32840dcae92400a8826b",
       weightedEcdsaSigner:
-        "0x38bf435be1112dabcaf5af04d6398fd3ad1f432173fd46e3864ff73f9e0b036f",
-      weightedP256Signer: null,
+        "0x334e05970aa6d01dcad6a6e5ffd309b612180e150531f850b1b6854224d5abc7",
+      weightedP256Signer:
+        "0x7e890abcda1f9394d7b819b8675c56ec27141fb4384fbfb9d21af494f35f47a8",
       timelockPolicy:
-        "0x916329f95ecb10a3c18bab13155697cbb481161bf8b24acada52461e87e8e3b6",
-      slicerRegistryPolicy: null
+        "0x7f50edc1acbb3fd5013040472364885be07828d738a119ee015a18383d37e476",
+      slicerRegistryPolicy:
+        "0x22991f881ef61d0c3fe5768a1988651594d9ea84ccaa3778e2247ca69c436fc0",
+      authorizationRevocationRegistry:
+        "0x5a93f9fbc9de24c9d2b5fe7e9fd81ac3b59a8bb6919977a844c24227b7d58804"
     }
   }
 ] as const
@@ -541,6 +564,10 @@ const buildContracts = (
     slicerRegistryPolicy: {
       ...canonicalContracts.slicerRegistryPolicy,
       runtimeCodeHash: runtimeCodeHashes.slicerRegistryPolicy ?? null
+    },
+    authorizationRevocationRegistry: {
+      ...canonicalContracts.authorizationRevocationRegistry,
+      runtimeCodeHash: runtimeCodeHashes.authorizationRevocationRegistry ?? null
     }
   }) satisfies SliceWalletContractDeployments
 
