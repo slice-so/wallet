@@ -32,11 +32,11 @@ const parameters = {
 // Captured from EntryPoint 0.7 getSenderAddress on a Base fork using the
 // pinned Kernel 0.3.3 factories. The fork tier independently replays it.
 const entryPointDerivedAddress =
-  "0xAa4127AE66Cc5Fb11E2a6F40FAD2c3D47F23E6Dd" as const
+  "0x614d09f18A013734E56584F157E48c6508d6Db5d" as const
 const indexedAddressVectors = [
-  [1n, "0x633BE631F0e21230EfAbeadA53655ec20020A7C1"],
-  [7n, "0x38E354eB6783594881b6efe139b573C9c00482DF"],
-  [31n, "0x12bbFc1055C95649079B5D2BFDA06eC5f5c8F7A1"]
+  [1n, "0xa3D8B1c04629A122E277Df609b375dd01765f4Ab"],
+  [7n, "0x520B1B81FCa0822C222292F5cAcF3e60B3D447D5"],
+  [31n, "0x1dC61fbcC9FFd59029174D677cf3f310882Af87b"]
 ] as const
 
 describe("Slice wallet offline account prediction", () => {

@@ -601,7 +601,14 @@ const developmentManifest = freezeManifest({
   },
   contracts: Object.fromEntries(
     Object.entries(canonicalDevelopmentManifest.contracts).map(
-      ([name, contract]) => [name, { ...contract }]
+      ([name, contract]) => [
+        name,
+        {
+          ...contract,
+          runtimeCodeHash:
+            name === "weightedP256Signer" ? null : contract.runtimeCodeHash
+        }
+      ]
     )
   ) as SliceWalletChainManifest["contracts"],
   defaultTransports: {

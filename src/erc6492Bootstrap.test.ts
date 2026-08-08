@@ -112,15 +112,20 @@ describe("compact ERC-6492 bootstrap", () => {
     )
   })
 
-  it("keeps the original proof on chains without a verified bootstrap", () => {
+  it("uses the verified bootstrap on admitted production chains", () => {
     const original = serializeErc6492Signature({
       address: sliceWalletKernelAddresses.metaFactory,
       data: "0x1234",
       signature: "0x5678"
     })
+    const compact = compactSliceWalletErc6492Signature({
+      chainId: 8453,
+      signature: original
+    })
 
-    expect(
-      compactSliceWalletErc6492Signature({ chainId: 8453, signature: original })
-    ).toBe(original)
+    expect(compact).not.toBe(original)
+    expect(parseErc6492Signature(compact).address).toBe(
+      sliceWalletKernelAddresses.erc6492BootstrapFactory
+    )
   })
 })

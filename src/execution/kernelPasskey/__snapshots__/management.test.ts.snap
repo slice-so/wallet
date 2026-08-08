@@ -9,7 +9,7 @@ exports[`store management permission policies encodes identical policy bytes thr
   ],
   "policyInfoInBytes": [
     "0x000085770b902D1e503D5f5141d9eaC16d0d08eEaDd2",
-    "0x00000e894B496Ad5fdc99c6Bd4C5651f807E1dDE4D0c",
+    "0x00003eE2795eeE0570594f6d0a74234712930E5a2F0f",
     "0x0000B9f8f524bE6EcD8C945b1b87f9ae5C192FdCE20F",
   ],
 }
