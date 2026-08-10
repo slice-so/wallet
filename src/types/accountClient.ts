@@ -1,15 +1,5 @@
-import type { ToKernelSmartAccountReturnType } from "permissionless/accounts"
+import type { Address, Chain, Client, Hex, Transport } from "viem"
 import type {
-  Address,
-  Chain,
-  Client,
-  Hex,
-  JsonRpcAccount,
-  LocalAccount,
-  Transport
-} from "viem"
-import type {
-  P256Credential,
   PaymasterActions,
   PrepareUserOperationParameterType,
   SmartAccount,
@@ -17,6 +7,10 @@ import type {
   UserOperation,
   UserOperationReceipt
 } from "viem/account-abstraction"
+import type {
+  SliceWalletPasskeyCredential,
+  SliceWalletPublicClient
+} from "./account"
 
 export type SliceAccountBackend = "kernel-passkey"
 
@@ -87,26 +81,10 @@ export type SliceAccountClientTransport = {
   ) => Promise<SliceAccountClientExecutionReceipt>
 }
 
-export type SliceKernelPasskeyCredential = Pick<
-  P256Credential,
-  "id" | "publicKey"
->
-
-export type SliceKernelPasskeyClient = Client<
-  Transport,
-  Chain | undefined,
-  JsonRpcAccount | LocalAccount | undefined
->
-
-export type SliceKernelPasskeyAccount = ToKernelSmartAccountReturnType<
-  "0.7",
-  false
->
-
 export type CreateSliceKernelPasskeyAccountParameters = {
   address?: Address
-  client: SliceKernelPasskeyClient
-  credential: SliceKernelPasskeyCredential
+  client: SliceWalletPublicClient
+  credential: SliceWalletPasskeyCredential
   getFn?: ToWebAuthnAccountParameters["getFn"]
   rpId?: ToWebAuthnAccountParameters["rpId"]
 }

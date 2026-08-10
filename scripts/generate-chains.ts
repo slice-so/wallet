@@ -96,7 +96,6 @@ const generated = `// Auto-generated from contracts deployment facts and wallet 
 
 import type { Hex } from "viem"
 import type {
-  SliceWalletAuthorityKind,
   SliceWalletChainManifest,
   SliceWalletContractDeployments
 } from "./types/chains"
@@ -230,7 +229,7 @@ export const assertSliceWalletAuthorityDeployment = ({
   authority,
   chainId
 }: {
-  authority: SliceWalletAuthorityKind
+  authority: keyof SliceWalletChainManifest["authorityAdmission"]
   chainId: number
 }) => {
   const manifest = getSliceWalletChainManifest(chainId)

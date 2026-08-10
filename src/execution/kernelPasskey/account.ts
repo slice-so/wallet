@@ -3,10 +3,8 @@ import {
   entryPoint07Address,
   toWebAuthnAccount
 } from "viem/account-abstraction"
-import type {
-  CreateSliceKernelPasskeyAccountParameters,
-  SliceKernelPasskeyAccount
-} from "../../types/accountClient"
+import type { SliceWalletKernelAccount } from "../../types/account"
+import type { CreateSliceKernelPasskeyAccountParameters } from "../../types/accountClient"
 import {
   sliceKernelBaseV33Addresses,
   sliceKernelWebAuthnValidatorAddress
@@ -18,7 +16,7 @@ export const createSliceKernelPasskeyAccount = async ({
   credential,
   getFn,
   rpId
-}: CreateSliceKernelPasskeyAccountParameters): Promise<SliceKernelPasskeyAccount> => {
+}: CreateSliceKernelPasskeyAccountParameters): Promise<SliceWalletKernelAccount> => {
   const owner = toWebAuthnAccount({
     credential,
     ...(getFn !== undefined ? { getFn } : {}),

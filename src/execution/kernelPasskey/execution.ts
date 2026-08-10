@@ -31,17 +31,14 @@ import {
   toHex,
   zeroAddress
 } from "viem"
-import type { WebAuthnAccount } from "viem/account-abstraction"
+import type { UserOperation, WebAuthnAccount } from "viem/account-abstraction"
 import { entryPoint07Address } from "viem/account-abstraction"
 import { privateKeyToAccount } from "viem/accounts"
-import type {
-  SliceAccountClientCall,
-  SliceKernelPasskeyCredential
-} from "../../types/accountClient"
+import type { SliceWalletPasskeyCredential } from "../../types/account"
+import type { SliceAccountClientCall } from "../../types/accountClient"
 import type {
   BuildSliceExecutionEnableTypedDataParameters,
-  CreateSliceExecutionAccountParameters,
-  SliceExecutionUserOperation
+  CreateSliceExecutionAccountParameters
 } from "../../types/execution"
 import { createSliceStoreManagementPermissionPolicies } from "../commerce/policies"
 import { getProductsModuleAddress } from "../generated/commerceFacts"
@@ -221,7 +218,7 @@ const getClientChainId = (
  * keccak256 of the base64url credential id).
  */
 export const encodeWebAuthnRootValidatorData = (
-  credential: SliceKernelPasskeyCredential
+  credential: SliceWalletPasskeyCredential
 ) => {
   const publicKey = PublicKey.fromHex(credential.publicKey)
   const authenticatorIdHash = keccak256(toHex(Base64.toBytes(credential.id)))
@@ -293,7 +290,7 @@ const createBuyerRootValidator = async ({
   credential
 }: {
   client: KernelSmartAccountImplementation["client"]
-  credential: SliceKernelPasskeyCredential
+  credential: SliceWalletPasskeyCredential
 }) => {
   // The sudo validator only supplies identity and enable data here; the
   // enable signature itself is produced externally by the passkey (mirrors
@@ -444,10 +441,7 @@ export const createSliceExecutionAccount = async (
     userOperation
   }: {
     sessionKey: Hex
-    userOperation: Pick<
-      SliceExecutionUserOperation,
-      "callData" | "nonce" | "sender"
-    >
+    userOperation: Pick<UserOperation<"0.7">, "callData" | "nonce" | "sender">
   }) =>
     privateKeyToAccount(sessionKey).signTypedData(
       getWeightedEcdsaProposalTypedData({
@@ -494,7 +488,7 @@ export const createSliceExecutionAccount = async (
       ...userOperationFields,
       sender: userOperation.sender ?? address,
       signature: "0x"
-    } satisfies SliceExecutionUserOperation
+    } satisfies UserOperation<"0.7">
     const proposalSignature = await signProposal({
       sessionKey: sessionPrivateKey,
       userOperation: unsignedUserOperation

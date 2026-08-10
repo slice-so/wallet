@@ -1,10 +1,8 @@
 import type { Address, Hex } from "viem"
 import type { SliceWalletPermissionAuthorization } from "./frame"
 import type { SliceWalletCheckoutCoSignerClient } from "./permission"
-import type {
-  SerializedWalletPolicyDescriptor,
-  WalletPolicyDescriptor
-} from "./policy"
+import type { SerializedWalletPolicyDescriptor } from "./policy"
+import type { SliceUserOperationPolicyFetch } from "./userOperation"
 
 export type SliceCheckoutApproval = { amount: bigint; currency: Address }
 export type SliceCheckoutAllowanceTotal = {
@@ -95,10 +93,6 @@ export type SliceWalletExecutionSessionDescriptor = {
   publicKey: Hex
   signerId: Address
 }
-export type SliceWalletExecutionFetch = (
-  input: RequestInfo | URL,
-  init?: RequestInit
-) => Promise<Response>
 export type SliceWalletCheckoutExecutionDelegationSnapshot = {
   allowanceUsdMicros: string
   budgetPeriodSec?: number
@@ -127,7 +121,7 @@ export type SliceWalletReplacementFinalization =
     userOperationHash?: Hex
   }
 export type CreateSliceWalletCheckoutExecutionClientParameters = {
-  fetch?: SliceWalletExecutionFetch
+  fetch?: SliceUserOperationPolicyFetch
 }
 export type SliceWalletCheckoutExecutionClient =
   SliceWalletCheckoutCoSignerClient & {
@@ -185,5 +179,3 @@ export type SliceWalletOwnerPermissionDescriptor = {
   kind: "p256"
   session: SliceWalletExecutionSessionDescriptor
 }
-
-export type SliceCommercePolicyDescriptor = WalletPolicyDescriptor

@@ -13,8 +13,8 @@ import type {
 } from "viem/account-abstraction"
 import { entryPoint07Address } from "viem/account-abstraction"
 import { anvil, base } from "viem/chains"
+import type { SliceWalletKernelAccount } from "../../types/account"
 import type {
-  SliceKernelPasskeyAccount,
   SliceKernelPasskeyBundlerClient,
   SliceKernelPasskeyBundlerReceipt,
   SliceKernelPasskeyPaymasterClient,
@@ -61,7 +61,7 @@ const client = createPublicClient({
 })
 const account = {
   address: accountAddress
-} as SliceKernelPasskeyAccount
+} as SliceWalletKernelAccount
 const call = {
   data: "0x1234",
   to: targetAddress,
@@ -81,7 +81,7 @@ const preparedUserOperation = {
 const signingAccount = {
   ...account,
   signUserOperation: mock(async () => "0x1234" as Hex)
-} as SliceKernelPasskeyAccount
+} as SliceWalletKernelAccount
 
 const createKernelUserOperationRequest = (
   accountOverride: Address = accountAddress
@@ -276,7 +276,7 @@ describe("createSliceKernelPasskeyTransport", () => {
       account: {
         ...account,
         signUserOperation
-      } as SliceKernelPasskeyAccount,
+      } as SliceWalletKernelAccount,
       bundlerUrl,
       client,
       createBundlerClient: () => ({

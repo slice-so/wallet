@@ -34,8 +34,6 @@ export type SliceWalletContractDeployments = {
   }
 }
 
-export type SliceWalletAuthorityKind = "checkout" | "generic" | "management"
-
 export type SliceWalletExecutionSafetyEnvelope = {
   readonly maxCallGasLimit: bigint
   readonly maxFeePerGas: bigint

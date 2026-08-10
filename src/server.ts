@@ -65,7 +65,7 @@ export type {
 } from "./types/policy"
 export type {
   RegisterSliceWalletCredentialInput,
-  SliceWalletCredentialAccountsAssertion,
+  SliceWalletCredentialProof,
   SliceWalletCredentialRowClassification,
   SliceWalletRegistryCredential
 } from "./types/registry"

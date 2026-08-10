@@ -16,8 +16,6 @@ import type {
 } from "viem/account-abstraction"
 import type { SliceWalletUnsignedUserOperation } from "./frame"
 
-export type SliceWalletAccountIndex = number
-
 export type SliceWalletActivityTokenDescriptor = {
   address: Address
   symbol: string
