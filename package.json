@@ -11,10 +11,8 @@
     ".": {
       "development": {
         "types": "./src/index.ts",
-        "bun": "./src/index.ts",
-        "workerd": "./src/index.ts",
-        "import": "./dist/esm/index.js",
-        "default": "./dist/esm/index.js"
+        "import": "./src/index.ts",
+        "default": "./src/index.ts"
       },
       "types": "./dist/esm/index.d.ts",
       "import": "./dist/esm/index.js",
@@ -23,10 +21,8 @@
     "./execution": {
       "development": {
         "types": "./src/execution.ts",
-        "bun": "./src/execution.ts",
-        "workerd": "./src/execution.ts",
-        "import": "./dist/esm/execution.js",
-        "default": "./dist/esm/execution.js"
+        "import": "./src/execution.ts",
+        "default": "./src/execution.ts"
       },
       "types": "./dist/esm/execution.d.ts",
       "import": "./dist/esm/execution.js",
@@ -35,10 +31,8 @@
     "./argon2id": {
       "development": {
         "types": "./src/argon2id.ts",
-        "bun": "./src/argon2id.ts",
-        "workerd": "./src/argon2id.ts",
-        "import": "./dist/esm/argon2id.js",
-        "default": "./dist/esm/argon2id.js"
+        "import": "./src/argon2id.ts",
+        "default": "./src/argon2id.ts"
       },
       "types": "./dist/esm/argon2id.d.ts",
       "import": "./dist/esm/argon2id.js",
@@ -47,10 +41,8 @@
     "./ceremony-routes": {
       "development": {
         "types": "./src/ceremonyRoutes.ts",
-        "bun": "./src/ceremonyRoutes.ts",
-        "workerd": "./src/ceremonyRoutes.ts",
-        "import": "./dist/esm/ceremonyRoutes.js",
-        "default": "./dist/esm/ceremonyRoutes.js"
+        "import": "./src/ceremonyRoutes.ts",
+        "default": "./src/ceremonyRoutes.ts"
       },
       "types": "./dist/esm/ceremonyRoutes.d.ts",
       "import": "./dist/esm/ceremonyRoutes.js",
@@ -59,10 +51,8 @@
     "./frame": {
       "development": {
         "types": "./src/frame.ts",
-        "bun": "./src/frame.ts",
-        "workerd": "./src/frame.ts",
-        "import": "./dist/esm/frame.js",
-        "default": "./dist/esm/frame.js"
+        "import": "./src/frame.ts",
+        "default": "./src/frame.ts"
       },
       "types": "./dist/esm/frame.d.ts",
       "import": "./dist/esm/frame.js",
@@ -71,10 +61,8 @@
     "./policy": {
       "development": {
         "types": "./src/policy.ts",
-        "bun": "./src/policy.ts",
-        "workerd": "./src/policy.ts",
-        "import": "./dist/esm/policy.js",
-        "default": "./dist/esm/policy.js"
+        "import": "./src/policy.ts",
+        "default": "./src/policy.ts"
       },
       "types": "./dist/esm/policy.d.ts",
       "import": "./dist/esm/policy.js",
@@ -83,10 +71,8 @@
     "./permissions": {
       "development": {
         "types": "./src/permissions.ts",
-        "bun": "./src/permissions.ts",
-        "workerd": "./src/permissions.ts",
-        "import": "./dist/esm/permissions.js",
-        "default": "./dist/esm/permissions.js"
+        "import": "./src/permissions.ts",
+        "default": "./src/permissions.ts"
       },
       "types": "./dist/esm/permissions.d.ts",
       "import": "./dist/esm/permissions.js",
@@ -95,10 +81,8 @@
     "./recovery": {
       "development": {
         "types": "./src/recovery.ts",
-        "bun": "./src/recovery.ts",
-        "workerd": "./src/recovery.ts",
-        "import": "./dist/esm/recovery.js",
-        "default": "./dist/esm/recovery.js"
+        "import": "./src/recovery.ts",
+        "default": "./src/recovery.ts"
       },
       "types": "./dist/esm/recovery.d.ts",
       "import": "./dist/esm/recovery.js",
@@ -107,10 +91,8 @@
     "./react": {
       "development": {
         "types": "./src/react.ts",
-        "bun": "./src/react.ts",
-        "workerd": "./src/react.ts",
-        "import": "./dist/esm/react.js",
-        "default": "./dist/esm/react.js"
+        "import": "./src/react.ts",
+        "default": "./src/react.ts"
       },
       "types": "./dist/esm/react.d.ts",
       "import": "./dist/esm/react.js",
@@ -119,10 +101,8 @@
     "./provider": {
       "development": {
         "types": "./src/provider.ts",
-        "bun": "./src/provider.ts",
-        "workerd": "./src/provider.ts",
-        "import": "./dist/esm/provider.js",
-        "default": "./dist/esm/provider.js"
+        "import": "./src/provider.ts",
+        "default": "./src/provider.ts"
       },
       "types": "./dist/esm/provider.d.ts",
       "import": "./dist/esm/provider.js",
@@ -131,10 +111,8 @@
     "./server": {
       "development": {
         "types": "./src/server.ts",
-        "bun": "./src/server.ts",
-        "workerd": "./src/server.ts",
-        "import": "./dist/esm/server.js",
-        "default": "./dist/esm/server.js"
+        "import": "./src/server.ts",
+        "default": "./src/server.ts"
       },
       "types": "./dist/esm/server.d.ts",
       "import": "./dist/esm/server.js",
@@ -143,10 +121,8 @@
     "./wagmi": {
       "development": {
         "types": "./src/wagmi.ts",
-        "bun": "./src/wagmi.ts",
-        "workerd": "./src/wagmi.ts",
-        "import": "./dist/esm/wagmi.js",
-        "default": "./dist/esm/wagmi.js"
+        "import": "./src/wagmi.ts",
+        "default": "./src/wagmi.ts"
       },
       "types": "./dist/esm/wagmi.d.ts",
       "import": "./dist/esm/wagmi.js",
