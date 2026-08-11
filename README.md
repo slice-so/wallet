@@ -10,7 +10,7 @@ Portable Kernel wallet primitives for Slice and third-party applications, includ
 - Delegated calls are checked against the same canonical policy descriptor in the ceremony, frame, SDK, and onchain permission.
 - Unsupported or opaque calls stay root-confirmed.
 - General ERC-8128 API sessions use a separate server-held EOA and receive no onchain wallet authority.
-- Slice ID session enrollment transports the standard ERC-8128 Delegation Grant artifact through the wallet ceremony; `@slicekit/id` validates the grant profile, while the wallet remains a protocol-neutral root-signing boundary.
+- Slice ID session enrollment transports the draft ERC-8128 Delegation Grant artifact through the wallet ceremony; `@slicekit/id` validates the Slice candidate profile, while the wallet remains a protocol-neutral root-signing boundary.
 
 ## Entry Points
 
