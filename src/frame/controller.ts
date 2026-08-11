@@ -14,7 +14,10 @@ import {
   sliceWalletDefaultRpId,
   sliceWalletEntryPoint
 } from "../constants"
-import { assertSliceStoreManagementPolicyDescriptor } from "../execution/commerce/policies"
+import {
+  assertSliceCheckoutPolicyDescriptor,
+  assertSliceStoreManagementPolicyDescriptor
+} from "../execution/commerce/policies"
 import { assertSliceWalletExecutionSafety } from "../executionSafety"
 import {
   encodeSliceWalletSyntheticWebAuthnSignature,
@@ -46,6 +49,7 @@ import type {
   SliceWalletStoredSession,
   SliceWalletWindowMessage
 } from "../types"
+import { SliceWalletUserRejectedRequestError } from "../userRejectedRequest"
 import {
   formatSliceWalletExecutionGrantMessage,
   hashSliceWalletAppPermissionRegistrationFields,
@@ -247,7 +251,13 @@ const parseBridgeRegistrationProofRequest = (
 }
 
 const errorResponse = (id: string, error: Error): SliceWalletFrameResponse => ({
-  error: { code: "invalid_request", message: error.message },
+  error: {
+    code:
+      error instanceof SliceWalletUserRejectedRequestError
+        ? error.code
+        : "invalid_request",
+    message: error.message
+  },
   id,
   version: 1
 })
@@ -334,7 +344,9 @@ export const attachSliceWalletSignerFrame = ({
       }
       const keyPair = await generateSliceWalletP256KeyPair(cryptoImpl)
       const policy = requestedPolicy
-      if (policy.grantKind === "management") {
+      if (policy.grantKind === "checkout") {
+        assertSliceCheckoutPolicyDescriptor(policy)
+      } else if (policy.grantKind === "management") {
         assertSliceStoreManagementPolicyDescriptor(policy)
       }
       const session: SliceWalletFrameSession = {
@@ -651,8 +663,26 @@ export const attachSliceWalletSignerFrame = ({
       isConnectRequest(event.data) &&
       event.ports.length === 1
     ) {
-      parentOrigin = new URL(event.origin).origin
-      parentPort = event.ports[0]
+      const candidatePort = event.ports[0]
+      let normalizedParentOrigin: string
+      try {
+        normalizedParentOrigin = new URL(event.origin).origin
+        if (normalizedParentOrigin === "null") {
+          throw new Error("Wallet frame requires a tuple parent origin.")
+        }
+      } catch {
+        candidatePort.start()
+        candidatePort.postMessage(
+          errorResponse(
+            event.data.id,
+            new Error("Wallet frame parent origin is invalid.")
+          )
+        )
+        candidatePort.close()
+        return
+      }
+      parentOrigin = normalizedParentOrigin
+      parentPort = candidatePort
       parentPort.addEventListener("message", onPortMessage)
       parentPort.start()
       parentPort.postMessage(successResponse(event.data.id, null))

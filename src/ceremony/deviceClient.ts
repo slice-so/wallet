@@ -3,6 +3,7 @@ import type {
   ManageSliceWalletDeviceParameters,
   SliceWalletProtocolValue
 } from "../types"
+import { toSliceWalletCeremonyError } from "../userRejectedRequest"
 import {
   requireSliceWalletPopupGesture,
   SliceWalletUserGestureRequiredError
@@ -78,7 +79,7 @@ const manageSliceWalletDevice = async (
           throw new Error("Device ceremony response nonce does not match.")
         }
         if (response.type === "slice-wallet:ceremony-error") {
-          throw new Error(response.message)
+          throw toSliceWalletCeremonyError(response)
         }
         if (response.type === "slice-wallet:popup-required") {
           throw new SliceWalletUserGestureRequiredError(response.reason)

@@ -1,6 +1,7 @@
 import {
   type Address,
   BaseError,
+  bytesToHex,
   createPublicClient,
   type Hex,
   hexToBigInt,
@@ -35,7 +36,7 @@ import { acquireSliceWalletSignerFrame } from "../frame/client"
 import { getSliceWalletP256SignerId } from "../p256Server"
 import {
   buildSliceWalletPermissionInstallCalls,
-  buildSliceWalletPermissionUninstallCalls,
+  buildSliceWalletPermissionRevocationCalls,
   createSliceWalletPermissionAccount
 } from "../permissionAccount"
 import {
@@ -1058,22 +1059,19 @@ const createSliceWalletChainRuntime = (
   const uninstallGrant = async (stored: StoredGenericGrant) => {
     const wallet = await requireActiveWallet()
     const session = toFrameSession(stored)
-    const code = await publicClient.getCode({
-      address: wallet.rootAccount.address
+    const { calls, revoked } = await buildSliceWalletPermissionRevocationCalls({
+      account: wallet.rootAccount.address,
+      client: publicClient,
+      session
     })
-    if (code !== undefined) {
-      const { calls } = await buildSliceWalletPermissionUninstallCalls({
-        account: wallet.rootAccount.address,
-        client: publicClient,
-        session
-      })
-      if (calls.length > 0) {
-        const hash = await createAccountBundler(
-          wallet.rootAccount
-        ).sendUserOperation({ calls })
-        await waitForSuccessfulUserOperation(hash)
-      }
+    if (revoked) return
+    if (calls.length === 0) {
+      throw new Error("Wallet permission revocation produced no calls.")
     }
+    const hash = await createAccountBundler(
+      wallet.rootAccount
+    ).sendUserOperation({ calls })
+    await waitForSuccessfulUserOperation(hash)
   }
 
   const getPendingGenericSession = async () => {
@@ -1835,7 +1833,6 @@ const createSliceWalletChainRuntime = (
           primary.account
         )
       },
-      permissionId: primary.permissionId,
       uninstall: async () => {
         const seen = new Set<string>()
         for (const grant of grants) {
@@ -2140,15 +2137,15 @@ const createSliceWalletChainRuntime = (
     getAccounts: async () => {
       const wallet = await hydrate()
       if (wallet === null) return []
-      try {
-        const lockState = await (await getFrame()).request({
-          method: "getAccountLockState",
-          params: { account: wallet.rootAccount.address }
-        })
-        return lockState === "unlocked" ? [wallet.rootAccount.address] : []
-      } catch {
-        return []
+      const lockState = await (await getFrame()).request({
+        method: "getAccountLockState",
+        params: { account: wallet.rootAccount.address }
+      })
+      if (lockState === "locked") return []
+      if (lockState !== "unlocked") {
+        throw new Error("Slice wallet frame returned an invalid lock state.")
       }
+      return [wallet.rootAccount.address]
     },
     hasCall: callTracker.hasCall,
     getCallsStatus: callTracker.getCallsStatus,
@@ -2226,6 +2223,36 @@ export const createSliceWalletProviderRuntime = (
       if (runtime.hasCall(id)) return runtime
     }
     return getChainRuntime(activeChainId)
+  }
+  const reservedCallIds = new Set<string>()
+  const reserveCallId = (requestedId?: string) => {
+    const { browserWindow, storage } = getBrowserDependencies(config)
+    let id = requestedId
+    if (id === undefined) {
+      let generatedId: string
+      do {
+        const bytes = new Uint8Array(32)
+        browserWindow.crypto.getRandomValues(bytes)
+        generatedId = bytesToHex(bytes)
+      } while (
+        reservedCallIds.has(generatedId) ||
+        readStoredSliceWalletCall(storage, generatedId) !== null ||
+        [...runtimes.values()].some((runtime) => runtime.hasCall(generatedId))
+      )
+      id = generatedId
+    }
+    if (
+      reservedCallIds.has(id) ||
+      readStoredSliceWalletCall(storage, id) !== null ||
+      [...runtimes.values()].some((runtime) => runtime.hasCall(id))
+    ) {
+      throw new SliceWalletProviderRpcError(
+        5720,
+        "Call id has already been used."
+      )
+    }
+    reservedCallIds.add(id)
+    return id
   }
 
   let switchQueue = Promise.resolve()
@@ -2425,13 +2452,23 @@ export const createSliceWalletProviderRuntime = (
     rotateGrant: (
       ...args: Parameters<SliceWalletChainRuntime["rotateGrant"]>
     ) => getChainRuntime().rotateGrant(...args),
-    sendCalls: (
+    sendCalls: async (
       calls: Parameters<SliceWalletChainRuntime["sendCalls"]>[0],
       requestedId?: Parameters<SliceWalletChainRuntime["sendCalls"]>[1],
       paymasterService?: Parameters<SliceWalletChainRuntime["sendCalls"]>[2],
       chainId = activeChainId
-    ) =>
-      getChainRuntime(chainId).sendCalls(calls, requestedId, paymasterService),
+    ) => {
+      const id = reserveCallId(requestedId)
+      try {
+        return await getChainRuntime(chainId).sendCalls(
+          calls,
+          id,
+          paymasterService
+        )
+      } finally {
+        reservedCallIds.delete(id)
+      }
+    },
     signMessage: (
       ...args: Parameters<SliceWalletChainRuntime["signMessage"]>
     ) => getChainRuntime().signMessage(...args),

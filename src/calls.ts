@@ -7,7 +7,8 @@ import {
   hexToBigInt,
   isAddress,
   keccak256,
-  sliceHex
+  sliceHex,
+  toFunctionSelector
 } from "viem"
 import type { WalletCall } from "./types/policy"
 
@@ -23,6 +24,7 @@ const erc7579ExecutionAbi = [
     type: "function"
   }
 ] as const
+const erc7579ExecuteSelector = toFunctionSelector(erc7579ExecutionAbi[0])
 
 const erc7579BatchParameters = [
   {
@@ -112,6 +114,9 @@ export const decodeSliceWalletRootUserOperationCalls = ({
   try {
     return decodeErc7579WalletCalls(callData)
   } catch {
+    if (callData.toLowerCase().startsWith(erc7579ExecuteSelector)) {
+      throw new Error("Malformed ERC-7579 execution wrapper.")
+    }
     // Kernel root validation executes account-administration calldata as a
     // direct self-call instead of wrapping it in ERC-7579 execute.
     return [{ data: callData, to: account, value: 0n }]

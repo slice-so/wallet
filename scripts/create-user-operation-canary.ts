@@ -23,6 +23,9 @@ import {
   sliceWalletSupportedChainIds
 } from "../src/chains"
 import { canaryCredential, canaryGetFn, canaryRpId } from "./lib/canaryWebAuthn"
+import { installSanitizedScriptFailureHandlers } from "./lib/scriptFailure"
+
+installSanitizedScriptFailureHandlers()
 
 const canaryRecipient =
   "0x0000000000000000000000000000000000008128" satisfies Address

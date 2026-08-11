@@ -64,6 +64,7 @@ import type {
   SliceWalletRecoveryCall
 } from "./types/recovery"
 import type { SliceWalletRegistryCredential } from "./types/registry"
+import { getSliceWalletValidationInstallConfig } from "./validationLifecycle"
 
 const recoveryEntryPoint = {
   address: sliceWalletEntryPoint.address,
@@ -633,18 +634,18 @@ export const buildRecoveryPermissionInstallCalls = async ({
   const permissionId = validator.getIdentifier()
   const validationId = toRecoveryValidationId(permissionId)
   const validationData = await validator.getEnableData(account)
+  const installConfig = await getSliceWalletValidationInstallConfig({
+    account,
+    client,
+    validationId
+  })
 
   return {
     calls: [
       {
         data: encodeFunctionData({
           abi: kernelAccountRecoveryAbi,
-          args: [
-            [validationId],
-            [{ hook: zeroAddress, nonce: 1 }],
-            [validationData],
-            ["0x"]
-          ],
+          args: [[validationId], [installConfig], [validationData], ["0x"]],
           functionName: "installValidations"
         }),
         to: account,

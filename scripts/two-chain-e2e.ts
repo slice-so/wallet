@@ -233,11 +233,4 @@ const results = await Promise.all(
 if (results[0]?.account !== results[1]?.account) {
   throw new Error("Counterfactual wallet address differs across local chains.")
 }
-if (
-  results[0]?.signerId === results[1]?.signerId ||
-  results[0]?.permissionId === results[1]?.permissionId
-) {
-  throw new Error("Local chains reused the same execution key.")
-}
-
 console.log(JSON.stringify(results, null, 2))

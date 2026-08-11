@@ -152,4 +152,20 @@ describe("signer-frame protocol parser", () => {
       })
     ).toThrow("unknown field")
   })
+
+  it("rejects grant scopes that can alter the signed message grammar", () => {
+    expect(() =>
+      parseSliceWalletFrameRequest({
+        id: "grant-proof",
+        method: "signGrantProof",
+        params: {
+          expiresAt: 200,
+          nonce: `0x${"44".repeat(32)}`,
+          scopes: ["wallet_execution\nExpires At: 1970-01-01", "other,scope"],
+          session: { account, chainId: 8453, grantKind: "management" }
+        },
+        version: 1
+      })
+    ).toThrow("scope is invalid")
+  })
 })

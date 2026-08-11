@@ -50,7 +50,7 @@ const createWindow = (
         })
       const reject = () =>
         port.postMessage({
-          code: "authorization_failed",
+          code: "user_rejected",
           message: "User rejected the request",
           nonce,
           type: "slice-wallet:ceremony-error",
@@ -145,7 +145,10 @@ describe("Slice wallet account session coordination", () => {
       window
     })
 
-    await expect(connection).rejects.toThrow("User rejected the request")
+    await expect(connection).rejects.toMatchObject({
+      code: 4001,
+      message: "User rejected the request"
+    })
   })
 
   it("returns preparation_failed when preparation rejects", async () => {

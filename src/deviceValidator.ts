@@ -37,6 +37,7 @@ import type {
   SliceWalletDeviceCall,
   SliceWalletDeviceCredential
 } from "./types/device"
+import { getSliceWalletValidationInstallConfig } from "./validationLifecycle"
 
 const permissionValidatorType = "0x02" satisfies Hex
 const executeSelector = toFunctionSelector("execute(bytes32,bytes)")
@@ -205,17 +206,17 @@ export const buildDeviceInstallCalls = async (
   const permissionId = validator.getIdentifier()
   const validationId = toDeviceValidationId(permissionId)
   const validationData = await validator.getEnableData(parameters.account)
+  const installConfig = await getSliceWalletValidationInstallConfig({
+    account: parameters.account,
+    client: parameters.client,
+    validationId
+  })
   return {
     calls: [
       {
         data: encodeFunctionData({
           abi: kernelDeviceLifecycleAbi,
-          args: [
-            [validationId],
-            [{ hook: zeroAddress, nonce: 1 }],
-            [validationData],
-            ["0x"]
-          ],
+          args: [[validationId], [installConfig], [validationData], ["0x"]],
           functionName: "installValidations"
         }),
         to: parameters.account,

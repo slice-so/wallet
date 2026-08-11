@@ -2,11 +2,13 @@ import { describe, expect, it } from "bun:test"
 import {
   hasAdmittedManagementAuthority,
   hasCompleteSliceWalletAdmissionEvidence,
+  hasVerifiedCheckoutAuthorityDeployment,
   hasVerifiedManagementAuthorityDeployment
 } from "./chainAdmission"
 
 const completeEvidence = {
   runtimeCodeHashes: {
+    authorizationRevocationRegistry: "0x1234",
     callPolicy: "0x1234",
     ecdsaSigner: "0x1234",
     entryPoint: "0x1234",
@@ -116,6 +118,12 @@ describe("wallet chain admission evidence", () => {
         runtimeCodeHashes: genericEvidence
       })
     ).toBe(true)
+    expect(
+      hasVerifiedCheckoutAuthorityDeployment({
+        ...completeEvidence,
+        runtimeCodeHashes: genericEvidence
+      })
+    ).toBe(false)
   })
 
   it("admits management only with a recorded registry-policy runtime", () => {
@@ -131,6 +139,19 @@ describe("wallet chain admission evidence", () => {
         }
       })
     ).toBe(true)
+    const {
+      authorizationRevocationRegistry: _authorizationRevocationRegistry,
+      ...withoutRevocationRegistry
+    } = completeEvidence.runtimeCodeHashes
+    expect(
+      hasVerifiedManagementAuthorityDeployment({
+        ...completeEvidence,
+        runtimeCodeHashes: {
+          ...withoutRevocationRegistry,
+          slicerRegistryPolicy: "0x1234"
+        }
+      })
+    ).toBe(false)
   })
 
   it("requires explicit bundler support for management validation storage reads", () => {

@@ -42,6 +42,7 @@ import type {
   BuildSliceWalletPermissionEnableTypedDataParameters,
   CreateSliceWalletPermissionAccountParameters
 } from "./types/permission"
+import { resolveSliceWalletValidationInstallConfig } from "./validationLifecycle"
 
 const kernelExecuteSelector = toFunctionSelector({
   inputs: [
@@ -56,6 +57,23 @@ const kernelExecuteSelector = toFunctionSelector({
 
 const permissionValidatorType = "0x02" satisfies Hex
 const kernelPermissionLifecycleAbi = [
+  {
+    inputs: [{ name: "pId", type: "bytes4" }],
+    name: "permissionConfig",
+    outputs: [
+      {
+        components: [
+          { name: "permissionFlag", type: "bytes2" },
+          { name: "signer", type: "address" },
+          { name: "policyData", type: "bytes22[]" }
+        ],
+        name: "",
+        type: "tuple"
+      }
+    ],
+    stateMutability: "view",
+    type: "function"
+  },
   {
     inputs: [],
     name: "currentNonce",
@@ -183,6 +201,16 @@ const assertSessionMode = (
   }
 }
 
+export const isSliceWalletPermissionInstalled = ({
+  configuredSigner,
+  expectedSigner,
+  selectorAllowed
+}: {
+  configuredSigner: Address
+  expectedSigner: Address
+  selectorAllowed: boolean
+}) => selectorAllowed && isAddressEqual(configuredSigner, expectedSigner)
+
 const createPermissionValidator = async ({
   client,
   mode,
@@ -204,7 +232,7 @@ const createPermissionValidator = async ({
           signerId: session.signerId
         })
 
-  return toPermissionValidator(client, {
+  const validator = await toPermissionValidator(client, {
     entryPoint: sliceWalletEntryPoint,
     flag: PolicyFlags.NOT_FOR_VALIDATE_SIG,
     kernelVersion: sliceWalletKernelVersion,
@@ -212,6 +240,7 @@ const createPermissionValidator = async ({
     policies: [...toWalletPermissionPolicies(session.policy)],
     signer
   })
+  return { signerContractAddress: signer.signerContractAddress, validator }
 }
 
 const createPermissionKernelAccount = async ({
@@ -234,7 +263,7 @@ const createPermissionKernelAccount = async ({
   | "rootSigner"
   | "session"
 >) => {
-  const [rootValidator, permissionValidator] = await Promise.all([
+  const [rootValidator, permission] = await Promise.all([
     createSliceWalletRootValidator({
       chainId: session.chainId,
       credential,
@@ -254,12 +283,12 @@ const createPermissionKernelAccount = async ({
       ...(enableSignature === undefined
         ? {}
         : { pluginEnableSignature: enableSignature }),
-      regular: permissionValidator,
+      regular: permission.validator,
       sudo: rootValidator
     },
     useMetaFactory: true
   })
-  return { account, permissionValidator }
+  return { account, permissionValidator: permission.validator }
 }
 
 const toUnsignedUserOperation = (
@@ -487,7 +516,7 @@ export const buildSliceWalletPermissionUninstallCalls = async ({
   client: KernelSmartAccountImplementation["client"]
   session: SliceWalletFrameSession
 }) => {
-  const validator = await createPermissionValidator({
+  const { validator } = await createPermissionValidator({
     client,
     mode: session.grantKind,
     session
@@ -532,7 +561,7 @@ export const buildSliceWalletPermissionRevocationCalls = async ({
   client: KernelSmartAccountImplementation["client"]
   session: SliceWalletFrameSession
 }) => {
-  const validator = await createPermissionValidator({
+  const { signerContractAddress, validator } = await createPermissionValidator({
     client,
     mode: session.grantKind,
     session
@@ -541,34 +570,42 @@ export const buildSliceWalletPermissionRevocationCalls = async ({
   const validationId = toExecutionValidationId(permissionId)
   let currentNonce: number
   let validationConfig: { hook: Address; nonce: number }
+  let permissionConfig: { signer: Address }
   let selectorAllowed: boolean
   try {
-    ;[currentNonce, validationConfig, selectorAllowed] = await getAction(
-      client,
-      multicall,
-      "multicall"
-    )({
-      allowFailure: false,
-      contracts: [
-        {
-          abi: kernelPermissionLifecycleAbi,
-          address: account,
-          functionName: "currentNonce"
-        },
-        {
-          abi: kernelPermissionLifecycleAbi,
-          address: account,
-          args: [validationId],
-          functionName: "validationConfig"
-        },
-        {
-          abi: kernelPermissionLifecycleAbi,
-          address: account,
-          args: [validationId, kernelExecuteSelector],
-          functionName: "isAllowedSelector"
-        }
-      ]
-    })
+    ;[currentNonce, validationConfig, permissionConfig, selectorAllowed] =
+      await getAction(
+        client,
+        multicall,
+        "multicall"
+      )({
+        allowFailure: false,
+        contracts: [
+          {
+            abi: kernelPermissionLifecycleAbi,
+            address: account,
+            functionName: "currentNonce"
+          },
+          {
+            abi: kernelPermissionLifecycleAbi,
+            address: account,
+            args: [validationId],
+            functionName: "validationConfig"
+          },
+          {
+            abi: kernelPermissionLifecycleAbi,
+            address: account,
+            args: [permissionId],
+            functionName: "permissionConfig"
+          },
+          {
+            abi: kernelPermissionLifecycleAbi,
+            address: account,
+            args: [validationId, kernelExecuteSelector],
+            functionName: "isAllowedSelector"
+          }
+        ]
+      })
   } catch (error) {
     const code = await getAction(
       client,
@@ -582,9 +619,14 @@ export const buildSliceWalletPermissionRevocationCalls = async ({
     // account is deployed by the revocation UserOperation.
     currentNonce = 1
     validationConfig = { hook: zeroAddress, nonce: 0 }
+    permissionConfig = { signer: zeroAddress }
     selectorAllowed = false
   }
-  const installed = !isAddressEqual(validationConfig.hook, zeroAddress)
+  const installed = isSliceWalletPermissionInstalled({
+    configuredSigner: permissionConfig.signer,
+    expectedSigner: signerContractAddress,
+    selectorAllowed
+  })
   const revoked = validationConfig.nonce > 0 && !installed && !selectorAllowed
   const checkpoint = {
     data: encodeFunctionData({
@@ -605,21 +647,14 @@ export const buildSliceWalletPermissionRevocationCalls = async ({
     to: account,
     value: 0n
   }
-  const installNonce =
-    validationConfig.nonce > 0
-      ? validationConfig.nonce
-      : validationConfig.nonce === currentNonce
-        ? currentNonce + 1
-        : currentNonce
+  const installConfig = resolveSliceWalletValidationInstallConfig({
+    currentNonce,
+    validationNonce: validationConfig.nonce
+  })
   const install = {
     data: encodeFunctionData({
       abi: kernelPermissionLifecycleAbi,
-      args: [
-        [validationId],
-        [{ hook: zeroAddress, nonce: installNonce }],
-        [validationData],
-        ["0x"]
-      ],
+      args: [[validationId], [installConfig], [validationData], ["0x"]],
       functionName: "installValidations"
     }),
     to: account,
@@ -631,7 +666,9 @@ export const buildSliceWalletPermissionRevocationCalls = async ({
     uninstall: [checkpoint, uninstall]
   } as const
   let calls: readonly { data: Hex; to: Address; value: bigint }[]
-  if (installed) {
+  if (revoked) {
+    calls = []
+  } else if (installed) {
     calls = alternatives.uninstall
   } else if (validationConfig.nonce === 0) {
     // A lazy permission that has never executed still has a reusable root
@@ -687,16 +724,98 @@ export const buildSliceWalletPermissionInstallCalls = async ({
   client: KernelSmartAccountImplementation["client"]
   session: SliceWalletFrameSession
 }) => {
-  const validator = await createPermissionValidator({
+  const { signerContractAddress, validator } = await createPermissionValidator({
     client,
     mode: session.grantKind,
     session
   })
   const permissionId = validator.getIdentifier()
-  if (await validator.isEnabled(account, kernelExecuteSelector)) {
+  const validationId = toExecutionValidationId(permissionId)
+  let currentNonce: number
+  let validationConfig: { hook: Address; nonce: number }
+  let permissionConfig: { signer: Address }
+  let selectorAllowed: boolean
+  try {
+    ;[currentNonce, validationConfig, permissionConfig, selectorAllowed] =
+      await getAction(
+        client,
+        multicall,
+        "multicall"
+      )({
+        allowFailure: false,
+        contracts: [
+          {
+            abi: kernelPermissionLifecycleAbi,
+            address: account,
+            functionName: "currentNonce"
+          },
+          {
+            abi: kernelPermissionLifecycleAbi,
+            address: account,
+            args: [validationId],
+            functionName: "validationConfig"
+          },
+          {
+            abi: kernelPermissionLifecycleAbi,
+            address: account,
+            args: [permissionId],
+            functionName: "permissionConfig"
+          },
+          {
+            abi: kernelPermissionLifecycleAbi,
+            address: account,
+            args: [validationId, kernelExecuteSelector],
+            functionName: "isAllowedSelector"
+          }
+        ]
+      })
+  } catch (error) {
+    const code = await getAction(
+      client,
+      getCode,
+      "getCode"
+    )({ address: account })
+    if (code !== undefined && code !== "0x") throw error
+    currentNonce = 1
+    validationConfig = { hook: zeroAddress, nonce: 0 }
+    permissionConfig = { signer: zeroAddress }
+    selectorAllowed = false
+  }
+  const signerConfigured = isAddressEqual(
+    permissionConfig.signer,
+    signerContractAddress
+  )
+  if (
+    isSliceWalletPermissionInstalled({
+      configuredSigner: permissionConfig.signer,
+      expectedSigner: signerContractAddress,
+      selectorAllowed
+    })
+  ) {
     return { calls: [], permissionId }
   }
-  const validationId = toExecutionValidationId(permissionId)
+  if (
+    !isAddressEqual(permissionConfig.signer, zeroAddress) &&
+    !signerConfigured
+  ) {
+    throw new Error("Wallet permission id is occupied by another signer.")
+  }
+  const grantAccess = {
+    data: encodeFunctionData({
+      abi: kernelPermissionLifecycleAbi,
+      args: [validationId, kernelExecuteSelector, true],
+      functionName: "grantAccess"
+    }),
+    to: account,
+    value: 0n
+  }
+  if (signerConfigured) {
+    return { calls: [grantAccess], permissionId }
+  }
+  const installConfig = resolveSliceWalletValidationInstallConfig({
+    currentNonce,
+    validationNonce: validationConfig.nonce
+  })
   return {
     calls: [
       {
@@ -704,7 +823,7 @@ export const buildSliceWalletPermissionInstallCalls = async ({
           abi: kernelPermissionLifecycleAbi,
           args: [
             [validationId],
-            [{ hook: zeroAddress, nonce: 1 }],
+            [installConfig],
             [await validator.getEnableData(account)],
             ["0x"]
           ],
@@ -713,15 +832,7 @@ export const buildSliceWalletPermissionInstallCalls = async ({
         to: account,
         value: 0n
       },
-      {
-        data: encodeFunctionData({
-          abi: kernelPermissionLifecycleAbi,
-          args: [validationId, kernelExecuteSelector, true],
-          functionName: "grantAccess"
-        }),
-        to: account,
-        value: 0n
-      }
+      grantAccess
     ],
     permissionId
   }

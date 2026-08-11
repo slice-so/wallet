@@ -3,6 +3,7 @@ import type {
   SliceWalletCeremonyRootSignRequest,
   SliceWalletRootSigner
 } from "../types"
+import { toSliceWalletCeremonyError } from "../userRejectedRequest"
 import {
   requireSliceWalletPopupGesture,
   SliceWalletUserGestureRequiredError
@@ -65,6 +66,7 @@ export const createSliceWalletCeremonyRootSigner =
         mode,
         nonce: message.nonce,
         path: `/ceremony/root?account=${encodeURIComponent(account)}&chainId=${chainId}`,
+        popupName: "slice-wallet-root-sign",
         window
       })
       port.postMessage(message)
@@ -78,7 +80,7 @@ export const createSliceWalletCeremonyRootSigner =
         throw new Error("Slice Wallet root response nonce does not match.")
       }
       if (response.type === "slice-wallet:ceremony-error") {
-        throw new Error(response.message)
+        throw toSliceWalletCeremonyError(response)
       }
       if (response.type === "slice-wallet:popup-required") {
         throw new SliceWalletUserGestureRequiredError(response.reason)

@@ -7,6 +7,7 @@ import type {
   SliceWalletConnectedAccount,
   SliceWalletProtocolValue
 } from "../types"
+import { toSliceWalletCeremonyError } from "../userRejectedRequest"
 import {
   requireSliceWalletPopupGesture,
   SliceWalletUserGestureRequiredError
@@ -63,6 +64,7 @@ const runSliceWalletAccountCeremony = async ({
           ? ""
           : `&account=${requestedAccount}&consentOnly=1`
       }`,
+      popupName: "slice-wallet-connect",
       window
     })
     let preparedSession:
@@ -78,7 +80,7 @@ const runSliceWalletAccountCeremony = async ({
           throw new Error("Slice Wallet account response nonce does not match.")
         }
         if (message.type === "slice-wallet:ceremony-error") {
-          throw new Error(message.message)
+          throw toSliceWalletCeremonyError(message)
         }
         if (message.type === "slice-wallet:popup-required") {
           throw new SliceWalletUserGestureRequiredError(message.reason)

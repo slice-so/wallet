@@ -49,12 +49,15 @@ export const hasVerifiedCheckoutAuthorityDeployment = (
   deployment: AdmissionEvidence
 ) =>
   hasCompleteSliceWalletAdmissionEvidence(deployment) &&
+  hasRuntime(deployment, "authorizationRevocationRegistry") &&
+  hasRuntime(deployment, "weightedEcdsaSigner") &&
   hasRuntime(deployment, "weightedP256Signer")
 
 export const hasVerifiedManagementAuthorityDeployment = (
   deployment: AdmissionEvidence
 ) =>
   hasCompleteSliceWalletAdmissionEvidence(deployment) &&
+  hasRuntime(deployment, "authorizationRevocationRegistry") &&
   hasRuntime(deployment, "slicerRegistryPolicy")
 
 export const hasAdmittedManagementAuthority = (

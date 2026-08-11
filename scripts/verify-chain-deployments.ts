@@ -16,6 +16,9 @@ import { getAlchemyRpcUrl } from "../../../scripts/lib/alchemyRpc"
 import deployments from "../../contracts/wallet/deployments/addresses.json"
 import policy from "../config/chains.policy.json"
 import { sliceWalletSupportedChainIds } from "../src/chains"
+import { installSanitizedScriptFailureHandlers } from "./lib/scriptFailure"
+
+installSanitizedScriptFailureHandlers()
 
 const entryPointNonceAbi = [
   {

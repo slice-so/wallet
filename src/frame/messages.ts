@@ -8,6 +8,7 @@ import {
   stringToHex
 } from "viem"
 import { assertSliceWalletAccountIndex } from "../accountIndex"
+import { assertSliceWalletGrantScope } from "../grantScope"
 import { encodeWalletPolicyDescriptor, getWalletPolicyHash } from "../policy"
 import type { SliceWalletFrameSession } from "../types/frame"
 
@@ -209,6 +210,7 @@ export const formatSliceWalletExecutionGrantMessage = ({
           ]
         })()
       : []
+  const canonicalScopes = scopes.map(assertSliceWalletGrantScope)
 
   return [
     "Slice Wallet Execution Grant",
@@ -226,7 +228,7 @@ export const formatSliceWalletExecutionGrantMessage = ({
     `Permission ID: ${session.permissionId}`,
     `Policy Hash: ${getWalletPolicyHash(session.policy)}`,
     ...checkoutLines,
-    `Scopes: ${[...new Set(scopes)].sort().join(",")}`,
+    `Scopes: ${[...new Set(canonicalScopes)].sort().join(",")}`,
     `Expires At: ${new Date(expiresAt * 1000).toISOString()}`,
     `Nonce: ${nonce}`
   ].join("\n")

@@ -42,6 +42,7 @@ export type CreateRecoveryPermissionAccountParameters = {
   }>
   recoveryPrivateKey?: Hex
   recoverySignerAddress: Address
+  /** Must match the policy originally installed on an already-deployed account. Registry-created counterfactual accounts use the canonical default. */
   recoveryTimelock?: SliceTimelockPolicyParameters
 }
 
@@ -52,6 +53,7 @@ export type CreateDeployedRecoveryPermissionAccountParameters = {
   client: KernelSmartAccountImplementation["client"]
   recoveryPrivateKey: Hex
   recoverySignerAddress: Address
+  /** Must match the policy originally installed on the account. */
   recoveryTimelock?: SliceTimelockPolicyParameters
 }
 

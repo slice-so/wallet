@@ -46,7 +46,10 @@ import {
   sliceKernelBaseV33Addresses,
   sliceKernelTimelockPolicyAddress
 } from "./sliceKernelAddresses"
-import { getSliceSmartAccountCalls } from "./sliceSmartAccountCalls"
+import {
+  getSliceSmartAccountCalls,
+  isSliceSmartAccountExecutionCallData
+} from "./sliceSmartAccountCalls"
 import { maxAcceptedSliceCallsPerBatch } from "./sliceUserOperationLimits"
 
 type SliceSenderVerification = "unknown" | "verified"
@@ -692,6 +695,7 @@ const getSliceUserOperationCalls = ({
 }) => {
   const decoded = getSliceSmartAccountCalls(userOperation.callData)
   if (decoded !== null) return decoded
+  if (isSliceSmartAccountExecutionCallData(userOperation.callData)) return null
 
   // Kernel executes a single root-authorized self-call directly instead of
   // wrapping it in ERC-7579 execute(bytes32,bytes).

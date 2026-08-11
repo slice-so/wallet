@@ -21,11 +21,20 @@ export type SliceWalletActivityTokenDescriptor = {
   symbol: string
 }
 
+export type SliceWalletAccountActivityField<Value> =
+  | { status: "available"; value: Value }
+  | {
+      error: { code: number | null; message: string }
+      status: "unavailable"
+    }
+
 export type SliceWalletAccountActivity = {
   address: Address
-  code: Hex | null
-  nativeBalance: string
-  tokenBalances: Readonly<Record<string, string>>
+  code: SliceWalletAccountActivityField<Hex | null>
+  nativeBalance: SliceWalletAccountActivityField<string>
+  tokenBalances: Readonly<
+    Record<string, SliceWalletAccountActivityField<string>>
+  >
 }
 
 export type SliceWalletAccountActivityBatchRequest = {

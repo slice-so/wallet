@@ -2,6 +2,7 @@ import { formatSliceWalletExistingCredentialAuthorization } from "../registry"
 import type {
   RegisterRecoveredSliceWalletCredentialParameters,
   SliceWalletProtocolValue,
+  SliceWalletRecoveryHandoffAuthorizationRequest,
   SliceWalletRecoveryHandoffAuthorizationResponse,
   SliceWalletRegistryCredential
 } from "../types"
@@ -63,6 +64,7 @@ export const registerRecoveredSliceWalletCredential = async ({
       mode,
       nonce,
       path: `/ceremony/recovery?account=${encodeURIComponent(account)}&accountIndex=${accountIndex}&chainId=${chainId}`,
+      popupName: "slice-wallet-recovery",
       window
     })
     return new Promise<{
@@ -74,7 +76,9 @@ export const registerRecoveredSliceWalletCredential = async ({
         surface.close()
         reject(new Error("Recovery handoff timed out."))
       }, timeoutMs)
-      let signed = false
+      let authorization: SliceWalletRecoveryHandoffAuthorizationRequest | null =
+        null
+      let phase: "authorization" | "signing" | "result" = "authorization"
       const finish = () => {
         clearTimeout(timeout)
         port.close()
@@ -100,7 +104,8 @@ export const registerRecoveredSliceWalletCredential = async ({
               }
               throw new SliceWalletUserGestureRequiredError(response.reason)
             }
-            if (!signed) {
+            if (phase === "signing") return
+            if (phase === "authorization") {
               const request =
                 parseSliceWalletRecoveryHandoffAuthorizationRequest(event.data)
               if (
@@ -128,15 +133,18 @@ export const registerRecoveredSliceWalletCredential = async ({
                   "Recovery authorization message is not canonical."
                 )
               }
+              authorization = request
+              phase = "signing"
+              const rootSignature = await signMessage(request.message)
+              phase = "result"
               const response = {
                 nonce,
                 recoveryPermissionId,
                 recoverySignerAddress,
-                rootSignature: await signMessage(request.message),
+                rootSignature,
                 type: "slice-wallet:recovery-root-signature",
                 version: 1
               } satisfies SliceWalletRecoveryHandoffAuthorizationResponse
-              signed = true
               port.postMessage(response)
               return
             }
@@ -148,11 +156,26 @@ export const registerRecoveredSliceWalletCredential = async ({
             if (result.type === "slice-wallet:recovery-error") {
               throw new Error(result.message)
             }
+            if (authorization === null) {
+              throw new Error("Recovery result arrived before authorization.")
+            }
             if (
               result.registry.accountAddress.toLowerCase() !==
-              account.toLowerCase()
+                authorization.account.toLowerCase() ||
+              result.registry.accountIndex !== authorization.accountIndex ||
+              result.registry.credentialIdHash.toLowerCase() !==
+                authorization.credentialIdHash.toLowerCase() ||
+              result.registry.publicKey.toLowerCase() !==
+                authorization.publicKey.toLowerCase() ||
+              result.registry.factoryVersion !== authorization.factoryVersion ||
+              result.registry.recoveryPermissionId?.toLowerCase() !==
+                recoveryPermissionId.toLowerCase() ||
+              result.registry.recoverySignerAddress?.toLowerCase() !==
+                recoverySignerAddress.toLowerCase()
             ) {
-              throw new Error("Recovered credential belongs to another wallet.")
+              throw new Error(
+                "Recovered credential does not match the authorized credential."
+              )
             }
             finish()
             resolve({

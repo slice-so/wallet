@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test"
-import { IDBFactory } from "fake-indexeddb"
+import { describe, expect, it, spyOn } from "bun:test"
+import { IDBDatabase as FakeIDBDatabase, IDBFactory } from "fake-indexeddb"
 import type { Address } from "viem"
 import { generateSliceWalletP256KeyPair } from "../p256"
 import type { SliceWalletFrameSession } from "../types"
@@ -16,7 +16,7 @@ describe("signer-frame session store", () => {
     const session = {
       account,
       chainId: 8453,
-      expiresAt: 200,
+      expiresAt: 4_000_000_000,
       grantKind: "generic",
       permissionId: "0x01020304",
       policy: {
@@ -32,7 +32,7 @@ describe("signer-frame session store", () => {
         chainId: 8453,
         grantKind: "generic",
         validAfter: 100,
-        validUntil: 200,
+        validUntil: 4_000_000_000,
         version: 1
       },
       publicKey: keyPair.publicKeyHex,
@@ -146,13 +146,13 @@ describe("signer-frame session store", () => {
     ).resolves.toMatchObject({ session: { signerId: second.signerId } })
   })
 
-  it("reads account-scoped IndexedDB management records without slicer metadata", async () => {
+  it("reads legacy management records and collects expired IndexedDB sessions", async () => {
     const indexedDb = new IDBFactory()
     const keyPair = await generateSliceWalletP256KeyPair()
     const legacySession = {
       account,
       chainId: 8453,
-      expiresAt: 200,
+      expiresAt: 4_000_000_000,
       grantKind: "management",
       permissionId: "0x01020304",
       policy: {
@@ -176,7 +176,7 @@ describe("signer-frame session store", () => {
         chainId: 8453,
         grantKind: "management",
         validAfter: 100,
-        validUntil: 200,
+        validUntil: 4_000_000_000,
         version: 1
       },
       publicKey: keyPair.publicKeyHex,
@@ -196,6 +196,21 @@ describe("signer-frame session store", () => {
           privateKey: keyPair.privateKey,
           session: legacySession
         })
+        transaction.objectStore("sessions").put({
+          appOrigin: "https://shop.example",
+          id: `https://shop.example:${account.toLowerCase()}:8453:generic`,
+          privateKey: keyPair.privateKey,
+          session: {
+            ...legacySession,
+            expiresAt: 200,
+            grantKind: "generic",
+            policy: {
+              ...legacySession.policy,
+              grantKind: "generic",
+              validUntil: 200
+            }
+          }
+        })
         transaction.addEventListener("complete", () => {
           database.close()
           resolve()
@@ -213,6 +228,49 @@ describe("signer-frame session store", () => {
         grantKind: "management"
       })
     ).resolves.toMatchObject({ session: { grantKind: "management" } })
+    await expect(
+      store.get("https://shop.example", {
+        account,
+        chainId: 8453,
+        grantKind: "generic"
+      })
+    ).resolves.toBeNull()
+  })
+
+  it("keeps the store usable when best-effort garbage collection fails", async () => {
+    const indexedDb = new IDBFactory()
+    const transaction = FakeIDBDatabase.prototype.transaction
+    let rejectGarbageCollection = true
+    const transactionSpy = spyOn(
+      FakeIDBDatabase.prototype,
+      "transaction"
+    ).mockImplementation(function (
+      this: IDBDatabase,
+      ...parameters: Parameters<IDBDatabase["transaction"]>
+    ) {
+      if (rejectGarbageCollection && parameters[1] === "readwrite") {
+        rejectGarbageCollection = false
+        throw new Error("IndexedDB cleanup failed.")
+      }
+      return transaction.apply(this, parameters)
+    })
+    try {
+      const store = createSliceWalletIndexedDbSessionStore(indexedDb)
+      await expect(
+        store.get("https://shop.example", {
+          account,
+          chainId: 8453,
+          grantKind: "generic"
+        })
+      ).resolves.toBeNull()
+      await store.setAccountUnlocked("https://shop.example", account, true)
+      await expect(
+        store.isAccountUnlocked("https://shop.example", account)
+      ).resolves.toBe(true)
+      expect(rejectGarbageCollection).toBe(false)
+    } finally {
+      transactionSpy.mockRestore()
+    }
   })
 
   it("persists connection state by app origin until explicit lock", async () => {

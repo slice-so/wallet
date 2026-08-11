@@ -7,11 +7,11 @@ import type {
   SliceWalletCeremonyMode,
   SliceWalletProtocolValue
 } from "../types"
+import { SliceWalletUserRejectedRequestError } from "../userRejectedRequest"
 import { SliceWalletUserGestureRequiredError } from "./broker"
 import { parseSliceWalletCeremonyReadyMessage } from "./protocol"
 
 const ceremonyClosedPollIntervalMs = 100
-const userRejectedRequestMessage = "User rejected the request"
 
 type SliceWalletCeremonySurface = {
   close: () => void
@@ -277,7 +277,7 @@ export const openSliceWalletCeremonyChannel = ({
     const closedPoll = setInterval(() => {
       if (!surface.closed) return
       cleanup()
-      reject(new Error(userRejectedRequestMessage))
+      reject(new SliceWalletUserRejectedRequestError())
     }, ceremonyClosedPollIntervalMs)
     const onReady = (event: MessageEvent<SliceWalletProtocolValue>) => {
       if (event.source !== surface.source || event.origin !== origin) return
@@ -336,7 +336,7 @@ export const waitForSliceWalletCeremonyMessage = <Result>({
 
       cleanup()
       port.close()
-      reject(new Error(userRejectedRequestMessage))
+      reject(new SliceWalletUserRejectedRequestError())
     }, ceremonyClosedPollIntervalMs)
     const onMessage = (event: MessageEvent<SliceWalletProtocolValue>) => {
       cleanup()

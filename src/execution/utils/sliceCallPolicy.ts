@@ -237,9 +237,16 @@ export const classifySliceSmartAccountCall = (
 
   // Commerce addresses exist only on Slice commerce chains. Resolve them only
   // after chain-agnostic Kernel administration has been classified.
-  const productsModuleAddress = getProductsModuleAddress(chainId)
-  const fundsModuleAddress = getFundsModuleAddress(chainId)
-  const sliceCoreAddress = getSliceCoreAddress(chainId)
+  let productsModuleAddress: Address
+  let fundsModuleAddress: Address
+  let sliceCoreAddress: Address
+  try {
+    productsModuleAddress = getProductsModuleAddress(chainId)
+    fundsModuleAddress = getFundsModuleAddress(chainId)
+    sliceCoreAddress = getSliceCoreAddress(chainId)
+  } catch {
+    return "invalid"
+  }
   const target = normalizeAddress(call.target)
 
   if (target === normalizeAddress(productsModuleAddress)) {

@@ -89,6 +89,35 @@ const openDatabase = (indexedDb: IDBFactory) => {
   return requestResult(request)
 }
 
+const deleteExpiredSessions = async (database: IDBDatabase) => {
+  const transaction = database.transaction(objectStoreName, "readwrite")
+  const completed = transactionComplete(transaction)
+  const request = transaction.objectStore(objectStoreName).openCursor()
+  const cursorCompleted = new Promise<void>((resolve, reject) => {
+    request.addEventListener("success", () => {
+      const cursor = request.result
+      if (cursor === null) {
+        resolve()
+        return
+      }
+      const value = cursor.value as PersistedAccountUnlock | PersistedSession
+      if (
+        "session" in value &&
+        value.session.expiresAt <= Math.floor(Date.now() / 1_000)
+      ) {
+        cursor.delete()
+      }
+      cursor.continue()
+    })
+    request.addEventListener(
+      "error",
+      () => reject(request.error ?? new Error("IndexedDB cursor failed.")),
+      { once: true }
+    )
+  })
+  await Promise.all([cursorCompleted, completed])
+}
+
 const readMemoryRecord = ({
   appOrigin,
   key,
@@ -109,113 +138,122 @@ const readMemoryRecord = ({
 
 export const createSliceWalletIndexedDbSessionStore = (
   indexedDb: IDBFactory = indexedDB
-): SliceWalletSessionStore => ({
-  commitPending: async (appOrigin, key) => {
+): SliceWalletSessionStore => {
+  let garbageCollection: Promise<void> | null = null
+  const openSessionDatabase = async () => {
     const database = await openDatabase(indexedDb)
-    const transaction = database.transaction(objectStoreName, "readwrite")
-    const store = transaction.objectStore(objectStoreName)
-    const pending = await readPersistedSession({
-      appOrigin,
-      key,
-      pending: true,
-      store
-    })
-    if (pending === undefined) {
-      transaction.abort()
+    garbageCollection ??= deleteExpiredSessions(database).catch(() => undefined)
+    await garbageCollection
+    return database
+  }
+  return {
+    commitPending: async (appOrigin, key) => {
+      const database = await openSessionDatabase()
+      const transaction = database.transaction(objectStoreName, "readwrite")
+      const store = transaction.objectStore(objectStoreName)
+      const pending = await readPersistedSession({
+        appOrigin,
+        key,
+        pending: true,
+        store
+      })
+      if (pending === undefined) {
+        transaction.abort()
+        database.close()
+        throw new Error("Pending wallet session is unavailable.")
+      }
+      const committed = {
+        ...pending,
+        id: getRecordKey(appOrigin, key)
+      } satisfies PersistedSession
+      store.put(committed)
+      store.delete(getPendingRecordKey(appOrigin, key))
+      await transactionComplete(transaction)
       database.close()
-      throw new Error("Pending wallet session is unavailable.")
-    }
-    const committed = {
-      ...pending,
-      id: getRecordKey(appOrigin, key)
-    } satisfies PersistedSession
-    store.put(committed)
-    store.delete(getPendingRecordKey(appOrigin, key))
-    await transactionComplete(transaction)
-    database.close()
-    return committed
-  },
-  delete: async (appOrigin, key) => {
-    const database = await openDatabase(indexedDb)
-    const transaction = database.transaction(objectStoreName, "readwrite")
-    const store = transaction.objectStore(objectStoreName)
-    store.delete(getRecordKey(appOrigin, key))
-    store.delete(getPendingRecordKey(appOrigin, key))
-    await transactionComplete(transaction)
-    database.close()
-  },
-  deletePending: async (appOrigin, key) => {
-    const database = await openDatabase(indexedDb)
-    const transaction = database.transaction(objectStoreName, "readwrite")
-    transaction
-      .objectStore(objectStoreName)
-      .delete(getPendingRecordKey(appOrigin, key))
-    await transactionComplete(transaction)
-    database.close()
-  },
-  get: async (appOrigin, key) => {
-    const database = await openDatabase(indexedDb)
-    const transaction = database.transaction(objectStoreName, "readonly")
-    const record = await readPersistedSession({
-      appOrigin,
-      key,
-      pending: false,
-      store: transaction.objectStore(objectStoreName)
-    })
-    await transactionComplete(transaction)
-    database.close()
-    return (record as PersistedSession | undefined) ?? null
-  },
-  getPending: async (appOrigin, key) => {
-    const database = await openDatabase(indexedDb)
-    const transaction = database.transaction(objectStoreName, "readonly")
-    const record = await readPersistedSession({
-      appOrigin,
-      key,
-      pending: true,
-      store: transaction.objectStore(objectStoreName)
-    })
-    await transactionComplete(transaction)
-    database.close()
-    return (record as PersistedSession | undefined) ?? null
-  },
-  isAccountUnlocked: async (appOrigin, account) => {
-    const database = await openDatabase(indexedDb)
-    const transaction = database.transaction(objectStoreName, "readonly")
-    const record = await requestResult(
+      return committed
+    },
+    delete: async (appOrigin, key) => {
+      const database = await openSessionDatabase()
+      const transaction = database.transaction(objectStoreName, "readwrite")
+      const store = transaction.objectStore(objectStoreName)
+      store.delete(getRecordKey(appOrigin, key))
+      store.delete(getPendingRecordKey(appOrigin, key))
+      await transactionComplete(transaction)
+      database.close()
+    },
+    deletePending: async (appOrigin, key) => {
+      const database = await openSessionDatabase()
+      const transaction = database.transaction(objectStoreName, "readwrite")
       transaction
         .objectStore(objectStoreName)
-        .get(getAccountUnlockKey(appOrigin, account))
-    )
-    await transactionComplete(transaction)
-    database.close()
-    return (record as PersistedAccountUnlock | undefined)?.unlocked === true
-  },
-  putPending: async (record) => {
-    const database = await openDatabase(indexedDb)
-    const transaction = database.transaction(objectStoreName, "readwrite")
-    transaction.objectStore(objectStoreName).put({
-      ...record,
-      appOrigin: normalizeOrigin(record.appOrigin),
-      id: getPendingRecordKey(record.appOrigin, record.session)
-    } satisfies PersistedSession)
-    await transactionComplete(transaction)
-    database.close()
-  },
-  setAccountUnlocked: async (appOrigin, account, unlocked) => {
-    const database = await openDatabase(indexedDb)
-    const transaction = database.transaction(objectStoreName, "readwrite")
-    const store = transaction.objectStore(objectStoreName)
-    const id = getAccountUnlockKey(appOrigin, account)
-    if (unlocked) {
-      store.put({ id, unlocked: true } satisfies PersistedAccountUnlock)
-    } else {
-      store.delete(id)
+        .delete(getPendingRecordKey(appOrigin, key))
+      await transactionComplete(transaction)
+      database.close()
+    },
+    get: async (appOrigin, key) => {
+      const database = await openSessionDatabase()
+      const transaction = database.transaction(objectStoreName, "readonly")
+      const record = await readPersistedSession({
+        appOrigin,
+        key,
+        pending: false,
+        store: transaction.objectStore(objectStoreName)
+      })
+      await transactionComplete(transaction)
+      database.close()
+      return (record as PersistedSession | undefined) ?? null
+    },
+    getPending: async (appOrigin, key) => {
+      const database = await openSessionDatabase()
+      const transaction = database.transaction(objectStoreName, "readonly")
+      const record = await readPersistedSession({
+        appOrigin,
+        key,
+        pending: true,
+        store: transaction.objectStore(objectStoreName)
+      })
+      await transactionComplete(transaction)
+      database.close()
+      return (record as PersistedSession | undefined) ?? null
+    },
+    isAccountUnlocked: async (appOrigin, account) => {
+      const database = await openSessionDatabase()
+      const transaction = database.transaction(objectStoreName, "readonly")
+      const record = await requestResult(
+        transaction
+          .objectStore(objectStoreName)
+          .get(getAccountUnlockKey(appOrigin, account))
+      )
+      await transactionComplete(transaction)
+      database.close()
+      return (record as PersistedAccountUnlock | undefined)?.unlocked === true
+    },
+    putPending: async (record) => {
+      const database = await openSessionDatabase()
+      const transaction = database.transaction(objectStoreName, "readwrite")
+      transaction.objectStore(objectStoreName).put({
+        ...record,
+        appOrigin: normalizeOrigin(record.appOrigin),
+        id: getPendingRecordKey(record.appOrigin, record.session)
+      } satisfies PersistedSession)
+      await transactionComplete(transaction)
+      database.close()
+    },
+    setAccountUnlocked: async (appOrigin, account, unlocked) => {
+      const database = await openSessionDatabase()
+      const transaction = database.transaction(objectStoreName, "readwrite")
+      const store = transaction.objectStore(objectStoreName)
+      const id = getAccountUnlockKey(appOrigin, account)
+      if (unlocked) {
+        store.put({ id, unlocked: true } satisfies PersistedAccountUnlock)
+      } else {
+        store.delete(id)
+      }
+      await transactionComplete(transaction)
+      database.close()
     }
-    await transactionComplete(transaction)
-    database.close()
   }
-})
+}
 
 export const createSliceWalletMemorySessionStore =
   (): SliceWalletSessionStore => {

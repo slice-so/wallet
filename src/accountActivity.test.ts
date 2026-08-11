@@ -30,8 +30,8 @@ describe("wallet account activity", () => {
     expect(batchFetch.mock.calls[0]?.[0]).toHaveLength(64)
     expect(activity).toHaveLength(32)
     expect(activity[0]).toMatchObject({
-      code: null,
-      nativeBalance: "1",
+      code: { status: "available", value: null },
+      nativeBalance: { status: "available", value: "1" },
       tokenBalances: {}
     })
   })
@@ -45,5 +45,31 @@ describe("wallet account activity", () => {
     expect(batchFetch.mock.calls.map(([requests]) => requests.length)).toEqual([
       64, 2
     ])
+  })
+
+  it("marks failed fields unavailable instead of synthesizing zero values", async () => {
+    const batchFetch = mock(
+      async (requests: readonly SliceWalletAccountActivityBatchRequest[]) =>
+        requests.map((request) => ({
+          error: { code: -32_000, message: "upstream unavailable" },
+          id: request.id,
+          jsonrpc: "2.0" as const
+        }))
+    )
+    const [activity] = await loadSliceWalletAccountActivity([addresses[0]], {
+      batchFetch,
+      tokens: [
+        {
+          address: "0x0000000000000000000000000000000000000042",
+          symbol: "TEST"
+        }
+      ]
+    })
+
+    expect(activity).toMatchObject({
+      code: { error: { code: -32_000 }, status: "unavailable" },
+      nativeBalance: { status: "unavailable" },
+      tokenBalances: { TEST: { status: "unavailable" } }
+    })
   })
 })

@@ -187,19 +187,17 @@ describe("normalized wallet policies", () => {
   })
 
   it("rejects wildcard targets in generic permissions", () => {
-    const transferSelector = toFunctionSelector("transfer(address,uint256)")
     expect(() =>
       encodeWalletPolicyDescriptor(
         descriptor([
-          {
-            parameterRules: [],
-            selector: transferSelector,
-            target: walletPolicyWildcardTarget,
-            valueLimit: 0n
-          }
+          createErc20TransferCallRule({
+            maximumAmount: 100n,
+            recipient,
+            token: zeroAddress
+          })
         ])
       )
-    ).toThrow("Generic")
+    ).toThrow("wildcard target")
   })
 
   it("prefers exact-target rules over management wildcard rules", () => {

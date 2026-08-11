@@ -1,8 +1,17 @@
-import { type Address, type Hex, isAddress, isHex } from "viem"
+import {
+  type Address,
+  type Hex,
+  isAddress,
+  isAddressEqual,
+  isHex,
+  zeroAddress
+} from "viem"
+import { assertSliceWalletGrantScope } from "../grantScope"
 import { normalizeWalletPolicyDescriptor } from "../policy"
 import type {
   SliceWalletCheckoutGrant,
   SliceWalletFrameRequest,
+  SliceWalletFrameResponse,
   SliceWalletFrameSessionKey,
   SliceWalletProtocolValue,
   SliceWalletUnsignedUserOperation,
@@ -97,10 +106,17 @@ const parseCheckoutGrant = (
   if (budgetPeriodSec !== undefined && budgetPeriodSec <= 0) {
     throw new Error("Checkout budget period must be positive.")
   }
+  const coSignerAddress = addressValue(
+    input.coSignerAddress,
+    "Checkout co-signer"
+  )
+  if (isAddressEqual(coSignerAddress, zeroAddress)) {
+    throw new Error("Checkout co-signer cannot be the zero address.")
+  }
   return {
     allowanceUsdMicros,
     ...(budgetPeriodSec === undefined ? {} : { budgetPeriodSec }),
-    coSignerAddress: addressValue(input.coSignerAddress, "Checkout co-signer")
+    coSignerAddress
   }
 }
 
@@ -341,7 +357,7 @@ export const parseSliceWalletFrameRequest = (
         expiresAt: integerValue(params.expiresAt, "Grant expiration"),
         nonce: hexValue(params.nonce, "Grant nonce"),
         scopes: arrayValue(params.scopes, "Grant scopes").map((scope) =>
-          stringValue(scope, "Grant scope")
+          assertSliceWalletGrantScope(stringValue(scope, "Grant scope"))
         ),
         session: parseSessionKey(params.session)
       },
@@ -435,4 +451,49 @@ export const parseSliceWalletFrameRequest = (
   }
 
   throw new Error("Unsupported wallet frame method.")
+}
+
+export const parseSliceWalletFrameResponse = (
+  value: SliceWalletProtocolValue
+): SliceWalletFrameResponse => {
+  const input = record(value, "Frame response")
+  const id = stringValue(input.id, "Response id")
+  if (input.version !== 1) {
+    throw new Error("Unsupported wallet protocol version.")
+  }
+  if ("error" in input) {
+    assertKeys(input, ["error", "id", "version"])
+    const error = record(input.error, "Frame response error")
+    assertKeys(error, ["code", "message"])
+    if (
+      typeof error.code !== "string" &&
+      (typeof error.code !== "number" || !Number.isSafeInteger(error.code))
+    ) {
+      throw new Error("Frame response error code is invalid.")
+    }
+    return {
+      error: {
+        code: error.code,
+        message: stringValue(error.message, "Frame response error message")
+      },
+      id,
+      version: 1
+    }
+  }
+  assertKeys(input, ["id", "result", "version"])
+  if (
+    input.result !== null &&
+    typeof input.result !== "string" &&
+    (typeof input.result !== "object" || Array.isArray(input.result))
+  ) {
+    throw new Error("Frame response result is invalid.")
+  }
+  return {
+    id,
+    result: input.result as Extract<
+      SliceWalletFrameResponse,
+      { result: object | string | null }
+    >["result"],
+    version: 1
+  }
 }

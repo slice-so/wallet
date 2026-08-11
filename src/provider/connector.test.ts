@@ -15,6 +15,7 @@ describe("Slice Wallet Wagmi connector", () => {
         sliceWalletConnector(
           {
             announce: false,
+            chainIds: [anvil.id],
             defaultChainId: anvil.id,
             idOrigin: "http://localhost:3003",
             transports: {
@@ -38,5 +39,30 @@ describe("Slice Wallet Wagmi connector", () => {
       name: "Slice ID",
       type: "injected"
     })
+  })
+
+  test("creates its provider without a browser global", async () => {
+    const config = createConfig({
+      chains: [anvil],
+      connectors: [
+        sliceWalletConnector({
+          announce: false,
+          chainIds: [anvil.id],
+          defaultChainId: anvil.id,
+          idOrigin: "http://localhost:3003",
+          transports: {
+            [anvil.id]: {
+              bundlerUrl: "http://localhost:3001/api/bundler",
+              rpcUrl: "http://localhost:8545"
+            }
+          }
+        })
+      ],
+      transports: { [anvil.id]: http("http://localhost:8545") }
+    })
+
+    const provider = await config.connectors[0]?.getProvider()
+    expect(provider).toBeDefined()
+    provider?.destroy()
   })
 })

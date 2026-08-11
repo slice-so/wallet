@@ -172,6 +172,7 @@ const encodeBuyerExecutionEnableUserOperationSignature = ({
     )
   ])
 
+/** @deprecated Use createSliceCheckoutPolicyDescriptor for canonical buyer-bound checkout policy construction. */
 export const createBuyerCheckoutCallPolicy = (chainId: number) => {
   const productsModuleAddress = getProductsModuleAddress(chainId)
   return toCallPolicy({

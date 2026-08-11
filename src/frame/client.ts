@@ -4,6 +4,18 @@ import type {
   SliceWalletProtocolValue,
   SliceWalletSignerFrameClient
 } from "../types"
+import { SliceWalletUserRejectedRequestError } from "../userRejectedRequest"
+import { parseSliceWalletFrameResponse } from "./protocol"
+
+export class SliceWalletFrameRequestError extends Error {
+  readonly code: number | string
+
+  constructor(code: number | string, message: string) {
+    super(message)
+    this.code = code
+    this.name = "SliceWalletFrameRequestError"
+  }
+}
 
 const isFrameReadyMessage = (value: SliceWalletProtocolValue) => {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -24,10 +36,17 @@ type SharedSignerFrame = {
   references: number
 }
 
-const sharedSignerFrames = new WeakMap<
-  Document,
-  Map<string, SharedSignerFrame>
->()
+const sharedSignerFramesSymbol = Symbol.for(
+  "@slicekit/wallet/shared-signer-frames/v1"
+)
+type SharedSignerFrameGlobal = typeof globalThis & {
+  [key: symbol]: WeakMap<Document, Map<string, SharedSignerFrame>> | undefined
+}
+const sharedSignerFrameGlobal = globalThis as SharedSignerFrameGlobal
+const sharedSignerFrames =
+  sharedSignerFrameGlobal[sharedSignerFramesSymbol] ??
+  new WeakMap<Document, Map<string, SharedSignerFrame>>()
+sharedSignerFrameGlobal[sharedSignerFramesSymbol] = sharedSignerFrames
 
 export const connectSliceWalletSignerFrame = async ({
   document,
@@ -91,7 +110,7 @@ export const connectSliceWalletSignerFrame = async ({
   if (iframe.contentWindow === null)
     throw new Error("Slice wallet frame is unavailable.")
 
-  const channel = new MessageChannel()
+  const channel = new globalThis.MessageChannel()
   const pending = new Map<
     string,
     {
@@ -107,14 +126,42 @@ export const connectSliceWalletSignerFrame = async ({
   >()
   channel.port1.addEventListener(
     "message",
-    (event: MessageEvent<SliceWalletFrameResponse>) => {
-      const response = event.data
-      const request = pending.get(response.id)
+    (event: MessageEvent<SliceWalletProtocolValue>) => {
+      if (
+        typeof event.data !== "object" ||
+        event.data === null ||
+        Array.isArray(event.data)
+      ) {
+        return
+      }
+      const input = event.data as {
+        readonly [key: string]: SliceWalletProtocolValue
+      }
+      if (typeof input.id !== "string") return
+      const request = pending.get(input.id)
       if (request === undefined) return
+      let response: SliceWalletFrameResponse
+      try {
+        response = parseSliceWalletFrameResponse(event.data)
+      } catch {
+        clearTimeout(request.timeout)
+        pending.delete(input.id)
+        request.reject(
+          new Error("Slice wallet frame returned an invalid response.")
+        )
+        return
+      }
       clearTimeout(request.timeout)
       pending.delete(response.id)
       if ("error" in response) {
-        request.reject(new Error(response.error.message))
+        request.reject(
+          response.error.code === 4001
+            ? new SliceWalletUserRejectedRequestError(response.error.message)
+            : new SliceWalletFrameRequestError(
+                response.error.code,
+                response.error.message
+              )
+        )
       } else {
         request.resolve(response.result)
       }

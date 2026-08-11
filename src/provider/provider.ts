@@ -374,17 +374,34 @@ export const createSliceWalletProviderInternal = (
   }: ProviderDependencies = {}
 ): SliceWalletProvider => {
   const runtime = createRuntime(config)
-  const origin = new URL(
-    config.window?.location.href ?? globalThis.location.href
-  ).origin
   const listeners = new Map<ProviderEvent, Set<ProviderEventListener>>()
+  const getOrigin = () => {
+    const href = config.window?.location.href ?? globalThis.location?.href
+    if (href === undefined) {
+      throw new SliceWalletProviderRpcError(
+        4100,
+        "Wallet permissions require a browser origin."
+      )
+    }
+    return new URL(href).origin
+  }
 
   const emit = <Event extends ProviderEvent>(
     event: Event,
     payload: SliceWalletProviderEventMap[Event]
   ) => {
     for (const listener of listeners.get(event) ?? []) {
-      listener(payload)
+      try {
+        listener(payload)
+      } catch (error) {
+        // A consumer callback must not turn a successfully committed wallet
+        // transition into a rejected RPC request.
+        if (typeof globalThis.reportError === "function") {
+          try {
+            globalThis.reportError(error)
+          } catch {}
+        }
+      }
     }
   }
 
@@ -513,12 +530,12 @@ export const createSliceWalletProviderInternal = (
     if (method === "wallet_requestPermissions") {
       assertEthAccountsRequest(params)
       await connect()
-      return [accountPermission(origin)]
+      return [accountPermission(getOrigin())]
     }
     if (method === "wallet_getPermissions") {
       return (await runtime.getAccounts()).length === 0
         ? []
-        : [accountPermission(origin)]
+        : [accountPermission(getOrigin())]
     }
     if (method === "wallet_revokePermissions") {
       assertEthAccountsRevocation(params)

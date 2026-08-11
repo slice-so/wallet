@@ -12,7 +12,7 @@
       "dependsOn": ["^build", "@slice/contracts#wallet-deployments:inputs"],
       "envMode": "loose",
       "inputs": [
-        "src/**/*.ts",
+        "$TURBO_DEFAULT$",
         "build.ts",
         "config/chains.policy.json",
         "scripts/generate-chains.ts"
