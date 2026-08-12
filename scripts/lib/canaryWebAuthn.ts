@@ -1,5 +1,6 @@
 import { Base64, Hex as OxHex, P256, PublicKey, WebAuthnP256 } from "ox"
 import type { Signature } from "ox/Signature"
+import type { BufferSource } from "ox/webauthn/Types"
 import type { CreateSliceWalletKernelAccountParameters } from "../../src/types/account"
 
 const canaryPrivateKey =

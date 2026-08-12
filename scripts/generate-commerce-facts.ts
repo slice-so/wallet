@@ -17,7 +17,9 @@ const hookAddresses = Array.from(
   new Set(
     Object.values(addresses).flatMap((category) =>
       Object.values(category).flatMap((deployments) =>
-        deployments.map(({ address }) => address.toLowerCase())
+        deployments.map(({ address }: { address: string }) =>
+          address.toLowerCase()
+        )
       )
     )
   )
