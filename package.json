@@ -130,7 +130,9 @@
     }
   },
   "files": [
-    "./dist"
+    "./dist",
+    "./LICENSE-MIT",
+    "./LICENSE-APACHE"
   ],
   "scripts": {
     "admit:canary": "bun --conditions=development scripts/create-user-operation-canary.ts",
@@ -159,6 +161,7 @@
     "hash-wasm": "catalog:",
     "ox": "catalog:",
     "permissionless": "catalog:",
+    "tslib": "^2.8.1",
     "viem": "catalog:"
   },
   "peerDependencies": {
