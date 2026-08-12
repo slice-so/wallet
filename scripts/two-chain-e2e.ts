@@ -191,6 +191,7 @@ const results = await Promise.all(
     })
 
     const permissionAccount = await createSliceWalletPermissionAccount({
+      accountIndex: 0n,
       address: account.address,
       client: publicClient,
       credential: registeredRootCredential,
