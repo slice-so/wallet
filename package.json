@@ -1,6 +1,6 @@
 {
   "name": "@slicekit/wallet",
-  "version": "0.1.0-beta.0",
+  "version": "0.0.0",
   "description": "Portable Slice smart wallet SDK",
   "license": "(MIT OR Apache-2.0)",
   "type": "module",
