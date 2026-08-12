@@ -1,6 +1,22 @@
-import { toKernelSmartAccount } from "permissionless/accounts"
-import { toWebAuthnAccount } from "viem/account-abstraction"
-import { sliceWalletEntryPoint, sliceWalletKernelAddresses } from "./constants"
+import { createKernelAccount, type KernelValidator } from "@zerodev/sdk"
+import type { Address } from "viem"
+import {
+  getUserOperationHash,
+  toWebAuthnAccount
+} from "viem/account-abstraction"
+import { toAccount } from "viem/accounts"
+import { getChainId } from "viem/actions"
+import { getAction } from "viem/utils"
+import {
+  sliceWalletEntryPoint,
+  sliceWalletKernelAddresses,
+  sliceWalletKernelVersion
+} from "./constants"
+import {
+  encodeWebAuthnRootValidatorData,
+  encodeWebAuthnValidatorSignature
+} from "./execution/kernelPasskey/webAuthn"
+import { sliceWalletWebAuthnDummySignature } from "./rootValidator"
 import type {
   CreateSliceWalletKernelAccountParameters,
   SliceWalletKernelAccount
@@ -19,16 +35,59 @@ export const createSliceWalletKernelAccount = async ({
     ...(rpId === undefined ? {} : { rpId })
   })
 
-  return toKernelSmartAccount({
-    accountLogicAddress: sliceWalletKernelAddresses.implementation,
+  const validatorAccount = toAccount({
+    address: sliceWalletKernelAddresses.webAuthnRootValidator,
+    async signMessage({ message }) {
+      return encodeWebAuthnValidatorSignature(
+        await owner.signMessage({ message })
+      )
+    },
+    async signTransaction() {
+      throw new Error("A smart-account validator does not sign transactions.")
+    },
+    async signTypedData(typedData) {
+      return encodeWebAuthnValidatorSignature(
+        await owner.signTypedData(typedData)
+      )
+    }
+  })
+  const rootValidator: KernelValidator<"SliceWalletWebAuthnRootValidator"> = {
+    ...validatorAccount,
+    address: sliceWalletKernelAddresses.webAuthnRootValidator,
+    getEnableData: async () => encodeWebAuthnRootValidatorData(credential),
+    getIdentifier: () => sliceWalletKernelAddresses.webAuthnRootValidator,
+    getNonceKey: async (_accountAddress?: Address, customNonceKey?: bigint) =>
+      customNonceKey ?? 0n,
+    getStubSignature: async () => sliceWalletWebAuthnDummySignature,
+    isEnabled: async () => true,
+    signUserOperation: async (userOperation) => {
+      const { chainId: requestedChainId, ...operation } = userOperation
+      const chainId =
+        requestedChainId ??
+        client.chain?.id ??
+        (await getAction(client, getChainId, "getChainId")({}))
+      const hash = getUserOperationHash({
+        chainId,
+        entryPointAddress: sliceWalletEntryPoint.address,
+        entryPointVersion: sliceWalletEntryPoint.version,
+        userOperation: { ...operation, signature: "0x" }
+      })
+      return encodeWebAuthnValidatorSignature(await owner.sign({ hash }))
+    },
+    source: "SliceWalletWebAuthnRootValidator",
+    supportedKernelVersions: sliceWalletKernelVersion,
+    validatorType: "SECONDARY"
+  }
+
+  return createKernelAccount(client, {
     ...(address === undefined ? {} : { address }),
-    client,
+    accountImplementationAddress: sliceWalletKernelAddresses.implementation,
     entryPoint: sliceWalletEntryPoint,
     factoryAddress: sliceWalletKernelAddresses.factory,
+    kernelVersion: sliceWalletKernelVersion,
     metaFactoryAddress: sliceWalletKernelAddresses.metaFactory,
-    owners: [owner],
-    validatorAddress: sliceWalletKernelAddresses.webAuthnRootValidator,
-    version: "0.3.3"
+    plugins: { sudo: rootValidator },
+    useMetaFactory: true
   })
 }
 

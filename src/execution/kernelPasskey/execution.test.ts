@@ -8,7 +8,7 @@ import {
 import {
   encodeWebAuthnRootValidatorData,
   encodeWebAuthnValidatorSignature
-} from "./execution"
+} from "./webAuthn"
 
 const buildKernelNonce = ({
   mode,

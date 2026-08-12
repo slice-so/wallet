@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test"
+import * as Base64 from "ox/Base64"
 import {
   concatHex,
   createPublicClient,
@@ -8,8 +9,10 @@ import {
   getContractAddress,
   hexToBytes,
   keccak256,
-  parseErc6492Signature
+  parseErc6492Signature,
+  toHex
 } from "viem"
+import { createSliceWalletKernelAccount } from "./account"
 import {
   predictSliceWalletKernelAccountAddress,
   sliceWalletKernelProxyInitCodeHash
@@ -115,6 +118,51 @@ describe("Slice wallet offline account prediction", () => {
 
     expect(account.address).toBe(predicted)
     expect(actual).toBe(predicted)
+  })
+
+  it("keeps passkey account deployment byte-compatible", async () => {
+    const client = createPublicClient({
+      chain: defineChain({
+        id: parameters.chainId,
+        name: "Offline Base",
+        nativeCurrency: { decimals: 18, name: "Ether", symbol: "ETH" },
+        rpcUrls: { default: { http: ["http://127.0.0.1"] } }
+      }),
+      transport: custom({
+        async request({ method }) {
+          if (method === "eth_getCode") return "0x"
+          throw new Error(`Unexpected RPC request: ${method}`)
+        }
+      })
+    })
+    const credential = {
+      id: Base64.fromBytes(new Uint8Array([1, 2, 3, 4]), {
+        pad: false,
+        url: true
+      }),
+      publicKey: parameters.credential.publicKey
+    }
+    const registeredCredential = {
+      credentialIdHash: keccak256(toHex(Base64.toBytes(credential.id))),
+      publicKey: credential.publicKey
+    }
+    const [passkeyAccount, registeredAccount] = await Promise.all([
+      createSliceWalletKernelAccount({
+        address: entryPointDerivedAddress,
+        client,
+        credential
+      }),
+      createSliceWalletRegisteredKernelAccount({
+        address: entryPointDerivedAddress,
+        chainId: parameters.chainId,
+        client,
+        credential: registeredCredential
+      })
+    ])
+
+    expect(await passkeyAccount.getFactoryArgs()).toEqual(
+      await registeredAccount.getFactoryArgs()
+    )
   })
 
   it("keeps UserOperation deployment canonical while compacting recovery proofs", async () => {

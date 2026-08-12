@@ -13,7 +13,6 @@ import {
   createKernelAccount,
   type KernelSmartAccountImplementation
 } from "@zerodev/sdk"
-import { Base64, PublicKey } from "ox"
 import {
   type Abi,
   type AbiFunction,
@@ -23,15 +22,13 @@ import {
   encodeFunctionData,
   erc20Abi,
   type Hex,
-  keccak256,
   maxUint256,
   pad,
   parseAbiParameters,
   toFunctionSelector,
-  toHex,
   zeroAddress
 } from "viem"
-import type { UserOperation, WebAuthnAccount } from "viem/account-abstraction"
+import type { UserOperation } from "viem/account-abstraction"
 import { entryPoint07Address } from "viem/account-abstraction"
 import { privateKeyToAccount } from "viem/accounts"
 import type { SliceWalletPasskeyCredential } from "../../types/account"
@@ -46,6 +43,7 @@ import {
   sliceKernelBaseV33Addresses,
   sliceKernelWebAuthnValidatorAddress
 } from "../utils/sliceAccountClient"
+import { encodeWebAuthnRootValidatorData } from "./webAuthn"
 import {
   buildWeightedEcdsaStubSignature,
   getWeightedEcdsaProposalTypedData,
@@ -59,8 +57,8 @@ import {
  * with the ProductsModule as spender. A stolen key can only buy Slice
  * products; it can never transfer funds out.
  *
- * The account address stays pinned to the permissionless-derived one; the
- * ZeroDev client here is only the enable/signing engine.
+ * The account address stays pinned to the canonical Kernel deployment; this
+ * client is only the enable/signing engine.
  */
 
 const buyerEntryPoint = {
@@ -211,79 +209,6 @@ const getClientChainId = (
     throw new Error("Kernel permission clients require an explicit chain.")
   }
   return chainId
-}
-
-/**
- * Enable data for the onchain WebAuthn root validator — must byte-match the
- * encoding permissionless used at account creation ({x, y} public key plus
- * keccak256 of the base64url credential id).
- */
-export const encodeWebAuthnRootValidatorData = (
-  credential: SliceWalletPasskeyCredential
-) => {
-  const publicKey = PublicKey.fromHex(credential.publicKey)
-  const authenticatorIdHash = keccak256(toHex(Base64.toBytes(credential.id)))
-
-  return encodeAbiParameters(
-    [
-      {
-        components: [
-          { name: "x", type: "uint256" },
-          { name: "y", type: "uint256" }
-        ],
-        name: "webAuthnData",
-        type: "tuple"
-      },
-      { name: "authenticatorIdHash", type: "bytes32" }
-    ],
-    [{ x: publicKey.x, y: publicKey.y }, authenticatorIdHash]
-  )
-}
-
-/**
- * WebAuthn validator signature envelope. The enable digest must be signed in
- * the root validator's raw format (no ERC-7739 nesting): a WebAuthn assertion
- * over the typed-data hash, encoded for the onchain verifier.
- */
-export const encodeWebAuthnValidatorSignature = ({
-  signature,
-  webauthn
-}: Pick<
-  Awaited<ReturnType<WebAuthnAccount["sign"]>>,
-  "signature" | "webauthn"
->) => {
-  const { r, s } = parseWebAuthnSignature(signature)
-
-  return encodeAbiParameters(
-    [
-      { name: "authenticatorData", type: "bytes" },
-      { name: "clientDataJSON", type: "string" },
-      { name: "responseTypeLocation", type: "uint256" },
-      { name: "r", type: "uint256" },
-      { name: "s", type: "uint256" },
-      { name: "usePrecompiled", type: "bool" }
-    ],
-    [
-      webauthn.authenticatorData,
-      webauthn.clientDataJSON,
-      BigInt(webauthn.typeIndex ?? 0),
-      r,
-      s,
-      false
-    ]
-  )
-}
-
-const parseWebAuthnSignature = (signature: Hex) => {
-  const bytes = signature.slice(2)
-  if (bytes.length < 128) {
-    throw new Error("Invalid WebAuthn signature length.")
-  }
-
-  return {
-    r: BigInt(`0x${bytes.slice(0, 64)}`),
-    s: BigInt(`0x${bytes.slice(64, 128)}`)
-  }
 }
 
 const createBuyerRootValidator = async ({

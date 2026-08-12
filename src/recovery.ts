@@ -12,7 +12,6 @@ import {
   type KernelValidator
 } from "@zerodev/sdk"
 import { toKernelPluginManager } from "@zerodev/sdk/accounts"
-import { encode7579Calls } from "permissionless/utils"
 import {
   type Address,
   concat,
@@ -752,9 +751,13 @@ export const buildRecoveryNoOpCall = (): SliceWalletRecoveryCall => ({
 })
 
 export const buildRecoveryNoOpCallData = () =>
-  encode7579Calls({
-    callData: [buildRecoveryNoOpCall()],
-    mode: { type: "call" }
+  encodeFunctionData({
+    abi: kernelAccountRecoveryAbi,
+    args: [
+      pad("0x", { size: 32 }),
+      concat([zeroAddress, numberToHex(0n, { size: 32 })])
+    ],
+    functionName: "execute"
   })
 
 export const encodeRecoveryProposalSignature = ({

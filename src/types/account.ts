@@ -1,5 +1,7 @@
-import type { KernelSmartAccountImplementation } from "@zerodev/sdk"
-import type { ToKernelSmartAccountReturnType } from "permissionless/accounts"
+import type {
+  CreateKernelAccountReturnType,
+  KernelSmartAccountImplementation
+} from "@zerodev/sdk"
 import type {
   Address,
   Chain,
@@ -75,10 +77,7 @@ export type SliceWalletPublicClient = Client<
   JsonRpcAccount | LocalAccount | undefined
 >
 
-export type SliceWalletKernelAccount = ToKernelSmartAccountReturnType<
-  "0.7",
-  false
->
+export type SliceWalletKernelAccount = CreateKernelAccountReturnType<"0.7">
 
 export type SliceWalletRootSignaturePurpose =
   | "message"
