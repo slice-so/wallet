@@ -496,7 +496,9 @@ export const createSliceWalletPermissionAccount = async (
 
 export const buildSliceWalletPermissionEnableTypedData = async (
   parameters: BuildSliceWalletPermissionEnableTypedDataParameters
-) => {
+): ReturnType<
+  KernelSmartAccountImplementation["kernelPluginManager"]["getPluginsEnableTypedData"]
+> => {
   const mode = parameters.session.grantKind
   const { account } = await createPermissionKernelAccount({
     ...parameters,

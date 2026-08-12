@@ -714,7 +714,9 @@ export const buildRecoveryEnableTypedData = async (
     CreateRecoveryPermissionAccountParameters,
     "enableSignature" | "getFactoryArgs" | "recoveryPrivateKey"
   >
-) => {
+): ReturnType<
+  KernelSmartAccountImplementation["kernelPluginManager"]["getPluginsEnableTypedData"]
+> => {
   const account = await createRecoveryPermissionAccount(parameters)
   return account.kernelPluginManager.getPluginsEnableTypedData(
     parameters.address

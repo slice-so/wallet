@@ -469,7 +469,9 @@ export const createSliceExecutionAccount = async (
 
 export const buildSliceExecutionEnableTypedData = async (
   parameters: BuildSliceExecutionEnableTypedDataParameters
-) => {
+): ReturnType<
+  KernelSmartAccountImplementation["kernelPluginManager"]["getPluginsEnableTypedData"]
+> => {
   const account = await createSliceExecutionAccount(parameters)
   return account.kernelPluginManager.getPluginsEnableTypedData(
     parameters.address
