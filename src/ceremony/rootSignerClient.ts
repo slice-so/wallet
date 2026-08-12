@@ -1,3 +1,4 @@
+import { isAddressEqual } from "viem"
 import type {
   CreateSliceWalletCeremonyRootSignerParameters,
   SliceWalletCeremonyRootSignRequest,
@@ -31,6 +32,14 @@ export const createSliceWalletCeremonyRootSigner =
     if (request === undefined || request.purpose !== purpose) {
       throw new Error(
         "This root signature request requires structured ceremony data."
+      )
+    }
+    if (
+      request.purpose === "user_operation" &&
+      !isAddressEqual(request.userOperation.sender, account)
+    ) {
+      throw new Error(
+        "Root user operation sender does not match the wallet account."
       )
     }
     const message = {

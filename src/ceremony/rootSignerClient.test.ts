@@ -13,6 +13,38 @@ const expectedHash = `0x${"11".repeat(32)}` as Hex
 const signature = `0x${"22".repeat(64)}` as Hex
 
 describe("root signer ceremony continuation", () => {
+  it("rejects a root user operation for a different account before opening a ceremony", async () => {
+    const open = mock(() => null)
+    const rootSigner = createSliceWalletCeremonyRootSigner({
+      account,
+      chainId: 8453,
+      idOrigin: "https://id.slice.so",
+      window: Object.assign(Object.create(null) as Window, {
+        crypto: globalThis.crypto,
+        open
+      })
+    })
+
+    await expect(
+      rootSigner(expectedHash, "user_operation", {
+        purpose: "user_operation",
+        userOperation: {
+          callData: "0x",
+          callGasLimit: 1n,
+          maxFeePerGas: 2n,
+          maxPriorityFeePerGas: 1n,
+          nonce: 3n,
+          preVerificationGas: 4n,
+          sender: "0x7200000000000000000000000000000000000002",
+          verificationGasLimit: 5n
+        }
+      })
+    ).rejects.toThrow(
+      "Root user operation sender does not match the wallet account."
+    )
+    expect(open).not.toHaveBeenCalled()
+  })
+
   it("resumes with the exact prepared signing request after activation expires", async () => {
     const broker = createSliceWalletCeremonyBroker()
     const request = {
