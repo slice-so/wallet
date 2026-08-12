@@ -106,7 +106,7 @@ const canonicalContracts = {
     address: "0x000000000000D01eA45F9eFD5c54f037Fa57Ea1a"
   },
   weightedEcdsaSigner: {
-    address: "0xB555Fb2951A52C6D7156Fbd1F6573F7eb7aDc363"
+    address: "0x4836168BdFbF1D19D5a13aEb07A01Bc423BAa71F"
   },
   weightedP256Signer: {
     address: "0x5b8EC08F8e6eafc4dbF95E171EAbb137174b82f1",
@@ -126,7 +126,7 @@ const deployments = [
   {
     admitted: true,
     authorityAdmission: {
-      checkout: true,
+      checkout: false,
       generic: true,
       management: false
     },
@@ -200,8 +200,7 @@ const deployments = [
         "0x3cd725b6ba67b40b7979190c41a015e82cf21e098eb61832ba623f8538bab7fc",
       soladyP256Verifier:
         "0x9933b3f70809361dcfebe1f731b129890454cc29af5b32840dcae92400a8826b",
-      weightedEcdsaSigner:
-        "0xcc5510774c8eedb9a2001cc7bb9eed9343f5ba285c184656d62b71f094c6c076",
+      weightedEcdsaSigner: null,
       weightedP256Signer:
         "0x3497bb26d46d0856d92d1a0f3e5aaeebc696b497b583f2235b9b1a5557e1c483",
       timelockPolicy:
@@ -215,7 +214,7 @@ const deployments = [
   {
     admitted: true,
     authorityAdmission: {
-      checkout: true,
+      checkout: false,
       generic: true,
       management: false
     },
@@ -289,8 +288,7 @@ const deployments = [
         "0x3cd725b6ba67b40b7979190c41a015e82cf21e098eb61832ba623f8538bab7fc",
       soladyP256Verifier:
         "0x9933b3f70809361dcfebe1f731b129890454cc29af5b32840dcae92400a8826b",
-      weightedEcdsaSigner:
-        "0xb648be3025607dd4c27e5f402b00827065c397494785a54e88ca2ab023633494",
+      weightedEcdsaSigner: null,
       weightedP256Signer:
         "0x0d93c27b2e497fdda498a97287f85eecbe6cdb1c4b88d60b34f47d27ac8c66e2",
       timelockPolicy:
@@ -384,7 +382,7 @@ const deployments = [
       soladyP256Verifier:
         "0x9933b3f70809361dcfebe1f731b129890454cc29af5b32840dcae92400a8826b",
       weightedEcdsaSigner:
-        "0x7d4fdb782c0f4e1b7bf6449bae7a32436892c457b3def1383c4f98d61eb30c40",
+        "0x4dc99619784e85a5592ef36d528afe6d7ed6278b75f1ab4c60aa1b964f68262c",
       weightedP256Signer:
         "0x7368c7060603c3fd2610d4f18cdf68bf24a160a9a4fdcffc2242cc25f90d456b",
       timelockPolicy:
@@ -398,7 +396,7 @@ const deployments = [
   {
     admitted: true,
     authorityAdmission: {
-      checkout: true,
+      checkout: false,
       generic: true,
       management: false
     },
@@ -472,8 +470,7 @@ const deployments = [
         "0x3cd725b6ba67b40b7979190c41a015e82cf21e098eb61832ba623f8538bab7fc",
       soladyP256Verifier:
         "0x9933b3f70809361dcfebe1f731b129890454cc29af5b32840dcae92400a8826b",
-      weightedEcdsaSigner:
-        "0x334e05970aa6d01dcad6a6e5ffd309b612180e150531f850b1b6854224d5abc7",
+      weightedEcdsaSigner: null,
       weightedP256Signer:
         "0x7e890abcda1f9394d7b819b8675c56ec27141fb4384fbfb9d21af494f35f47a8",
       timelockPolicy:
