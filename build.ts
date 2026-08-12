@@ -1,8 +1,10 @@
 import { readdirSync, readFileSync } from "node:fs"
 import { buildPackage } from "../../build"
+import { bundleDeclarationTypes } from "../../build-declarations"
 import { dependencies, peerDependencies } from "./package.json"
 
 await buildPackage({
+  bundleDeclarations: bundleDeclarationTypes,
   clientEntrypoints: ["./src/react.ts"],
   entrypoints: [
     "./src/index.ts",
