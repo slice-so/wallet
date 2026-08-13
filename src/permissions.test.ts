@@ -12,8 +12,8 @@ import {
   sliceWalletPermissionActions
 } from "./permissions"
 import type {
+  SliceWalletEip1193Provider,
   SliceWalletPermissionGrant,
-  SliceWalletProvider,
   SliceWalletProviderValue
 } from "./types"
 
@@ -77,7 +77,9 @@ const createProvider = (supportsPermissions = true) => {
   const request = mock(
     async ({
       method
-    }: Parameters<Pick<SliceWalletProvider, "request">["request"]>[0]) => {
+    }: Parameters<
+      Pick<SliceWalletEip1193Provider, "request">["request"]
+    >[0]) => {
       let result: SliceWalletProviderValue | undefined
       if (method === "eth_accounts") result = [account]
       else if (method === "eth_chainId") result = "0x2105"
@@ -89,7 +91,7 @@ const createProvider = (supportsPermissions = true) => {
     }
   )
   return {
-    provider: { request } satisfies Pick<SliceWalletProvider, "request">,
+    provider: { request } satisfies Pick<SliceWalletEip1193Provider, "request">,
     request
   }
 }
@@ -194,7 +196,7 @@ describe("published Slice permission SDK", () => {
         if (method === "eth_chainId") return "0x2105"
         throw new Error("Method not found")
       })
-    } satisfies Pick<SliceWalletProvider, "request">
+    } satisfies Pick<SliceWalletEip1193Provider, "request">
     await expect(getPermissions(missingMethod)).rejects.toBeInstanceOf(
       SliceWalletPermissionUnsupportedWalletError
     )

@@ -10,7 +10,7 @@ import {
 } from "../index"
 import type {
   SliceWalletCeremonyBroker,
-  SliceWalletProvider,
+  SliceWalletEip1193Provider,
   SliceWalletSignerFrameClient
 } from "../types"
 import type {
@@ -154,7 +154,7 @@ export const useSliceWalletCeremonyActions = ({
     if (provider === undefined) {
       throw new Error("Slice Wallet provider is unavailable.")
     }
-    return provider as SliceWalletProvider
+    return provider as SliceWalletEip1193Provider
   }, [getSliceConnector])
 
   const connectWallet = useCallback(async () => {

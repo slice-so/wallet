@@ -1,6 +1,6 @@
 import type {
-  SliceWalletEip6963ProviderDetail,
-  SliceWalletProvider
+  SliceWalletEip1193Provider,
+  SliceWalletEip6963ProviderDetail
 } from "../types"
 
 export const sliceWalletProviderIcon =
@@ -10,7 +10,7 @@ export const announceSliceWalletProvider = ({
   provider,
   window = globalThis.window
 }: {
-  provider: SliceWalletProvider
+  provider: SliceWalletEip1193Provider
   window?: Window
 }) => {
   if (window === undefined) {

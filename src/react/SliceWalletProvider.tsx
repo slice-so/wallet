@@ -26,7 +26,7 @@ import {
 } from "../index"
 import { buildRecoveryCancelCall } from "../recovery"
 import type { SliceAccountClient } from "../types/accountClient"
-import type { SliceWalletProvider as SliceWalletEip1193Provider } from "../types/provider"
+import type { SliceWalletEip1193Provider } from "../types/provider"
 import type {
   SliceWalletContextValue,
   SliceWalletCredentialRecord,

@@ -3,8 +3,8 @@ import { type Address, isAddress } from "viem"
 import { anvil } from "viem/chains"
 import { sliceWalletChainManifests } from "../chains"
 import type {
+  SliceWalletEip1193Provider,
   SliceWalletParameters,
-  SliceWalletProvider,
   SliceWalletProviderValue
 } from "../types"
 import type { SliceWalletProviderConfig } from "../types/providerInternal"
@@ -24,8 +24,8 @@ export const sliceWalletConnector = (
   parameters: SliceWalletParameters,
   runtime: SliceWalletConnectorRuntime = {}
 ) =>
-  createConnector<SliceWalletProvider>((config) => {
-    let provider: SliceWalletProvider | null = null
+  createConnector<SliceWalletEip1193Provider>((config) => {
+    let provider: SliceWalletEip1193Provider | null = null
     let stopAnnouncement: (() => void) | null = null
     const inheritedChainIds = config.chains
       .map((chain) => chain.id)

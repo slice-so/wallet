@@ -1,8 +1,8 @@
 import { type Address, type Hex, isAddress, isHex, numberToHex } from "viem"
 import { getSliceWalletChainPolicy } from "../chains"
 import type {
+  SliceWalletEip1193Provider,
   SliceWalletProtocolValue,
-  SliceWalletProvider,
   SliceWalletProviderEventMap,
   SliceWalletProviderRequestArguments,
   SliceWalletProviderValue
@@ -159,7 +159,7 @@ const parseWalletConnect = (
     )
   }
   let session:
-    | Parameters<SliceWalletProvider["connectWithSession"]>[0]
+    | Parameters<SliceWalletEip1193Provider["connectWithSession"]>[0]
     | undefined
   let grantPermissions:
     | {
@@ -372,7 +372,7 @@ export const createSliceWalletProviderInternal = (
   {
     createRuntime = createSliceWalletProviderRuntime
   }: ProviderDependencies = {}
-): SliceWalletProvider => {
+): SliceWalletEip1193Provider => {
   const runtime = createRuntime(config)
   const listeners = new Map<ProviderEvent, Set<ProviderEventListener>>()
   const getOrigin = () => {
@@ -439,26 +439,25 @@ export const createSliceWalletProviderInternal = (
     return account
   }
 
-  const connectWithSession: SliceWalletProvider["connectWithSession"] = async (
-    session
-  ) => {
-    const before = await runtime.getAccounts()
-    const result = await runtime.connectWithSession(session)
-    const account = result.wallet.rootAccount.address
-    if (before.length === 0) {
-      emit("connect", { chainId: numberToHex(runtime.chainId) })
-      emit("accountsChanged", [account])
+  const connectWithSession: SliceWalletEip1193Provider["connectWithSession"] =
+    async (session) => {
+      const before = await runtime.getAccounts()
+      const result = await runtime.connectWithSession(session)
+      const account = result.wallet.rootAccount.address
+      if (before.length === 0) {
+        emit("connect", { chainId: numberToHex(runtime.chainId) })
+        emit("accountsChanged", [account])
+      }
+      return {
+        account,
+        ...(result.session === undefined ? {} : { session: result.session })
+      }
     }
-    return {
-      account,
-      ...(result.session === undefined ? {} : { session: result.session })
-    }
-  }
 
-  const requestSession: SliceWalletProvider["requestSession"] = () =>
+  const requestSession: SliceWalletEip1193Provider["requestSession"] = () =>
     runtime.requestSession()
 
-  const subscribePendingCeremony: SliceWalletProvider["subscribePendingCeremony"] =
+  const subscribePendingCeremony: SliceWalletEip1193Provider["subscribePendingCeremony"] =
     (listener) => runtime.subscribePendingCeremony(listener)
 
   const request = async ({

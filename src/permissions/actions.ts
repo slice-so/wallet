@@ -1,9 +1,9 @@
 import { type Client, type Hex, isAddress, isHex } from "viem"
 import { parseSliceWalletGrantPermissions } from "../provider/protocol"
 import type {
+  SliceWalletEip1193Provider,
   SliceWalletGrantPermissionsRequest,
   SliceWalletPermissionGrant,
-  SliceWalletProvider,
   SliceWalletProviderValue
 } from "../types"
 
@@ -121,12 +121,12 @@ const parseGrant = (
 }
 
 const permissionCapabilities = new WeakMap<
-  Pick<SliceWalletProvider, "request">,
+  Pick<SliceWalletEip1193Provider, "request">,
   Set<string>
 >()
 
 const assertPermissionCapability = async (
-  provider: Pick<SliceWalletProvider, "request">
+  provider: Pick<SliceWalletEip1193Provider, "request">
 ) => {
   const account = parseAccount(
     await provider.request({ method: "eth_accounts" })
@@ -193,7 +193,7 @@ const assertPermissionCapability = async (
 }
 
 export const grantPermissions = async (
-  provider: Pick<SliceWalletProvider, "request">,
+  provider: Pick<SliceWalletEip1193Provider, "request">,
   request: SliceWalletGrantPermissionsRequest
 ) => {
   const expected = await assertPermissionCapability(provider)
@@ -207,7 +207,7 @@ export const grantPermissions = async (
 }
 
 export const getPermissions = async (
-  provider: Pick<SliceWalletProvider, "request">
+  provider: Pick<SliceWalletEip1193Provider, "request">
 ) => {
   const expected = await assertPermissionCapability(provider)
   const value = await provider.request({
@@ -221,7 +221,7 @@ export const getPermissions = async (
 }
 
 export const rotatePermission = async (
-  provider: Pick<SliceWalletProvider, "request">,
+  provider: Pick<SliceWalletEip1193Provider, "request">,
   permissionId: Hex
 ) => {
   const expected = await assertPermissionCapability(provider)
@@ -235,7 +235,7 @@ export const rotatePermission = async (
 }
 
 export const revokePermission = async (
-  provider: Pick<SliceWalletProvider, "request">,
+  provider: Pick<SliceWalletEip1193Provider, "request">,
   permissionId: Hex
 ) => {
   await assertPermissionCapability(provider)
@@ -247,7 +247,7 @@ export const revokePermission = async (
 
 const toPermissionProvider = (
   client: Client
-): Pick<SliceWalletProvider, "request"> => ({
+): Pick<SliceWalletEip1193Provider, "request"> => ({
   request: (request) =>
     client.request(request as never) as Promise<
       SliceWalletProviderValue | undefined
