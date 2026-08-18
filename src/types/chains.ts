@@ -2,12 +2,12 @@ import type { Address, Chain, Hex } from "viem"
 
 export type SliceWalletContractDeployment = {
   readonly address: Address
-  readonly deployedRuntimeCodeHash: Hex | null
-  readonly expectedRuntimeCodeHash: Hex
+  readonly runtimeCodeHash: Hex | null
   readonly version?: string
 }
 
 export type SliceWalletContractDeployments = {
+  readonly authorizationRevocationRegistry: SliceWalletContractDeployment
   readonly callPolicy: SliceWalletContractDeployment
   readonly ecdsaSigner: SliceWalletContractDeployment
   readonly erc6492BootstrapFactory: SliceWalletContractDeployment
@@ -33,8 +33,6 @@ export type SliceWalletContractDeployments = {
     readonly version: "1"
   }
 }
-
-export type SliceWalletAuthorityKind = "checkout" | "generic" | "management"
 
 export type SliceWalletExecutionSafetyEnvelope = {
   readonly maxCallGasLimit: bigint

@@ -1,7 +1,8 @@
 import type { Address, Chain, Hex } from "viem"
 import type { SliceWalletCeremonyMode } from "./ceremony"
-import type { WalletCall } from "./policy"
+import type { SerializedWalletPolicyDescriptor, WalletCall } from "./policy"
 import type {
+  SliceWalletParameters,
   SliceWalletPermissionGrant,
   SliceWalletProviderValue
 } from "./provider"
@@ -24,7 +25,7 @@ export type SliceWalletProviderConfig = {
   defaultChainId: number
   document?: Document
   fetch?: typeof fetch
-  grantPermissions?: import("./provider").SliceWalletParameters["grantPermissions"]
+  grantPermissions?: SliceWalletParameters["grantPermissions"]
   idOrigin: string
   requireAdmittedChain?: boolean
   session?: {
@@ -39,7 +40,7 @@ export type SliceWalletProviderConfig = {
 
 export type StoredGenericGrant = Omit<SliceWalletPermissionGrant, "version"> & {
   enableSignature: Hex
-  policy: import("./policy").SerializedWalletPolicyDescriptor
+  policy: SerializedWalletPolicyDescriptor
   publicKey: Hex
   signerId: Address
 }

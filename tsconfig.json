@@ -1,10 +1,27 @@
 {
-  "extends": "@slice/typescript-config/react-library.json",
+  "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
-    "customConditions": ["development"],
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "types": ["bun-types"],
+    "composite": false,
+    "declaration": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "preserveWatchOutput": true,
+    "inlineSources": false,
+    "jsx": "react-jsx",
     "lib": ["ES2025", "DOM"],
-    "outDir": "./dist/esm",
-    "rootDir": "./src"
+    "customConditions": ["development"]
   },
-  "include": ["src/**/*"]
+  "exclude": ["node_modules"],
+  "include": ["*.ts", "scripts/**/*.ts", "src/**/*"]
 }

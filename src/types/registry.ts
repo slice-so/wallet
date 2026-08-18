@@ -65,14 +65,6 @@ export type SliceWalletCredentialAccountsChallenge = {
   purpose: "credential-accounts"
 }
 
-export type SliceWalletCredentialAccountsAssertion = {
-  authenticatorData: Hex
-  clientDataJSON: string
-  r: string
-  s: string
-  userVerificationRequired: true
-}
-
 export type SliceWalletCredentialRowClassification = {
   credential: SliceWalletRegistryCredential
   status: "active" | "inactive" | "unavailable"

@@ -10,21 +10,20 @@ import {
 } from "../commerce/policies"
 
 const account = "0x2222222222222222222222222222222222222222"
-const sessionSignerAddress = "0x3333333333333333333333333333333333333333"
 const parameters = {
   account,
   chainId: base.id,
   expiresAt: 2_000_000_000,
-  sessionSignerAddress,
   startsAt: 1_900_000_000
 } as const
 
-const selectorFor = (functionName: "release" | "setRoles") =>
-  toFunctionSelector(
-    functionName === "setRoles"
-      ? "setRoles(bytes32,address)"
-      : "release(address,address,bool)"
-  )
+const releaseSelector = toFunctionSelector("release(address,address,bool)")
+const roleMutationSelectors = [
+  toFunctionSelector("grantRoles(bytes32,address)"),
+  toFunctionSelector("revokeRoles(bytes32,address)"),
+  toFunctionSelector("setRoles(bytes32,address)"),
+  toFunctionSelector("renounceRoles(bytes32)")
+] as const
 
 describe("store management permission policies", () => {
   it("encodes identical policy bytes through commerce and Kernel entry paths", () => {
@@ -53,30 +52,24 @@ describe("store management permission policies", () => {
     }).toMatchSnapshot()
   })
 
-  it("keeps wildcard slicer calls zero-value and pins sensitive arguments", () => {
+  it("omits role changes and pins wildcard release arguments", () => {
     const [callPolicy] =
       createSliceStoreManagementPermissionPolicies(parameters)
     if (callPolicy?.policyParams.type !== "call") {
       throw new Error("Store management policy must start with a call policy.")
     }
 
-    const setRoles = callPolicy.policyParams.permissions?.find(
-      (permission) => permission.selector === selectorFor("setRoles")
+    const roleMutations = callPolicy.policyParams.permissions?.filter(
+      (permission) =>
+        roleMutationSelectors.some(
+          (selector) => selector === permission.selector
+        )
     )
     const release = callPolicy.policyParams.permissions?.find(
-      (permission) => permission.selector === selectorFor("release")
+      (permission) => permission.selector === releaseSelector
     )
 
-    expect(setRoles).toMatchObject({
-      rules: [
-        {
-          condition: ParamCondition.NOT_EQUAL,
-          offset: 32
-        }
-      ],
-      target: zeroAddress,
-      valueLimit: 0n
-    })
+    expect(roleMutations).toEqual([])
     expect(release).toMatchObject({
       rules: [
         {

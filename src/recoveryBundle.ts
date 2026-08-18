@@ -56,8 +56,8 @@ const deriveAesKey = async ({
   envelope: Pick<SliceWalletRecoveryBundleEnvelope, "kdf">
   passphrase: string
 }) => {
-  if (passphrase.length < 16) {
-    throw new Error("Recovery passphrase must contain at least 16 characters.")
+  if (passphrase.length < 24) {
+    throw new Error("Recovery passphrase must contain at least 24 characters.")
   }
   const rawKey = await argon2id({
     iterations: envelope.kdf.iterations,
@@ -243,7 +243,8 @@ const parsePayload = (value: SliceWalletRecoveryJsonValue) => {
   }
   if (
     !/^\d+$/.test(payload.accountIndex) ||
-    payload.credentialId.length === 0
+    payload.credentialId.length === 0 ||
+    !payload.credentialPublicKey.startsWith("0x04")
   ) {
     throw new Error("Recovery payload metadata is invalid.")
   }

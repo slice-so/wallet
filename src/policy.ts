@@ -384,6 +384,9 @@ const assertGenericCallRule = (call: WalletPolicyCallRule) => {
     }
     return
   }
+  if (isAddressEqual(call.target, walletPolicyWildcardTarget)) {
+    throw new Error("Generic ERC-20 rules cannot use a wildcard target.")
+  }
   if (call.valueLimit !== 0n) {
     throw new Error("Generic ERC-20 rules cannot transfer native value.")
   }

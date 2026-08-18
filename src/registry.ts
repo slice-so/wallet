@@ -2,10 +2,10 @@ import { type Hex, hexToBytes, isHex, keccak256, stringToHex } from "viem"
 import { assertSliceWalletAccountIndex } from "./accountIndex"
 import type {
   RegisterSliceWalletCredentialInput,
-  SliceWalletCredentialAccountsAssertion,
   SliceWalletCredentialAccountsChallenge,
   SliceWalletCredentialListAuthorization,
   SliceWalletCredentialListChallenge,
+  SliceWalletCredentialProof,
   SliceWalletCredentialRegistrationKind,
   SliceWalletRegistryChallenge,
   SliceWalletRegistryCredential
@@ -197,7 +197,7 @@ export const createSliceWalletRegistryClient = ({
       challenge,
       credentialId
     }: {
-      assertionResponse: SliceWalletCredentialAccountsAssertion
+      assertionResponse: SliceWalletCredentialProof
       chainId: number
       challenge: Hex
       credentialId: string

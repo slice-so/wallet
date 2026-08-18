@@ -1,5 +1,7 @@
-import type { KernelSmartAccountImplementation } from "@zerodev/sdk"
-import type { ToKernelSmartAccountReturnType } from "permissionless/accounts"
+import type {
+  CreateKernelAccountReturnType,
+  KernelSmartAccountImplementation
+} from "@zerodev/sdk"
 import type {
   Address,
   Chain,
@@ -16,18 +18,25 @@ import type {
 } from "viem/account-abstraction"
 import type { SliceWalletUnsignedUserOperation } from "./frame"
 
-export type SliceWalletAccountIndex = number
-
 export type SliceWalletActivityTokenDescriptor = {
   address: Address
   symbol: string
 }
 
+export type SliceWalletAccountActivityField<Value> =
+  | { status: "available"; value: Value }
+  | {
+      error: { code: number | null; message: string }
+      status: "unavailable"
+    }
+
 export type SliceWalletAccountActivity = {
   address: Address
-  code: Hex | null
-  nativeBalance: string
-  tokenBalances: Readonly<Record<string, string>>
+  code: SliceWalletAccountActivityField<Hex | null>
+  nativeBalance: SliceWalletAccountActivityField<string>
+  tokenBalances: Readonly<
+    Record<string, SliceWalletAccountActivityField<string>>
+  >
 }
 
 export type SliceWalletAccountActivityBatchRequest = {
@@ -68,10 +77,7 @@ export type SliceWalletPublicClient = Client<
   JsonRpcAccount | LocalAccount | undefined
 >
 
-export type SliceWalletKernelAccount = ToKernelSmartAccountReturnType<
-  "0.7",
-  false
->
+export type SliceWalletKernelAccount = CreateKernelAccountReturnType<"0.7">
 
 export type SliceWalletRootSignaturePurpose =
   | "message"

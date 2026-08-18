@@ -1,5 +1,6 @@
 /** ERC-4337 envelope adapter over the decision core in sliceCallPolicy.ts. */
 
+import { ERC8128_REVOCATION_REGISTRY_ADDRESS } from "@slicekit/erc8128"
 import {
   type Address,
   decodeFunctionData,
@@ -45,7 +46,10 @@ import {
   sliceKernelBaseV33Addresses,
   sliceKernelTimelockPolicyAddress
 } from "./sliceKernelAddresses"
-import { getSliceSmartAccountCalls } from "./sliceSmartAccountCalls"
+import {
+  getSliceSmartAccountCalls,
+  isSliceSmartAccountExecutionCallData
+} from "./sliceSmartAccountCalls"
 import { maxAcceptedSliceCallsPerBatch } from "./sliceUserOperationLimits"
 
 type SliceSenderVerification = "unknown" | "verified"
@@ -78,8 +82,8 @@ const eip7702AuthorizationQuantityFields = [
 
 const eip7702FactoryMarker = "0x7702" as const
 export const sliceIdAuthorizationRevocationRegistryAddress =
-  "0x9704977001344568d2bfcf39ac569699cf34482e" as const satisfies Address
-const sliceIdRevocationChainIds = [31337] as const
+  ERC8128_REVOCATION_REGISTRY_ADDRESS satisfies Address
+const sliceIdRevocationChainIds = [1, 10, 8453, 42161, 31337] as const
 const authorizationRevocationRegistryWriteAbi = [
   {
     inputs: [{ name: "authorizationId", type: "bytes32" }],
@@ -691,6 +695,7 @@ const getSliceUserOperationCalls = ({
 }) => {
   const decoded = getSliceSmartAccountCalls(userOperation.callData)
   if (decoded !== null) return decoded
+  if (isSliceSmartAccountExecutionCallData(userOperation.callData)) return null
 
   // Kernel executes a single root-authorized self-call directly instead of
   // wrapping it in ERC-7579 execute(bytes32,bytes).

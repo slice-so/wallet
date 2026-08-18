@@ -26,13 +26,12 @@ import {
 } from "../index"
 import { buildRecoveryCancelCall } from "../recovery"
 import type { SliceAccountClient } from "../types/accountClient"
-import type { SliceWalletProvider as SliceWalletEip1193Provider } from "../types/provider"
+import type { SliceWalletEip1193Provider } from "../types/provider"
 import type {
   SliceWalletContextValue,
   SliceWalletCredentialRecord,
   SliceWalletExecutionSession,
   SliceWalletManagementExecutionSession,
-  SliceWalletManagementLifecycle,
   SliceWalletManagementLifecycleControl,
   SliceWalletManagementMutationBroadcast,
   SliceWalletPendingAction,
@@ -146,19 +145,18 @@ export function SliceWalletProvider({
   const broadcastManagementMutationRef = useRef<
     ((message: SliceWalletManagementMutationBroadcast) => void) | null
   >(null)
-  const managementLifecycleRef = useRef<SliceWalletManagementLifecycle | null>(
-    null
+  const managementLifecycle = useMemo(
+    () =>
+      createManagementLifecycle({
+        chainId: walletChain.id,
+        hydrate: (account, control) =>
+          managementHydrationTaskRef.current(account, control),
+        onIdentityChange: () => setManagementExecutionSession(null),
+        onMutation: (message) =>
+          broadcastManagementMutationRef.current?.(message)
+      }),
+    [walletChain.id]
   )
-  if (managementLifecycleRef.current === null) {
-    managementLifecycleRef.current = createManagementLifecycle({
-      chainId: walletChain.id,
-      hydrate: (account, control) =>
-        managementHydrationTaskRef.current(account, control),
-      onIdentityChange: () => setManagementExecutionSession(null),
-      onMutation: (message) => broadcastManagementMutationRef.current?.(message)
-    })
-  }
-  const managementLifecycle = managementLifecycleRef.current
   const managementHydration = useSyncExternalStore(
     managementLifecycle.subscribe,
     managementLifecycle.getSnapshot,
@@ -191,16 +189,21 @@ export function SliceWalletProvider({
     storeManagement,
     walletChain
   })
-  managementHydrationTaskRef.current = async (account, control) => {
-    const activeWallet = activeWalletRef.current
-    if (
-      activeWallet === null ||
-      !isAddressEqual(activeWallet.kernelAccount.address, account)
-    ) {
-      return
+  useEffect(() => {
+    managementHydrationTaskRef.current = async (account, control) => {
+      const activeWallet = activeWalletRef.current
+      if (
+        activeWallet === null ||
+        !isAddressEqual(activeWallet.kernelAccount.address, account)
+      ) {
+        return
+      }
+      await hydrateManagementExecutionSession({ ...activeWallet, control })
     }
-    await hydrateManagementExecutionSession({ ...activeWallet, control })
-  }
+    return () => {
+      managementHydrationTaskRef.current = async () => undefined
+    }
+  }, [hydrateManagementExecutionSession])
 
   const { refreshRecovery } = useSliceWalletAccountHydration({
     activeWalletRef,

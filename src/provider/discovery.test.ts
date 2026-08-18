@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test"
 import type {
-  SliceWalletEip6963ProviderDetail,
-  SliceWalletProvider
+  SliceWalletEip1193Provider,
+  SliceWalletEip6963ProviderDetail
 } from "../types"
 import { announceSliceWalletProvider } from "./discovery"
 
@@ -31,7 +31,7 @@ describe("EIP-6963 discovery", () => {
         }
       }
     })
-    const provider: SliceWalletProvider = {
+    const provider: SliceWalletEip1193Provider = {
       cancelPendingCeremony: () => undefined,
       continueInPopup: async () => "0x",
       connectWithSession: async () => ({

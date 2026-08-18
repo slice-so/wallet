@@ -26,11 +26,8 @@ export type {
   SliceAccountClientPaymasterContext,
   SliceAccountClientSendCallsParameters,
   SliceAccountClientTransport,
-  SliceKernelPasskeyAccount,
   SliceKernelPasskeyBundlerClient,
   SliceKernelPasskeyBundlerReceipt,
-  SliceKernelPasskeyClient,
-  SliceKernelPasskeyCredential,
   SliceKernelPasskeyPaymasterClient,
   SliceKernelPasskeySendUserOperationParameters,
   SliceKernelPasskeyUserOperationEvent
@@ -38,6 +35,7 @@ export type {
 export type {
   SliceBundlerRequestOptions,
   SliceBundlerRetryReason,
+  SliceBundlerRpcUrlParameters,
   SliceBundlerUpstreamErrorClassifier,
   SliceBundlerUserOperationAuthorizationInput,
   SliceBundlerUserOperationAuthorizer
@@ -45,8 +43,7 @@ export type {
 export type * from "./types/commerce"
 export type {
   BuildSliceExecutionEnableTypedDataParameters,
-  CreateSliceExecutionAccountParameters,
-  SliceExecutionUserOperation
+  CreateSliceExecutionAccountParameters
 } from "./types/execution"
 export type * from "./types/executionPermission"
 export type {

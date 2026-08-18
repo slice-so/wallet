@@ -1550,6 +1550,29 @@ describe("multichain provider runtime routing", () => {
     expect(fixture.sendCallsByChain.has(base.id)).toBe(false)
   })
 
+  test("reserves caller-supplied call ids across chain runtimes", async () => {
+    const fixture = createRuntimeFixture()
+    const runtime = createSliceWalletProviderRuntime(config, fixture)
+    runtime.getChainRuntime(base.id)
+    let releaseFirst: () => void = () => {
+      throw new Error("First call was not started.")
+    }
+    fixture.sendCallsByChain.get(base.id)?.mockImplementation(
+      () =>
+        new Promise<{ id: string; userOperationHash: Hex }>((resolve) => {
+          releaseFirst = () => resolve({ id: "shared-call", userOperationHash })
+        })
+    )
+
+    const first = runtime.sendCalls([], "shared-call", undefined, base.id)
+    await Promise.resolve()
+    await expect(
+      runtime.sendCalls([], "shared-call", undefined, optimism.id)
+    ).rejects.toMatchObject({ code: 5720 })
+    releaseFirst()
+    await first
+  })
+
   test("finds an in-memory call after switching away from its chain", async () => {
     const fixture = createRuntimeFixture()
     const runtime = createSliceWalletProviderRuntime(config, fixture)

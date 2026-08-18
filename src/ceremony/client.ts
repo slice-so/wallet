@@ -7,6 +7,7 @@ import type {
   SliceWalletPermissionAuthorization,
   SliceWalletProtocolValue
 } from "../types"
+import { toSliceWalletCeremonyError } from "../userRejectedRequest"
 import {
   requireSliceWalletPopupGesture,
   SliceWalletUserGestureRequiredError
@@ -202,6 +203,7 @@ export const authorizeSliceWalletSession = async ({
         nonce,
         session
       }).href,
+      popupName: "slice-wallet-grant",
       readyTimeoutMs: popupReadyTimeoutMs,
       window
     })
@@ -212,7 +214,7 @@ export const authorizeSliceWalletSession = async ({
           throw new Error("Wallet ceremony response nonce does not match.")
         }
         if (response.type === "slice-wallet:ceremony-error") {
-          throw new Error(response.message)
+          throw toSliceWalletCeremonyError(response)
         }
         if (response.type === "slice-wallet:popup-required") {
           throw new SliceWalletUserGestureRequiredError(response.reason)
@@ -291,6 +293,7 @@ export const authorizeSliceWalletSessions = async ({
         nonce,
         sessions
       }).href,
+      popupName: "slice-wallet-grants",
       readyTimeoutMs: popupReadyTimeoutMs,
       window
     })
@@ -301,7 +304,7 @@ export const authorizeSliceWalletSessions = async ({
           throw new Error("Wallet ceremony response nonce does not match.")
         }
         if (response.type === "slice-wallet:ceremony-error") {
-          throw new Error(response.message)
+          throw toSliceWalletCeremonyError(response)
         }
         if (response.type === "slice-wallet:popup-required") {
           throw new SliceWalletUserGestureRequiredError(response.reason)

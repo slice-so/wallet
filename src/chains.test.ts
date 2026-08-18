@@ -36,20 +36,16 @@ describe("Slice Wallet chain manifest", () => {
     const base = getSliceWalletChainManifest(8453)
 
     expect(base.authorityAdmission).toEqual({
-      checkout: false,
+      checkout: true,
       generic: true,
       management: false
     })
-    expect(base.contracts.timestampPolicy.deployedRuntimeCodeHash).toBe(
-      base.contracts.timestampPolicy.expectedRuntimeCodeHash
-    )
-    expect(base.contracts.rateLimitPolicy.deployedRuntimeCodeHash).toBe(
-      base.contracts.rateLimitPolicy.expectedRuntimeCodeHash
-    )
-    expect(base.contracts.weightedP256Signer.deployedRuntimeCodeHash).toBeNull()
+    expect(base.contracts.timestampPolicy.runtimeCodeHash).not.toBeNull()
+    expect(base.contracts.rateLimitPolicy.runtimeCodeHash).not.toBeNull()
+    expect(base.contracts.weightedP256Signer.runtimeCodeHash).not.toBeNull()
     expect(
-      base.contracts.erc6492BootstrapFactory.deployedRuntimeCodeHash
-    ).toBeNull()
+      base.contracts.erc6492BootstrapFactory.runtimeCodeHash
+    ).not.toBeNull()
     expect(base.contracts.weightedP256Signer.address).toBe(
       sliceKernelWeightedP256SignerAddress
     )
@@ -67,7 +63,7 @@ describe("Slice Wallet chain manifest", () => {
         authority: "checkout",
         chainId: 8453
       })
-    ).toThrow("Slice Wallet checkout authority is not verified on chain 8453.")
+    ).not.toThrow()
     expect(() =>
       assertSliceWalletAuthorityDeployment({
         authority: "management",
@@ -96,12 +92,10 @@ describe("Slice Wallet chain manifest", () => {
       generic: true,
       management: true
     })
-    expect(local.contracts.weightedP256Signer.deployedRuntimeCodeHash).toBe(
-      local.contracts.weightedP256Signer.expectedRuntimeCodeHash
-    )
+    expect(local.contracts.weightedP256Signer.runtimeCodeHash).toBeNull()
     expect(
-      local.contracts.erc6492BootstrapFactory.deployedRuntimeCodeHash
-    ).toBe(local.contracts.erc6492BootstrapFactory.expectedRuntimeCodeHash)
+      local.contracts.erc6492BootstrapFactory.runtimeCodeHash
+    ).not.toBeNull()
     expect(local.defaultTransports).toEqual({
       bundlerUrl: "http://127.0.0.1:4337",
       rpcUrl: "http://127.0.0.1:8545"

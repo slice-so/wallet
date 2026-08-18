@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test"
+import * as Base64 from "ox/Base64"
 import {
   concatHex,
   createPublicClient,
@@ -8,8 +9,10 @@ import {
   getContractAddress,
   hexToBytes,
   keccak256,
-  parseErc6492Signature
+  parseErc6492Signature,
+  toHex
 } from "viem"
+import { createSliceWalletKernelAccount } from "./account"
 import {
   predictSliceWalletKernelAccountAddress,
   sliceWalletKernelProxyInitCodeHash
@@ -32,11 +35,11 @@ const parameters = {
 // Captured from EntryPoint 0.7 getSenderAddress on a Base fork using the
 // pinned Kernel 0.3.3 factories. The fork tier independently replays it.
 const entryPointDerivedAddress =
-  "0x2EAC7591EbE1Fe88f9C01ff4bb4AcD0DA699cDac" as const
+  "0x614d09f18A013734E56584F157E48c6508d6Db5d" as const
 const indexedAddressVectors = [
-  [1n, "0xe2eD5057d825F09acd7BC55BDF142c1A9fbD7394"],
-  [7n, "0x17E812B6D1482B78F55be326EB251BBAa52Ca143"],
-  [31n, "0x256869b034257E59c32CA1b1604391C4A5Cf8E3f"]
+  [1n, "0xa3D8B1c04629A122E277Df609b375dd01765f4Ab"],
+  [7n, "0x520B1B81FCa0822C222292F5cAcF3e60B3D447D5"],
+  [31n, "0x1dC61fbcC9FFd59029174D677cf3f310882Af87b"]
 ] as const
 
 describe("Slice wallet offline account prediction", () => {
@@ -115,6 +118,51 @@ describe("Slice wallet offline account prediction", () => {
 
     expect(account.address).toBe(predicted)
     expect(actual).toBe(predicted)
+  })
+
+  it("keeps passkey account deployment byte-compatible", async () => {
+    const client = createPublicClient({
+      chain: defineChain({
+        id: parameters.chainId,
+        name: "Offline Base",
+        nativeCurrency: { decimals: 18, name: "Ether", symbol: "ETH" },
+        rpcUrls: { default: { http: ["http://127.0.0.1"] } }
+      }),
+      transport: custom({
+        async request({ method }) {
+          if (method === "eth_getCode") return "0x"
+          throw new Error(`Unexpected RPC request: ${method}`)
+        }
+      })
+    })
+    const credential = {
+      id: Base64.fromBytes(new Uint8Array([1, 2, 3, 4]), {
+        pad: false,
+        url: true
+      }),
+      publicKey: parameters.credential.publicKey
+    }
+    const registeredCredential = {
+      credentialIdHash: keccak256(toHex(Base64.toBytes(credential.id))),
+      publicKey: credential.publicKey
+    }
+    const [passkeyAccount, registeredAccount] = await Promise.all([
+      createSliceWalletKernelAccount({
+        address: entryPointDerivedAddress,
+        client,
+        credential
+      }),
+      createSliceWalletRegisteredKernelAccount({
+        address: entryPointDerivedAddress,
+        chainId: parameters.chainId,
+        client,
+        credential: registeredCredential
+      })
+    ])
+
+    expect(await passkeyAccount.getFactoryArgs()).toEqual(
+      await registeredAccount.getFactoryArgs()
+    )
   })
 
   it("keeps UserOperation deployment canonical while compacting recovery proofs", async () => {

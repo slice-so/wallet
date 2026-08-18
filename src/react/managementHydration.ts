@@ -185,7 +185,6 @@ export const hydrateStoredManagementExecutionSession = async ({
       account,
       chainId,
       expiresAt: session.expiresAt,
-      sessionSignerAddress: session.signerId,
       startsAt: session.policy.validAfter
     })
     if (

@@ -45,7 +45,11 @@ export type SliceWalletCeremonyAuthorizationsMessage = {
 }
 
 export type SliceWalletCeremonyErrorMessage = {
-  code: "authorization_failed" | "bridge_unavailable" | "invalid_request"
+  code:
+    | "authorization_failed"
+    | "bridge_unavailable"
+    | "invalid_request"
+    | "user_rejected"
   message: string
   nonce: Hex
   type: "slice-wallet:ceremony-error"

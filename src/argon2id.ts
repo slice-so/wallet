@@ -1,5 +1,4 @@
 import { argon2id } from "hash-wasm"
-import { hexToBytes } from "viem"
 import type { SliceWalletArgon2id } from "./types"
 
 export const recoveryArgon2id: SliceWalletArgon2id = async ({
@@ -9,14 +8,13 @@ export const recoveryArgon2id: SliceWalletArgon2id = async ({
   passphrase,
   salt
 }) => {
-  const value = await argon2id({
+  return argon2id({
     hashLength: 32,
     iterations,
     memorySize: memoryKiB,
-    outputType: "hex",
+    outputType: "binary",
     parallelism,
     password: passphrase,
     salt
   })
-  return hexToBytes(`0x${value}`)
 }

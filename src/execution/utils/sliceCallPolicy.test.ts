@@ -244,6 +244,12 @@ describe("classifySliceSmartAccountCall", () => {
         { allowAccountAdministration: true, chainId: 10, sender }
       )
     ).toBe("account")
+    expect(
+      classifySliceSmartAccountCall(
+        { data: "0x", target: unknownTarget, value: 0n },
+        { allowAccountAdministration: false, chainId: 10, sender }
+      )
+    ).toBe("invalid")
   })
 
   it("binds recovery cancellation to the timelock and sender account", () => {

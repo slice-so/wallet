@@ -105,6 +105,7 @@ export const useSliceWalletExecutionHydration = ({
       return createKernelPasskeySliceAccountClient({
         account: kernelAccount.address,
         chainId: walletChain.id,
+        policy: session.policy,
         transport: createSliceKernelPasskeyTransport({
           account: executionAccount,
           bundlerUrl: getSliceBundlerApiUrl(window.location.origin),
@@ -275,6 +276,7 @@ export const useSliceWalletExecutionHydration = ({
       return createKernelPasskeySliceAccountClient({
         account: kernelAccount.address,
         chainId: walletChain.id,
+        policy: session.policy,
         transport: createSliceKernelPasskeyTransport({
           account: executionAccount,
           bundlerUrl: getSliceBundlerApiUrl(window.location.origin),

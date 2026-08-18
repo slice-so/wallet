@@ -107,14 +107,6 @@ export const resolveCanonicalSliceWalletConfig = (
     sliceWalletDevelopmentChainIds.includes(chainId)
   )
   if (
-    chainIds.includes(anvil.id) &&
-    !sliceWalletDevelopmentChainIds.includes(anvil.id)
-  ) {
-    throw invalidProviderRequest(
-      "The Anvil Slice Wallet chain is unavailable in production."
-    )
-  }
-  if (
     configuredDevelopmentChainIds.length > 0 &&
     (chainIds.length !== 1 || configuredDevelopmentChainIds[0] !== anvil.id)
   ) {

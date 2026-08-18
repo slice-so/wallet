@@ -281,7 +281,7 @@ export type SliceWalletUnsignedUserOperation = {
 export type SliceWalletFrameResponse =
   | {
       error: {
-        code: string
+        code: number | string
         message: string
       }
       id: string

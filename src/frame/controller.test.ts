@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { type Address, type Hex, hexToBytes } from "viem"
-import { createSliceStoreManagementPolicyDescriptor } from "../execution/commerce/policies"
+import {
+  createSliceCheckoutPolicyDescriptor,
+  createSliceStoreManagementPolicyDescriptor
+} from "../execution/commerce/policies"
 import { verifySliceWalletP256 } from "../p256Server"
 import { createNativeTransferCallRule, getWalletPolicyHash } from "../policy"
 import type {
@@ -245,6 +248,62 @@ describe("isolated signer-frame controller", () => {
       source: substituteParent.port1
     })
     expect(await substituteResponse).toBeNull()
+    detach()
+  })
+
+  test("rejects a non-canonical checkout policy at the frame boundary", async () => {
+    const parent = new MessageChannel()
+    const window = new MockMessageWindow(parent.port1)
+    const store = new MemorySessionStore()
+    const detach = attachSliceWalletSignerFrame({
+      decodeScopedCalls: () => [],
+      now: () => 100,
+      selfOrigin: "https://id.slice.so",
+      sessionStore: store,
+      validateCheckoutCalls: () => {},
+      window
+    })
+    const connection = new MessageChannel()
+    const connected = receive(connection.port1)
+    window.dispatch({
+      data: { id: "connect", method: "connect", version: 1 },
+      origin: "https://app.example",
+      ports: [connection.port2],
+      source: parent.port1
+    })
+    await connected
+
+    const response = receive(connection.port1)
+    connection.port1.postMessage({
+      id: "create-checkout",
+      method: "createSession",
+      params: {
+        checkout: {
+          allowanceUsdMicros: "100000000",
+          coSignerAddress: recipient
+        },
+        policy: {
+          account,
+          calls: [
+            createNativeTransferCallRule({ maximumValue: 1n, recipient })
+          ],
+          chainId: 8453,
+          grantKind: "checkout",
+          validAfter: 90,
+          validUntil: 1_000,
+          version: 1
+        }
+      },
+      version: 1
+    } satisfies SliceWalletProtocolValue)
+
+    expect(await response).toMatchObject({
+      error: {
+        message: "Checkout wallet policy contains unsupported authority."
+      },
+      id: "create-checkout"
+    })
+    expect(store.pending.size).toBe(0)
     detach()
   })
 
@@ -530,15 +589,12 @@ describe("isolated signer-frame controller", () => {
       source: secondParent.port1
     })
     await Promise.all([firstConnected, secondConnected])
-    const policy = {
+    const policy = createSliceCheckoutPolicyDescriptor({
       account,
-      calls: [createNativeTransferCallRule({ maximumValue: 1n, recipient })],
       chainId: 8453,
-      grantKind: "checkout",
-      validAfter: 90,
-      validUntil: 1_000,
-      version: 1
-    } as const
+      expiresAt: 1_000,
+      startsAt: 90
+    })
     const created = receive(secondConnection.port1)
     secondConnection.port1.postMessage({
       id: "create-second",
@@ -717,15 +773,12 @@ describe("isolated signer-frame controller", () => {
     })
     await connected
 
-    const policy = {
+    const policy = createSliceCheckoutPolicyDescriptor({
       account,
-      calls: [createNativeTransferCallRule({ maximumValue: 1n, recipient })],
       chainId: 8453,
-      grantKind: "checkout",
-      validAfter: 90,
-      validUntil: 1_000,
-      version: 1
-    } as const
+      expiresAt: 1_000,
+      startsAt: 90
+    })
     const created = receive(connection.port1)
     connection.port1.postMessage({
       id: "create",
@@ -792,15 +845,12 @@ describe("isolated signer-frame controller", () => {
       source: parent.port1
     })
     await connected
-    const policy = {
+    const policy = createSliceCheckoutPolicyDescriptor({
       account,
-      calls: [createNativeTransferCallRule({ maximumValue: 1n, recipient })],
       chainId: 8453,
-      grantKind: "checkout",
-      validAfter: 90,
-      validUntil: 1_000,
-      version: 1
-    } as const
+      expiresAt: 1_000,
+      startsAt: 90
+    })
     const create = async (id: string) => {
       const response = receive(connection.port1)
       connection.port1.postMessage({
@@ -998,15 +1048,12 @@ describe("isolated signer-frame controller", () => {
     })
     await connected
 
-    const policy = {
+    const policy = createSliceCheckoutPolicyDescriptor({
       account,
-      calls: [createNativeTransferCallRule({ maximumValue: 1n, recipient })],
       chainId: 8453,
-      grantKind: "checkout",
-      validAfter: 90,
-      validUntil: 1_000,
-      version: 1
-    } as const
+      expiresAt: 1_000,
+      startsAt: 90
+    })
     const created = receive(connection.port1)
     connection.port1.postMessage({
       id: "create",

@@ -3,6 +3,7 @@ import { type Address, numberToHex } from "viem"
 import { base, optimism } from "viem/chains"
 import type { SliceWalletProviderValue } from "../types"
 import type { SliceWalletProviderConfig } from "../types/providerInternal"
+import { SliceWalletUserRejectedRequestError } from "../userRejectedRequest"
 import { SliceWalletProviderRpcError } from "./errors"
 import { createSliceWalletProviderInternal } from "./provider"
 
@@ -178,6 +179,53 @@ const expectRpcError = async (
 }
 
 describe("Slice Wallet provider dispatch", () => {
+  test("preserves EIP-1193 user rejection errors", async () => {
+    const { provider, runtime } = createProvider()
+    const rejection = new SliceWalletUserRejectedRequestError()
+    runtime.connect.mockImplementation(async () => {
+      throw rejection
+    })
+
+    await expect(request(provider, "eth_requestAccounts")).rejects.toBe(
+      rejection
+    )
+    expect(rejection.code).toBe(4001)
+  })
+
+  test("isolates throwing event listeners from RPC results and sibling listeners", async () => {
+    const { provider } = createProvider()
+    await request(provider, "wallet_disconnect")
+    const nativeReportError = Object.getOwnPropertyDescriptor(
+      globalThis,
+      "reportError"
+    )
+    const listenerError = new Error("consumer listener failed")
+    const reportError = mock(() => undefined)
+    Object.defineProperty(globalThis, "reportError", {
+      configurable: true,
+      value: reportError
+    })
+    try {
+      const accountEvents: string[][] = []
+      provider.on("accountsChanged", () => {
+        throw listenerError
+      })
+      provider.on("accountsChanged", (accounts) => {
+        accountEvents.push([...accounts])
+      })
+
+      await expect(request(provider, "eth_requestAccounts")).resolves.toEqual([
+        account
+      ])
+      expect(accountEvents).toEqual([[account]])
+      expect(reportError).toHaveBeenCalledWith(listenerError)
+    } finally {
+      if (nativeReportError !== undefined) {
+        Object.defineProperty(globalThis, "reportError", nativeReportError)
+      }
+    }
+  })
+
   test("requests consent for an already-connected account without reconnecting", async () => {
     const { provider, requestSession, runtime } = createProvider()
 

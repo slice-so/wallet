@@ -32,7 +32,7 @@ import {
 import { encodeSliceWalletRootValidatorData } from "./rootValidator"
 
 const sliceKernelTimelockPolicyAddress =
-  "0x7f66B69270f96EC6793c545742CCBbBe028Be3f6"
+  sliceWalletKernelAddresses.timelockPolicy
 const sliceKernelWebAuthnValidatorAddress =
   sliceWalletKernelAddresses.webAuthnRootValidator
 

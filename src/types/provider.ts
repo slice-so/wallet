@@ -39,7 +39,7 @@ export type SliceWalletProviderEventMap = {
   message: { data?: SliceWalletProviderValue; type: string }
 }
 
-export type SliceWalletProvider = {
+export type SliceWalletEip1193Provider = {
   cancelPendingCeremony: () => void
   continueInPopup: () => Promise<SliceWalletCeremonyContinuationResult>
   connectWithSession: (
@@ -179,5 +179,5 @@ export type SliceWalletEip6963ProviderInfo = {
 
 export type SliceWalletEip6963ProviderDetail = {
   info: SliceWalletEip6963ProviderInfo
-  provider: SliceWalletProvider
+  provider: SliceWalletEip1193Provider
 }

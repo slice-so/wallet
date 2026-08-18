@@ -1,8 +1,10 @@
+import { isAddressEqual } from "viem"
 import type {
   CreateSliceWalletCeremonyRootSignerParameters,
   SliceWalletCeremonyRootSignRequest,
   SliceWalletRootSigner
 } from "../types"
+import { toSliceWalletCeremonyError } from "../userRejectedRequest"
 import {
   requireSliceWalletPopupGesture,
   SliceWalletUserGestureRequiredError
@@ -30,6 +32,14 @@ export const createSliceWalletCeremonyRootSigner =
     if (request === undefined || request.purpose !== purpose) {
       throw new Error(
         "This root signature request requires structured ceremony data."
+      )
+    }
+    if (
+      request.purpose === "user_operation" &&
+      !isAddressEqual(request.userOperation.sender, account)
+    ) {
+      throw new Error(
+        "Root user operation sender does not match the wallet account."
       )
     }
     const message = {
@@ -65,6 +75,7 @@ export const createSliceWalletCeremonyRootSigner =
         mode,
         nonce: message.nonce,
         path: `/ceremony/root?account=${encodeURIComponent(account)}&chainId=${chainId}`,
+        popupName: "slice-wallet-root-sign",
         window
       })
       port.postMessage(message)
@@ -78,7 +89,7 @@ export const createSliceWalletCeremonyRootSigner =
         throw new Error("Slice Wallet root response nonce does not match.")
       }
       if (response.type === "slice-wallet:ceremony-error") {
-        throw new Error(response.message)
+        throw toSliceWalletCeremonyError(response)
       }
       if (response.type === "slice-wallet:popup-required") {
         throw new SliceWalletUserGestureRequiredError(response.reason)

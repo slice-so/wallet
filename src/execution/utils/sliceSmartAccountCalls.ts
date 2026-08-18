@@ -5,7 +5,8 @@ import {
   type Hex,
   hexToBigInt,
   isAddress,
-  sliceHex
+  sliceHex,
+  toFunctionSelector
 } from "viem"
 import type { SliceSmartAccountCall } from "../../types/commerce"
 import {
@@ -249,6 +250,23 @@ const smartAccountCallDecoders: SliceSmartAccountCallDecoder[] = [
   { decode: decodeOperationAwareExecuteCalls },
   { decode: decodeSafeCalls }
 ]
+
+const smartAccountExecutionSelectors = new Set(
+  [
+    ambireAccountExecutionAbi,
+    coinbaseSmartWalletExecutionAbi,
+    erc7579AccountExecutionAbi,
+    metaMaskDelegatorExecutionAbi,
+    operationAwareExecutionAbi,
+    safeExecutionAbi,
+    simpleAccountBatchExecutionAbi,
+    zeroValueBatchExecutionAbi
+  ].flatMap((abi) => abi.map((item) => toFunctionSelector(item)))
+)
+
+export const isSliceSmartAccountExecutionCallData = (callData: Hex) =>
+  callData.length >= 10 &&
+  smartAccountExecutionSelectors.has(sliceHex(callData, 0, 4))
 
 export const getSliceSmartAccountCalls = (
   callData: Hex

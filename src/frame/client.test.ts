@@ -1,10 +1,47 @@
 import { describe, expect, it } from "bun:test"
-import { acquireSliceWalletSignerFrame } from "./client"
+import type { SliceWalletProtocolValue } from "../types"
+import {
+  acquireSliceWalletSignerFrame,
+  connectSliceWalletSignerFrame
+} from "./client"
 
-const createBrowserFixture = () => {
+class FixtureMessagePort extends EventTarget {
+  peer: FixtureMessagePort | null = null
+
+  close() {}
+
+  postMessage(message: SliceWalletProtocolValue) {
+    queueMicrotask(() => {
+      this.peer?.dispatchEvent(new MessageEvent("message", { data: message }))
+    })
+  }
+
+  start() {}
+}
+
+class FixtureMessageChannel {
+  readonly port1: FixtureMessagePort
+  readonly port2: FixtureMessagePort
+
+  constructor() {
+    this.port1 = new FixtureMessagePort()
+    this.port2 = new FixtureMessagePort()
+    this.port1.peer = this.port2
+    this.port2.peer = this.port1
+  }
+}
+
+const createBrowserFixture = (
+  responseFor: (id: string) => SliceWalletProtocolValue | null = (id) => ({
+    id,
+    result: null,
+    version: 1
+  })
+) => {
   const windowListeners = new Set<(event: MessageEvent) => void>()
   let removed = 0
   let requestId = 0
+  let framePort: MessagePort | null = null
   const contentWindow = Object.assign(Object.create(null) as Window, {
     postMessage: (
       message: { id: string },
@@ -13,11 +50,17 @@ const createBrowserFixture = () => {
     ) => {
       const port = ports[0]
       if (port === undefined) throw new Error("Missing signer frame port.")
-      port.addEventListener("message", (event: MessageEvent<{ id: string }>) =>
-        port.postMessage({ id: event.data.id, result: null })
+      framePort = port
+      port.addEventListener(
+        "message",
+        (event: MessageEvent<{ id: string }>) => {
+          const response = responseFor(event.data.id)
+          if (response !== null) port.postMessage(response)
+        }
       )
       port.start()
-      port.postMessage({ id: message.id, result: null })
+      const response = responseFor(message.id)
+      if (response !== null) port.postMessage(response)
     }
   })
   const iframeListeners = new Map<string, () => void>()
@@ -72,6 +115,10 @@ const createBrowserFixture = () => {
   return {
     document,
     getRemovedCount: () => removed,
+    postFrameMessage: (message: SliceWalletProtocolValue) => {
+      if (framePort === null) throw new Error("Signer frame is not connected.")
+      framePort.postMessage(message)
+    },
     window: browserWindow
   }
 }
@@ -93,5 +140,54 @@ describe("shared signer frame leases", () => {
     expect(fixture.getRemovedCount()).toBe(0)
     second.destroy()
     expect(fixture.getRemovedCount()).toBe(1)
+  })
+
+  it("rejects a matched malformed response instead of leaving it pending", async () => {
+    const nativeMessageChannel = Object.getOwnPropertyDescriptor(
+      globalThis,
+      "MessageChannel"
+    )
+    Object.defineProperty(globalThis, "MessageChannel", {
+      configurable: true,
+      value: FixtureMessageChannel
+    })
+    const responseIds: string[] = []
+    try {
+      const fixture = createBrowserFixture(
+        (id): SliceWalletProtocolValue | null => {
+          responseIds.push(id)
+          if (id === "request-2") return null
+          return { id, result: null, version: 1 }
+        }
+      )
+      const client = await connectSliceWalletSignerFrame({
+        document: fixture.document,
+        frameUrl: "https://id.slice.so/frame",
+        timeoutMs: 100,
+        window: fixture.window
+      })
+
+      const response = client.request({
+        method: "getAccountLockState",
+        params: { account: "0x1111111111111111111111111111111111111111" }
+      })
+      await Bun.sleep(5)
+      expect(responseIds).toEqual(["request-1", "request-2"])
+      fixture.postFrameMessage({
+        error: { code: "invalid_request" },
+        id: "request-2",
+        version: 1
+      })
+      await expect(response).rejects.toThrow("invalid response")
+      client.destroy()
+    } finally {
+      if (nativeMessageChannel !== undefined) {
+        Object.defineProperty(
+          globalThis,
+          "MessageChannel",
+          nativeMessageChannel
+        )
+      }
+    }
   })
 })

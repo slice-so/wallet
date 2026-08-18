@@ -9,10 +9,23 @@ import type {
   SliceWalletAccountActivity,
   SliceWalletAccountActivityBatchRequest,
   SliceWalletAccountActivityBatchResponse,
+  SliceWalletAccountActivityField,
   SliceWalletActivityTokenDescriptor
 } from "./types"
 
 const batchSize = 64
+
+const unavailableActivityField = (
+  response: SliceWalletAccountActivityBatchResponse | undefined,
+  label: string
+): SliceWalletAccountActivityField<never> => ({
+  error: {
+    code: response?.error?.code ?? null,
+    message:
+      response?.error?.message ?? `${label} RPC returned an invalid response.`
+  },
+  status: "unavailable"
+})
 
 const chunks = <Value>(values: readonly Value[], size: number) => {
   const result: Value[][] = []
@@ -108,31 +121,49 @@ export const loadSliceWalletAccountActivity = async (
   )
   let cursor = 1
   return uniqueAddresses.map((address, addressIndex) => {
-    const code = results.get(cursor++)?.result
-    const nativeBalance = results.get(cursor++)?.result
-    const tokenBalances: Record<string, string> = {}
+    const codeResponse = results.get(cursor++)
+    const nativeBalanceResponse = results.get(cursor++)
+    const code = codeResponse?.result
+    const nativeBalance = nativeBalanceResponse?.result
+    const tokenBalances: Record<
+      string,
+      SliceWalletAccountActivityField<string>
+    > = {}
     tokens.forEach((token, tokenIndex) => {
       const tokenOffset =
         uniqueAddresses.length * 2 +
         tokenIndex * uniqueAddresses.length +
         addressIndex +
         1
-      const value = results.get(tokenOffset)?.result
+      const response = results.get(tokenOffset)
+      const value = response?.result
       tokenBalances[token.symbol] =
-        value !== undefined && isHex(value, { strict: true })
-          ? BigInt(value).toString()
-          : "0"
+        response?.error === undefined &&
+        value !== undefined &&
+        isHex(value, { strict: true })
+          ? { status: "available", value: BigInt(value).toString() }
+          : unavailableActivityField(response, `${token.symbol} balance`)
     })
     return {
       address: address as Address,
       code:
-        code !== undefined && isHex(code, { strict: true }) && code !== "0x"
-          ? (code as Hex)
-          : null,
+        codeResponse?.error === undefined &&
+        code !== undefined &&
+        isHex(code, { strict: true })
+          ? {
+              status: "available" as const,
+              value: code === "0x" ? null : (code as Hex)
+            }
+          : unavailableActivityField(codeResponse, "Account code"),
       nativeBalance:
-        nativeBalance !== undefined && isHex(nativeBalance, { strict: true })
-          ? BigInt(nativeBalance).toString()
-          : "0",
+        nativeBalanceResponse?.error === undefined &&
+        nativeBalance !== undefined &&
+        isHex(nativeBalance, { strict: true })
+          ? {
+              status: "available" as const,
+              value: BigInt(nativeBalance).toString()
+            }
+          : unavailableActivityField(nativeBalanceResponse, "Native balance"),
       tokenBalances
     }
   })

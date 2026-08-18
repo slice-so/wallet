@@ -1,10 +1,12 @@
 import type { Address, Hex } from "viem"
 import { entryPoint07Address } from "viem/account-abstraction"
 import { base } from "viem/chains"
+import { assertWalletCallsMatchPolicy } from "../../policy"
 import type {
   SliceAccountClient,
   SliceAccountClientTransport
 } from "../../types/accountClient"
+import type { WalletPolicyDescriptor } from "../../types/policy"
 import {
   sliceKernelBaseV33Addresses,
   sliceKernelPasskeyBackend,
@@ -31,14 +33,24 @@ export const sliceKernelBaseV33Config = {
 } as const
 
 export class SliceAccountClientExecutionError extends Error {
+  readonly fallbackReason: "outside-policy" | null
   readonly wasBroadcast: boolean
 
   constructor(
     message: string,
-    { cause, wasBroadcast }: { cause?: Error; wasBroadcast: boolean }
+    {
+      cause,
+      fallbackReason,
+      wasBroadcast
+    }: {
+      cause?: Error
+      fallbackReason?: "outside-policy"
+      wasBroadcast: boolean
+    }
   ) {
     super(message, cause ? { cause } : undefined)
     this.name = "SliceAccountClientExecutionError"
+    this.fallbackReason = fallbackReason ?? null
     this.wasBroadcast = wasBroadcast
   }
 }
@@ -46,6 +58,7 @@ export class SliceAccountClientExecutionError extends Error {
 export const createKernelPasskeySliceAccountClient = ({
   account,
   chainId: clientChainId = sliceKernelBaseV33Config.chainId,
+  policy,
   transport
 }: {
   account: Address
@@ -54,6 +67,7 @@ export const createKernelPasskeySliceAccountClient = ({
    * runs the same pinned contracts under a different chain id.
    */
   chainId?: number
+  policy?: WalletPolicyDescriptor
   transport: SliceAccountClientTransport
 }): SliceAccountClient => ({
   account,
@@ -66,6 +80,23 @@ export const createKernelPasskeySliceAccountClient = ({
         "Kernel passkey Slice account client received a mismatched chain.",
         { wasBroadcast: false }
       )
+    }
+
+    if (policy !== undefined) {
+      try {
+        assertWalletCallsMatchPolicy(calls, policy)
+      } catch (error) {
+        throw new SliceAccountClientExecutionError(
+          error instanceof Error
+            ? error.message
+            : "Wallet calls are outside the delegated policy.",
+          {
+            ...(error instanceof Error ? { cause: error } : {}),
+            fallbackReason: "outside-policy",
+            wasBroadcast: false
+          }
+        )
+      }
     }
 
     let executionId: Hex

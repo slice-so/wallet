@@ -204,7 +204,6 @@ describe("Slice management execution client", () => {
       account,
       chainId: 8453,
       expiresAt: now + 3_600,
-      sessionSignerAddress: signer,
       startsAt: now - 1
     })
     const managementPermissionId = getWalletPermissionId(

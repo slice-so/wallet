@@ -12,7 +12,6 @@ import {
   type KernelValidator
 } from "@zerodev/sdk"
 import { toKernelPluginManager } from "@zerodev/sdk/accounts"
-import { encode7579Calls } from "permissionless/utils"
 import {
   type Address,
   concat,
@@ -64,6 +63,7 @@ import type {
   SliceWalletRecoveryCall
 } from "./types/recovery"
 import type { SliceWalletRegistryCredential } from "./types/registry"
+import { getSliceWalletValidationInstallConfig } from "./validationLifecycle"
 
 const recoveryEntryPoint = {
   address: sliceWalletEntryPoint.address,
@@ -633,18 +633,18 @@ export const buildRecoveryPermissionInstallCalls = async ({
   const permissionId = validator.getIdentifier()
   const validationId = toRecoveryValidationId(permissionId)
   const validationData = await validator.getEnableData(account)
+  const installConfig = await getSliceWalletValidationInstallConfig({
+    account,
+    client,
+    validationId
+  })
 
   return {
     calls: [
       {
         data: encodeFunctionData({
           abi: kernelAccountRecoveryAbi,
-          args: [
-            [validationId],
-            [{ hook: zeroAddress, nonce: 1 }],
-            [validationData],
-            ["0x"]
-          ],
+          args: [[validationId], [installConfig], [validationData], ["0x"]],
           functionName: "installValidations"
         }),
         to: account,
@@ -714,7 +714,9 @@ export const buildRecoveryEnableTypedData = async (
     CreateRecoveryPermissionAccountParameters,
     "enableSignature" | "getFactoryArgs" | "recoveryPrivateKey"
   >
-) => {
+): ReturnType<
+  KernelSmartAccountImplementation["kernelPluginManager"]["getPluginsEnableTypedData"]
+> => {
   const account = await createRecoveryPermissionAccount(parameters)
   return account.kernelPluginManager.getPluginsEnableTypedData(
     parameters.address
@@ -751,9 +753,13 @@ export const buildRecoveryNoOpCall = (): SliceWalletRecoveryCall => ({
 })
 
 export const buildRecoveryNoOpCallData = () =>
-  encode7579Calls({
-    callData: [buildRecoveryNoOpCall()],
-    mode: { type: "call" }
+  encodeFunctionData({
+    abi: kernelAccountRecoveryAbi,
+    args: [
+      pad("0x", { size: 32 }),
+      concat([zeroAddress, numberToHex(0n, { size: 32 })])
+    ],
+    functionName: "execute"
   })
 
 export const encodeRecoveryProposalSignature = ({

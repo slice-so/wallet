@@ -444,7 +444,8 @@ export const parseSliceWalletCeremonyResponse = (
     input.version !== 1 ||
     (input.code !== "authorization_failed" &&
       input.code !== "bridge_unavailable" &&
-      input.code !== "invalid_request")
+      input.code !== "invalid_request" &&
+      input.code !== "user_rejected")
   ) {
     throw new Error("Ceremony error response is invalid.")
   }

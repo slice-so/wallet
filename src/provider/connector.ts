@@ -1,9 +1,10 @@
 import { createConnector } from "@wagmi/core"
 import { type Address, isAddress } from "viem"
+import { anvil } from "viem/chains"
 import { sliceWalletChainManifests } from "../chains"
 import type {
+  SliceWalletEip1193Provider,
   SliceWalletParameters,
-  SliceWalletProvider,
   SliceWalletProviderValue
 } from "../types"
 import type { SliceWalletProviderConfig } from "../types/providerInternal"
@@ -22,15 +23,16 @@ type SliceWalletConnectorRuntime = Pick<
 export const sliceWalletConnector = (
   parameters: SliceWalletParameters,
   runtime: SliceWalletConnectorRuntime = {}
-) => {
-  let provider: SliceWalletProvider | null = null
-  let stopAnnouncement: (() => void) | null = null
-
-  return createConnector<SliceWalletProvider>((config) => {
+) =>
+  createConnector<SliceWalletEip1193Provider>((config) => {
+    let provider: SliceWalletEip1193Provider | null = null
+    let stopAnnouncement: (() => void) | null = null
     const inheritedChainIds = config.chains
       .map((chain) => chain.id)
       .filter(
-        (chainId) => sliceWalletChainManifests[chainId]?.admitted === true
+        (chainId) =>
+          chainId !== anvil.id &&
+          sliceWalletChainManifests[chainId]?.admitted === true
       )
     const providerConfig = {
       ...resolveCanonicalSliceWalletConfig({
@@ -39,8 +41,47 @@ export const sliceWalletConnector = (
       }),
       ...runtime
     }
+    const onAccountsChanged = (accounts: readonly string[]) => {
+      if (accounts.length === 0) {
+        config.emitter.emit("disconnect")
+        return
+      }
+      config.emitter.emit("change", {
+        accounts: accounts.filter((account) =>
+          isAddress(account)
+        ) as readonly Address[]
+      })
+    }
+    const onChainChanged = (chainId: string) => {
+      config.emitter.emit("change", { chainId: Number(chainId) })
+    }
+    const onDisconnect = () => {
+      config.emitter.emit("disconnect")
+    }
+    const destroyProvider = () => {
+      if (provider === null) return
+      provider.removeListener("accountsChanged", onAccountsChanged)
+      provider.removeListener("chainChanged", onChainChanged)
+      provider.removeListener("disconnect", onDisconnect)
+      stopAnnouncement?.()
+      stopAnnouncement = null
+      provider.destroy()
+      provider = null
+    }
     const getProvider = () => {
-      provider ??= createSliceWalletProviderInternal(providerConfig)
+      if (provider !== null) return provider
+      provider = createSliceWalletProviderInternal(providerConfig)
+      provider.on("accountsChanged", onAccountsChanged)
+      provider.on("chainChanged", onChainChanged)
+      provider.on("disconnect", onDisconnect)
+      if (providerConfig.announce === true) {
+        stopAnnouncement = announceSliceWalletProvider({
+          provider,
+          ...(providerConfig.window === undefined
+            ? {}
+            : { window: providerConfig.window })
+        })
+      }
       return provider
     }
 
@@ -111,24 +152,7 @@ export const sliceWalletConnector = (
       // instead of treating them as unavailable browser extensions.
       type: "injected",
       async setup() {
-        const walletProvider = getProvider()
-        if (providerConfig.announce === true && stopAnnouncement === null) {
-          stopAnnouncement = announceSliceWalletProvider({
-            provider: walletProvider,
-            ...(providerConfig.window === undefined
-              ? {}
-              : { window: providerConfig.window })
-          })
-        }
-        walletProvider.on("accountsChanged", (accounts) =>
-          this.onAccountsChanged([...accounts])
-        )
-        walletProvider.on("chainChanged", (chainId) =>
-          this.onChainChanged(chainId)
-        )
-        walletProvider.on("disconnect", (error) =>
-          this.onDisconnect(new Error(error.message))
-        )
+        getProvider()
       },
       async connect({ chainId, isReconnecting, withCapabilities } = {}) {
         let switchPromise:
@@ -231,6 +255,7 @@ export const sliceWalletConnector = (
       },
       async disconnect() {
         await getProvider().request({ method: "wallet_disconnect" })
+        destroyProvider()
       },
       async getAccounts() {
         return parseAccounts(
@@ -270,18 +295,10 @@ export const sliceWalletConnector = (
         return chain
       },
       onAccountsChanged(accounts) {
-        if (accounts.length === 0) {
-          config.emitter.emit("disconnect")
-          return
-        }
-        config.emitter.emit("change", {
-          accounts: accounts.filter((account) =>
-            isAddress(account)
-          ) as readonly Address[]
-        })
+        onAccountsChanged(accounts)
       },
       onChainChanged(chainId) {
-        config.emitter.emit("change", { chainId: Number(chainId) })
+        onChainChanged(chainId)
       },
       onConnect(connectInfo) {
         config.emitter.emit("connect", {
@@ -290,8 +307,7 @@ export const sliceWalletConnector = (
         })
       },
       onDisconnect() {
-        config.emitter.emit("disconnect")
+        onDisconnect()
       }
     }
   })
-}

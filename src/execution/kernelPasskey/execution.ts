@@ -13,7 +13,6 @@ import {
   createKernelAccount,
   type KernelSmartAccountImplementation
 } from "@zerodev/sdk"
-import { Base64, PublicKey } from "ox"
 import {
   type Abi,
   type AbiFunction,
@@ -23,25 +22,20 @@ import {
   encodeFunctionData,
   erc20Abi,
   type Hex,
-  keccak256,
   maxUint256,
   pad,
   parseAbiParameters,
   toFunctionSelector,
-  toHex,
   zeroAddress
 } from "viem"
-import type { WebAuthnAccount } from "viem/account-abstraction"
+import type { UserOperation } from "viem/account-abstraction"
 import { entryPoint07Address } from "viem/account-abstraction"
 import { privateKeyToAccount } from "viem/accounts"
-import type {
-  SliceAccountClientCall,
-  SliceKernelPasskeyCredential
-} from "../../types/accountClient"
+import type { SliceWalletPasskeyCredential } from "../../types/account"
+import type { SliceAccountClientCall } from "../../types/accountClient"
 import type {
   BuildSliceExecutionEnableTypedDataParameters,
-  CreateSliceExecutionAccountParameters,
-  SliceExecutionUserOperation
+  CreateSliceExecutionAccountParameters
 } from "../../types/execution"
 import { createSliceStoreManagementPermissionPolicies } from "../commerce/policies"
 import { getProductsModuleAddress } from "../generated/commerceFacts"
@@ -49,6 +43,7 @@ import {
   sliceKernelBaseV33Addresses,
   sliceKernelWebAuthnValidatorAddress
 } from "../utils/sliceAccountClient"
+import { encodeWebAuthnRootValidatorData } from "./webAuthn"
 import {
   buildWeightedEcdsaStubSignature,
   getWeightedEcdsaProposalTypedData,
@@ -62,8 +57,8 @@ import {
  * with the ProductsModule as spender. A stolen key can only buy Slice
  * products; it can never transfer funds out.
  *
- * The account address stays pinned to the permissionless-derived one; the
- * ZeroDev client here is only the enable/signing engine.
+ * The account address stays pinned to the canonical Kernel deployment; this
+ * client is only the enable/signing engine.
  */
 
 const buyerEntryPoint = {
@@ -175,6 +170,7 @@ const encodeBuyerExecutionEnableUserOperationSignature = ({
     )
   ])
 
+/** @deprecated Use createSliceCheckoutPolicyDescriptor for canonical buyer-bound checkout policy construction. */
 export const createBuyerCheckoutCallPolicy = (chainId: number) => {
   const productsModuleAddress = getProductsModuleAddress(chainId)
   return toCallPolicy({
@@ -215,85 +211,12 @@ const getClientChainId = (
   return chainId
 }
 
-/**
- * Enable data for the onchain WebAuthn root validator — must byte-match the
- * encoding permissionless used at account creation ({x, y} public key plus
- * keccak256 of the base64url credential id).
- */
-export const encodeWebAuthnRootValidatorData = (
-  credential: SliceKernelPasskeyCredential
-) => {
-  const publicKey = PublicKey.fromHex(credential.publicKey)
-  const authenticatorIdHash = keccak256(toHex(Base64.toBytes(credential.id)))
-
-  return encodeAbiParameters(
-    [
-      {
-        components: [
-          { name: "x", type: "uint256" },
-          { name: "y", type: "uint256" }
-        ],
-        name: "webAuthnData",
-        type: "tuple"
-      },
-      { name: "authenticatorIdHash", type: "bytes32" }
-    ],
-    [{ x: publicKey.x, y: publicKey.y }, authenticatorIdHash]
-  )
-}
-
-/**
- * WebAuthn validator signature envelope. The enable digest must be signed in
- * the root validator's raw format (no ERC-7739 nesting): a WebAuthn assertion
- * over the typed-data hash, encoded for the onchain verifier.
- */
-export const encodeWebAuthnValidatorSignature = ({
-  signature,
-  webauthn
-}: Pick<
-  Awaited<ReturnType<WebAuthnAccount["sign"]>>,
-  "signature" | "webauthn"
->) => {
-  const { r, s } = parseWebAuthnSignature(signature)
-
-  return encodeAbiParameters(
-    [
-      { name: "authenticatorData", type: "bytes" },
-      { name: "clientDataJSON", type: "string" },
-      { name: "responseTypeLocation", type: "uint256" },
-      { name: "r", type: "uint256" },
-      { name: "s", type: "uint256" },
-      { name: "usePrecompiled", type: "bool" }
-    ],
-    [
-      webauthn.authenticatorData,
-      webauthn.clientDataJSON,
-      BigInt(webauthn.typeIndex ?? 0),
-      r,
-      s,
-      false
-    ]
-  )
-}
-
-const parseWebAuthnSignature = (signature: Hex) => {
-  const bytes = signature.slice(2)
-  if (bytes.length < 128) {
-    throw new Error("Invalid WebAuthn signature length.")
-  }
-
-  return {
-    r: BigInt(`0x${bytes.slice(0, 64)}`),
-    s: BigInt(`0x${bytes.slice(64, 128)}`)
-  }
-}
-
 const createBuyerRootValidator = async ({
   client,
   credential
 }: {
   client: KernelSmartAccountImplementation["client"]
-  credential: SliceKernelPasskeyCredential
+  credential: SliceWalletPasskeyCredential
 }) => {
   // The sudo validator only supplies identity and enable data here; the
   // enable signature itself is produced externally by the passkey (mirrors
@@ -373,7 +296,6 @@ const createStoreManagementExecutionValidator = async ({
         account: accountAddress,
         chainId: getClientChainId(client),
         expiresAt: validUntil,
-        sessionSignerAddress,
         startsAt
       })
     ],
@@ -445,10 +367,7 @@ export const createSliceExecutionAccount = async (
     userOperation
   }: {
     sessionKey: Hex
-    userOperation: Pick<
-      SliceExecutionUserOperation,
-      "callData" | "nonce" | "sender"
-    >
+    userOperation: Pick<UserOperation<"0.7">, "callData" | "nonce" | "sender">
   }) =>
     privateKeyToAccount(sessionKey).signTypedData(
       getWeightedEcdsaProposalTypedData({
@@ -495,7 +414,7 @@ export const createSliceExecutionAccount = async (
       ...userOperationFields,
       sender: userOperation.sender ?? address,
       signature: "0x"
-    } satisfies SliceExecutionUserOperation
+    } satisfies UserOperation<"0.7">
     const proposalSignature = await signProposal({
       sessionKey: sessionPrivateKey,
       userOperation: unsignedUserOperation
@@ -550,7 +469,9 @@ export const createSliceExecutionAccount = async (
 
 export const buildSliceExecutionEnableTypedData = async (
   parameters: BuildSliceExecutionEnableTypedDataParameters
-) => {
+): ReturnType<
+  KernelSmartAccountImplementation["kernelPluginManager"]["getPluginsEnableTypedData"]
+> => {
   const account = await createSliceExecutionAccount(parameters)
   return account.kernelPluginManager.getPluginsEnableTypedData(
     parameters.address

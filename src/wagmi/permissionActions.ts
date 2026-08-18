@@ -10,7 +10,7 @@ import {
   revokePermission,
   rotatePermission
 } from "../permissions/actions"
-import type { SliceWalletProvider } from "../types"
+import type { SliceWalletEip1193Provider } from "../types"
 import type {
   SliceWalletWagmiGrantPermissionParameters,
   SliceWalletWagmiPermissionParameters
@@ -30,7 +30,7 @@ const getPermissionProvider = async <config extends Config>({
   ) {
     throw new ConnectorNotConnectedError()
   }
-  return provider as Pick<SliceWalletProvider, "request">
+  return provider as Pick<SliceWalletEip1193Provider, "request">
 }
 
 export const grantSliceWalletPermissions = async <config extends Config>(

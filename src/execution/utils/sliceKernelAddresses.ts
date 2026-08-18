@@ -1,4 +1,5 @@
 import type { Address } from "viem"
+import { sliceWalletKernelAddresses } from "../../constants"
 
 export const sliceKernelV33Version = "3.3" as const
 export const sliceKernelPasskeyBackend = "kernel-passkey" as const
@@ -16,13 +17,13 @@ export const sliceKernelWebAuthnValidatorAddress =
   "0x7ab16Ff354AcB328452F1D445b3Ddee9a91e9e69" as const satisfies Address
 
 export const sliceKernelWeightedEcdsaSignerAddress =
-  "0x45fC7d684683773DDA5bE3b3ba0a7997EccFdb0a" as const satisfies Address
+  sliceWalletKernelAddresses.weightedEcdsaSigner satisfies Address
 
 export const sliceKernelWeightedP256SignerAddress =
-  "0xe9c0dBa15040D8B20a94D5bCA18382496B277485" as const satisfies Address
+  sliceWalletKernelAddresses.weightedP256Signer satisfies Address
 
 export const sliceKernelTimelockPolicyAddress =
-  "0x7f66B69270f96EC6793c545742CCBbBe028Be3f6" as const satisfies Address
+  sliceWalletKernelAddresses.timelockPolicy satisfies Address
 
 export const sliceKernelSlicerRegistryPolicyAddress =
-  "0xbDbE8205C0044fD06d49a674ce6C7d956BF2B72a" as const satisfies Address
+  sliceWalletKernelAddresses.slicerRegistryPolicy satisfies Address
