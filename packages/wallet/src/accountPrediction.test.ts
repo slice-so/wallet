@@ -1,24 +1,20 @@
-import { describe, expect, it } from "bun:test"
-import { sliceWalletKernelAddresses } from "@slicekit/wallet-primitives/server"
-import * as Base64 from "ox/Base64"
+import { describe, expect, test } from "bun:test"
 import {
-  concatHex,
+  buildRecoveryPermissionInitConfig,
+  predictSliceWalletKernelAccountAddress,
+  sliceWalletKernelAddresses,
+  sliceWalletKernelProxyInitCodeHash
+} from "@slicekit/wallet-primitives"
+import { kernelFactoryAbi } from "@slicekit/wallet-primitives/kernel"
+import {
   createPublicClient,
   custom,
   decodeFunctionData,
   defineChain,
-  getContractAddress,
   hexToBytes,
-  keccak256,
   parseErc6492Signature,
-  toHex
+  serializeErc6492Signature
 } from "viem"
-import { createSliceWalletKernelAccount } from "./account"
-import {
-  predictSliceWalletKernelAccountAddress,
-  sliceWalletKernelProxyInitCodeHash
-} from "./accountPrediction"
-import { buildRecoveryPermissionInitConfig } from "./recovery"
 import { createSliceWalletRegisteredKernelAccount } from "./rootValidator"
 
 const parameters = {
@@ -32,183 +28,179 @@ const parameters = {
   recoverySignerAddress: "0x0000000000000000000000000000000000000001"
 } as const
 
-// Captured from EntryPoint 0.7 getSenderAddress on a Base fork using the
-// pinned Kernel 0.3.3 factories. The fork tier independently replays it.
-const entryPointDerivedAddress =
-  "0x614d09f18A013734E56584F157E48c6508d6Db5d" as const
-const indexedAddressVectors = [
-  [1n, "0xa3D8B1c04629A122E277Df609b375dd01765f4Ab"],
-  [7n, "0x520B1B81FCa0822C222292F5cAcF3e60B3D447D5"],
-  [31n, "0x1dC61fbcC9FFd59029174D677cf3f310882Af87b"]
+const vectors = [
+  [0n, "0x543f58773eaF2B7B4afa7E1da81633a02C112666"],
+  [1n, "0xe435FCe145dED6DEEFe9134098580056A5E6468F"],
+  [7n, "0x13B42957CE54Ae99226A67e118EB08aA583e5522"],
+  [31n, "0xaC17903A1E4EDBe5fE466405BBc56d0f8405970a"]
 ] as const
 
-describe("Slice wallet offline account prediction", () => {
-  it("matches the permanent known-address vector without RPC", async () => {
-    await expect(
-      predictSliceWalletKernelAccountAddress(parameters)
-    ).resolves.toBe(entryPointDerivedAddress)
-    expect(sliceWalletKernelProxyInitCodeHash).toBe(
-      "0xc452397f1e7518f8cea0566ac057e243bb1643f6298aba8eec8cdee78ee3b3dd"
-    )
+const client = createPublicClient({
+  chain: defineChain({
+    id: parameters.chainId,
+    name: "Offline Base",
+    nativeCurrency: { decimals: 18, name: "Ether", symbol: "ETH" },
+    rpcUrls: { default: { http: ["http://127.0.0.1"] } }
+  }),
+  transport: custom({
+    async request({ method }) {
+      if (method === "eth_getCode") return "0x"
+      throw new Error(`Unexpected RPC request: ${method}`)
+    }
   })
+})
 
-  it("pins the full account-index salt derivation", async () => {
-    for (const [index, address] of indexedAddressVectors) {
-      await expect(
-        predictSliceWalletKernelAccountAddress({ ...parameters, index })
-      ).resolves.toBe(address)
+const developmentClient = createPublicClient({
+  chain: defineChain({
+    id: 31337,
+    name: "Offline Anvil",
+    nativeCurrency: { decimals: 18, name: "Ether", symbol: "ETH" },
+    rpcUrls: { default: { http: ["http://127.0.0.1"] } }
+  }),
+  transport: custom({
+    async request({ method }) {
+      if (method === "eth_getCode") return "0x"
+      throw new Error(`Unexpected RPC request: ${method}`)
+    }
+  })
+})
+
+describe("KernelUUPS v4 account prediction", () => {
+  test("matches pinned release factory vectors", async () => {
+    expect(sliceWalletKernelProxyInitCodeHash).toBe(
+      "0x95b9b5003472f9fd900f2a6ac4b9afdfa2c4188e6bcc115d2fc87bf420846ed8"
+    )
+    for (const [index, address] of vectors) {
+      expect(
+        await predictSliceWalletKernelAccountAddress({ ...parameters, index })
+      ).toBe(address)
     }
   })
 
-  it("matches the pinned Kernel account constructor", async () => {
-    const client = createPublicClient({
-      chain: defineChain({
-        id: parameters.chainId,
-        name: "Offline Base",
-        nativeCurrency: { decimals: 18, name: "Ether", symbol: "ETH" },
-        rpcUrls: { default: { http: ["http://127.0.0.1"] } }
-      }),
-      transport: custom({
-        async request({ method }) {
-          if (method === "eth_getCode") return "0x"
-          throw new Error(`Unexpected RPC request: ${method}`)
-        }
-      })
-    })
+  test("returns official KernelFactory deploy calldata", async () => {
     const recovery = await buildRecoveryPermissionInitConfig({
-      client,
       recoverySignerAddress: parameters.recoverySignerAddress
     })
-    const predicted = await predictSliceWalletKernelAccountAddress(parameters)
     const account = await createSliceWalletRegisteredKernelAccount({
-      address: predicted,
       chainId: parameters.chainId,
       client,
       credential: parameters.credential,
+      index: 7n,
       initConfig: recovery.initConfig
     })
-
     const factoryArgs = await account.getFactoryArgs()
-    if (factoryArgs.factoryData === undefined) {
-      throw new Error("Kernel account factory data is missing.")
-    }
-    const deployment = decodeFunctionData({
-      abi: [
-        {
-          inputs: [
-            { name: "factory", type: "address" },
-            { name: "createData", type: "bytes" },
-            { name: "salt", type: "bytes32" }
-          ],
-          name: "deployWithFactory",
-          outputs: [{ name: "account", type: "address" }],
-          stateMutability: "payable",
-          type: "function"
-        }
-      ] as const,
-      data: factoryArgs.factoryData
+    expect(factoryArgs.factory).toBe(sliceWalletKernelAddresses.factory)
+    const decoded = decodeFunctionData({
+      abi: kernelFactoryAbi,
+      data: factoryArgs.factoryData ?? "0x"
     })
-    const [factory, initializationData, index] = deployment.args
-    const actual = getContractAddress({
-      bytecodeHash: sliceWalletKernelProxyInitCodeHash,
-      from: factory,
-      opcode: "CREATE2",
-      salt: keccak256(concatHex([initializationData, index]))
-    })
-
-    expect(account.address).toBe(predicted)
-    expect(actual).toBe(predicted)
+    expect(decoded.functionName).toBe("deploy")
+    expect(decoded.args[1]).toBe(7n)
+    expect(decoded.args[0]).toHaveLength(4)
+    expect(account.address).toBe(vectors[2][1])
   })
 
-  it("keeps passkey account deployment byte-compatible", async () => {
-    const client = createPublicClient({
-      chain: defineChain({
-        id: parameters.chainId,
-        name: "Offline Base",
-        nativeCurrency: { decimals: 18, name: "Ether", symbol: "ETH" },
-        rpcUrls: { default: { http: ["http://127.0.0.1"] } }
-      }),
-      transport: custom({
-        async request({ method }) {
-          if (method === "eth_getCode") return "0x"
-          throw new Error(`Unexpected RPC request: ${method}`)
+  test("derives identical identity and factory calldata for every r1 selector", async () => {
+    const results = await Promise.all(
+      [undefined, "0.4.0", "Kernel 0.4.0", "slice-kernel-v4-ep09-r1"].map(
+        async (factoryVersion) => {
+          const recovery = await buildRecoveryPermissionInitConfig({
+            chainId: parameters.chainId,
+            ...(factoryVersion === undefined ? {} : { factoryVersion }),
+            recoverySignerAddress: parameters.recoverySignerAddress
+          })
+          const account = await createSliceWalletRegisteredKernelAccount({
+            chainId: parameters.chainId,
+            client,
+            credential: parameters.credential,
+            ...(factoryVersion === undefined ? {} : { factoryVersion }),
+            index: 7n,
+            initConfig: recovery.initConfig
+          })
+          return {
+            address: account.address,
+            factoryArgs: await account.getFactoryArgs()
+          }
         }
-      })
-    })
-    const credential = {
-      id: Base64.fromBytes(new Uint8Array([1, 2, 3, 4]), {
-        pad: false,
-        url: true
-      }),
-      publicKey: parameters.credential.publicKey
-    }
-    const registeredCredential = {
-      credentialIdHash: keccak256(toHex(Base64.toBytes(credential.id))),
-      publicKey: credential.publicKey
-    }
-    const [passkeyAccount, registeredAccount] = await Promise.all([
-      createSliceWalletKernelAccount({
-        address: entryPointDerivedAddress,
-        client,
-        credential
-      }),
+      )
+    )
+    expect(results).toEqual(results.map(() => results[0]))
+  })
+
+  test("rejects an unknown persisted selector before account construction", async () => {
+    await expect(
       createSliceWalletRegisteredKernelAccount({
-        address: entryPointDerivedAddress,
         chainId: parameters.chainId,
         client,
-        credential: registeredCredential
+        credential: parameters.credential,
+        factoryVersion: "4.0"
       })
-    ])
-
-    expect(await passkeyAccount.getFactoryArgs()).toEqual(
-      await registeredAccount.getFactoryArgs()
-    )
+    ).rejects.toThrow("Unknown Slice Wallet deployment profile")
   })
 
-  it("keeps UserOperation deployment canonical while compacting recovery proofs", async () => {
-    const chainId = 31337
-    const client = createPublicClient({
-      chain: defineChain({
-        id: chainId,
-        name: "Offline Anvil",
-        nativeCurrency: { decimals: 18, name: "Ether", symbol: "ETH" },
-        rpcUrls: { default: { http: ["http://127.0.0.1"] } }
-      }),
-      transport: custom({
-        async request({ method }) {
-          if (method === "eth_getCode") return "0x"
-          throw new Error(`Unexpected RPC request: ${method}`)
-        }
-      })
-    })
+  test("uses viem's standard ERC-6492 wrapper for undeployed accounts", async () => {
     const recovery = await buildRecoveryPermissionInitConfig({
-      client,
       recoverySignerAddress: parameters.recoverySignerAddress
     })
-    const predicted = await predictSliceWalletKernelAccountAddress({
-      ...parameters,
-      chainId
-    })
     const account = await createSliceWalletRegisteredKernelAccount({
-      address: predicted,
-      chainId,
+      chainId: parameters.chainId,
       client,
       credential: parameters.credential,
       initConfig: recovery.initConfig,
-      rootSigner: async () => `0x${"22".repeat(512)}`
+      rootSigner: async () => `0x${"22".repeat(64)}`
+    })
+    const parsed = parseErc6492Signature(
+      await account.signMessage({ message: "Kernel v4" })
+    )
+    expect(parsed.address?.toLowerCase()).toBe(
+      sliceWalletKernelAddresses.factory.toLowerCase()
+    )
+    if (parsed.data === undefined) {
+      throw new Error("Expected an ERC-6492 deployment payload.")
+    }
+    expect(
+      decodeFunctionData({ abi: kernelFactoryAbi, data: parsed.data })
+        .functionName
+    ).toBe("deploy")
+  })
+
+  test("reduces a real Kernel v4 counterfactual signature on development chains", async () => {
+    const recovery = await buildRecoveryPermissionInitConfig({
+      chainId: 31337,
+      recoverySignerAddress: parameters.recoverySignerAddress
+    })
+    const account = await createSliceWalletRegisteredKernelAccount({
+      chainId: 31337,
+      client: developmentClient,
+      credential: parameters.credential,
+      initConfig: recovery.initConfig,
+      rootSigner: async () => `0x${"22".repeat(64)}`
+    })
+    const compactSignature = await account.signMessage({
+      message: "Kernel v4 compact ERC-6492"
+    })
+    const factoryArgs = await account.getFactoryArgs()
+    const compactProof = parseErc6492Signature(compactSignature)
+    if (compactProof.address === undefined || compactProof.data === undefined) {
+      throw new Error("Expected a compact ERC-6492 deployment payload.")
+    }
+    if (
+      factoryArgs.factory === undefined ||
+      factoryArgs.factoryData === undefined
+    ) {
+      throw new Error("Expected Kernel v4 factory arguments.")
+    }
+    const standardSignature = serializeErc6492Signature({
+      address: factoryArgs.factory,
+      data: factoryArgs.factoryData,
+      signature: compactProof.signature
     })
 
-    const factoryArgs = await account.getFactoryArgs()
-    const signature = await account.signMessage({ message: "compact proof" })
-    const parsed = parseErc6492Signature(signature)
-
-    expect(factoryArgs.factory).toBe(sliceWalletKernelAddresses.metaFactory)
-    expect(hexToBytes(factoryArgs.factoryData ?? "0x").length).toBeGreaterThan(
-      2_000
-    )
-    expect(parsed.address).toBe(
+    expect(compactProof.address).toBe(
       sliceWalletKernelAddresses.erc6492BootstrapFactory
     )
-    expect(hexToBytes(signature).length).toBeLessThan(1_600)
+    expect(factoryArgs.factory).toBe(sliceWalletKernelAddresses.factory)
+    expect(hexToBytes(standardSignature).length).toBe(2_464)
+    expect(hexToBytes(compactSignature).length).toBe(608)
   })
 })

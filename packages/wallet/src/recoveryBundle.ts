@@ -1,3 +1,4 @@
+import { resolveSliceWalletDeployment } from "@slicekit/wallet-primitives/kernel"
 import {
   type Address,
   bytesToHex,
@@ -205,7 +206,6 @@ const parsePayload = (value: SliceWalletRecoveryJsonValue) => {
     "credentialPublicKey",
     "factory",
     "factoryVersion",
-    "metaFactory",
     "recoveryPermissionId",
     "recoveryPrivateKey",
     "recoverySignerAddress"
@@ -225,7 +225,6 @@ const parsePayload = (value: SliceWalletRecoveryJsonValue) => {
       input.factoryVersion,
       "Recovery factory version"
     ),
-    metaFactory: addressField(input.metaFactory, "Recovery meta-factory"),
     recoveryPermissionId: hexField(
       input.recoveryPermissionId,
       "Recovery permission id",
@@ -248,7 +247,14 @@ const parsePayload = (value: SliceWalletRecoveryJsonValue) => {
   ) {
     throw new Error("Recovery payload metadata is invalid.")
   }
-  return payload
+  const deployment = resolveSliceWalletDeployment({
+    chainId: payload.chainId,
+    factoryVersion: payload.factoryVersion
+  })
+  if (deployment.factory.toLowerCase() !== payload.factory.toLowerCase()) {
+    throw new Error("Recovery payload factory does not match its profile.")
+  }
+  return { ...payload, factoryVersion: deployment.profile.id }
 }
 
 export const encryptSliceWalletRecoveryBundle = async ({
@@ -260,6 +266,17 @@ export const encryptSliceWalletRecoveryBundle = async ({
   passphrase: string
   payload: SliceWalletRecoveryBundlePayload
 }): Promise<SliceWalletRecoveryBundleEnvelope> => {
+  const deployment = resolveSliceWalletDeployment({
+    chainId: payload.chainId,
+    factoryVersion: payload.factoryVersion
+  })
+  if (deployment.factory.toLowerCase() !== payload.factory.toLowerCase()) {
+    throw new Error("Recovery payload factory does not match its profile.")
+  }
+  const canonicalPayload = {
+    ...payload,
+    factoryVersion: deployment.profile.id
+  }
   const salt = crypto.getRandomValues(new Uint8Array(16))
   const iv = crypto.getRandomValues(new Uint8Array(12))
   const kdf = {
@@ -268,8 +285,8 @@ export const encryptSliceWalletRecoveryBundle = async ({
     salt: bytesToHex(salt)
   }
   const base = {
-    account: payload.account,
-    chainId: payload.chainId,
+    account: canonicalPayload.account,
+    chainId: canonicalPayload.chainId,
     kdf
   }
   const key = await deriveAesKey({ argon2id, envelope: { kdf }, passphrase })
@@ -281,7 +298,7 @@ export const encryptSliceWalletRecoveryBundle = async ({
       tagLength: 128
     },
     key,
-    textEncoder.encode(JSON.stringify(payload))
+    textEncoder.encode(JSON.stringify(canonicalPayload))
   )
   return {
     ...base,

@@ -1,9 +1,9 @@
+import type { WalletPolicyDescriptor } from "@slicekit/wallet-primitives"
 import {
-  sliceKernelBaseV33Config,
+  sliceKernelConfig,
   sliceKernelPasskeyBackend
 } from "@slicekit/wallet-primitives/execution"
 import { assertWalletCallsMatchPolicy } from "@slicekit/wallet-primitives/policy"
-import type { WalletPolicyDescriptor } from "@slicekit/wallet-primitives/server"
 import type { Address, Hex } from "viem"
 import type {
   SliceAccountClient,
@@ -35,7 +35,7 @@ export class SliceAccountClientExecutionError extends Error {
 
 export const createKernelPasskeySliceAccountClient = ({
   account,
-  chainId: clientChainId = sliceKernelBaseV33Config.chainId,
+  chainId: clientChainId = sliceKernelConfig.chainId,
   policy,
   transport
 }: {

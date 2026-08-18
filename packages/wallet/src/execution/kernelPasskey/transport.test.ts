@@ -1,6 +1,8 @@
 import { describe, expect, it, mock } from "bun:test"
-import type { SliceBundlerRetryReason } from "@slicekit/wallet-primitives/execution"
-import { sliceKernelPasskeyBackend } from "@slicekit/wallet-primitives/execution"
+import {
+  type SliceBundlerRetryReason,
+  sliceKernelPasskeyBackend
+} from "@slicekit/wallet-primitives"
 import {
   type Address,
   createPublicClient,
@@ -8,12 +10,12 @@ import {
   http,
   RpcRequestError
 } from "viem"
-import type {
-  GetPaymasterDataReturnType,
-  GetPaymasterStubDataReturnType,
-  UserOperation
+import {
+  entryPoint09Address,
+  type GetPaymasterDataReturnType,
+  type GetPaymasterStubDataReturnType,
+  type UserOperation
 } from "viem/account-abstraction"
-import { entryPoint07Address } from "viem/account-abstraction"
 import { anvil, base } from "viem/chains"
 import type { SliceWalletKernelAccount } from "../../types/account"
 import type {
@@ -59,7 +61,7 @@ const client = createPublicClient({
 })
 const account = {
   address: accountAddress
-} as SliceWalletKernelAccount
+} as never as SliceWalletKernelAccount
 const call = {
   data: "0x1234",
   to: targetAddress,
@@ -75,7 +77,7 @@ const preparedUserOperation = {
   sender: accountAddress,
   signature: "0x",
   verificationGasLimit: 100_000n
-} satisfies UserOperation<"0.7">
+} satisfies UserOperation<"0.9">
 const signingAccount = {
   ...account,
   signUserOperation: mock(async () => "0x1234" as Hex)
@@ -265,7 +267,7 @@ describe("createSliceKernelPasskeyTransport", () => {
       paymasterData: "0x",
       paymasterPostOpGasLimit: 0n,
       paymasterVerificationGasLimit: 0n
-    } satisfies UserOperation<"0.7">
+    } satisfies UserOperation<"0.9">
     const signUserOperation = mock(async () => "0x1234" as Hex)
     const sendPreparedUserOperation = mock(
       async (): Promise<Hex> => userOperationHash
@@ -338,7 +340,7 @@ describe("createSliceKernelPasskeyTransport", () => {
       maxFeePerGas: 2n,
       maxPriorityFeePerGas: 2n,
       paymasterData: "0x1234"
-    } satisfies UserOperation<"0.7">
+    } satisfies UserOperation<"0.9">
     const prepareUserOperation = mock(
       async (
         parameters: Parameters<
@@ -350,7 +352,7 @@ describe("createSliceKernelPasskeyTransport", () => {
           : preparedUserOperation
     )
     const sendPreparedUserOperation = mock(
-      async (operation: UserOperation<"0.7">): Promise<Hex> => {
+      async (operation: UserOperation<"0.9">): Promise<Hex> => {
         if (operation.maxFeePerGas === 1n) {
           throw createRetryRpcError("fee_floor")
         }
@@ -418,7 +420,7 @@ describe("createSliceKernelPasskeyTransport", () => {
           ...preparedUserOperation,
           chainId: base.id,
           context: parameters.paymasterContext,
-          entryPointAddress: entryPoint07Address
+          entryPointAddress: entryPoint09Address
         }
         await parameters.paymaster?.getPaymasterStubData(paymasterParameters)
         await parameters.paymaster?.getPaymasterData(paymasterParameters)
@@ -516,7 +518,7 @@ describe("createSliceKernelPasskeyTransport", () => {
       ...preparedUserOperation,
       callData: "0xabcd",
       maxFeePerGas: 2n
-    } satisfies UserOperation<"0.7">
+    } satisfies UserOperation<"0.9">
     const prepareUserOperation = mock(
       async (
         parameters: Parameters<
@@ -553,7 +555,7 @@ describe("createSliceKernelPasskeyTransport", () => {
       ...preparedUserOperation,
       maxFeePerGas: 2n,
       maxPriorityFeePerGas: 2n
-    } satisfies UserOperation<"0.7">
+    } satisfies UserOperation<"0.9">
     const prepareUserOperation = mock(
       async (
         parameters: Parameters<

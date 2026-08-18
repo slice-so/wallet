@@ -1,5 +1,5 @@
 import { describe, expect, it, mock } from "bun:test"
-import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives/server"
+import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives"
 import {
   sliceWalletBrokerRequiredDialogRoutes,
   sliceWalletDialogCeremonyRoutes

@@ -1,11 +1,11 @@
 "use client"
 
-import { createSliceCheckoutPolicyDescriptor } from "@slicekit/wallet-primitives/execution"
-import { serializeWalletPolicyDescriptor } from "@slicekit/wallet-primitives/policy"
 import type {
   SliceWalletPermissionAuthorization,
   SliceWalletProtocolValue
-} from "@slicekit/wallet-primitives/server"
+} from "@slicekit/wallet-primitives"
+import { createSliceCheckoutPolicyDescriptor } from "@slicekit/wallet-primitives/execution"
+import { serializeWalletPolicyDescriptor } from "@slicekit/wallet-primitives/policy"
 import { useCallback } from "react"
 import { type Address, isAddress } from "viem"
 import { authorizeSliceWalletSession } from "../ceremony/client"
@@ -285,6 +285,7 @@ export const useSliceWalletCheckoutEnablement = ({
             accountAddress: kernelAccount.address,
             ...(budgetPeriodSec === undefined ? {} : { budgetPeriodSec }),
             coSignerAddress,
+            enableNonce: authorization.enableNonce,
             enableSignature: authorization.enableSignature,
             expiresAt: new Date(session.expiresAt * 1_000).toISOString(),
             kind: "checkout",
@@ -301,6 +302,7 @@ export const useSliceWalletCheckoutEnablement = ({
             : { budgetPeriodSec: registration.budgetPeriodSec }),
           coSignerAddress: registration.coSignerAddress,
           delegationId: registration.delegationId,
+          enableNonce: authorization.enableNonce,
           enableSignature: authorization.enableSignature,
           expiresAt: registration.expiresAt,
           kind: "checkout",
@@ -361,6 +363,7 @@ export const useSliceWalletCheckoutEnablement = ({
           : { budgetPeriodSec: registration.budgetPeriodSec }),
         coSignerAddress: registration.coSignerAddress,
         delegationId: registration.delegationId,
+        enableNonce: authorization.enableNonce,
         enableSignature: authorization.enableSignature,
         expiresAt: registration.expiresAt,
         kind: "checkout",

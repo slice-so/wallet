@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test"
 import {
   getKernelNonceValidation,
   isKernelRootValidationNonce
-} from "@slicekit/wallet-primitives/execution"
+} from "@slicekit/wallet-primitives"
 import { Base64 } from "ox"
 import { decodeAbiParameters, keccak256, toHex } from "viem"
 import {
@@ -47,11 +47,9 @@ describe("kernel nonce validation parsing", () => {
     expect(isKernelRootValidationNonce(permissionNonce)).toBe(false)
 
     const parsed = getKernelNonceValidation(permissionNonce)
-    expect(parsed.mode).toBe(0)
-    expect(parsed.validatorType).toBe(2)
-    expect(parsed.validatorAddress).toBe(
-      "0x7ab16ff354acb328452f1d445b3ddee9a91e9e69"
-    )
+    expect(parsed.validationMode).toBe(0)
+    expect(parsed.validationType).toBe(2)
+    expect(parsed.permissionId).toBe("0x7ab16ff3")
   })
 })
 

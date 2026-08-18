@@ -21,6 +21,7 @@ describe("Slice wallet import boundaries", () => {
       sourceText: [
         'import "@slicekit/abi"',
         'export * from "@slice/database"',
+        'import { toCallPolicy } from "@zerodev/permissions/policies"',
         'const external = import("../../outside")',
         'type External = import("@slice/database").SliceWallet'
       ].join("\n")
@@ -29,6 +30,7 @@ describe("Slice wallet import boundaries", () => {
     expect(violations).toEqual([
       'src/nested/fixture.ts imports internal Slice package "@slicekit/abi"',
       'src/nested/fixture.ts imports internal Slice package "@slice/database"',
+      'src/nested/fixture.ts imports a ZeroDev SDK "@zerodev/permissions/policies"',
       'src/nested/fixture.ts escapes the wallet source boundary via "../../outside"',
       'src/nested/fixture.ts imports internal Slice package "@slice/database"'
     ])

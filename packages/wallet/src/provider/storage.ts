@@ -1,15 +1,16 @@
 import {
+  assertSliceWalletAccountIndex,
+  getSliceWalletP256SignerId,
+  maximumBrowserGenericGrantTtlSec,
+  type WalletPolicyJsonValue
+} from "@slicekit/wallet-primitives"
+import { resolveSliceWalletDeploymentProfileId } from "@slicekit/wallet-primitives/kernel"
+import {
   getWalletPermissionId,
   getWalletPolicyHash,
   parseSerializedWalletPolicyDescriptor,
   serializeWalletPolicyDescriptor
 } from "@slicekit/wallet-primitives/policy"
-import type { WalletPolicyJsonValue } from "@slicekit/wallet-primitives/server"
-import {
-  assertSliceWalletAccountIndex,
-  getSliceWalletP256SignerId,
-  maximumBrowserGenericGrantTtlSec
-} from "@slicekit/wallet-primitives/server"
 import {
   type Address,
   type Hex,
@@ -23,7 +24,7 @@ import {
   zeroAddress
 } from "viem"
 import {
-  entryPoint07Address,
+  entryPoint09Address,
   getUserOperationHash,
   type UserOperation
 } from "viem/account-abstraction"
@@ -42,12 +43,12 @@ import type {
 } from "../types/providerInternal"
 import { parseSliceWalletGrantPermissions } from "./protocol"
 
-const accountStorageKey = "slice.wallet.provider.account"
+const accountStorageKey = "slice.wallet.provider.v4.account"
 const grantStorageKey = (chainId: number, account: Address) =>
-  `slice.wallet.provider.generic-grant:${chainId}:${account.toLowerCase()}`
+  `slice.wallet.provider.v4.generic-grant:${chainId}:${account.toLowerCase()}`
 const grantRotationStorageKey = (chainId: number, account: Address) =>
-  `slice.wallet.provider.generic-rotation:${chainId}:${account.toLowerCase()}`
-const callStoragePrefix = "slice.wallet.provider.call:"
+  `slice.wallet.provider.v4.generic-rotation:${chainId}:${account.toLowerCase()}`
+const callStoragePrefix = "slice.wallet.provider.v4.call:"
 const callRetentionMs = 24 * 60 * 60 * 1000
 
 type StoredAccount = Pick<
@@ -165,7 +166,7 @@ export const readStoredSliceWalletAccount = (
     accountIndex: assertSliceWalletAccountIndex(value.accountIndex),
     createdAt: value.createdAt,
     credentialIdHash: value.credentialIdHash,
-    factoryVersion: value.factoryVersion,
+    factoryVersion: resolveSliceWalletDeploymentProfileId(value.factoryVersion),
     publicKey: value.publicKey as Hex,
     recoveryPermissionId: value.recoveryPermissionId as Hex | null,
     recoverySignerAddress: value.recoverySignerAddress as Address | null,
@@ -176,7 +177,13 @@ export const readStoredSliceWalletAccount = (
 export const writeStoredSliceWalletAccount = (
   storage: Storage | null,
   account: StoredAccount
-) => write(storage, accountStorageKey, account)
+) =>
+  write(storage, accountStorageKey, {
+    ...account,
+    factoryVersion: resolveSliceWalletDeploymentProfileId(
+      account.factoryVersion
+    )
+  })
 
 export const clearStoredSliceWalletAccount = (storage: Storage | null) =>
   remove(storage, accountStorageKey)
@@ -192,6 +199,7 @@ const parseStoredSliceWalletGrant = (
       "account",
       "chainId",
       "createdAt",
+      "enableNonce",
       "enableSignature",
       "expiresAt",
       "permissionId",
@@ -217,6 +225,9 @@ const parseStoredSliceWalletGrant = (
     !/^0x04[0-9a-fA-F]{128}$/.test(value.publicKey) ||
     typeof value.signerId !== "string" ||
     !isAddress(value.signerId) ||
+    typeof value.enableNonce !== "string" ||
+    !/^\d+$/.test(value.enableNonce) ||
+    BigInt(value.enableNonce).toString() !== value.enableNonce ||
     typeof value.enableSignature !== "string" ||
     !isHex(value.enableSignature, { strict: true }) ||
     !Array.isArray(value.permissions) ||
@@ -265,6 +276,7 @@ const parseStoredSliceWalletGrant = (
       account: value.account,
       chainId: value.chainId,
       createdAt: value.createdAt,
+      enableNonce: value.enableNonce,
       enableSignature: value.enableSignature,
       expiresAt: value.expiresAt,
       permissionId: value.permissionId as Hex,
@@ -477,7 +489,7 @@ const parseStoredGrantInstallationUserOperation = (
 
 export const deserializeStoredGenericGrantInstallationUserOperation = (
   value: StoredGenericGrantInstallationUserOperation
-): UserOperation<"0.7"> => ({
+): UserOperation<"0.9"> => ({
   callData: value.callData,
   callGasLimit: hexToBigInt(value.callGasLimit),
   ...(value.factory === undefined
@@ -503,7 +515,7 @@ export const deserializeStoredGenericGrantInstallationUserOperation = (
 })
 
 export const serializeStoredGenericGrantInstallationUserOperation = (
-  userOperation: UserOperation<"0.7">
+  userOperation: UserOperation<"0.9">
 ): StoredGenericGrantInstallationUserOperation => {
   if (userOperation.authorization !== undefined) {
     throw new Error(
@@ -589,7 +601,7 @@ const parseStoredGrantInstallation = (
     callDataHash === null ||
     hexToBytes(callDataHash).length !== 32 ||
     entryPoint === null ||
-    entryPoint !== entryPoint07Address.toLowerCase() ||
+    entryPoint !== entryPoint09Address.toLowerCase() ||
     nonce === null ||
     sender === null ||
     userOperation === null ||
@@ -605,7 +617,7 @@ const parseStoredGrantInstallation = (
     const recomputedHash = getUserOperationHash({
       chainId,
       entryPointAddress: entryPoint,
-      entryPointVersion: "0.7",
+      entryPointVersion: "0.9",
       userOperation:
         deserializeStoredGenericGrantInstallationUserOperation(userOperation)
     })
@@ -629,6 +641,7 @@ const grantsMatch = (left: StoredGenericGrant, right: StoredGenericGrant) =>
   left.account.toLowerCase() === right.account.toLowerCase() &&
   left.chainId === right.chainId &&
   left.createdAt === right.createdAt &&
+  left.enableNonce === right.enableNonce &&
   left.enableSignature.toLowerCase() === right.enableSignature.toLowerCase() &&
   left.expiresAt === right.expiresAt &&
   left.permissionId.toLowerCase() === right.permissionId.toLowerCase() &&

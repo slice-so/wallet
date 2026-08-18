@@ -12,7 +12,7 @@ const chainId = 8453
 const credentialIdHash = `0x${"22".repeat(32)}` as const
 const nonce = `0x${"33".repeat(32)}` as const
 const publicKey = `0x04${"44".repeat(64)}` as const
-const factoryVersion = "0.3.3"
+const factoryVersion = "slice-kernel-v4-ep09-r1"
 const message = formatSliceWalletExistingCredentialAuthorization({
   accountAddress: account,
   accountIndex: 0,

@@ -1,8 +1,9 @@
-import type { SliceWalletRegisteredRootCredential } from "@slicekit/wallet-primitives/server"
-import type { ModularSigner } from "@zerodev/permissions"
-import type { KernelSmartAccountImplementation } from "@zerodev/sdk"
+import type {
+  SliceKernelModularSigner,
+  SliceWalletRegisteredRootCredential
+} from "@slicekit/wallet-primitives"
 import type { Address, Hex, LocalAccount } from "viem"
-
+import type { SliceWalletPublicClient } from "./account"
 export type SliceWalletDeviceCredential = {
   credentialIdHash: Hex
   publicKey: Hex
@@ -10,9 +11,10 @@ export type SliceWalletDeviceCredential = {
 
 export type CreateSliceWalletDeviceValidatorParameters = {
   chainId: number
-  client: KernelSmartAccountImplementation["client"]
+  client: SliceWalletPublicClient
   credential: SliceWalletDeviceCredential
-  signer: ModularSigner
+  factoryVersion?: string
+  signer: SliceKernelModularSigner
 }
 
 export type BuildSliceWalletDeviceCallsParameters =
@@ -24,6 +26,7 @@ export type CreateSliceWalletDeviceKernelAccountParameters =
   CreateSliceWalletDeviceValidatorParameters & {
     account: Address
     accountIndex: bigint
+    enableSignature?: Hex
     rootCredential: SliceWalletRegisteredRootCredential
   }
 

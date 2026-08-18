@@ -79,6 +79,8 @@ export const readStoredExecutionSessionResult = async (
       session.kind !== kind ||
       !isAddress(session.accountAddress) ||
       !isAddress(session.signerAddress) ||
+      !/^\d+$/.test(session.enableNonce) ||
+      BigInt(session.enableNonce).toString() !== session.enableNonce ||
       !isHex(session.enableSignature, { strict: true }) ||
       !isHex(session.permissionId, { strict: true }) ||
       (session.kind === "checkout" && !isAddress(session.coSignerAddress))

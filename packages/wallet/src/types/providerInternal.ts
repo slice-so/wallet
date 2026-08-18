@@ -1,7 +1,7 @@
 import type {
   SerializedWalletPolicyDescriptor,
   WalletCall
-} from "@slicekit/wallet-primitives/server"
+} from "@slicekit/wallet-primitives"
 import type { Address, Chain, Hex } from "viem"
 import type { SliceWalletCeremonyMode } from "./ceremony"
 import type {
@@ -42,6 +42,7 @@ export type SliceWalletProviderConfig = {
 }
 
 export type StoredGenericGrant = Omit<SliceWalletPermissionGrant, "version"> & {
+  enableNonce: string
   enableSignature: Hex
   policy: SerializedWalletPolicyDescriptor
   publicKey: Hex

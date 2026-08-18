@@ -1,28 +1,31 @@
 import {
   getSliceWalletChainPolicy,
-  sliceWalletEntryPoint,
-  sliceWalletKernelAddresses,
-  sliceWalletKernelVersion
-} from "@slicekit/wallet-primitives/server"
-import { PolicyFlags, toPermissionValidator } from "@zerodev/permissions"
-import { toSudoPolicy } from "@zerodev/permissions/policies"
-import { createKernelAccount, KernelV3_3AccountAbi } from "@zerodev/sdk"
+  type SliceKernelPermission,
+  sliceWalletKernelAddresses
+} from "@slicekit/wallet-primitives"
+import {
+  buildKernelInstallTypedData,
+  encodeKernelInstallPackagesCall,
+  encodeKernelPermissionUninstallCalls,
+  getKernelPermissionInstallState,
+  getKernelPermissionInstalls,
+  kernelAccountAbi,
+  kernelModuleType,
+  resolveSliceWalletDeployment
+} from "@slicekit/wallet-primitives/kernel"
 import {
   concat,
-  encodeFunctionData,
   type Hex,
   hexToBytes,
   isAddressEqual,
   keccak256,
-  pad,
   slice,
-  stringToHex,
-  toFunctionSelector,
-  zeroAddress
+  stringToHex
 } from "viem"
-import { readContract } from "viem/actions"
+import { getCode, multicall, readContract } from "viem/actions"
 import { getAction } from "viem/utils"
 import { assertSliceWalletExecutionSafety } from "./executionSafety"
+import { createKernelV4Account } from "./kernel/account"
 import {
   encodeSliceWalletWebAuthnSignerData,
   toSliceWalletWebAuthnSigner
@@ -37,54 +40,6 @@ import type {
   SliceWalletDeviceCall,
   SliceWalletDeviceCredential
 } from "./types/device"
-import { getSliceWalletValidationInstallConfig } from "./validationLifecycle"
-
-const permissionValidatorType = "0x02" satisfies Hex
-const executeSelector = toFunctionSelector("execute(bytes32,bytes)")
-
-const kernelDeviceLifecycleAbi = [
-  {
-    inputs: [
-      { name: "vId", type: "bytes21" },
-      { name: "selector", type: "bytes4" },
-      { name: "allow", type: "bool" }
-    ],
-    name: "grantAccess",
-    outputs: [],
-    stateMutability: "payable",
-    type: "function"
-  },
-  {
-    inputs: [
-      { name: "vIds", type: "bytes21[]" },
-      {
-        components: [
-          { name: "nonce", type: "uint32" },
-          { name: "hook", type: "address" }
-        ],
-        name: "configs",
-        type: "tuple[]"
-      },
-      { name: "validationData", type: "bytes[]" },
-      { name: "hookData", type: "bytes[]" }
-    ],
-    name: "installValidations",
-    outputs: [],
-    stateMutability: "payable",
-    type: "function"
-  },
-  {
-    inputs: [
-      { name: "vId", type: "bytes21" },
-      { name: "data", type: "bytes" },
-      { name: "hookData", type: "bytes" }
-    ],
-    name: "uninstallValidation",
-    outputs: [],
-    stateMutability: "payable",
-    type: "function"
-  }
-] as const
 
 const assertCredentialIdHash = (credentialIdHash: Hex) => {
   if (hexToBytes(credentialIdHash).length !== 32) {
@@ -105,12 +60,6 @@ export const getSliceWalletDevicePermissionId = (
   )
 }
 
-const toDeviceValidationId = (permissionId: Hex) =>
-  pad(concat([permissionValidatorType, permissionId]), {
-    dir: "right",
-    size: 21
-  })
-
 export const toSliceWalletDeviceSigner = ({
   account,
   credential
@@ -125,65 +74,96 @@ export const toSliceWalletDeviceSigner = ({
 
 export const createSliceWalletDeviceValidator = async ({
   chainId,
-  client,
   credential,
   signer
-}: CreateSliceWalletDeviceValidatorParameters) => {
+}: CreateSliceWalletDeviceValidatorParameters): Promise<SliceKernelPermission> => {
   const manifest = getSliceWalletChainPolicy(chainId)
   if (
-    !isAddressEqual(
-      signer.signerContractAddress,
-      manifest.contracts.webAuthnSigner.address
-    )
+    !isAddressEqual(signer.address, manifest.contracts.webAuthnSigner.address)
   ) {
     throw new Error("Device signer does not use the pinned WebAuthnSigner.")
   }
   if (
-    signer.getSignerData().toLowerCase() !==
+    signer.data.toLowerCase() !==
     encodeSliceWalletWebAuthnSignerData(credential).toLowerCase()
   ) {
     throw new Error("Device signer data does not match the credential.")
   }
-  return toPermissionValidator(client, {
-    entryPoint: sliceWalletEntryPoint,
-    flag: PolicyFlags.FOR_ALL_VALIDATION,
-    kernelVersion: sliceWalletKernelVersion,
-    permissionId: getSliceWalletDevicePermissionId(credential.credentialIdHash),
+  return {
+    id: getSliceWalletDevicePermissionId(credential.credentialIdHash),
     policies: [
-      toSudoPolicy({ policyAddress: manifest.contracts.sudoPolicy.address })
+      {
+        address: manifest.contracts.sudoPolicy.address,
+        data: "0x",
+        kind: "sudo"
+      }
     ],
     signer
-  })
+  }
 }
 
-export const isSliceWalletDevicePermissionIdAvailable = async ({
-  account,
-  client,
-  credentialIdHash
-}: {
+const getDeviceInstallation = async (
+  parameters: BuildSliceWalletDeviceCallsParameters
+) => {
+  const permission = await createSliceWalletDeviceValidator(parameters)
+  const code = await getAction(
+    parameters.client,
+    getCode,
+    "getCode"
+  )({
+    address: parameters.account
+  })
+  if (code === undefined || code === "0x") {
+    return { installed: false, permission }
+  }
+  const installed = await getAction(
+    parameters.client,
+    multicall,
+    "multicall"
+  )({
+    allowFailure: false,
+    contracts: getKernelPermissionInstalls(permission).map((install) => ({
+      abi: kernelAccountAbi,
+      address: parameters.account,
+      args: [install.moduleType, install.module, permission.id] as const,
+      functionName: "isModuleInstalled" as const
+    }))
+  })
+  return { installed: installed.every(Boolean), permission }
+}
+
+export const isSliceWalletDevicePermissionIdAvailable = async (parameters: {
   account: `0x${string}`
   client: CreateSliceWalletDeviceValidatorParameters["client"]
   credentialIdHash: Hex
 }) => {
-  const config = await getAction(
-    client,
+  const code = await getAction(
+    parameters.client,
+    getCode,
+    "getCode"
+  )({
+    address: parameters.account
+  })
+  if (code === undefined || code === "0x") return true
+  return !(await getAction(
+    parameters.client,
     readContract,
     "readContract"
   )({
-    abi: KernelV3_3AccountAbi,
-    address: account,
-    args: [getSliceWalletDevicePermissionId(credentialIdHash)],
-    functionName: "permissionConfig"
-  })
-  return isAddressEqual(config.signer, zeroAddress)
+    abi: kernelAccountAbi,
+    address: parameters.account,
+    args: [
+      kernelModuleType.signer,
+      sliceWalletKernelAddresses.webAuthnSignerV004,
+      getSliceWalletDevicePermissionId(parameters.credentialIdHash)
+    ],
+    functionName: "isModuleInstalled"
+  }))
 }
 
 export const isSliceWalletDeviceActive = async (
   parameters: BuildSliceWalletDeviceCallsParameters
-) => {
-  const validator = await createSliceWalletDeviceValidator(parameters)
-  return validator.isEnabled(parameters.account, executeSelector)
-}
+) => (await getDeviceInstallation(parameters)).installed
 
 export const buildDeviceInstallCalls = async (
   parameters: BuildSliceWalletDeviceCallsParameters
@@ -191,48 +171,20 @@ export const buildDeviceInstallCalls = async (
   calls: readonly SliceWalletDeviceCall[]
   permissionId: Hex
 }> => {
-  if (
-    !(await isSliceWalletDevicePermissionIdAvailable({
-      account: parameters.account,
-      client: parameters.client,
-      credentialIdHash: parameters.credential.credentialIdHash
-    }))
-  ) {
-    throw new Error(
-      "Device permission id is already occupied; create a new credential."
-    )
-  }
-  const validator = await createSliceWalletDeviceValidator(parameters)
-  const permissionId = validator.getIdentifier()
-  const validationId = toDeviceValidationId(permissionId)
-  const validationData = await validator.getEnableData(parameters.account)
-  const installConfig = await getSliceWalletValidationInstallConfig({
-    account: parameters.account,
-    client: parameters.client,
-    validationId
-  })
+  const { installed, permission } = await getDeviceInstallation(parameters)
   return {
-    calls: [
-      {
-        data: encodeFunctionData({
-          abi: kernelDeviceLifecycleAbi,
-          args: [[validationId], [installConfig], [validationData], ["0x"]],
-          functionName: "installValidations"
-        }),
-        to: parameters.account,
-        value: 0n
-      },
-      {
-        data: encodeFunctionData({
-          abi: kernelDeviceLifecycleAbi,
-          args: [validationId, executeSelector, true],
-          functionName: "grantAccess"
-        }),
-        to: parameters.account,
-        value: 0n
-      }
-    ],
-    permissionId
+    calls: installed
+      ? []
+      : [
+          {
+            data: encodeKernelInstallPackagesCall(
+              getKernelPermissionInstalls(permission)
+            ),
+            to: parameters.account,
+            value: 0n
+          }
+        ],
+    permissionId: permission.id
   }
 }
 
@@ -242,38 +194,12 @@ export const buildDeviceUninstallCalls = async (
   calls: readonly SliceWalletDeviceCall[]
   permissionId: Hex
 }> => {
-  const validator = await createSliceWalletDeviceValidator(parameters)
-  const permissionId = validator.getIdentifier()
-  if (!(await validator.isEnabled(parameters.account, executeSelector))) {
-    return { calls: [], permissionId }
-  }
-  const validationId = toDeviceValidationId(permissionId)
+  const { installed, permission } = await getDeviceInstallation(parameters)
   return {
-    calls: [
-      {
-        data: encodeFunctionData({
-          abi: kernelDeviceLifecycleAbi,
-          args: [validationId, executeSelector, false],
-          functionName: "grantAccess"
-        }),
-        to: parameters.account,
-        value: 0n
-      },
-      {
-        data: encodeFunctionData({
-          abi: kernelDeviceLifecycleAbi,
-          args: [
-            validationId,
-            await validator.getEnableData(parameters.account),
-            "0x"
-          ],
-          functionName: "uninstallValidation"
-        }),
-        to: parameters.account,
-        value: 0n
-      }
-    ],
-    permissionId
+    calls: installed
+      ? encodeKernelPermissionUninstallCalls(parameters.account, permission)
+      : [],
+    permissionId: permission.id
   }
 }
 
@@ -289,11 +215,31 @@ export const buildDevicePromotionCalls = async ({
   }
   return {
     calls: [
-      ...buildRecoveryRotationCalls(newRootCredential),
+      ...buildRecoveryRotationCalls(newRootCredential, {
+        chainId: parameters.chainId,
+        factoryVersion: parameters.factoryVersion
+      }),
       ...uninstall.calls
     ],
     permissionId: uninstall.permissionId
   }
+}
+
+export const buildSliceWalletDeviceEnableTypedData = async (
+  parameters: BuildSliceWalletDeviceCallsParameters
+) => {
+  const permission = await createSliceWalletDeviceValidator(parameters)
+  const { installNonce } = await getKernelPermissionInstallState({
+    account: parameters.account,
+    client: parameters.client,
+    permission
+  })
+  return buildKernelInstallTypedData({
+    account: parameters.account,
+    chainId: parameters.chainId,
+    nonce: installNonce,
+    packages: getKernelPermissionInstalls(permission)
+  })
 }
 
 export const createSliceWalletDeviceKernelAccount = async ({
@@ -301,23 +247,40 @@ export const createSliceWalletDeviceKernelAccount = async ({
   accountIndex,
   chainId,
   client,
+  enableSignature,
+  factoryVersion,
   rootCredential,
   ...parameters
 }: CreateSliceWalletDeviceKernelAccountParameters) => {
-  const [deviceValidator, rootValidator] = await Promise.all([
-    createSliceWalletDeviceValidator({ chainId, client, ...parameters }),
-    createSliceWalletRootValidator({ chainId, credential: rootCredential })
+  const deployment = resolveSliceWalletDeployment({ chainId, factoryVersion })
+  const [permission, rootValidator] = await Promise.all([
+    createSliceWalletDeviceValidator({
+      chainId,
+      client,
+      factoryVersion: deployment.profile.id,
+      ...parameters
+    }),
+    createSliceWalletRootValidator({
+      chainId,
+      credential: rootCredential,
+      factoryVersion: deployment.profile.id
+    })
   ])
-  const deviceAccount = await createKernelAccount(client, {
+  const deviceAccount = await createKernelV4Account({
     address: account,
-    accountImplementationAddress: sliceWalletKernelAddresses.implementation,
-    entryPoint: sliceWalletEntryPoint,
-    factoryAddress: sliceWalletKernelAddresses.factory,
-    index: accountIndex,
-    kernelVersion: sliceWalletKernelVersion,
-    metaFactoryAddress: sliceWalletKernelAddresses.metaFactory,
-    plugins: { regular: deviceValidator, sudo: rootValidator },
-    useMetaFactory: true
+    client,
+    ...(enableSignature === undefined ? {} : { enableSignature }),
+    entryPoint: deployment.entryPoint,
+    ...(deployment.erc6492BootstrapFactory === undefined
+      ? {}
+      : {
+          erc6492BootstrapFactory: deployment.erc6492BootstrapFactory
+        }),
+    factory: deployment.factory,
+    implementation: deployment.implementation,
+    nonce: accountIndex,
+    permission,
+    rootValidator
   })
   const signUserOperation: typeof deviceAccount.signUserOperation = async (
     userOperation
@@ -335,8 +298,5 @@ export const createSliceWalletDeviceKernelAccount = async ({
     })
     return deviceAccount.signUserOperation(userOperation)
   }
-  return {
-    ...deviceAccount,
-    signUserOperation
-  }
+  return { ...deviceAccount, signUserOperation }
 }

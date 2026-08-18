@@ -1,4 +1,4 @@
-import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives/server"
+import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives"
 import { createSliceWalletRegistryClient } from "../registry"
 import type {
   ConnectSliceWalletAccountParameters,

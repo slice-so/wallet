@@ -1,9 +1,9 @@
-import { getWalletPolicyHash } from "@slicekit/wallet-primitives/policy"
 import type {
   SliceWalletFrameSession,
   SliceWalletPermissionAuthorization,
   SliceWalletProtocolValue
-} from "@slicekit/wallet-primitives/server"
+} from "@slicekit/wallet-primitives"
+import { getWalletPolicyHash } from "@slicekit/wallet-primitives/policy"
 import { bytesToHex, type Hex } from "viem"
 import type {
   AuthorizeSliceWalletSessionParameters,

@@ -1,26 +1,13 @@
 import type {
+  SerializedWalletPolicyDescriptor,
+  SliceWalletPermissionAuthorization
+} from "@slicekit/wallet-primitives"
+import type {
   SliceUserOperationPolicyFetch,
   SliceWalletExecutionSessionDescriptor
 } from "@slicekit/wallet-primitives/execution"
-import type { SerializedWalletPolicyDescriptor } from "@slicekit/wallet-primitives/server"
 import type { Address, Hex } from "viem"
-import type { SliceWalletPermissionAuthorization } from "./frame"
 import type { SliceWalletCheckoutCoSignerClient } from "./permission"
-
-export type {
-  CreateSliceCheckoutPolicyParameters,
-  CreateSliceStoreManagementPolicyParameters,
-  SliceCallsBatchClassification,
-  SliceCallsBatchClassified,
-  SliceCheckoutAllowanceTotal,
-  SliceCheckoutApproval,
-  SliceCheckoutPayment,
-  SliceCheckoutProductLineItem,
-  SliceCheckoutPurchase,
-  SliceCheckoutSpendIntent,
-  SliceSmartAccountCall,
-  SliceWalletExecutionSessionDescriptor
-} from "@slicekit/wallet-primitives/execution"
 
 export type SliceWalletCheckoutExecutionGrantRegistration = {
   allowanceUsdMicros: string

@@ -1,4 +1,5 @@
-import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives/server"
+import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives"
+import { resolveSliceWalletDeploymentProfileId } from "@slicekit/wallet-primitives/kernel"
 import { type Address, type Hex, hexToBytes, isAddress, isHex } from "viem"
 import type {
   SliceWalletRecoveryHandoffAuthorizationRequest,
@@ -94,9 +95,8 @@ const parseRegistryCredential = (
       "Credential id hash",
       32
     ),
-    factoryVersion: stringValue(
-      input.factoryVersion,
-      "Credential factory version"
+    factoryVersion: resolveSliceWalletDeploymentProfileId(
+      stringValue(input.factoryVersion, "Credential factory version")
     ),
     publicKey: hexValue(input.publicKey, "Credential public key", 65),
     recoveryPermissionId:
@@ -146,7 +146,9 @@ export const parseSliceWalletRecoveryHandoffAuthorizationRequest = (
       "Credential id hash",
       32
     ),
-    factoryVersion: stringValue(input.factoryVersion, "Factory version"),
+    factoryVersion: resolveSliceWalletDeploymentProfileId(
+      stringValue(input.factoryVersion, "Factory version")
+    ),
     message: stringValue(input.message, "Root authorization message"),
     nonce: hexValue(input.nonce, "Recovery handoff nonce", 32),
     publicKey: hexValue(input.publicKey, "Credential public key", 65),

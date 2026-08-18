@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test"
+import { buildRecoveryPermissionInitConfig } from "@slicekit/wallet-primitives"
 import {
   decodeSliceWalletWebAuthnAssertion,
+  predictSliceWalletKernelAccountAddress,
   sliceWalletKernelAddresses,
   verifySliceWalletRootAuthorization
 } from "@slicekit/wallet-primitives/server"
@@ -16,12 +18,10 @@ import {
   RpcRequestError
 } from "viem"
 import { base } from "viem/chains"
-import { predictSliceWalletKernelAccountAddress } from "./accountPrediction"
 import {
   encodeSliceWalletSyntheticWebAuthnSignature,
   generateSliceWalletP256KeyPair
 } from "./p256"
-import { buildRecoveryPermissionInitConfig } from "./recovery"
 import { createSliceWalletRegisteredKernelAccount } from "./rootValidator"
 
 const account = "0x7100000000000000000000000000000000000001" as Address

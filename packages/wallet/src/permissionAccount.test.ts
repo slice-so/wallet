@@ -1,18 +1,14 @@
-import { describe, expect, it } from "bun:test"
-import type { SliceWalletFrameSession } from "@slicekit/wallet-primitives/server"
-import {
-  createNativeTransferCallRule,
-  sliceWalletKernelAddresses
-} from "@slicekit/wallet-primitives/server"
-import type { KernelSmartAccountImplementation } from "@zerodev/sdk"
-import { createPublicClient, custom, zeroAddress } from "viem"
-import { base } from "viem/chains"
+import { describe, expect, test } from "bun:test"
 import {
   buildSliceWalletPermissionInstallCalls,
   buildSliceWalletPermissionRevocationCalls,
-  isSliceWalletPermissionInstalled
-} from "./permissionAccount"
-import { resolveSliceWalletValidationInstallConfig } from "./validationLifecycle"
+  createNativeTransferCallRule,
+  type SliceWalletFrameSession
+} from "@slicekit/wallet-primitives"
+import { kernelAccountAbi } from "@slicekit/wallet-primitives/kernel"
+import { createPublicClient, custom, decodeFunctionData } from "viem"
+import { base } from "viem/chains"
+import { isSliceWalletPermissionInstalled } from "./permissionAccount"
 
 const signer = "0x1111111111111111111111111111111111111111" as const
 const account = "0x2222222222222222222222222222222222222222" as const
@@ -38,45 +34,18 @@ const session = {
   signerId: "0x4444444444444444444444444444444444444444"
 } satisfies SliceWalletFrameSession
 
-const createClient = ({
-  getCode,
-  multicall
-}: {
-  getCode: () => Promise<`0x${string}` | undefined>
-  multicall: () => Promise<
-    readonly [
-      number,
-      { hook: `0x${string}`; nonce: number },
-      {
-        permissionFlag: `0x${string}`
-        policyData: readonly `0x${string}`[]
-        signer: `0x${string}`
-      },
-      boolean
-    ]
-  >
-}) =>
-  Object.assign(
-    createPublicClient({
-      chain: base,
-      transport: custom({
-        request: async () => {
-          throw new Error("Unexpected raw RPC request.")
-        }
-      })
-    }),
-    { getCode, multicall }
-  ) as KernelSmartAccountImplementation["client"]
+const undeployedClient = createPublicClient({
+  chain: base,
+  transport: custom({
+    async request({ method }) {
+      if (method === "eth_getCode") return "0x"
+      throw new Error(`Unexpected RPC request: ${method}`)
+    }
+  })
+})
 
-describe("Kernel permission lifecycle", () => {
-  it("requires execute-selector authorization for an installed permission", () => {
-    expect(
-      isSliceWalletPermissionInstalled({
-        configuredSigner: signer,
-        expectedSigner: signer,
-        selectorAllowed: false
-      })
-    ).toBe(false)
+describe("Kernel v4 permission lifecycle", () => {
+  test("matches configured permission identity", () => {
     expect(
       isSliceWalletPermissionInstalled({
         configuredSigner: signer,
@@ -84,60 +53,55 @@ describe("Kernel permission lifecycle", () => {
         selectorAllowed: true
       })
     ).toBe(true)
-  })
-
-  it("derives install nonces from Kernel lifecycle state", () => {
     expect(
-      resolveSliceWalletValidationInstallConfig({
-        currentNonce: 4,
-        validationNonce: 0
+      isSliceWalletPermissionInstalled({
+        configuredSigner: signer,
+        expectedSigner: signer,
+        selectorAllowed: false
       })
-    ).toEqual({
-      hook: "0x0000000000000000000000000000000000000000",
-      nonce: 4
-    })
-    expect(
-      resolveSliceWalletValidationInstallConfig({
-        currentNonce: 4,
-        validationNonce: 3
-      }).nonce
-    ).toBe(3)
+    ).toBe(false)
   })
 
-  it("does not treat a selector-checkpointed permission as installed", async () => {
-    const client = createClient({
-      getCode: async () => "0x01",
-      multicall: async () => [
-        4,
-        { hook: zeroAddress, nonce: 3 },
-        {
-          permissionFlag: "0x0000",
-          policyData: [],
-          signer: sliceWalletKernelAddresses.webAuthnSignerV004
-        },
-        false
-      ]
-    })
-
+  test("installs policies before the signer in one package batch", async () => {
     const result = await buildSliceWalletPermissionInstallCalls({
       account,
-      client,
+      client: undeployedClient,
       session
     })
     expect(result.calls).toHaveLength(1)
+    const decoded = decodeFunctionData({
+      abi: kernelAccountAbi,
+      data: result.calls[0]?.data ?? "0x"
+    })
+    expect(decoded.functionName).toBe("installModule")
+    if (decoded.functionName !== "installModule") {
+      throw new Error("Expected a Kernel module installation call.")
+    }
+    const installs = decoded.args[0]
+    if (typeof installs === "bigint") {
+      throw new Error("Expected a Kernel installation package batch.")
+    }
+    expect(installs.map((install) => install.moduleType)).toEqual([
+      5n,
+      5n,
+      5n,
+      6n
+    ])
   })
 
-  it("fails revocation reads loudly for a deployed account", async () => {
-    const readFailure = new Error("RPC unavailable")
-    const client = createClient({
-      getCode: async () => "0x01",
-      multicall: async () => {
-        throw readFailure
-      }
+  test("burns an unused enable authorization with the install nonce", async () => {
+    const result = await buildSliceWalletPermissionRevocationCalls({
+      account,
+      client: undeployedClient,
+      enableNonce: 0n,
+      session
     })
-
-    await expect(
-      buildSliceWalletPermissionRevocationCalls({ account, client, session })
-    ).rejects.toBe(readFailure)
+    expect(result.calls).toHaveLength(1)
+    const decoded = decodeFunctionData({
+      abi: kernelAccountAbi,
+      data: result.calls[0]?.data ?? "0x"
+    })
+    expect(decoded.functionName).toBe("setNonce")
+    expect(decoded.args).toEqual([0n, 1n])
   })
 })

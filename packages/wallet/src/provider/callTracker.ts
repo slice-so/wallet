@@ -1,4 +1,4 @@
-import type { WalletCall } from "@slicekit/wallet-primitives/server"
+import type { WalletCall } from "@slicekit/wallet-primitives"
 import { type Address, bytesToHex, type Hex, numberToHex } from "viem"
 import type {
   SliceWalletRequestPaymasterService,

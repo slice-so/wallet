@@ -3,7 +3,7 @@ import {
   getSliceWalletP256SignerId,
   normalizeSliceWalletP256Scalars,
   normalizeSliceWalletP256Signature
-} from "@slicekit/wallet-primitives/server"
+} from "@slicekit/wallet-primitives"
 import {
   bytesToBigInt,
   bytesToHex,

@@ -1,4 +1,5 @@
-import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives/server"
+import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives"
+import { resolveSliceWalletDeploymentProfileId } from "@slicekit/wallet-primitives/kernel"
 import { formatSliceWalletExistingCredentialAuthorization } from "../registry"
 import type {
   RegisterRecoveredSliceWalletCredentialParameters,
@@ -21,6 +22,16 @@ import {
   parseSliceWalletRecoveryHandoffResult
 } from "./recoveryProtocol"
 
+export const isSliceWalletRecoveryHandoffDeploymentProfileMatch = ({
+  factoryVersion,
+  requestFactoryVersion
+}: {
+  factoryVersion: string
+  requestFactoryVersion: string
+}) =>
+  requestFactoryVersion ===
+  resolveSliceWalletDeploymentProfileId(factoryVersion)
+
 export const registerRecoveredSliceWalletCredential = async ({
   account,
   accountIndex,
@@ -28,6 +39,7 @@ export const registerRecoveredSliceWalletCredential = async ({
   ceremonyMode = "popup",
   chainId,
   document,
+  factoryVersion,
   idOrigin,
   recoveryPermissionId,
   recoverySignerAddress,
@@ -39,6 +51,8 @@ export const registerRecoveredSliceWalletCredential = async ({
   registry: SliceWalletRegistryCredential
 }> => {
   const nonce = createSliceWalletCeremonyNonce(window)
+  const requestedFactoryVersion =
+    resolveSliceWalletDeploymentProfileId(factoryVersion)
   const resolvedMode = resolveSliceWalletCeremonyMode({
     brokerAvailable: ceremonyBroker !== undefined,
     document,
@@ -63,7 +77,7 @@ export const registerRecoveredSliceWalletCredential = async ({
       idOrigin,
       mode,
       nonce,
-      path: `/ceremony/recovery?account=${encodeURIComponent(account)}&accountIndex=${accountIndex}&chainId=${chainId}`,
+      path: `/ceremony/recovery?account=${encodeURIComponent(account)}&accountIndex=${accountIndex}&chainId=${chainId}&factoryVersion=${encodeURIComponent(requestedFactoryVersion)}`,
       popupName: "slice-wallet-recovery",
       window
     })
@@ -112,7 +126,11 @@ export const registerRecoveredSliceWalletCredential = async ({
                 request.nonce !== nonce ||
                 request.chainId !== chainId ||
                 request.accountIndex !== accountIndex ||
-                request.account.toLowerCase() !== account.toLowerCase()
+                request.account.toLowerCase() !== account.toLowerCase() ||
+                !isSliceWalletRecoveryHandoffDeploymentProfileMatch({
+                  factoryVersion,
+                  requestFactoryVersion: request.factoryVersion
+                })
               ) {
                 throw new Error(
                   "Recovery authorization does not match this wallet."
@@ -167,7 +185,9 @@ export const registerRecoveredSliceWalletCredential = async ({
                 authorization.credentialIdHash.toLowerCase() ||
               result.registry.publicKey.toLowerCase() !==
                 authorization.publicKey.toLowerCase() ||
-              result.registry.factoryVersion !== authorization.factoryVersion ||
+              resolveSliceWalletDeploymentProfileId(
+                result.registry.factoryVersion
+              ) !== requestedFactoryVersion ||
               result.registry.recoveryPermissionId?.toLowerCase() !==
                 recoveryPermissionId.toLowerCase() ||
               result.registry.recoverySignerAddress?.toLowerCase() !==

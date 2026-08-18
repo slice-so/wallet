@@ -1,4 +1,4 @@
-import type { SliceWalletFrameSessionKey } from "@slicekit/wallet-primitives/server"
+import type { SliceWalletFrameSessionKey } from "@slicekit/wallet-primitives"
 import type {
   SliceWalletSessionStore,
   SliceWalletStoredSession

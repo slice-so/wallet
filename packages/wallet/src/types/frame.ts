@@ -1,24 +1,16 @@
 import type {
-  WalletCall,
-  WalletPolicyDescriptor
-} from "@slicekit/wallet-primitives/policy"
-import type {
   SliceWalletCheckoutGrant,
   SliceWalletFrameSession,
   SliceWalletFrameSessionKey,
   SliceWalletPermissionAuthorization,
   SliceWalletProtocolValue,
   WalletGrantKind
-} from "@slicekit/wallet-primitives/server"
+} from "@slicekit/wallet-primitives"
+import type {
+  WalletCall,
+  WalletPolicyDescriptor
+} from "@slicekit/wallet-primitives/policy"
 import type { Address, Hex } from "viem"
-
-export type {
-  SliceWalletCheckoutGrant,
-  SliceWalletFrameSession,
-  SliceWalletFrameSessionKey,
-  SliceWalletPermissionAuthorization,
-  SliceWalletProtocolValue
-} from "@slicekit/wallet-primitives/server"
 
 /** Frame-internal record. It must never cross the parent protocol. */
 export type SliceWalletStoredSession = {

@@ -9,18 +9,23 @@ import {
   getProductsModuleAddress,
   sliceHookAddressList
 } from "@slicekit/abi/deployments"
-import type { SliceSenderAccountSnapshot } from "@slicekit/wallet-primitives/execution"
 import {
   ambireAccountExecutionAbi,
   coinbaseSmartWalletExecutionAbi,
   erc7579AccountExecutionAbi,
   erc7579BatchExecutionAbiParameters,
-  kernelValidationManagementAbi,
   metaMaskDelegatorExecutionAbi,
-  sliceKernelBaseV33Addresses
-} from "@slicekit/wallet-primitives/execution"
+  type SliceSenderAccountSnapshot,
+  sliceKernelAddresses,
+  sliceWalletKernelAddresses
+} from "@slicekit/wallet-primitives"
+import {
+  kernelPermissionExecuteSelector,
+  kernelValidationManagementAbi
+} from "@slicekit/wallet-primitives/kernel"
 import {
   type Address,
+  concat,
   encodeAbiParameters,
   encodeFunctionData,
   encodePacked,
@@ -103,7 +108,7 @@ const erc7579SingleDefaultMode =
 const erc7579SingleTryMode =
   "0x0001000000000000000000000000000000000000000000000000000000000000" satisfies Hex
 
-// Kernel v3 nonce layout: [1B mode][1B validator type][20B id][2B key][8B seq]
+// Kernel v4 nonce layout: [1B mode][1B validator type][20B id][2B key][8B seq]
 const buildKernelNonce = ({
   mode,
   validatorType
@@ -117,7 +122,6 @@ const permissionValidationNonce = buildKernelNonce({
   mode: 0n,
   validatorType: 2n
 })
-const recoveryValidationId = `0x02${"11".repeat(20)}` as Hex
 
 /** Runtime code of accounts deployed by the pinned Slice Kernel factory. */
 const kernelProxyCode =
@@ -125,7 +129,7 @@ const kernelProxyCode =
 
 const kernelSenderAccountSnapshot: SliceSenderAccountSnapshot = {
   code: kernelProxyCode,
-  erc1967Implementation: pad(sliceKernelBaseV33Addresses.implementation, {
+  erc1967Implementation: pad(sliceKernelAddresses.implementation, {
     size: 32
   })
 }
@@ -198,23 +202,37 @@ const encodeHookConfigureProduct = () =>
     args: [1n, 2n, 0n, "0x"]
   })
 
-const encodeInstallValidations = () =>
+const encodeInstallPermission = () =>
   encodeFunctionData({
     abi: kernelValidationManagementAbi,
-    functionName: "installValidations",
+    functionName: "installModule",
     args: [
-      [recoveryValidationId],
-      [{ hook: zeroAddress, nonce: 1 }],
-      ["0x"],
-      ["0x"]
+      [
+        {
+          internalData: "0x12345678",
+          module: sliceWalletKernelAddresses.sudoPolicy,
+          moduleData: "0x",
+          moduleType: 5n
+        },
+        {
+          internalData: concat([
+            "0x12345678",
+            zeroAddress,
+            kernelPermissionExecuteSelector
+          ]),
+          module: sliceWalletKernelAddresses.ecdsaSigner,
+          moduleData: "0x",
+          moduleType: 6n
+        }
+      ]
     ]
   })
 
-const encodeGrantAccess = (allow = true) =>
+const encodeInstallNonceCheckpoint = () =>
   encodeFunctionData({
     abi: kernelValidationManagementAbi,
-    functionName: "grantAccess",
-    args: [recoveryValidationId, "0xe9ae5c53", allow]
+    functionName: "setNonce",
+    args: [0n, 1n]
   })
 
 const encodeSmartWalletExecuteBatch = (
@@ -1178,12 +1196,9 @@ describe("slice paymaster", () => {
       data: encodeSetProductType()
     })
 
-    for (const factory of [
-      sliceKernelBaseV33Addresses.factory,
-      sliceKernelBaseV33Addresses.metaFactory
-    ]) {
+    for (const factory of [sliceKernelAddresses.factory]) {
       const body = createPaymasterBody(callData, {
-        entryPoint: entryPoint07Address,
+        entryPoint: entryPoint09Address,
         factory,
         factoryData: "0x1234"
       })
@@ -1223,7 +1238,7 @@ describe("slice paymaster", () => {
         data: encodeSetProductType()
       }),
       {
-        entryPoint: entryPoint07Address,
+        entryPoint: entryPoint09Address,
         factory: untrustedFactoryAddress,
         factoryData: "0x1234"
       }
@@ -1302,13 +1317,13 @@ describe("slice paymaster", () => {
     expect(rejectedFetchPaymaster).not.toHaveBeenCalled()
   })
 
-  it("applies the Kernel factory gate to EntryPoint v0.6 initCode", async () => {
+  it("rejects the Kernel v4 factory through EntryPoint v0.6", async () => {
     const callData = encodeSmartWalletExecute({
       target: productsModuleAddress,
       data: encodeSetProductType()
     })
     const acceptedBody = createPaymasterBody(callData, {
-      initCode: createInitCode(sliceKernelBaseV33Addresses.metaFactory)
+      initCode: createInitCode(sliceKernelAddresses.factory)
     })
     const acceptedFetchPaymaster = mock(
       async (_input: RequestInfo | URL, init?: RequestInit) => {
@@ -1333,8 +1348,8 @@ describe("slice paymaster", () => {
       }
     )
 
-    expect(acceptedResponse.status).toBe(200)
-    expect(acceptedFetchPaymaster).toHaveBeenCalledTimes(1)
+    expect(acceptedResponse.status).toBe(403)
+    expect(acceptedFetchPaymaster).not.toHaveBeenCalled()
 
     const rejectedBody = createPaymasterBody(callData, {
       initCode: createInitCode(untrustedFactoryAddress)
@@ -1676,10 +1691,10 @@ describe("slice paymaster", () => {
   it("sponsors root-signed recovery validation management on the sender", async () => {
     const body = createPaymasterBody(
       encodeErc7579ExecuteBatch([
-        { target: sender, data: encodeInstallValidations() },
-        { target: sender, data: encodeGrantAccess() }
+        { target: sender, data: encodeInstallPermission() },
+        { target: sender, data: encodeInstallNonceCheckpoint() }
       ]),
-      { entryPoint: entryPoint07Address, nonce: rootValidationNonce }
+      { entryPoint: entryPoint09Address, nonce: rootValidationNonce }
     )
     const fetchPaymaster = mock(
       async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -1713,8 +1728,8 @@ describe("slice paymaster", () => {
   })
 
   it("sponsors Kernel's direct root self-administration call", async () => {
-    const body = createPaymasterBody(encodeGrantAccess(false), {
-      entryPoint: entryPoint07Address,
+    const body = createPaymasterBody(encodeInstallNonceCheckpoint(), {
+      entryPoint: entryPoint09Address,
       nonce: rootValidationNonce
     })
     const fetchPaymaster = mock(async () =>
@@ -1746,10 +1761,10 @@ describe("slice paymaster", () => {
   it("rejects recovery administration when the sender cannot be verified", async () => {
     const body = createPaymasterBody(
       encodeErc7579ExecuteBatch([
-        { target: sender, data: encodeInstallValidations() },
-        { target: sender, data: encodeGrantAccess() }
+        { target: sender, data: encodeInstallPermission() },
+        { target: sender, data: encodeInstallNonceCheckpoint() }
       ]),
-      { entryPoint: entryPoint07Address, nonce: rootValidationNonce }
+      { entryPoint: entryPoint09Address, nonce: rootValidationNonce }
     )
     const fetchPaymaster = mock<typeof fetch>()
 
@@ -1808,10 +1823,10 @@ describe("slice paymaster", () => {
   it("rejects recovery validation management without root validation", async () => {
     const body = createPaymasterBody(
       encodeErc7579ExecuteBatch([
-        { target: sender, data: encodeInstallValidations() },
-        { target: sender, data: encodeGrantAccess() }
+        { target: sender, data: encodeInstallPermission() },
+        { target: sender, data: encodeInstallNonceCheckpoint() }
       ]),
-      { entryPoint: entryPoint07Address, nonce: permissionValidationNonce }
+      { entryPoint: entryPoint09Address, nonce: permissionValidationNonce }
     )
     const fetchPaymaster = mock<typeof fetch>()
 

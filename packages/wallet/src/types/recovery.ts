@@ -1,10 +1,9 @@
 import type {
   SliceTimelockPolicyParameters,
   SliceWalletRegisteredRootCredential
-} from "@slicekit/wallet-primitives/server"
-import type { Policy, PolicyFlags } from "@zerodev/permissions"
-import type { KernelSmartAccountImplementation } from "@zerodev/sdk"
+} from "@slicekit/wallet-primitives"
 import type { Address, Hex } from "viem"
+import type { SliceWalletPublicClient } from "./account"
 import type { SliceWalletRegistryCredential } from "./registry"
 
 export type SliceRecoveryProposalStatus =
@@ -13,24 +12,14 @@ export type SliceRecoveryProposalStatus =
   | "executed"
   | "cancelled"
 
-export type SliceTimelockPolicy = Policy & {
-  sliceTimelockPolicyParams: {
-    delaySec: number
-    expirationSec: number
-    guardian: Address
-    policyAddress: Address
-    policyFlag: PolicyFlags
-    type: "slice-timelock"
-  }
-}
-
 export type CreateRecoveryPermissionAccountParameters = {
   accountIndex: bigint
   address: Address
   chainId: number
-  client: KernelSmartAccountImplementation["client"]
+  client: SliceWalletPublicClient
   credential: SliceWalletRegisteredRootCredential
   enableSignature?: Hex
+  factoryVersion?: string
   getFactoryArgs?: () => Promise<{
     factory?: Address | undefined
     factoryData?: Hex | undefined
@@ -45,18 +34,12 @@ export type CreateDeployedRecoveryPermissionAccountParameters = {
   accountIndex: bigint
   address: Address
   chainId: number
-  client: KernelSmartAccountImplementation["client"]
+  client: SliceWalletPublicClient
+  factoryVersion?: string
   recoveryPrivateKey: Hex
   recoverySignerAddress: Address
   /** Must match the policy originally installed on the account. */
   recoveryTimelock?: SliceTimelockPolicyParameters
-}
-
-export type PredictSliceWalletKernelAccountAddressParameters = {
-  chainId: number
-  credential: SliceWalletRegisteredRootCredential
-  index?: bigint
-  recoverySignerAddress: Address
 }
 
 export type SliceWalletRecoveryCodePayload = {
@@ -84,7 +67,6 @@ export type SliceWalletRecoveryBundlePayload = {
   credentialPublicKey: Hex
   factory: Address
   factoryVersion: string
-  metaFactory: Address
   recoveryPermissionId: Hex
   recoveryPrivateKey: Hex
   recoverySignerAddress: Address

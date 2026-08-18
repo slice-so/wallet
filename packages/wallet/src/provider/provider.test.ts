@@ -401,7 +401,7 @@ describe("Slice Wallet provider dispatch", () => {
     )
   })
 
-  test("advertises verified generic permissions alongside EIP-5792", async () => {
+  test("withholds generic permissions from de-admitted chains", async () => {
     const { provider } = createProvider()
 
     expect(
@@ -412,16 +412,7 @@ describe("Slice Wallet provider dispatch", () => {
     ).toEqual({
       [numberToHex(base.id)]: {
         atomic: { status: "supported" },
-        paymasterService: { supported: true },
-        slicePermissions: {
-          supportedTemplates: [
-            "native-transfer",
-            "erc20-transfer",
-            "erc20-approve",
-            "erc20-transfer-from"
-          ],
-          version: "1"
-        }
+        paymasterService: { supported: true }
       }
     })
     expect(

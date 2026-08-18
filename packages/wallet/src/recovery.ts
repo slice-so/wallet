@@ -1,153 +1,63 @@
-import type {
-  SliceTimelockPolicyParameters,
-  SliceWalletRegisteredRootCredential
-} from "@slicekit/wallet-primitives/server"
 import {
-  assertRecoveryPermissionInitConfig as assertProtocolRecoveryPermissionInitConfig,
-  buildRecoveryPermissionInitConfig as buildProtocolRecoveryPermissionInitConfig,
-  encodeSliceWalletRootValidatorData,
-  sliceWalletEntryPoint,
-  sliceWalletKernelAddresses,
-  sliceWalletKernelVersion
-} from "@slicekit/wallet-primitives/server"
-import { PolicyFlags, toPermissionValidator } from "@zerodev/permissions"
-import { CallPolicyVersion, toCallPolicy } from "@zerodev/permissions/policies"
-import { toECDSASigner, toEmptyECDSASigner } from "@zerodev/permissions/signers"
+  buildRecoveryPermissionInitConfig,
+  createRecoveryPermission,
+  type SliceKernelClient,
+  type SliceKernelPermission,
+  type SliceKernelValidator,
+  type SliceTimelockPolicyParameters,
+  type SliceWalletRegisteredRootCredential,
+  sliceWalletTimelockPolicyAddress
+} from "@slicekit/wallet-primitives"
 import {
-  createKernelAccount,
-  type KernelSmartAccountImplementation,
-  type KernelValidator
-} from "@zerodev/sdk"
-import { toKernelPluginManager } from "@zerodev/sdk/accounts"
+  buildKernelInstallTypedData,
+  encodeKernelInstallPackagesCall,
+  encodeKernelPermissionSignature,
+  encodeKernelPermissionUninstallCalls,
+  getKernelPermissionInstalls,
+  kernelAccountAbi,
+  kernelWebAuthnValidatorLifecycleAbi,
+  resolveSliceWalletDeployment
+} from "@slicekit/wallet-primitives/kernel"
 import {
   type Address,
   concat,
+  decodeAbiParameters,
   decodeFunctionResult,
-  encodeAbiParameters,
   encodeFunctionData,
   type Hex,
   isHex,
   numberToHex,
   pad,
   size,
-  slice,
-  toFunctionSelector,
   type WalletClient,
   zeroAddress
 } from "viem"
 import {
   type BundlerClient,
-  entryPoint07Abi,
-  entryPoint07Address,
+  entryPoint09Abi,
+  entryPoint09Address,
   type SmartAccount,
   toPackedUserOperation,
   type UserOperation
 } from "viem/account-abstraction"
-import { privateKeyToAccount, toAccount } from "viem/accounts"
-import { readContract } from "viem/actions"
+import { getCode, multicall, readContract } from "viem/actions"
 import { getAction } from "viem/utils"
-import { createSliceWalletRootValidator } from "./rootValidator"
+import { createKernelV4Account } from "./kernel/account"
+import { encodeKernelCalls } from "./kernel/execution"
+import {
+  createSliceWalletRootValidator,
+  encodeSliceWalletRootValidatorData
+} from "./rootValidator"
 import type {
   CreateDeployedRecoveryPermissionAccountParameters,
   CreateRecoveryPermissionAccountParameters,
   RecoveryUserOperationGas,
   SliceRecoveryProposalStatus,
-  SliceTimelockPolicy,
   SliceWalletRecoveryCall
 } from "./types/recovery"
 import type { SliceWalletRegistryCredential } from "./types/registry"
-import { getSliceWalletValidationInstallConfig } from "./validationLifecycle"
 
-const recoveryEntryPoint = {
-  address: sliceWalletEntryPoint.address,
-  version: "0.7"
-} as const
-
-const recoveryKernelVersion = sliceWalletKernelVersion
-
-const sliceKernelBaseV33Addresses = sliceWalletKernelAddresses
-export const sliceWalletTimelockPolicyAddress =
-  sliceWalletKernelAddresses.timelockPolicy
-const sliceKernelTimelockPolicyAddress = sliceWalletTimelockPolicyAddress
-const sliceKernelWebAuthnValidatorAddress =
-  sliceWalletKernelAddresses.webAuthnRootValidator
-
-export const sliceRecoveryTimelockDelaySec = 3 * 24 * 60 * 60
-export const sliceRecoveryTimelockExpirationSec = 30 * 24 * 60 * 60
-
-const webAuthnValidatorLifecycleAbi = [
-  {
-    inputs: [{ name: "data", type: "bytes" }],
-    name: "onInstall",
-    outputs: [],
-    stateMutability: "payable",
-    type: "function"
-  },
-  {
-    inputs: [{ name: "data", type: "bytes" }],
-    name: "onUninstall",
-    outputs: [],
-    stateMutability: "payable",
-    type: "function"
-  }
-] as const
-
-const kernelAccountRecoveryAbi = [
-  {
-    inputs: [
-      { name: "vId", type: "bytes21" },
-      { name: "selector", type: "bytes4" },
-      { name: "allow", type: "bool" }
-    ],
-    name: "grantAccess",
-    outputs: [],
-    stateMutability: "payable",
-    type: "function"
-  },
-  {
-    inputs: [
-      {
-        name: "vIds",
-        type: "bytes21[]"
-      },
-      {
-        components: [
-          { name: "nonce", type: "uint32" },
-          { name: "hook", type: "address" }
-        ],
-        name: "configs",
-        type: "tuple[]"
-      },
-      { name: "validationData", type: "bytes[]" },
-      { name: "hookData", type: "bytes[]" }
-    ],
-    name: "installValidations",
-    outputs: [],
-    stateMutability: "payable",
-    type: "function"
-  },
-  {
-    inputs: [
-      { name: "vId", type: "bytes21" },
-      { name: "data", type: "bytes" },
-      { name: "hookData", type: "bytes" }
-    ],
-    name: "uninstallValidation",
-    outputs: [],
-    stateMutability: "payable",
-    type: "function"
-  },
-  {
-    inputs: [
-      { name: "execMode", type: "bytes32" },
-      { name: "executionCalldata", type: "bytes" }
-    ],
-    name: "execute",
-    outputs: [],
-    stateMutability: "payable",
-    type: "function"
-  }
-] as const
+const timelockPolicySignatureIndex = 1
 
 const timelockPolicyAbi = [
   {
@@ -219,144 +129,13 @@ const getRecoveryProposalStatus = (
 const toTimelockPolicyId = (permissionId: Hex) =>
   pad(permissionId, { dir: "right", size: 32 })
 
-const permissionValidatorType = "0x02" satisfies Hex
-const timelockPolicySignatureIndex = 1
-
-const toRecoveryValidationId = (permissionId: Hex) =>
-  pad(concat([permissionValidatorType, permissionId]), {
-    dir: "right",
-    size: 21
-  })
-
-const executeSelector = toFunctionSelector(kernelAccountRecoveryAbi[3])
-const emptyCallSelector = "0x00000000" satisfies Hex
-
-export const toSliceTimelockPolicy = ({
-  delaySec = sliceRecoveryTimelockDelaySec,
-  expirationSec = sliceRecoveryTimelockExpirationSec,
-  guardian = zeroAddress,
-  policyAddress = sliceKernelTimelockPolicyAddress,
-  policyFlag = PolicyFlags.FOR_ALL_VALIDATION
-}: SliceTimelockPolicyParameters = {}): SliceTimelockPolicy => {
-  const policy: SliceTimelockPolicy = {
-    getPolicyData: () =>
-      encodeAbiParameters(
-        [
-          { name: "delay", type: "uint48" },
-          { name: "expirationPeriod", type: "uint48" },
-          { name: "guardian", type: "address" }
-        ],
-        [delaySec, expirationSec, guardian]
-      ),
-    getPolicyInfoInBytes: () => concat([policyFlag, policyAddress]),
-    // ZeroDev's serializable Policy union is closed over its built-in
-    // policies. Runtime permission ids only consume getPolicyInfoInBytes()
-    // and getPolicyData(); keep real Timelock metadata in
-    // sliceTimelockPolicyParams.
-    policyParams: {
-      policyAddress,
-      policyFlag,
-      type: "timestamp",
-      validAfter: delaySec,
-      validUntil: expirationSec
-    },
-    sliceTimelockPolicyParams: {
-      delaySec,
-      expirationSec,
-      guardian,
-      policyAddress,
-      policyFlag,
-      type: "slice-timelock"
-    }
-  }
-
-  return policy
-}
-
-export const createRecoveryCallPolicy = () =>
-  toCallPolicy({
-    permissions: [
-      {
-        selector: emptyCallSelector,
-        target: zeroAddress
-      },
-      {
-        selector: toFunctionSelector(webAuthnValidatorLifecycleAbi[1]),
-        target: sliceKernelWebAuthnValidatorAddress
-      },
-      {
-        selector: toFunctionSelector(webAuthnValidatorLifecycleAbi[0]),
-        target: sliceKernelWebAuthnValidatorAddress
-      }
-    ],
-    policyVersion: CallPolicyVersion.V0_0_5
-  })
-
-const createRecoveryPermissionValidator = async ({
-  client,
-  delaySec,
-  expirationSec,
-  guardian,
-  recoveryPrivateKey,
-  recoverySignerAddress
-}: {
-  client: KernelSmartAccountImplementation["client"]
-  delaySec?: number
-  expirationSec?: number
-  guardian?: Address
-  recoveryPrivateKey?: Hex
-  recoverySignerAddress: Address
-}) => {
-  const signer =
-    recoveryPrivateKey === undefined
-      ? toEmptyECDSASigner(recoverySignerAddress)
-      : await toECDSASigner({ signer: privateKeyToAccount(recoveryPrivateKey) })
-
-  return toPermissionValidator(client, {
-    entryPoint: recoveryEntryPoint,
-    flag: PolicyFlags.NOT_FOR_VALIDATE_SIG,
-    kernelVersion: recoveryKernelVersion,
-    policies: [
-      createRecoveryCallPolicy(),
-      toSliceTimelockPolicy({ delaySec, expirationSec, guardian })
-    ],
-    signer
-  })
-}
-
-const _sliceWalletRecoveryEcdsaSignerAddress =
-  sliceWalletKernelAddresses.ecdsaSigner
-
-type BuildRecoveryPermissionInitConfigParameters = {
-  client: KernelSmartAccountImplementation["client"]
-  recoverySignerAddress: Address
-  recoveryTimelock?: SliceTimelockPolicyParameters
-}
-
-export const buildRecoveryPermissionInitConfig = async ({
-  client: _client,
-  recoverySignerAddress,
-  recoveryTimelock
-}: BuildRecoveryPermissionInitConfigParameters) => {
-  return buildProtocolRecoveryPermissionInitConfig({
-    recoverySignerAddress,
-    recoveryTimelock
-  })
-}
-
-export const assertRecoveryPermissionInitConfig = async ({
-  client: _client,
-  initConfig
-}: {
-  client: KernelSmartAccountImplementation["client"]
-  initConfig: readonly Hex[]
-}) => assertProtocolRecoveryPermissionInitConfig({ initConfig })
-
 export const getSliceWalletRegistryRecoveryInitConfig = async ({
+  chainId,
   client,
   credential
 }: {
-  client: KernelSmartAccountImplementation["client"]
+  chainId?: number
+  client: SliceKernelClient
   credential: SliceWalletRegistryCredential
 }) => {
   if (
@@ -366,6 +145,8 @@ export const getSliceWalletRegistryRecoveryInitConfig = async ({
     return undefined
   }
   const recovery = await buildRecoveryPermissionInitConfig({
+    chainId: chainId ?? client.chain?.id ?? 8453,
+    factoryVersion: credential.factoryVersion,
     client,
     recoverySignerAddress: credential.recoverySignerAddress
   })
@@ -378,14 +159,13 @@ export const getSliceWalletRegistryRecoveryInitConfig = async ({
   return recovery.initConfig
 }
 
-const missingDeployedRoot = () => {
+const missingDeployedRoot = async () => {
   throw new Error(
     "Recovery of a deployed account cannot use the root validator."
   )
 }
 
 const deployedRecoveryAccountMarker = Symbol("SliceWalletDeployedRecovery")
-
 const isDeployedRecoveryAccount = (account: SmartAccount) =>
   (
     account as SmartAccount & {
@@ -393,73 +173,57 @@ const isDeployedRecoveryAccount = (account: SmartAccount) =>
     }
   )[deployedRecoveryAccountMarker] === true
 
-const createDeployedRecoveryRootValidator =
-  (): KernelValidator<"SliceWalletDeployedRecoveryRoot"> => {
-    const account = toAccount({
-      address: sliceWalletKernelAddresses.webAuthnRootValidator,
-      signMessage: missingDeployedRoot,
-      signTransaction: missingDeployedRoot,
-      signTypedData: missingDeployedRoot
-    })
-    return {
-      ...account,
-      address: sliceWalletKernelAddresses.webAuthnRootValidator,
-      // ZeroDev eagerly encodes unused factory data while constructing an
-      // account object. Empty public enable data lets that construction finish;
-      // every root signing method remains unavailable and factory args are
-      // overridden below.
-      getEnableData: async () => "0x",
-      getIdentifier: () => sliceWalletKernelAddresses.webAuthnRootValidator,
-      getNonceKey: async () => 0n,
-      getStubSignature: async () => missingDeployedRoot(),
-      isEnabled: async () => true,
-      signUserOperation: async () => missingDeployedRoot(),
-      source: "SliceWalletDeployedRecoveryRoot",
-      supportedKernelVersions: recoveryKernelVersion,
-      validatorType: "SECONDARY"
-    }
-  }
+const createDeployedRecoveryRootValidator = (
+  address: Address
+): SliceKernelValidator => ({
+  address,
+  getEnableData: async () => "0x",
+  getStubSignature: missingDeployedRoot,
+  signHash: missingDeployedRoot
+})
 
-const createRecoveryKernelAccount = async ({
+const createRecoveryKernelAccount = ({
   address,
   accountIndex,
   chainId,
   client,
   enableSignature,
-  recoveryValidator,
+  factoryVersion,
+  getFactoryArgs,
+  permission,
   rootValidator
 }: {
   address: Address
   accountIndex: bigint
   chainId: number
-  client: KernelSmartAccountImplementation["client"]
+  client: SliceKernelClient
   enableSignature?: Hex
-  recoveryValidator: Awaited<
-    ReturnType<typeof createRecoveryPermissionValidator>
-  >
-  rootValidator: KernelValidator
+  factoryVersion?: string
+  getFactoryArgs?: () => Promise<{
+    factory?: Address
+    factoryData?: Hex
+  }>
+  permission: SliceKernelPermission
+  rootValidator: SliceKernelValidator
 }) => {
-  const plugins = await toKernelPluginManager(client, {
-    chainId,
-    entryPoint: recoveryEntryPoint,
-    ...(enableSignature === undefined
-      ? {}
-      : { pluginEnableSignature: enableSignature }),
-    isPreInstalled: true,
-    kernelVersion: recoveryKernelVersion,
-    regular: recoveryValidator,
-    sudo: rootValidator
-  })
-  return createKernelAccount(client, {
+  const deployment = resolveSliceWalletDeployment({ chainId, factoryVersion })
+  return createKernelV4Account({
     address,
-    accountImplementationAddress: sliceKernelBaseV33Addresses.implementation,
-    entryPoint: recoveryEntryPoint,
-    factoryAddress: sliceKernelBaseV33Addresses.factory,
-    index: accountIndex,
-    kernelVersion: recoveryKernelVersion,
-    metaFactoryAddress: sliceKernelBaseV33Addresses.metaFactory,
-    plugins,
-    useMetaFactory: true
+    client,
+    ...(enableSignature === undefined ? {} : { enableSignature }),
+    entryPoint: deployment.entryPoint,
+    ...(deployment.erc6492BootstrapFactory === undefined
+      ? {}
+      : {
+          erc6492BootstrapFactory: deployment.erc6492BootstrapFactory
+        }),
+    factory: deployment.factory,
+    ...(getFactoryArgs === undefined ? {} : { getFactoryArgs }),
+    implementation: deployment.implementation,
+    nonce: accountIndex,
+    permission,
+    permissionPreinstalled: true,
+    rootValidator
   })
 }
 
@@ -470,53 +234,18 @@ export const createRecoveryPermissionAccount = async ({
   client,
   credential,
   enableSignature,
+  factoryVersion,
   getFactoryArgs,
   recoveryPrivateKey,
   recoverySignerAddress,
   recoveryTimelock
 }: CreateRecoveryPermissionAccountParameters) => {
-  const [rootValidator, recoveryValidator] = await Promise.all([
-    createSliceWalletRootValidator({ chainId, credential }),
-    createRecoveryPermissionValidator({
-      client,
-      delaySec: recoveryTimelock?.delaySec,
-      expirationSec: recoveryTimelock?.expirationSec,
-      guardian: recoveryTimelock?.guardian,
-      recoveryPrivateKey,
-      recoverySignerAddress
-    })
-  ])
-  const account = await createRecoveryKernelAccount({
-    address,
-    accountIndex,
+  const permission = createRecoveryPermission({
     chainId,
-    client,
-    enableSignature,
-    recoveryValidator,
-    rootValidator
-  })
-
-  return {
-    ...account,
-    ...(getFactoryArgs === undefined ? {} : { getFactoryArgs }),
-    recoveryPermissionId: recoveryValidator.getIdentifier()
-  }
-}
-
-export const createDeployedRecoveryPermissionAccount = async ({
-  address,
-  accountIndex,
-  chainId,
-  client,
-  recoveryPrivateKey,
-  recoverySignerAddress,
-  recoveryTimelock
-}: CreateDeployedRecoveryPermissionAccountParameters) => {
-  const recoveryValidator = await createRecoveryPermissionValidator({
-    client,
     delaySec: recoveryTimelock?.delaySec,
     expirationSec: recoveryTimelock?.expirationSec,
     guardian: recoveryTimelock?.guardian,
+    ...(factoryVersion === undefined ? {} : { factoryVersion }),
     recoveryPrivateKey,
     recoverySignerAddress
   })
@@ -525,119 +254,165 @@ export const createDeployedRecoveryPermissionAccount = async ({
     accountIndex,
     chainId,
     client,
-    recoveryValidator,
-    rootValidator: createDeployedRecoveryRootValidator()
+    ...(enableSignature === undefined ? {} : { enableSignature }),
+    ...(getFactoryArgs === undefined ? {} : { getFactoryArgs }),
+    ...(factoryVersion === undefined ? {} : { factoryVersion }),
+    permission,
+    rootValidator: createSliceWalletRootValidator({
+      chainId,
+      credential,
+      ...(factoryVersion === undefined ? {} : { factoryVersion })
+    })
   })
-  return {
-    ...account,
-    [deployedRecoveryAccountMarker]: true,
+  return { ...account, recoveryPermissionId: permission.id }
+}
+
+export const createDeployedRecoveryPermissionAccount = async ({
+  address,
+  accountIndex,
+  chainId,
+  client,
+  factoryVersion,
+  recoveryPrivateKey,
+  recoverySignerAddress,
+  recoveryTimelock
+}: CreateDeployedRecoveryPermissionAccountParameters) => {
+  const permission = createRecoveryPermission({
+    chainId,
+    delaySec: recoveryTimelock?.delaySec,
+    expirationSec: recoveryTimelock?.expirationSec,
+    guardian: recoveryTimelock?.guardian,
+    ...(factoryVersion === undefined ? {} : { factoryVersion }),
+    recoveryPrivateKey,
+    recoverySignerAddress
+  })
+  const account = await createRecoveryKernelAccount({
+    address,
+    accountIndex,
+    chainId,
+    client,
+    ...(factoryVersion === undefined ? {} : { factoryVersion }),
     getFactoryArgs: async () => ({
       factory: undefined,
       factoryData: undefined
     }),
-    recoveryPermissionId: recoveryValidator.getIdentifier()
+    permission,
+    rootValidator: createDeployedRecoveryRootValidator(
+      resolveSliceWalletDeployment({ chainId, factoryVersion }).rootValidator
+    )
+  })
+  return {
+    ...account,
+    [deployedRecoveryAccountMarker]: true,
+    recoveryPermissionId: permission.id
   }
 }
 
 type BuildRecoveryPermissionCallsParameters = {
   account: Address
-  client: KernelSmartAccountImplementation["client"]
+  chainId?: number
+  client: SliceKernelClient
+  factoryVersion?: string
   recoverySignerAddress: Address
   recoveryTimelock?: SliceTimelockPolicyParameters
 }
 
-export const buildRecoveryPermissionInstallCalls = async ({
+const getRecoveryPermissionInstalled = async ({
   account,
   client,
+  permission
+}: {
+  account: Address
+  client: SliceKernelClient
+  permission: SliceKernelPermission
+}) => {
+  const code = await getAction(client, getCode, "getCode")({ address: account })
+  if (code === undefined || code === "0x") return false
+  const installed = await getAction(
+    client,
+    multicall,
+    "multicall"
+  )({
+    allowFailure: false,
+    contracts: getKernelPermissionInstalls(permission).map((install) => ({
+      abi: kernelAccountAbi,
+      address: account,
+      args: [install.moduleType, install.module, permission.id] as const,
+      functionName: "isModuleInstalled" as const
+    }))
+  })
+  return installed.every(Boolean)
+}
+
+export const buildRecoveryPermissionInstallCalls = async ({
+  account,
+  chainId,
+  client,
+  factoryVersion,
   recoverySignerAddress,
   recoveryTimelock
 }: BuildRecoveryPermissionCallsParameters): Promise<{
   calls: SliceWalletRecoveryCall[]
   permissionId: Hex
 }> => {
-  const validator = await createRecoveryPermissionValidator({
-    client,
+  const permission = createRecoveryPermission({
+    ...(chainId === undefined ? {} : { chainId }),
     delaySec: recoveryTimelock?.delaySec,
     expirationSec: recoveryTimelock?.expirationSec,
     guardian: recoveryTimelock?.guardian,
+    ...(factoryVersion === undefined ? {} : { factoryVersion }),
     recoverySignerAddress
   })
-  const permissionId = validator.getIdentifier()
-  const validationId = toRecoveryValidationId(permissionId)
-  const validationData = await validator.getEnableData(account)
-  const installConfig = await getSliceWalletValidationInstallConfig({
+  const installed = await getRecoveryPermissionInstalled({
     account,
     client,
-    validationId
+    permission
   })
-
   return {
-    calls: [
-      {
-        data: encodeFunctionData({
-          abi: kernelAccountRecoveryAbi,
-          args: [[validationId], [installConfig], [validationData], ["0x"]],
-          functionName: "installValidations"
-        }),
-        to: account,
-        value: 0n
-      },
-      {
-        data: encodeFunctionData({
-          abi: kernelAccountRecoveryAbi,
-          args: [validationId, executeSelector, true],
-          functionName: "grantAccess"
-        }),
-        to: account,
-        value: 0n
-      }
-    ],
-    permissionId
+    calls: installed
+      ? []
+      : [
+          {
+            data: encodeKernelInstallPackagesCall(
+              getKernelPermissionInstalls(permission)
+            ),
+            to: account,
+            value: 0n
+          }
+        ],
+    permissionId: permission.id
   }
 }
 
 export const buildRecoveryPermissionUninstallCalls = async ({
   account,
+  chainId,
   client,
+  factoryVersion,
   recoverySignerAddress,
   recoveryTimelock
 }: BuildRecoveryPermissionCallsParameters): Promise<{
   calls: SliceWalletRecoveryCall[]
   permissionId: Hex
 }> => {
-  const validator = await createRecoveryPermissionValidator({
-    client,
+  const permission = createRecoveryPermission({
+    ...(chainId === undefined ? {} : { chainId }),
     delaySec: recoveryTimelock?.delaySec,
     expirationSec: recoveryTimelock?.expirationSec,
     guardian: recoveryTimelock?.guardian,
+    ...(factoryVersion === undefined ? {} : { factoryVersion }),
     recoverySignerAddress
   })
-  const permissionId = validator.getIdentifier()
-  const validationId = toRecoveryValidationId(permissionId)
-  const validationData = await validator.getEnableData(account)
-
+  const installed = await getRecoveryPermissionInstalled({
+    account,
+    client,
+    permission
+  })
   return {
-    calls: [
-      {
-        data: encodeFunctionData({
-          abi: kernelAccountRecoveryAbi,
-          args: [validationId, executeSelector, false],
-          functionName: "grantAccess"
-        }),
-        to: account,
-        value: 0n
-      },
-      {
-        data: encodeFunctionData({
-          abi: kernelAccountRecoveryAbi,
-          args: [validationId, validationData, "0x"],
-          functionName: "uninstallValidation"
-        }),
-        to: account,
-        value: 0n
-      }
-    ],
-    permissionId
+    calls: installed
+      ? encodeKernelPermissionUninstallCalls(account, permission)
+      : [],
+    permissionId: permission.id
   }
 }
 
@@ -646,37 +421,74 @@ export const buildRecoveryEnableTypedData = async (
     CreateRecoveryPermissionAccountParameters,
     "enableSignature" | "getFactoryArgs" | "recoveryPrivateKey"
   >
-): ReturnType<
-  KernelSmartAccountImplementation["kernelPluginManager"]["getPluginsEnableTypedData"]
-> => {
-  const account = await createRecoveryPermissionAccount(parameters)
-  return account.kernelPluginManager.getPluginsEnableTypedData(
-    parameters.address
-  )
+) => {
+  const permission = createRecoveryPermission({
+    chainId: parameters.chainId,
+    delaySec: parameters.recoveryTimelock?.delaySec,
+    expirationSec: parameters.recoveryTimelock?.expirationSec,
+    guardian: parameters.recoveryTimelock?.guardian,
+    ...(parameters.factoryVersion === undefined
+      ? {}
+      : { factoryVersion: parameters.factoryVersion }),
+    recoverySignerAddress: parameters.recoverySignerAddress
+  })
+  const code = await getAction(
+    parameters.client,
+    getCode,
+    "getCode"
+  )({
+    address: parameters.address
+  })
+  const nonce =
+    code === undefined || code === "0x"
+      ? 0n
+      : await getAction(
+          parameters.client,
+          readContract,
+          "readContract"
+        )({
+          abi: kernelAccountAbi,
+          address: parameters.address,
+          args: [0n],
+          functionName: "nonce"
+        })
+  return buildKernelInstallTypedData({
+    account: parameters.address,
+    chainId: parameters.chainId,
+    nonce,
+    packages: getKernelPermissionInstalls(permission)
+  })
 }
 
 export const buildRecoveryRotationCalls = (
-  newCredential: SliceWalletRegisteredRootCredential
-): SliceWalletRecoveryCall[] => [
-  {
-    data: encodeFunctionData({
-      abi: webAuthnValidatorLifecycleAbi,
-      args: ["0x"],
-      functionName: "onUninstall"
-    }),
-    to: sliceKernelWebAuthnValidatorAddress,
-    value: 0n
-  },
-  {
-    data: encodeFunctionData({
-      abi: webAuthnValidatorLifecycleAbi,
-      args: [encodeSliceWalletRootValidatorData(newCredential)],
-      functionName: "onInstall"
-    }),
-    to: sliceKernelWebAuthnValidatorAddress,
-    value: 0n
-  }
-]
+  newCredential: SliceWalletRegisteredRootCredential,
+  deploymentSelector: { chainId?: number; factoryVersion?: string } = {}
+): SliceWalletRecoveryCall[] => {
+  const deployment = resolveSliceWalletDeployment({
+    chainId: deploymentSelector.chainId ?? 8453,
+    factoryVersion: deploymentSelector.factoryVersion
+  })
+  return [
+    {
+      data: encodeFunctionData({
+        abi: kernelWebAuthnValidatorLifecycleAbi,
+        args: ["0x"],
+        functionName: "onUninstall"
+      }),
+      to: deployment.rootValidator,
+      value: 0n
+    },
+    {
+      data: encodeFunctionData({
+        abi: kernelWebAuthnValidatorLifecycleAbi,
+        args: [encodeSliceWalletRootValidatorData(newCredential)],
+        functionName: "onInstall"
+      }),
+      to: deployment.rootValidator,
+      value: 0n
+    }
+  ]
+}
 
 export const buildRecoveryNoOpCall = (): SliceWalletRecoveryCall => ({
   data: "0x",
@@ -685,14 +497,7 @@ export const buildRecoveryNoOpCall = (): SliceWalletRecoveryCall => ({
 })
 
 export const buildRecoveryNoOpCallData = () =>
-  encodeFunctionData({
-    abi: kernelAccountRecoveryAbi,
-    args: [
-      pad("0x", { size: 32 }),
-      concat([zeroAddress, numberToHex(0n, { size: 32 })])
-    ],
-    functionName: "execute"
-  })
+  encodeKernelCalls([buildRecoveryNoOpCall()])
 
 export const encodeRecoveryProposalSignature = ({
   callData,
@@ -716,21 +521,30 @@ export const encodeRecoveryProposalUserOperationSignature = ({
   nonce: bigint
   signature: Hex
 }) => {
-  if (!isHex(signature) || slice(signature, 0, 1) !== "0xff") {
+  if (!isHex(signature)) {
+    throw new Error("Recovery proposal signature is invalid.")
+  }
+  let decodedSignatures: readonly Hex[]
+  try {
+    ;[decodedSignatures] = decodeAbiParameters(
+      [{ name: "signatures", type: "bytes[]" }],
+      signature
+    )
+  } catch {
     throw new Error("Recovery proposal signatures require permission mode.")
   }
-
-  const proposalSignature = encodeRecoveryProposalSignature({
+  if (decodedSignatures.length !== 3) {
+    throw new Error("Recovery proposal signatures require permission mode.")
+  }
+  const signatures = [...decodedSignatures]
+  signatures[timelockPolicySignatureIndex] = encodeRecoveryProposalSignature({
     callData,
     nonce
   })
-
-  return concat([
-    numberToHex(timelockPolicySignatureIndex, { size: 1 }),
-    numberToHex(size(proposalSignature), { size: 8 }),
-    proposalSignature,
-    signature
-  ])
+  return encodeKernelPermissionSignature({
+    policySignatures: signatures.slice(0, -1),
+    signerSignature: signatures.at(-1) ?? "0x"
+  })
 }
 
 export const withRecoveryProposalSignature = <
@@ -769,7 +583,7 @@ export const buildRecoveryCancelCall = ({
     args: [toTimelockPolicyId(permissionId), account, callData, nonce],
     functionName: "cancelProposal"
   }),
-  to: sliceKernelTimelockPolicyAddress,
+  to: sliceWalletTimelockPolicyAddress,
   value: 0n
 })
 
@@ -835,15 +649,14 @@ export const buildRecoveryUserOperation = async ({
     callData: await account.encodeCalls(calls),
     ...gas,
     signature: "0x"
-  } satisfies UserOperation<"0.7">
-
+  } satisfies UserOperation<"0.9">
   return {
     ...userOperationBase,
     signature: await account.signUserOperation({
       ...userOperationBase,
       chainId
     })
-  } satisfies UserOperation<"0.7">
+  } satisfies UserOperation<"0.9">
 }
 
 export const buildRecoveryProposalUserOperation = ({
@@ -877,8 +690,8 @@ export const depositRecoveryEntryPoint = ({
 }) =>
   walletClient.writeContract({
     account: walletClient.account ?? null,
-    address: entryPoint07Address,
-    abi: entryPoint07Abi,
+    address: entryPoint09Address,
+    abi: entryPoint09Abi,
     chain: walletClient.chain ?? null,
     functionName: "depositTo",
     args: [account],
@@ -893,13 +706,13 @@ export const submitRecoveryHandleOps = ({
 }: {
   beneficiary: Address
   gas?: bigint
-  userOperation: UserOperation<"0.7">
+  userOperation: UserOperation<"0.9">
   walletClient: WalletClient
 }) =>
   walletClient.writeContract({
     account: walletClient.account ?? null,
-    address: entryPoint07Address,
-    abi: entryPoint07Abi,
+    address: entryPoint09Address,
+    abi: entryPoint09Abi,
     chain: walletClient.chain ?? null,
     functionName: "handleOps",
     args: [[toPackedUserOperation(userOperation)], beneficiary],
@@ -915,7 +728,7 @@ export const getRecoveryState = async ({
 }: {
   account: Address
   callData: Hex
-  client: KernelSmartAccountImplementation["client"]
+  client: SliceKernelClient
   nonce: bigint
   permissionId: Hex
 }) => {
@@ -925,16 +738,11 @@ export const getRecoveryState = async ({
     "readContract"
   )({
     abi: timelockPolicyAbi,
-    address: sliceKernelTimelockPolicyAddress,
+    address: sliceWalletTimelockPolicyAddress,
     args: [account, callData, nonce, toTimelockPolicyId(permissionId), account],
     functionName: "getProposal"
   })
-
-  return {
-    status: getRecoveryProposalStatus(status),
-    validAfter,
-    validUntil
-  }
+  return { status: getRecoveryProposalStatus(status), validAfter, validUntil }
 }
 
 export const getRecoveryConfig = async ({
@@ -943,7 +751,7 @@ export const getRecoveryConfig = async ({
   permissionId
 }: {
   account: Address
-  client: KernelSmartAccountImplementation["client"]
+  client: SliceKernelClient
   permissionId: Hex
 }) => {
   const [delaySec, expirationSec, guardian, initialized] = await getAction(
@@ -952,7 +760,7 @@ export const getRecoveryConfig = async ({
     "readContract"
   )({
     abi: timelockPolicyConfigAbi,
-    address: sliceKernelTimelockPolicyAddress,
+    address: sliceWalletTimelockPolicyAddress,
     args: [toTimelockPolicyId(permissionId), account],
     functionName: "timelockConfig"
   })
@@ -965,10 +773,5 @@ export const decodeRecoveryStateResult = (data: Hex) => {
     data,
     functionName: "getProposal"
   })
-
-  return {
-    status: getRecoveryProposalStatus(status),
-    validAfter,
-    validUntil
-  }
+  return { status: getRecoveryProposalStatus(status), validAfter, validUntil }
 }

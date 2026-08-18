@@ -1,4 +1,4 @@
-import { getSliceWalletChainPolicy } from "@slicekit/wallet-primitives/server"
+import { getSliceWalletChainPolicy } from "@slicekit/wallet-primitives"
 import type { SliceWalletUnsignedUserOperation } from "./types/frame"
 
 const developmentChainIds = new Set([31_337, 31_338])
@@ -6,7 +6,7 @@ const baseExecutionSafetyEnvelope =
   getSliceWalletChainPolicy(8453).executionSafety
 const localExecutionSafetyEnvelope = {
   ...baseExecutionSafetyEnvelope,
-  // Alto's local V0.7 estimator simulates with 10M gas and applies a 130%
+  // Alto's local v0.9 estimator simulates with 10M gas and applies a 130%
   // verification multiplier. Keep local fork signing inside those bounds
   // without widening any funded-network envelope.
   maxCallGasLimit: 10_000_000n,

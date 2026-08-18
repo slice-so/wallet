@@ -1,15 +1,14 @@
-import { getWalletPermissionId } from "@slicekit/wallet-primitives/policy"
-import type {
-  SliceWalletCheckoutGrant,
-  SliceWalletFrameSession,
-  SliceWalletPermissionAuthorization,
-  SliceWalletProtocolValue,
-  WalletGrantKind
-} from "@slicekit/wallet-primitives/server"
 import {
   assertSliceWalletAccountIndex,
-  getSliceWalletP256SignerId
-} from "@slicekit/wallet-primitives/server"
+  getSliceWalletP256SignerId,
+  type SliceWalletCheckoutGrant,
+  type SliceWalletFrameSession,
+  type SliceWalletKernelTypedData,
+  type SliceWalletPermissionAuthorization,
+  type SliceWalletProtocolValue,
+  type WalletGrantKind
+} from "@slicekit/wallet-primitives"
+import { getWalletPermissionId } from "@slicekit/wallet-primitives/policy"
 import { type Address, type Hex, hexToBytes, isAddress, isHex } from "viem"
 import {
   parseSliceWalletPolicyDescriptor,
@@ -128,6 +127,17 @@ const nonNegativeIntegerValue = (
   const parsed = integerValue(value, label)
   if (parsed < 0) throw new Error(`${label} must not be negative.`)
   return parsed
+}
+
+const nonNegativeIntegerString = (
+  value: SliceWalletProtocolValue,
+  label: string
+) => {
+  const parsed = stringValue(value, label)
+  if (!/^\d+$/.test(parsed)) {
+    throw new Error(`${label} must be a non-negative integer string.`)
+  }
+  return BigInt(parsed).toString()
 }
 
 const booleanValue = (value: SliceWalletProtocolValue, label: string) => {
@@ -296,6 +306,7 @@ export const parseSliceWalletPermissionAuthorization = (
     [
       "accountIndex",
       "appOrigin",
+      "enableNonce",
       "enableSignature",
       "rootCredential",
       "session"
@@ -359,6 +370,10 @@ export const parseSliceWalletPermissionAuthorization = (
           )
         }),
     appOrigin: originValue(input.appOrigin, "Application origin"),
+    enableNonce: nonNegativeIntegerString(
+      input.enableNonce,
+      "Permission enable nonce"
+    ),
     enableSignature: hexValue(input.enableSignature, "Enable signature"),
     ...(executionGrant === undefined ? {} : { executionGrant }),
     rootCredential,
@@ -726,23 +741,62 @@ export const parseSliceWalletCeremonyRootSignRequest = (
     }
     const typedData = record(request.typedData, "Root typed data")
     assertKeys(typedData, ["domain", "message", "primaryType", "types"])
-    if (typedData.primaryType !== "Kernel") {
-      throw new Error("Root typed-data primary type is invalid.")
-    }
+    const primaryType = stringValue(
+      typedData.primaryType,
+      "Root typed-data primary type"
+    )
     const domain = record(typedData.domain, "Root typed-data domain")
-    assertKeys(domain, ["chainId", "name", "verifyingContract", "version"])
+    assertKeys(
+      domain,
+      [],
+      ["chainId", "name", "salt", "verifyingContract", "version"]
+    )
     const message = record(typedData.message, "Root typed-data message")
-    assertKeys(message, ["hash"])
     const types = record(typedData.types, "Root typed-data types")
-    assertKeys(types, ["Kernel"])
-    const kernelTypes = types.Kernel
-    if (!Array.isArray(kernelTypes) || kernelTypes.length !== 1) {
-      throw new Error("Root typed-data fields are invalid.")
+    const parsedTypes: SliceWalletKernelTypedData["types"] = Object.fromEntries(
+      Object.entries(types).map(([name, fields]) => {
+        if (!Array.isArray(fields) || fields.length === 0) {
+          throw new Error("Root typed-data fields are invalid.")
+        }
+        return [
+          name,
+          fields.map((field) => {
+            const parsed = record(field, "Root typed-data field")
+            assertKeys(parsed, ["name", "type"])
+            return {
+              name: stringValue(parsed.name, "Root typed-data field name"),
+              type: stringValue(parsed.type, "Root typed-data field type")
+            }
+          })
+        ]
+      })
+    )
+    if (parsedTypes[primaryType] === undefined) {
+      throw new Error("Root typed-data primary type is undefined.")
     }
-    const hashField = record(kernelTypes[0], "Root typed-data hash field")
-    assertKeys(hashField, ["name", "type"])
-    if (hashField.name !== "hash" || hashField.type !== "bytes32") {
-      throw new Error("Root typed-data hash field is invalid.")
+    const parsedDomain: SliceWalletKernelTypedData["domain"] = {
+      ...(domain.chainId === undefined
+        ? {}
+        : { chainId: integerValue(domain.chainId, "Typed-data chain id") }),
+      ...(domain.name === undefined
+        ? {}
+        : { name: stringValue(domain.name, "Typed-data domain name") }),
+      ...(domain.salt === undefined
+        ? {}
+        : { salt: hexValue(domain.salt, "Typed-data domain salt", 32) }),
+      ...(domain.verifyingContract === undefined
+        ? {}
+        : {
+            verifyingContract: addressValue(
+              domain.verifyingContract,
+              "Typed-data verifying contract"
+            )
+          }),
+      ...(domain.version === undefined
+        ? {}
+        : {
+            version: stringValue(domain.version, "Typed-data domain version")
+          })
     }
     return {
       account: addressValue(input.account, "Root account"),
@@ -752,20 +806,10 @@ export const parseSliceWalletCeremonyRootSignRequest = (
         purpose: "typed_data",
         source: parsedSource,
         typedData: {
-          domain: {
-            chainId: integerValue(domain.chainId, "Typed-data chain id"),
-            name: stringValue(domain.name, "Typed-data domain name"),
-            verifyingContract: addressValue(
-              domain.verifyingContract,
-              "Typed-data verifying contract"
-            ),
-            version: stringValue(domain.version, "Typed-data domain version")
-          },
-          message: {
-            hash: hexValue(message.hash, "Typed-data message hash", 32)
-          },
-          primaryType: "Kernel",
-          types: { Kernel: [{ name: "hash", type: "bytes32" }] }
+          domain: parsedDomain,
+          message,
+          primaryType,
+          types: parsedTypes
         }
       },
       type: "slice-wallet:root-sign-request",

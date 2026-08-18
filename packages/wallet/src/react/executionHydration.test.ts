@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test"
-import type { SliceWalletFrameSession } from "@slicekit/wallet-primitives/server"
 import {
   getWalletPermissionId,
+  type SliceWalletFrameSession,
   serializeWalletPolicyDescriptor
-} from "@slicekit/wallet-primitives/server"
+} from "@slicekit/wallet-primitives"
 import { createSliceStoreManagementPolicyDescriptor } from "../execution"
 import { generateSliceWalletP256KeyPair } from "../p256"
 import type { SliceWalletSignerFrameClient } from "../types/frame"
@@ -15,6 +15,7 @@ const account = "0x0000000000000000000000000000000000000001" as const
 const stored = {
   accountAddress: account,
   delegationId: "delegation",
+  enableNonce: "0",
   enableSignature: "0x12",
   expiresAt: "2099-01-01T00:00:00.000Z",
   kind: "store_management",
@@ -350,6 +351,7 @@ describe("management execution hydration", () => {
     const storedSession = {
       accountAddress: account,
       delegationId: "delegation",
+      enableNonce: "0",
       enableSignature: "0x12",
       expiresAt: "2099-01-01T00:00:00.000Z",
       kind: "store_management",

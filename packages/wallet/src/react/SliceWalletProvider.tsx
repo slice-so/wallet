@@ -1,8 +1,9 @@
 "use client"
 
-import { getSliceWalletChainManifest } from "@slicekit/wallet-primitives/server"
+import { getSliceWalletChainPolicy } from "@slicekit/wallet-primitives"
 import {
   createContext,
+  type ReactNode,
   useCallback,
   useContext,
   useEffect,
@@ -62,12 +63,65 @@ export { defaultExecutionAllowanceUsdMicros } from "./executionCheckout"
 
 const SliceWalletContext = createContext<SliceWalletContextValue | null>(null)
 
-export function SliceWalletProvider({
+const unavailableManagementHydration = {
+  error: null,
+  status: "settled"
+} as const
+
+const unavailableSliceWalletValue = {
+  cancelPendingCeremony: () => undefined,
+  cancelRecoveryProposal: async () => undefined,
+  continueInPopup: async () => null,
+  createWallet: async () => false,
+  disableManagementExecutionSession: async () => undefined,
+  enableExecutionSession: async () => {
+    throw new Error("Slice Wallet is unavailable on this chain.")
+  },
+  enableManagementExecutionSession: async () => {
+    throw new Error("Slice Wallet is unavailable on this chain.")
+  },
+  error: null,
+  executionSession: null,
+  getManagementExecutionSession: () => null,
+  getStoreCreationExecutionSession: () => null,
+  hasStoredCredential: false,
+  loginWallet: async () => false,
+  managementHydration: unavailableManagementHydration,
+  pendingAction: null,
+  pendingCeremony: null,
+  recovery: null,
+  recoveryPendingAction: null,
+  refreshExecutionAllowance: async () => undefined,
+  refreshRecovery: async () => undefined,
+  retryManagementHydration: async () => undefined,
+  signInWallet: async () => undefined,
+  status: "unavailable",
+  switchAccount: async () => false
+} satisfies SliceWalletContextValue
+
+const UnavailableSliceWalletProvider = ({
+  children
+}: {
+  children: ReactNode
+}) => (
+  <SliceWalletContext.Provider value={unavailableSliceWalletValue}>
+    {children}
+  </SliceWalletContext.Provider>
+)
+
+type AvailableSliceWalletProviderProps = SliceWalletProviderProps & {
+  walletChain: ReturnType<typeof getSliceWalletChainPolicy>["chain"]
+  walletRpcUrl: string
+}
+
+const AvailableSliceWalletProvider = ({
   adapters = {},
   ceremonyMode = "auto",
   children,
-  notifications
-}: SliceWalletProviderProps) {
+  notifications,
+  walletChain,
+  walletRpcUrl
+}: AvailableSliceWalletProviderProps) => {
   const defaultCheckoutExecution = useMemo(
     () => ({ client: createSliceWalletCheckoutExecutionClient() }),
     []
@@ -77,14 +131,6 @@ export function SliceWalletProvider({
   const fetchWalletRecovery = adapters.fetchWalletRecovery
   const storeManagement = adapters.storeManagement
   const wagmiConfig = useConfig()
-  const usesLocalSliceChain =
-    !wagmiConfig.chains.some((chain) => chain.id === base.id) &&
-    wagmiConfig.chains.some((chain) => chain.id === anvil.id)
-  const walletChain = useMemo(
-    () =>
-      usesLocalSliceChain ? anvil : getSliceWalletChainManifest(base.id).chain,
-    [usesLocalSliceChain]
-  )
   const normalizedIdOrigin =
     walletChain.id === anvil.id
       ? "http://localhost:3003"
@@ -93,11 +139,9 @@ export function SliceWalletProvider({
     () =>
       createPublicClient({
         chain: walletChain,
-        transport: http(
-          getSliceWalletChainManifest(walletChain.id).defaultTransports.rpcUrl
-        )
+        transport: http(walletRpcUrl)
       }),
-    [walletChain]
+    [walletChain, walletRpcUrl]
   )
   const [status, setStatus] = useState<SliceWalletStatus>("loading")
   const connection = useConnection({ config: wagmiConfig })
@@ -535,6 +579,32 @@ export function SliceWalletProvider({
     <SliceWalletContext.Provider value={value}>
       {children}
     </SliceWalletContext.Provider>
+  )
+}
+
+export function SliceWalletProvider(props: SliceWalletProviderProps) {
+  const wagmiConfig = useConfig()
+  const usesLocalSliceChain =
+    !wagmiConfig.chains.some((chain) => chain.id === base.id) &&
+    wagmiConfig.chains.some((chain) => chain.id === anvil.id)
+  const walletPolicy = getSliceWalletChainPolicy(
+    usesLocalSliceChain ? anvil.id : base.id
+  )
+
+  if (!walletPolicy.admitted) {
+    return (
+      <UnavailableSliceWalletProvider>
+        {props.children}
+      </UnavailableSliceWalletProvider>
+    )
+  }
+
+  return (
+    <AvailableSliceWalletProvider
+      {...props}
+      walletChain={usesLocalSliceChain ? anvil : walletPolicy.chain}
+      walletRpcUrl={walletPolicy.defaultTransports.rpcUrl}
+    />
   )
 }
 

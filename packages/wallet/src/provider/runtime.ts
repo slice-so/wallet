@@ -1,21 +1,26 @@
 import {
+  assertSliceWalletAuthorityDeployment,
+  buildSliceWalletPermissionInstallCalls,
+  buildSliceWalletPermissionRevocationCalls,
+  getSliceWalletChainManifest,
+  getSliceWalletP256SignerId,
+  predictSliceWalletKernelAccountAddressFromInitConfig,
+  type SliceWalletFrameSession,
+  type SliceWalletPermissionAuthorization,
+  type WalletCall,
+  type WalletPolicyDescriptor
+} from "@slicekit/wallet-primitives"
+import {
+  resolveSliceWalletDeploymentProfileId,
+  SliceWalletDeploymentProfileError
+} from "@slicekit/wallet-primitives/kernel"
+import {
   assertWalletCallsMatchPolicy,
   deserializeWalletPolicyDescriptor,
   getWalletPermissionId,
   getWalletPolicyHash,
   serializeWalletPolicyDescriptor
 } from "@slicekit/wallet-primitives/policy"
-import type {
-  SliceWalletFrameSession,
-  WalletCall,
-  WalletPolicyDescriptor
-} from "@slicekit/wallet-primitives/server"
-import {
-  assertSliceWalletAuthorityDeployment,
-  getSliceWalletChainManifest,
-  getSliceWalletP256SignerId,
-  predictSliceWalletKernelAccountAddressFromInitConfig
-} from "@slicekit/wallet-primitives/server"
 import {
   type Address,
   BaseError,
@@ -46,11 +51,7 @@ import { authorizeSliceWalletSessions } from "../ceremony/client"
 import { parseSliceWalletFrameSession } from "../ceremony/protocol"
 import { createSliceWalletCeremonyKernelAccount } from "../ceremony/rootAccountClient"
 import { acquireSliceWalletSignerFrame } from "../frame/client"
-import {
-  buildSliceWalletPermissionInstallCalls,
-  buildSliceWalletPermissionRevocationCalls,
-  createSliceWalletPermissionAccount
-} from "../permissionAccount"
+import { createSliceWalletPermissionAccount } from "../permissionAccount"
 import { getSliceWalletRegistryRecoveryInitConfig } from "../recovery"
 import {
   createSliceWalletRegistryClient,
@@ -115,19 +116,24 @@ type ActiveWallet = {
 }
 
 export const deriveSliceWalletRegistryAccountAddress = async ({
+  chainId,
   client,
   credential
 }: Parameters<typeof getSliceWalletRegistryRecoveryInitConfig>[0]) => {
+  const effectiveChainId = chainId ?? client.chain?.id ?? 8453
   const initConfig = await getSliceWalletRegistryRecoveryInitConfig({
+    chainId: effectiveChainId,
     client,
     credential
   })
   return {
     address: predictSliceWalletKernelAccountAddressFromInitConfig({
+      chainId: effectiveChainId,
       credential: {
         credentialIdHash: credential.credentialIdHash,
         publicKey: credential.publicKey
       },
+      factoryVersion: credential.factoryVersion,
       index: BigInt(credential.accountIndex),
       ...(initConfig === undefined ? {} : { initConfig })
     }),
@@ -378,8 +384,8 @@ export const submitSliceWalletGenericGrantInstallation = async <Prepared>({
 }
 
 const normalizePreparedGenericGrantInstallation = (
-  userOperation: UserOperation<"0.7">
-): UserOperation<"0.7"> => {
+  userOperation: UserOperation<"0.9">
+): UserOperation<"0.9"> => {
   const {
     authorization,
     factory,
@@ -590,6 +596,7 @@ const createSliceWalletChainRuntime = (
   ) => {
     const { address, initConfig } =
       await assertSliceWalletRegistryAccountIdentity({
+        chainId: config.chain.id,
         client: publicClient,
         credential
       })
@@ -604,6 +611,7 @@ const createSliceWalletChainRuntime = (
         publicKey: credential.publicKey
       },
       document: browserDocument,
+      factoryVersion: credential.factoryVersion,
       idOrigin,
       index: BigInt(credential.accountIndex),
       ...(initConfig === undefined ? {} : { initConfig }),
@@ -669,7 +677,8 @@ const createSliceWalletChainRuntime = (
             metadata.credentialIdHash.toLowerCase() ||
           credential.publicKey.toLowerCase() !==
             metadata.publicKey.toLowerCase() ||
-          credential.factoryVersion !== metadata.factoryVersion ||
+          resolveSliceWalletDeploymentProfileId(credential.factoryVersion) !==
+            metadata.factoryVersion ||
           credential.recoveryPermissionId?.toLowerCase() !==
             metadata.recoveryPermissionId?.toLowerCase() ||
           credential.recoverySignerAddress?.toLowerCase() !==
@@ -681,6 +690,7 @@ const createSliceWalletChainRuntime = (
         }
         return activate(credential)
       } catch (error) {
+        if (error instanceof SliceWalletDeploymentProfileError) throw error
         if (
           error instanceof SliceWalletRegistryRequestError &&
           error.status < 500
@@ -690,6 +700,7 @@ const createSliceWalletChainRuntime = (
         }
         try {
           await assertSliceWalletRegistryAccountIdentity({
+            chainId: config.chain.id,
             client: publicClient,
             credential: metadata
           })
@@ -712,7 +723,9 @@ const createSliceWalletChainRuntime = (
           try {
             currentRoot = await getSliceWalletRootValidatorPublicKey({
               account: metadata.accountAddress,
-              client: publicClient
+              chainId: config.chain.id,
+              client: publicClient,
+              factoryVersion: metadata.factoryVersion
             })
           } catch {
             return null
@@ -1033,6 +1046,7 @@ const createSliceWalletChainRuntime = (
           publicKey: wallet.credential.publicKey
         },
         enableSignature: grant.stored.enableSignature,
+        factoryVersion: wallet.credential.factoryVersion,
         frameClient: await getFrame(),
         getFactoryArgs: () => wallet.rootAccount.getFactoryArgs(),
         mode: "generic",
@@ -1064,6 +1078,7 @@ const createSliceWalletChainRuntime = (
     const { calls, revoked } = await buildSliceWalletPermissionRevocationCalls({
       account: wallet.rootAccount.address,
       client: publicClient,
+      enableNonce: BigInt(stored.enableNonce),
       session
     })
     if (revoked) return
@@ -1221,9 +1236,9 @@ const createSliceWalletChainRuntime = (
       return setRotationPhase(rotation, "installed")
     }
     const wallet = await requireActiveWallet()
-    if (wallet.rootAccount.entryPoint.version !== "0.7") {
+    if (wallet.rootAccount.entryPoint.version !== "0.9") {
       throw new Error(
-        "Generic permission installation requires EntryPoint 0.7."
+        "Generic permission installation requires EntryPoint 0.9."
       )
     }
     const bundler = createAccountBundler(wallet.rootAccount)
@@ -1233,7 +1248,7 @@ const createSliceWalletChainRuntime = (
       prepare: () =>
         bundler.prepareUserOperation({
           calls: installation.calls
-        }) as Promise<UserOperation<"0.7">>,
+        }) as Promise<UserOperation<"0.9">>,
       setPhase: setRotationPhase,
       sign: async (prepared) => {
         const canonicalPrepared =
@@ -1253,7 +1268,7 @@ const createSliceWalletChainRuntime = (
             "Prepared wallet permission installation identity is invalid."
           )
         }
-        const request: UserOperation<"0.7"> = {
+        const request: UserOperation<"0.9"> = {
           ...canonicalPrepared,
           signature:
             await wallet.rootAccount.signUserOperation(canonicalPrepared)
@@ -1265,7 +1280,7 @@ const createSliceWalletChainRuntime = (
         const userOperationHash = getUserOperationHash({
           chainId: config.chain.id,
           entryPointAddress: wallet.rootAccount.entryPoint.address,
-          entryPointVersion: "0.7",
+          entryPointVersion: "0.9",
           userOperation: replay
         })
         return {
@@ -1295,10 +1310,12 @@ const createSliceWalletChainRuntime = (
   }
 
   const toStoredGrant = ({
+    enableNonce,
     enableSignature,
     permissions,
     session
   }: {
+    enableNonce: string
     enableSignature: Hex
     permissions: readonly SliceWalletGenericPermission[]
     session: SliceWalletFrameSession
@@ -1306,6 +1323,7 @@ const createSliceWalletChainRuntime = (
     account: session.account,
     chainId: session.chainId,
     createdAt: Math.min(session.expiresAt - 1, session.policy.validAfter + 300),
+    enableNonce: BigInt(enableNonce).toString(),
     enableSignature,
     expiresAt: session.expiresAt,
     permissionId: session.permissionId,
@@ -1946,8 +1964,15 @@ const createSliceWalletChainRuntime = (
         }
       })
     }
-    const persist = async (enableSignature: Hex) => {
+    const persist = async ({
+      enableNonce,
+      enableSignature
+    }: Pick<
+      SliceWalletPermissionAuthorization,
+      "enableNonce" | "enableSignature"
+    >) => {
       const stored = toStoredGrant({
+        enableNonce,
         enableSignature,
         permissions,
         session
@@ -1994,6 +2019,7 @@ const createSliceWalletChainRuntime = (
             predecessor: previous,
             rebroadcastAttempts: 0,
             replacement: toStoredGrant({
+              enableNonce: authorization.enableNonce,
               enableSignature: authorization.enableSignature,
               permissions,
               session
@@ -2016,7 +2042,7 @@ const createSliceWalletChainRuntime = (
     }
     try {
       const authorization = await authorize()
-      return await persist(authorization.enableSignature)
+      return await persist(authorization)
     } catch (error) {
       await discardPending()
       throw error
@@ -2041,6 +2067,7 @@ const createSliceWalletChainRuntime = (
       grant.stored.account
     )
     const replacement = toStoredGrant({
+      enableNonce: rotation?.replacement.enableNonce ?? "0",
       enableSignature: "0x",
       permissions: getSliceWalletPendingGrantPermissions({
         pending,

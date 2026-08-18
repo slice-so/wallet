@@ -1,6 +1,6 @@
-import type { SliceBundlerRetryReason } from "@slicekit/wallet-primitives/execution"
+import { sliceKernelConfig } from "@slicekit/wallet-primitives"
 import {
-  sliceKernelBaseV33Config,
+  type SliceBundlerRetryReason,
   sliceKernelPasskeyBackend
 } from "@slicekit/wallet-primitives/execution"
 import {
@@ -56,8 +56,8 @@ type SliceKernelPasskeyPrepareUserOperationParameters = {
 )
 
 const normalizePreparedUserOperation = (
-  userOperation: UserOperation<"0.7">
-): UserOperation<"0.7"> => {
+  userOperation: UserOperation<"0.9">
+): UserOperation<"0.9"> => {
   if (userOperation.paymaster !== undefined) return userOperation
 
   // Some bundlers return zero paymaster gas estimates for self-funded
@@ -91,7 +91,7 @@ const createDefaultSliceKernelPasskeyBundlerClient: CreateSliceKernelPasskeyBund
             calls: parameters.calls,
             ...(paymaster === undefined ? {} : { paymaster }),
             ...(paymasterContext === undefined ? {} : { paymasterContext })
-          }) as Promise<UserOperation<"0.7">>
+          }) as Promise<UserOperation<"0.9">>
         }
         return bundlerClient.prepareUserOperation({
           account,
@@ -108,7 +108,7 @@ const createDefaultSliceKernelPasskeyBundlerClient: CreateSliceKernelPasskeyBund
             : { parameters: parameters.parameters }),
           ...(paymaster === undefined ? {} : { paymaster }),
           ...(paymasterContext === undefined ? {} : { paymasterContext })
-        }) as Promise<UserOperation<"0.7">>
+        }) as Promise<UserOperation<"0.9">>
       },
       sendPreparedUserOperation: (userOperation) =>
         bundlerClient.request(
@@ -116,7 +116,7 @@ const createDefaultSliceKernelPasskeyBundlerClient: CreateSliceKernelPasskeyBund
             method: "eth_sendUserOperation",
             params: [
               formatUserOperationRequest(userOperation),
-              sliceKernelBaseV33Config.entryPoint
+              sliceKernelConfig.entryPoint
             ]
           },
           { retryCount: 0 }
@@ -251,7 +251,7 @@ const getUserOperationProposalKey = ({
 }: {
   paymasterContextHash?: Hex
   paymasterUrl?: string
-  userOperation: UserOperation<"0.7">
+  userOperation: UserOperation<"0.9">
 }) =>
   keccak256(
     encodeAbiParameters(
@@ -274,8 +274,8 @@ const assertRetryPreservesProposal = ({
   original,
   retried
 }: {
-  original: UserOperation<"0.7">
-  retried: UserOperation<"0.7">
+  original: UserOperation<"0.9">
+  retried: UserOperation<"0.9">
 }) => {
   if (
     original.sender.toLowerCase() !== retried.sender.toLowerCase() ||
@@ -357,7 +357,7 @@ export const createSliceKernelPasskeyTransport = ({
         bundlerClient.prepareUserOperation &&
         bundlerClient.sendPreparedUserOperation
       ) {
-        let userOperation: UserOperation<"0.7">
+        let userOperation: UserOperation<"0.9">
         try {
           userOperation = await prepareAndSign({
             account,
@@ -401,7 +401,7 @@ export const createSliceKernelPasskeyTransport = ({
             throw error
           }
 
-          let retriedUserOperation: UserOperation<"0.7">
+          let retriedUserOperation: UserOperation<"0.9">
           try {
             retriedUserOperation = await prepareAndSign({
               account,

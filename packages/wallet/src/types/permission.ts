@@ -1,13 +1,13 @@
-import type { SliceWalletRegisteredRootCredential } from "@slicekit/wallet-primitives/server"
-import type { KernelSmartAccountImplementation } from "@zerodev/sdk"
-import type { Address, Hex } from "viem"
-import type { SliceWalletRootSigner } from "./account"
 import type {
   SliceWalletFrameSession,
+  SliceWalletRegisteredRootCredential
+} from "@slicekit/wallet-primitives"
+import type { Address, Hex } from "viem"
+import type { SliceWalletPublicClient, SliceWalletRootSigner } from "./account"
+import type {
   SliceWalletSignerFrameClient,
   SliceWalletUnsignedUserOperation
 } from "./frame"
-
 export type SliceWalletCheckoutCoSignChallenge = {
   challenge: Hex
   challengeExpiresAt: number
@@ -47,9 +47,10 @@ export type SliceWalletCheckoutCoSignerClient = {
 type SliceWalletPermissionAccountCommonParameters = {
   address: Address
   accountIndex: bigint
-  client: KernelSmartAccountImplementation["client"]
+  client: SliceWalletPublicClient
   credential: SliceWalletRegisteredRootCredential
   enableSignature?: Hex
+  factoryVersion?: string
   frameClient: SliceWalletSignerFrameClient
   getFactoryArgs?: () => Promise<{
     factory?: Address
@@ -71,8 +72,3 @@ export type CreateSliceWalletPermissionAccountParameters =
           mode: "generic" | "management"
         }
     )
-
-export type BuildSliceWalletPermissionEnableTypedDataParameters = Omit<
-  SliceWalletPermissionAccountCommonParameters,
-  "enableSignature" | "frameClient" | "getFactoryArgs"
->

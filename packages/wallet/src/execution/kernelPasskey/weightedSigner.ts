@@ -1,8 +1,8 @@
+import type { SliceKernelModularSigner } from "@slicekit/wallet-primitives"
 import { sliceKernelWeightedEcdsaSignerAddress } from "@slicekit/wallet-primitives/execution"
-import type { ModularSigner } from "@zerodev/permissions"
-import { addressToEmptyAccount, constants } from "@zerodev/sdk"
+import { kernelDummyEcdsaSignature } from "@slicekit/wallet-primitives/kernel"
 import { concat, encodeAbiParameters, type Hex, pad } from "viem"
-import { privateKeyToAccount } from "viem/accounts"
+import { privateKeyToAccount, toAccount } from "viem/accounts"
 import type {
   WeightedEcdsaProposalTypedDataParameters,
   WeightedEcdsaSignerParameters
@@ -34,8 +34,8 @@ export const encodeWeightedEcdsaSignerData = ({
   )
 
 export const weightedEcdsaDummySignature = concat([
-  constants.DUMMY_ECDSA_SIG,
-  constants.DUMMY_ECDSA_SIG
+  kernelDummyEcdsaSignature,
+  kernelDummyEcdsaSignature
 ])
 
 /**
@@ -48,7 +48,7 @@ export const weightedEcdsaDummySignature = concat([
  * estimation.
  */
 export const buildWeightedEcdsaStubSignature = (proposalSignature: Hex) =>
-  concat([proposalSignature, constants.DUMMY_ECDSA_SIG])
+  concat([proposalSignature, kernelDummyEcdsaSignature])
 
 export const weightedEcdsaProposalTypes = {
   Proposal: [
@@ -89,17 +89,30 @@ export const toWeightedEcdsaSigner = ({
   sessionPrivateKey,
   sessionSignerAddress,
   signerContractAddress = sliceKernelWeightedEcdsaSignerAddress
-}: WeightedEcdsaSignerParameters): ModularSigner => {
+}: WeightedEcdsaSignerParameters): SliceKernelModularSigner => {
   const account =
     sessionPrivateKey === undefined
-      ? addressToEmptyAccount(sessionSignerAddress)
+      ? toAccount({
+          address: sessionSignerAddress,
+          async signMessage() {
+            throw new Error("The execution session key is unavailable.")
+          },
+          async signTransaction() {
+            throw new Error("A permission signer cannot sign transactions.")
+          },
+          async signTypedData() {
+            throw new Error("The execution session key is unavailable.")
+          }
+        })
       : privateKeyToAccount(sessionPrivateKey)
 
   return {
     account,
-    getDummySignature: () => weightedEcdsaDummySignature,
-    getSignerData: () =>
-      encodeWeightedEcdsaSignerData({ coSignerAddress, sessionSignerAddress }),
-    signerContractAddress
+    address: signerContractAddress,
+    data: encodeWeightedEcdsaSignerData({
+      coSignerAddress,
+      sessionSignerAddress
+    }),
+    stubSignature: weightedEcdsaDummySignature
   }
 }

@@ -1,4 +1,4 @@
-import type { KernelSmartAccountImplementation } from "@zerodev/sdk"
+import type { SliceKernelClient } from "@slicekit/wallet-primitives"
 import type { Address, Hex } from "viem"
 import type { UserOperation } from "viem/account-abstraction"
 import type { SliceWalletPasskeyCredential } from "./account"
@@ -6,9 +6,10 @@ import type { SliceWalletPasskeyCredential } from "./account"
 type SliceExecutionAccountCommonParameters = {
   address: Address
   accountIndex: bigint
-  client: KernelSmartAccountImplementation["client"]
+  client: SliceKernelClient
   credential: SliceWalletPasskeyCredential
   enableSignature?: Hex
+  factoryVersion?: string
   getFactoryArgs?: () => Promise<{
     factory?: Address | undefined
     factoryData?: Hex | undefined
@@ -24,7 +25,7 @@ export type CreateSliceExecutionAccountParameters =
       | {
           coSignerAddress: Address
           getCoSignature?: (args: {
-            userOperation: UserOperation<"0.7">
+            userOperation: UserOperation<"0.9">
           }) => Promise<Hex>
           mode: "checkout"
         }

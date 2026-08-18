@@ -1,15 +1,22 @@
-import type { SerializedWalletPolicyDescriptor } from "@slicekit/wallet-primitives/server"
+import type {
+  SerializedWalletPolicyDescriptor,
+  SliceWalletExecutionSessionDescriptor
+} from "@slicekit/wallet-primitives"
 import type { ReactNode } from "react"
 import type { Address, Hex } from "viem"
 import type { SliceAccountClient } from "./accountClient"
 import type { SliceWalletCeremonyMode } from "./ceremony"
 import type {
   SliceWalletCheckoutExecutionClient,
-  SliceWalletExecutionSessionDescriptor,
   SliceWalletManagementExecutionClient
 } from "./commerce"
 import type { SliceWalletPendingCeremony } from "./pendingCeremony"
-export type SliceWalletStatus = "error" | "idle" | "loading" | "ready"
+export type SliceWalletStatus =
+  | "error"
+  | "idle"
+  | "loading"
+  | "ready"
+  | "unavailable"
 export type SliceWalletPendingAction = "create" | "login" | null
 export type SliceWalletRecoveryPendingAction = "cancel" | null
 
@@ -65,6 +72,7 @@ export type SliceWalletCredentialRecord = {
   accountAddress: Address
   accountIndex: number
   credentialIdHash: Hex
+  factoryVersion: string
   publicKey: Hex
   recoveryPermissionId: Hex | null
   recoverySignerAddress: Address | null
@@ -110,6 +118,7 @@ export type SliceWalletManagementExecutionSession = {
 export type StoredSliceWalletExecutionSession = {
   accountAddress: Address
   delegationId: string
+  enableNonce: string
   enableSignature: Hex
   expiresAt: string
   permissionId: Hex

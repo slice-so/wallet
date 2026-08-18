@@ -80,6 +80,12 @@ export const getSliceWalletSourceImportBoundaryViolations = ({
       )
       return
     }
+    // Kernel v4 encoding is owned by @slicekit/wallet-primitives/kernel and the
+    // in-package SmartAccount implementation; the ZeroDev SDKs must not return.
+    if (specifier.startsWith("@zerodev/")) {
+      violations.push(`${relativePath} imports a ZeroDev SDK "${specifier}"`)
+      return
+    }
     if (!specifier.startsWith(".")) return
 
     const resolvedImport = resolve(filePath, "..", specifier)

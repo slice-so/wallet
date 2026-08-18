@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test"
+import { sliceWalletCurrentDeploymentProfileId } from "@slicekit/wallet-primitives"
 import { concatBytes, stringToBytes, toBytes } from "viem"
 import {
   decryptSliceWalletRecoveryBundle,
@@ -35,9 +36,8 @@ const payload = {
   chainId: 8453,
   credentialId: "credential-id",
   credentialPublicKey: `0x04${"22".repeat(64)}`,
-  factory: "0x2577507b78c2008Ff367261CB6285d44ba5eF2E9",
-  factoryVersion: "Kernel 0.3.3",
-  metaFactory: "0xd703aaE79538628d27099B8c4f621bE4CCd142d5",
+  factory: "0xa299a4efee7bbfb2ea5668b30218c45fff78356c",
+  factoryVersion: "Kernel 0.4.0",
   recoveryPermissionId: "0x12345678",
   recoveryPrivateKey: `0x${"33".repeat(32)}`,
   recoverySignerAddress: "0x3333333333333333333333333333333333333333"
@@ -57,7 +57,10 @@ describe("Slice Wallet recovery bundle", () => {
         bundle,
         passphrase: "correct horse battery staple"
       })
-    ).resolves.toEqual(payload)
+    ).resolves.toEqual({
+      ...payload,
+      factoryVersion: sliceWalletCurrentDeploymentProfileId
+    })
   })
 
   it("rejects a wrong passphrase, AAD tampering, and unknown fields", async () => {

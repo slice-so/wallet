@@ -1,4 +1,4 @@
-import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives/server"
+import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives"
 import type { Hex } from "viem"
 import type { ManageSliceWalletDeviceParameters } from "../types"
 import { toSliceWalletCeremonyError } from "../userRejectedRequest"

@@ -1,47 +1,26 @@
-import type {
-  JsonObject,
-  JsonValue,
-  SliceAcceptedSenderCode,
-  SliceJsonRpcId,
-  SliceSenderAccountFetch,
-  SliceUpstreamJsonRpcError,
-  SliceUserOperation,
-  SliceUserOperationPolicyFetch
-} from "@slicekit/wallet-primitives/execution"
 import {
   createJsonRpcError,
   createSliceProxyResponse as createProxyResponse,
   createSliceSlicerAddressResolver,
   isAcceptedSliceUserOperation,
   isAddressString,
-  isJsonObject,
-  isJsonRpcId,
-  isSupportedSliceEntryPointRequest,
-  parseSliceUserOperation,
+  isSupportedSliceAcceptedPaymentTokensRequest,
+  type JsonValue,
+  parseSlicePaymasterRequest,
+  type SliceAcceptedSenderCode,
+  type SliceJsonRpcId,
+  type SlicePaymasterMethod,
+  type SlicePaymasterRequest,
+  type SlicePaymasterSponsorshipRequest,
+  type SliceSenderAccountFetch,
+  type SliceUpstreamJsonRpcError,
+  type SliceUserOperation,
+  type SliceUserOperationPolicyFetch,
+  slicePaymasterAcceptedPaymentTokensMethod,
   sliceUserOperationPolicyDescription
 } from "@slicekit/wallet-primitives/execution"
 import type { Address } from "viem"
 import { readUpstreamJsonRpcError } from "./sliceUserOperationTransport"
-
-type SlicePaymasterSponsorshipRequest = {
-  jsonrpc: "2.0"
-  id?: SliceJsonRpcId
-  method: SlicePaymasterSponsorshipMethod
-  params: [SliceUserOperation, Address, string | number, JsonObject?]
-  raw: JsonObject
-}
-
-type SliceAcceptedPaymentTokensRequest = {
-  jsonrpc: "2.0"
-  id?: SliceJsonRpcId
-  method: SlicePaymasterAcceptedTokensMethod
-  params: [Address, string | number, JsonValue]
-  raw: JsonObject
-}
-
-type SlicePaymasterRequest =
-  | SlicePaymasterSponsorshipRequest
-  | SliceAcceptedPaymentTokensRequest
 
 type SlicePaymasterConfig = {
   acceptUserOperation?: (input: {
@@ -50,11 +29,13 @@ type SlicePaymasterConfig = {
     userOperation: SliceUserOperation
   }) => boolean | Promise<boolean>
   acceptedSenderCode?: readonly SliceAcceptedSenderCode[]
+  acceptedChainIds?: readonly number[]
   allowAcceptedPaymentTokens?: boolean
   cdpApiKey?: string
   eip7702DelegateAllowlist?: readonly Address[]
   fetchSenderAccount?: SliceSenderAccountFetch
   policyBaseUrl?: string
+  paymasterRpcUrl?: string
   requireVerifiedSender?: boolean
 }
 
@@ -74,27 +55,8 @@ type HandleSlicePaymasterRequestOptions = SlicePaymasterConfig & {
   onUpstreamError?: SlicePaymasterUpstreamErrorHandler
 }
 
-type SlicePaymasterSponsorshipMethod =
-  | "pm_getPaymasterStubData"
-  | "pm_getPaymasterData"
-type SlicePaymasterAcceptedTokensMethod = "pm_getAcceptedPaymentTokens"
-type SlicePaymasterMethod =
-  | SlicePaymasterSponsorshipMethod
-  | SlicePaymasterAcceptedTokensMethod
-
 const basePaymasterRpcUrl = "https://api.developer.coinbase.com/rpc/v1/base"
 export const slicePaymasterApiPath = "/api/paymaster"
-const acceptedPaymentTokensMethod = "pm_getAcceptedPaymentTokens" as const
-const supportedPaymasterMethods = [
-  "pm_getPaymasterStubData",
-  "pm_getPaymasterData",
-  acceptedPaymentTokensMethod
-] as const
-const sponsorshipPaymasterMethods = [
-  "pm_getPaymasterStubData",
-  "pm_getPaymasterData"
-] as const
-
 export const slicePaymasterPolicyDescription = [
   "The Slice paymaster proxy accepts only ERC-7677 JSON-RPC paymaster requests for Base EntryPoint v0.6, v0.7, v0.8, or v0.9.",
   sliceUserOperationPolicyDescription
@@ -104,17 +66,6 @@ const getStringConfigValue = (value: string | undefined) => {
   const trimmed = value?.trim()
   return trimmed ? trimmed : null
 }
-
-const isSlicePaymasterMethod = (
-  value: JsonValue | undefined
-): value is SlicePaymasterMethod =>
-  typeof value === "string" &&
-  supportedPaymasterMethods.includes(value as SlicePaymasterMethod)
-
-const isSponsorshipPaymasterMethod = (
-  value: SlicePaymasterMethod
-): value is SlicePaymasterSponsorshipMethod =>
-  sponsorshipPaymasterMethods.includes(value as SlicePaymasterSponsorshipMethod)
 
 export const parseSlicePaymasterAddressList = (value: string | undefined) => {
   const rawAddresses = getStringConfigValue(value)
@@ -137,98 +88,32 @@ export const getSlicePaymasterRpcUrl = ({
   return apiKey ? `${basePaymasterRpcUrl}/${apiKey}` : null
 }
 
+const getExplicitSlicePaymasterRpcUrl = (value: string | undefined) => {
+  const configured = getStringConfigValue(value)
+  if (configured === null) return null
+  const url = new URL(configured)
+  const localHttp =
+    url.protocol === "http:" &&
+    (url.hostname === "localhost" || url.hostname === "127.0.0.1")
+  if (
+    (url.protocol !== "https:" && !localHttp) ||
+    url.username !== "" ||
+    url.password !== "" ||
+    url.hash !== ""
+  ) {
+    throw new Error("Slice paymaster RPC URL is not permitted.")
+  }
+  return url.toString()
+}
+
 export const getSlicePaymasterApiUrl = (origin: string | URL) =>
   new URL(slicePaymasterApiPath, origin).toString()
-
-const parseAcceptedPaymentTokensRequest = ({
-  body,
-  params
-}: {
-  body: JsonObject & {
-    id?: SliceJsonRpcId
-    method: SlicePaymasterAcceptedTokensMethod
-  }
-  params: JsonValue[]
-}): SliceAcceptedPaymentTokensRequest | null => {
-  if (params.length !== 3) return null
-
-  const [rawEntryPoint, rawChainId, rawContext] = params
-  if (!isAddressString(rawEntryPoint)) return null
-  if (typeof rawChainId !== "string" && typeof rawChainId !== "number") {
-    return null
-  }
-
-  return {
-    jsonrpc: "2.0",
-    id: body.id,
-    method: body.method,
-    params: [rawEntryPoint, rawChainId, rawContext],
-    raw: body
-  }
-}
-
-const parseSlicePaymasterRequest = (
-  body: JsonValue
-): SlicePaymasterRequest | null => {
-  if (!isJsonObject(body)) return null
-  if (body.jsonrpc !== "2.0") return null
-  if (!isJsonRpcId(body.id)) return null
-  if (!isSlicePaymasterMethod(body.method)) return null
-  if (!Array.isArray(body.params)) return null
-
-  if (body.method === acceptedPaymentTokensMethod) {
-    return parseAcceptedPaymentTokensRequest({
-      body: {
-        ...body,
-        method: acceptedPaymentTokensMethod
-      },
-      params: body.params
-    })
-  }
-
-  if (body.params.length < 3 || body.params.length > 4) return null
-  if (!isSponsorshipPaymasterMethod(body.method)) return null
-
-  const [rawUserOperation, rawEntryPoint, rawChainId, rawContext] = body.params
-  const userOperation = parseSliceUserOperation(rawUserOperation)
-  if (!userOperation) return null
-  if (!isAddressString(rawEntryPoint)) return null
-  if (typeof rawChainId !== "string" && typeof rawChainId !== "number") {
-    return null
-  }
-
-  const hasContext = rawContext !== undefined && rawContext !== null
-  if (hasContext && !isJsonObject(rawContext)) return null
-
-  const params: SlicePaymasterSponsorshipRequest["params"] = hasContext
-    ? [userOperation, rawEntryPoint, rawChainId, rawContext]
-    : [userOperation, rawEntryPoint, rawChainId]
-
-  return {
-    jsonrpc: "2.0",
-    id: body.id,
-    method: body.method,
-    params,
-    raw: {
-      ...body,
-      params: body.params.map((param, index) =>
-        index === 0 ? userOperation : param
-      )
-    }
-  }
-}
-
-const isAcceptedPaymentTokensRequestSupported = (
-  request: SliceAcceptedPaymentTokensRequest
-) => {
-  const [entryPoint, chainId] = request.params
-  return isSupportedSliceEntryPointRequest({ chainId, entryPoint })
-}
 
 const isSponsorableSlicePaymasterRequest = async (
   request: SlicePaymasterSponsorshipRequest,
   {
     acceptedSenderCode,
+    acceptedChainIds,
     acceptUserOperation,
     eip7702DelegateAllowlist,
     fetchSenderAccount,
@@ -238,6 +123,7 @@ const isSponsorableSlicePaymasterRequest = async (
   }: Pick<
     SlicePaymasterConfig,
     | "acceptedSenderCode"
+    | "acceptedChainIds"
     | "acceptUserOperation"
     | "eip7702DelegateAllowlist"
     | "fetchSenderAccount"
@@ -248,8 +134,15 @@ const isSponsorableSlicePaymasterRequest = async (
   }
 ) => {
   const [userOperation, entryPoint, chainId] = request.params
-  const accepted = await isAcceptedSliceUserOperation({
+  if (
+    acceptUserOperation !== undefined &&
+    !(await acceptUserOperation({ chainId, entryPoint, userOperation }))
+  ) {
+    return false
+  }
+  return isAcceptedSliceUserOperation({
     ...(acceptedSenderCode === undefined ? {} : { acceptedSenderCode }),
+    ...(acceptedChainIds === undefined ? {} : { acceptedChainIds }),
     chainId,
     eip7702DelegateAllowlist,
     entryPoint,
@@ -261,11 +154,6 @@ const isSponsorableSlicePaymasterRequest = async (
     ...(requireVerifiedSender === undefined ? {} : { requireVerifiedSender }),
     userOperation
   })
-  return (
-    accepted &&
-    (acceptUserOperation === undefined ||
-      (await acceptUserOperation({ chainId, entryPoint, userOperation })))
-  )
 }
 
 const forwardPaymasterRequest = async ({
@@ -300,6 +188,7 @@ export const handleSlicePaymasterRequest = async (
   request: Request,
   {
     acceptedSenderCode,
+    acceptedChainIds,
     acceptUserOperation,
     allowAcceptedPaymentTokens = true,
     cdpApiKey,
@@ -308,6 +197,7 @@ export const handleSlicePaymasterRequest = async (
     fetchSenderAccount,
     fetchSlicer,
     onUpstreamError,
+    paymasterRpcUrl: paymasterRpcUrlOverride,
     policyBaseUrl,
     requireVerifiedSender
   }: HandleSlicePaymasterRequestOptions
@@ -333,7 +223,9 @@ export const handleSlicePaymasterRequest = async (
     )
   }
 
-  const paymasterRpcUrl = getSlicePaymasterRpcUrl({ cdpApiKey })
+  const paymasterRpcUrl =
+    getExplicitSlicePaymasterRpcUrl(paymasterRpcUrlOverride) ??
+    getSlicePaymasterRpcUrl({ cdpApiKey })
   if (!paymasterRpcUrl) {
     return Response.json(
       createJsonRpcError({
@@ -345,10 +237,10 @@ export const handleSlicePaymasterRequest = async (
     )
   }
 
-  if (paymasterRequest.method === acceptedPaymentTokensMethod) {
+  if (paymasterRequest.method === slicePaymasterAcceptedPaymentTokensMethod) {
     if (
       !allowAcceptedPaymentTokens ||
-      !isAcceptedPaymentTokensRequestSupported(paymasterRequest)
+      !isSupportedSliceAcceptedPaymentTokensRequest(paymasterRequest)
     ) {
       return Response.json(
         createJsonRpcError({
@@ -371,6 +263,7 @@ export const handleSlicePaymasterRequest = async (
   if (
     !(await isSponsorableSlicePaymasterRequest(paymasterRequest, {
       ...(acceptedSenderCode === undefined ? {} : { acceptedSenderCode }),
+      ...(acceptedChainIds === undefined ? {} : { acceptedChainIds }),
       ...(acceptUserOperation === undefined ? {} : { acceptUserOperation }),
       eip7702DelegateAllowlist,
       ...(fetchSenderAccount === undefined ? {} : { fetchSenderAccount }),

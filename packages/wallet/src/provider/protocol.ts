@@ -1,4 +1,8 @@
 import {
+  maximumBrowserGenericGrantTtlSec,
+  type WalletPolicyDescriptor
+} from "@slicekit/wallet-primitives"
+import {
   createErc20ApproveCallRule,
   createErc20TransferCallRule,
   createErc20TransferFromCallRule,
@@ -6,8 +10,6 @@ import {
   getWalletPermissionValidAfter,
   normalizeWalletPolicyDescriptor
 } from "@slicekit/wallet-primitives/policy"
-import type { WalletPolicyDescriptor } from "@slicekit/wallet-primitives/server"
-import { maximumBrowserGenericGrantTtlSec } from "@slicekit/wallet-primitives/server"
 import {
   type Address,
   type Hex,

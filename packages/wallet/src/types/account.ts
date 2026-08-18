@@ -1,8 +1,9 @@
-import type { SliceWalletRegisteredRootCredential } from "@slicekit/wallet-primitives/server"
 import type {
-  CreateKernelAccountReturnType,
-  KernelSmartAccountImplementation
-} from "@zerodev/sdk"
+  SliceKernelAccount,
+  SliceKernelInstall,
+  SliceWalletKernelTypedData,
+  SliceWalletRegisteredRootCredential
+} from "@slicekit/wallet-primitives"
 import type {
   Address,
   Chain,
@@ -18,7 +19,6 @@ import type {
   ToWebAuthnAccountParameters
 } from "viem/account-abstraction"
 import type { SliceWalletUnsignedUserOperation } from "./frame"
-
 export type SliceWalletActivityTokenDescriptor = {
   address: Address
   symbol: string
@@ -73,26 +73,12 @@ export type SliceWalletPublicClient = Client<
   JsonRpcAccount | LocalAccount | undefined
 >
 
-export type SliceWalletKernelAccount = CreateKernelAccountReturnType<"0.7">
+export type SliceWalletKernelAccount = SliceKernelAccount
 
 export type SliceWalletRootSignaturePurpose =
   | "message"
   | "typed_data"
   | "user_operation"
-
-export type SliceWalletKernelTypedData = {
-  domain: {
-    chainId: number
-    name: string
-    verifyingContract: Address
-    version: string
-  }
-  message: { hash: Hex }
-  primaryType: "Kernel"
-  types: {
-    Kernel: readonly [{ name: "hash"; type: "bytes32" }]
-  }
-}
 
 export type SliceWalletRootSignatureRequest =
   | {
@@ -127,8 +113,10 @@ export type SliceWalletRootSigner = (
 
 export type CreateSliceWalletKernelAccountParameters = {
   address?: `0x${string}`
+  chainId?: number
   client: SliceWalletPublicClient
   credential: SliceWalletPasskeyCredential
+  factoryVersion?: string
   getFn?: ToWebAuthnAccountParameters["getFn"]
   rpId?: ToWebAuthnAccountParameters["rpId"]
 }
@@ -136,9 +124,10 @@ export type CreateSliceWalletKernelAccountParameters = {
 export type CreateSliceWalletRegisteredKernelAccountParameters = {
   address?: `0x${string}`
   chainId: number
-  client: KernelSmartAccountImplementation["client"]
+  client: SliceWalletPublicClient
   credential: SliceWalletRegisteredRootCredential
+  factoryVersion?: string
   index?: bigint
-  initConfig?: Hex[]
+  initConfig?: readonly SliceKernelInstall[]
   rootSigner?: SliceWalletRootSigner
 }

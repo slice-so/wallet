@@ -1,33 +1,19 @@
 import {
-  getSliceWalletChainPolicy,
-  sliceWalletDevelopmentChainIds,
-  sliceWalletKernelAddresses
-} from "@slicekit/wallet-primitives/server"
-import {
+  type Address,
   bytesToHex,
-  encodeFunctionData,
   type Hex,
   hexToBytes,
+  isAddressEqual,
   parseErc6492Signature,
   serializeErc6492Signature
 } from "viem"
-
-const bootstrapFactoryAbi = [
-  {
-    inputs: [{ name: "metaFactoryData", type: "bytes" }],
-    name: "deploy",
-    outputs: [{ name: "account", type: "address" }],
-    stateMutability: "payable",
-    type: "function"
-  }
-] as const
 
 const appendCompressedByte = (output: number[], byte: number) => {
   output.push(output.length < 4 ? byte ^ 0xff : byte)
 }
 
 /** Matches Solady LibZip.cdCompress for calldata consumed by cdFallback. */
-export const compressSliceWalletBootstrapCalldata = (data: Hex): Hex => {
+export const compressKernelErc6492BootstrapCalldata = (data: Hex): Hex => {
   const input = hexToBytes(data)
   const output: number[] = []
   let zeroRun = 0
@@ -70,43 +56,27 @@ export const compressSliceWalletBootstrapCalldata = (data: Hex): Hex => {
   return bytesToHex(Uint8Array.from(output))
 }
 
-const hasVerifiedBootstrapFactory = (chainId: number) => {
-  const deployment =
-    getSliceWalletChainPolicy(chainId).contracts.erc6492BootstrapFactory
-  return (
-    sliceWalletDevelopmentChainIds.includes(
-      chainId as (typeof sliceWalletDevelopmentChainIds)[number]
-    ) || deployment.runtimeCodeHash !== null
-  )
-}
-
-export const compactSliceWalletErc6492Signature = ({
-  chainId,
+export const compactKernelErc6492Signature = ({
+  bootstrapFactory,
+  factory,
   signature
 }: {
-  chainId: number
+  bootstrapFactory: Address
+  factory: Address
   signature: Hex
 }): Hex => {
-  if (!hasVerifiedBootstrapFactory(chainId)) return signature
-
   const parsed = parseErc6492Signature(signature)
   if (
     parsed.address === undefined ||
     parsed.data === undefined ||
-    parsed.address.toLowerCase() !==
-      sliceWalletKernelAddresses.metaFactory.toLowerCase()
+    !isAddressEqual(parsed.address, factory)
   ) {
     return signature
   }
 
-  const bootstrapCall = encodeFunctionData({
-    abi: bootstrapFactoryAbi,
-    args: [parsed.data],
-    functionName: "deploy"
-  })
   return serializeErc6492Signature({
-    address: sliceWalletKernelAddresses.erc6492BootstrapFactory,
-    data: compressSliceWalletBootstrapCalldata(bootstrapCall),
+    address: bootstrapFactory,
+    data: compressKernelErc6492BootstrapCalldata(parsed.data),
     signature: parsed.signature
   })
 }

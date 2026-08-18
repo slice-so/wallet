@@ -1,7 +1,9 @@
-import { sliceKernelWeightedP256SignerAddress } from "@slicekit/wallet-primitives/execution"
-import { sliceWalletKernelAddresses } from "@slicekit/wallet-primitives/server"
-import type { ModularSigner } from "@zerodev/permissions"
-import { addressToEmptyAccount, constants } from "@zerodev/sdk"
+import {
+  type SliceKernelModularSigner,
+  sliceKernelWeightedP256SignerAddress,
+  sliceWalletKernelAddresses
+} from "@slicekit/wallet-primitives"
+import { kernelDummyEcdsaSignature } from "@slicekit/wallet-primitives/kernel"
 import {
   type Address,
   bytesToBigInt,
@@ -13,6 +15,7 @@ import {
   type LocalAccount,
   toHex
 } from "viem"
+import { toAccount } from "viem/accounts"
 import { sliceWalletWebAuthnDummySignature } from "./rootValidator"
 
 const getP256Coordinates = (publicKey: Hex) => {
@@ -25,6 +28,20 @@ const getP256Coordinates = (publicKey: Hex) => {
     y: bytesToBigInt(bytes.slice(33, 65))
   }
 }
+
+const toEmptySignerAccount = (address: Address) =>
+  toAccount({
+    address,
+    async signMessage() {
+      throw new Error("The Slice signer frame must provide this signature.")
+    },
+    async signTransaction() {
+      throw new Error("A modular signer does not sign transactions.")
+    },
+    async signTypedData() {
+      throw new Error("The Slice signer frame must provide this signature.")
+    }
+  })
 
 export const encodeWeightedP256SignerData = ({
   coSignerAddress,
@@ -47,7 +64,7 @@ export const encodeWeightedP256SignerData = ({
 export const weightedP256DummySignature = concat([
   toHex(1n, { size: 32 }),
   toHex(1n, { size: 32 }),
-  constants.DUMMY_ECDSA_SIG,
+  kernelDummyEcdsaSignature,
   toHex(1n, { size: 6 })
 ])
 
@@ -59,12 +76,11 @@ export const toWeightedP256Signer = ({
   coSignerAddress: Address
   publicKey: Hex
   signerId: Address
-}): ModularSigner => ({
-  account: addressToEmptyAccount(signerId),
-  getDummySignature: () => weightedP256DummySignature,
-  getSignerData: () =>
-    encodeWeightedP256SignerData({ coSignerAddress, publicKey }),
-  signerContractAddress: sliceKernelWeightedP256SignerAddress
+}): SliceKernelModularSigner => ({
+  account: toEmptySignerAccount(signerId),
+  address: sliceKernelWeightedP256SignerAddress,
+  data: encodeWeightedP256SignerData({ coSignerAddress, publicKey }),
+  stubSignature: weightedP256DummySignature
 })
 
 export const toSliceWalletWebAuthnSessionSigner = ({
@@ -73,9 +89,9 @@ export const toSliceWalletWebAuthnSessionSigner = ({
 }: {
   publicKey: Hex
   signerId: Address
-}): ModularSigner =>
+}): SliceKernelModularSigner =>
   toSliceWalletWebAuthnSigner({
-    account: addressToEmptyAccount(signerId),
+    account: toEmptySignerAccount(signerId),
     credentialIdHash: keccak256(publicKey),
     publicKey
   })
@@ -88,15 +104,12 @@ export const toSliceWalletWebAuthnSigner = ({
   account: LocalAccount
   credentialIdHash: Hex
   publicKey: Hex
-}): ModularSigner => {
-  return {
-    account,
-    getDummySignature: () => sliceWalletWebAuthnDummySignature,
-    getSignerData: () =>
-      encodeSliceWalletWebAuthnSignerData({ credentialIdHash, publicKey }),
-    signerContractAddress: sliceWalletKernelAddresses.webAuthnSignerV004
-  }
-}
+}): SliceKernelModularSigner => ({
+  account,
+  address: sliceWalletKernelAddresses.webAuthnSignerV004,
+  data: encodeSliceWalletWebAuthnSignerData({ credentialIdHash, publicKey }),
+  stubSignature: sliceWalletWebAuthnDummySignature
+})
 
 export const encodeSliceWalletWebAuthnSignerData = ({
   credentialIdHash,

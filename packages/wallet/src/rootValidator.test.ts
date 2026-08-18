@@ -33,10 +33,12 @@ describe("Slice wallet root validator state", () => {
   it("returns the installed coordinates and treats zero storage as absent", async () => {
     const installed = await getSliceWalletRootValidatorPublicKey({
       account,
+      chainId: 8453,
       client: createRootStorageClient(123n, 456n)
     })
     const absent = await getSliceWalletRootValidatorPublicKey({
       account,
+      chainId: 8453,
       client: createRootStorageClient(0n, 0n)
     })
 
@@ -53,17 +55,19 @@ describe("Slice wallet root validator state", () => {
     })
 
     await expect(
-      validator.signUserOperation({
-        callData: "0x",
-        callGasLimit: 3_000_001n,
-        chainId: base.id,
-        maxFeePerGas: 1n,
-        maxPriorityFeePerGas: 1n,
-        nonce: 0n,
-        preVerificationGas: 1n,
-        sender: account,
-        signature: "0x",
-        verificationGasLimit: 1n
+      validator.signHash(`0x${"11".repeat(32)}`, {
+        purpose: "user_operation",
+        userOperation: {
+          callData: "0x",
+          callGasLimit: 3_000_001n,
+          maxFeePerGas: 1n,
+          maxPriorityFeePerGas: 1n,
+          nonce: 0n,
+          preVerificationGas: 1n,
+          sender: account,
+          signature: "0x",
+          verificationGasLimit: 1n
+        }
       })
     ).rejects.toThrow("gas safety envelope")
     expect(rootSigner).not.toHaveBeenCalled()

@@ -1,5 +1,5 @@
 import { describe, expect, it, mock } from "bun:test"
-import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives/server"
+import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives"
 import type { Hex } from "viem"
 import type { SliceWalletCeremonySessionResult } from "../types"
 import { connectSliceWalletAccount } from "./accountClient"
@@ -108,7 +108,7 @@ const registryFetch = Object.assign(
           accountIndex: 0,
           createdAt: new Date().toISOString(),
           credentialIdHash,
-          factoryVersion: "0.3.3",
+          factoryVersion: "slice-kernel-v4-ep09-r1",
           publicKey,
           recoveryPermissionId: null,
           recoverySignerAddress: null,

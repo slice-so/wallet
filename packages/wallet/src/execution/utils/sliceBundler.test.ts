@@ -1,10 +1,6 @@
 import { describe, expect, it, mock } from "bun:test"
 import { productsModuleAbi } from "@slicekit/abi"
 import { getProductsModuleAddress } from "@slicekit/abi/deployments"
-import type {
-  SliceSenderAccountSnapshot,
-  SliceUserOperation
-} from "@slicekit/wallet-primitives/execution"
 import {
   coinbaseSmartWalletExecutionAbi,
   erc7579AccountExecutionAbi,
@@ -14,14 +10,23 @@ import {
   isAcceptedSliceRecoveryCancellationUserOperation,
   isAcceptedSliceWalletSenderUserOperation,
   kernelTimelockPolicyCancelAbi,
-  kernelValidationManagementAbi,
+  type SliceSenderAccountSnapshot,
+  type SliceUserOperation,
   sliceIdAuthorizationRevocationRegistryAddress,
-  sliceKernelBaseV33Addresses,
-  sliceKernelBaseV33SenderCode,
-  sliceKernelTimelockPolicyAddress
-} from "@slicekit/wallet-primitives/execution"
+  sliceKernelAddresses,
+  sliceKernelSenderCode,
+  sliceKernelTimelockPolicyAddress,
+  sliceKernelWebAuthnValidatorAddress,
+  sliceWalletKernelAddresses
+} from "@slicekit/wallet-primitives"
+import {
+  kernelFactoryAbi,
+  kernelPermissionExecuteSelector,
+  kernelValidationManagementAbi
+} from "@slicekit/wallet-primitives/kernel"
 import {
   type Address,
+  concat,
   encodeAbiParameters,
   encodeFunctionData,
   erc20Abi,
@@ -32,7 +37,7 @@ import {
   zeroAddress,
   zeroHash
 } from "viem"
-import { entryPoint07Address } from "viem/account-abstraction"
+import { entryPoint09Address } from "viem/account-abstraction"
 import { anvil, base } from "viem/chains"
 import {
   classifyAltoBundlerRetryReason,
@@ -58,7 +63,7 @@ type BundlerUserOperationOptions = {
   nonce?: Hex
 }
 
-// Kernel v3 nonce layout: [1B mode][1B validator type][20B id][2B key][8B seq]
+// Kernel v4 nonce layout: [1B mode][1B validator type][20B id][2B key][8B seq]
 const buildKernelNonce = ({
   mode,
   validatorType
@@ -73,7 +78,6 @@ const permissionValidationNonce = buildKernelNonce({
   validatorType: 2n
 })
 
-const recoveryValidationId = `0x02${"11".repeat(20)}` as Hex
 const recoveryTimelockProposalId = `0x${"22".repeat(32)}` as Hex
 const erc7579BatchDefaultMode =
   "0x0100000000000000000000000000000000000000000000000000000000000000" satisfies Hex
@@ -84,27 +88,24 @@ const kernelProxyCode =
 
 const kernelSenderAccountSnapshot: SliceSenderAccountSnapshot = {
   code: kernelProxyCode,
-  erc1967Implementation: pad(sliceKernelBaseV33Addresses.implementation, {
+  erc1967Implementation: pad(sliceKernelAddresses.implementation, {
     size: 32
   })
 }
-const kernelMetaFactoryAbi = [
-  {
-    inputs: [
-      { name: "factory", type: "address" },
-      { name: "createData", type: "bytes" },
-      { name: "salt", type: "bytes32" }
-    ],
-    name: "deployWithFactory",
-    outputs: [{ name: "account", type: "address" }],
-    stateMutability: "payable",
-    type: "function"
-  }
-] as const
 const canonicalKernelFactoryData = encodeFunctionData({
-  abi: kernelMetaFactoryAbi,
-  args: [sliceKernelBaseV33Addresses.factory, "0x1234", zeroHash],
-  functionName: "deployWithFactory"
+  abi: kernelFactoryAbi,
+  args: [
+    [
+      {
+        internalData: "0x",
+        module: sliceKernelWebAuthnValidatorAddress,
+        moduleData: "0x1234",
+        moduleType: 1n
+      }
+    ],
+    0n
+  ],
+  functionName: "deploy"
 })
 const unknownSenderAccountSnapshot: SliceSenderAccountSnapshot = {
   code: "0x6001600155",
@@ -158,30 +159,44 @@ const encodeErc7579ExecuteBatch = (
     ]
   })
 
-const encodeInstallValidations = () =>
+const encodeInstallPermission = () =>
   encodeFunctionData({
     abi: kernelValidationManagementAbi,
-    functionName: "installValidations",
+    functionName: "installModule",
     args: [
-      [recoveryValidationId],
-      [{ hook: zeroAddress, nonce: 1 }],
-      ["0x"],
-      ["0x"]
+      [
+        {
+          internalData: "0x12345678",
+          module: sliceWalletKernelAddresses.sudoPolicy,
+          moduleData: "0x",
+          moduleType: 5n
+        },
+        {
+          internalData: concat([
+            "0x12345678",
+            zeroAddress,
+            kernelPermissionExecuteSelector
+          ]),
+          module: sliceWalletKernelAddresses.ecdsaSigner,
+          moduleData: "0x",
+          moduleType: 6n
+        }
+      ]
     ]
   })
 
-const encodeGrantAccess = (allow = true) =>
+const encodeInstallNonceCheckpoint = () =>
   encodeFunctionData({
     abi: kernelValidationManagementAbi,
-    functionName: "grantAccess",
-    args: [recoveryValidationId, "0xe9ae5c53", allow]
+    functionName: "setNonce",
+    args: [0n, 1n]
   })
 
-const encodeUninstallValidation = () =>
+const encodeUninstallPermission = () =>
   encodeFunctionData({
     abi: kernelValidationManagementAbi,
-    functionName: "uninstallValidation",
-    args: [recoveryValidationId, "0x", "0x"]
+    functionName: "uninstallModule",
+    args: [6n, sliceWalletKernelAddresses.ecdsaSigner, "0x"]
   })
 
 const encodeCancelRecoveryProposal = (account: Address) =>
@@ -210,7 +225,7 @@ const createBundlerBody = (
   jsonrpc: "2.0",
   id: 1,
   method,
-  params: [createBundlerUserOperation(callData, options), entryPoint07Address]
+  params: [createBundlerUserOperation(callData, options), entryPoint09Address]
 })
 
 type HandleSliceBundlerRequestOptions = Parameters<
@@ -228,6 +243,7 @@ const handleTestBundlerRequest = (
     Partial<Pick<HandleSliceBundlerRequestOptions, "fetchSlicer">>
 ) =>
   handleSliceBundlerRequest(request, {
+    allowCdpFallback: true,
     fetchSlicer: unexpectedSlicerValidationFetch(),
     ...options
   })
@@ -310,8 +326,13 @@ describe("slice bundler", () => {
   })
 
   it("resolves bundler URLs through the shared environment policy", () => {
-    expect(getSliceBundlerRpcUrl({ cdpApiKey })).toBe(bundlerUrl)
-    expect(getSliceBundlerRpcUrl({ cdpApiKey: "  " })).toBeNull()
+    expect(getSliceBundlerRpcUrl({ allowCdpFallback: true, cdpApiKey })).toBe(
+      bundlerUrl
+    )
+    expect(
+      getSliceBundlerRpcUrl({ allowCdpFallback: true, cdpApiKey: "  " })
+    ).toBeNull()
+    expect(getSliceBundlerRpcUrl({ cdpApiKey })).toBeNull()
     expect(getSliceBundlerRpcUrl({ chainId: 31_337 })).toBe(
       "http://localhost:4337"
     )
@@ -392,7 +413,7 @@ describe("slice bundler", () => {
       "eth_estimateUserOperationGas"
     ] as const) {
       const body = createBundlerBody(method, callData, {
-        factory: sliceKernelBaseV33Addresses.metaFactory,
+        factory: sliceKernelAddresses.factory,
         factoryData: "0x1234"
       })
       const fetchBundler = mock(
@@ -597,7 +618,7 @@ describe("slice bundler", () => {
       data: encodeSetProductType()
     })
     const body = createBundlerBody("eth_sendUserOperation", callData, {
-      factory: sliceKernelBaseV33Addresses.metaFactory,
+      factory: sliceKernelAddresses.factory,
       factoryData: "0x1234"
     })
     const fetchBundler = mock(async () =>
@@ -745,7 +766,7 @@ describe("slice bundler", () => {
     expect(response.status).toBe(200)
     expect(authorizeUserOperation).toHaveBeenCalledWith({
       chainId: base.id,
-      entryPoint: entryPoint07Address,
+      entryPoint: entryPoint09Address,
       userOperation: body.params[0]
     })
     expect(fetchBundler).toHaveBeenCalledTimes(1)
@@ -785,22 +806,33 @@ describe("slice bundler", () => {
     await expect(
       isAcceptedSliceWalletSenderUserOperation({
         chainId: base.id,
-        entryPoint: entryPoint07Address,
+        entryPoint: entryPoint09Address,
         fetchSenderAccount: createSenderAccountFetch(
           kernelSenderAccountSnapshot
         ),
         userOperation: deployedOperation
       })
     ).resolves.toBe(true)
+    await expect(
+      isAcceptedSliceWalletSenderUserOperation({
+        chainId: base.id,
+        entryPoint: entryPoint09Address,
+        fetchSenderAccount: createSenderAccountFetch({
+          ...kernelSenderAccountSnapshot,
+          erc1967Implementation: pad(arbitraryTargetAddress, { size: 32 })
+        }),
+        userOperation: deployedOperation
+      })
+    ).resolves.toBe(false)
 
     const undeployedOperation = createBundlerUserOperation("0x12345678", {
-      factory: sliceKernelBaseV33Addresses.metaFactory,
+      factory: sliceKernelAddresses.factory,
       factoryData: canonicalKernelFactoryData
     })
     await expect(
       isAcceptedSliceWalletSenderUserOperation({
         chainId: base.id,
-        entryPoint: entryPoint07Address,
+        entryPoint: entryPoint09Address,
         fetchSenderAccount: createSenderAccountFetch(
           undeployedSenderAccountSnapshot
         ),
@@ -810,22 +842,40 @@ describe("slice bundler", () => {
 
     for (const userOperation of [
       createBundlerUserOperation("0x12345678", {
-        factory: sliceKernelBaseV33Addresses.factory,
+        factory: sliceKernelAddresses.factory,
         factoryData: "0x1234"
       }),
       createBundlerUserOperation("0x12345678", {
-        factory: sliceKernelBaseV33Addresses.metaFactory
+        factory: sliceKernelAddresses.factory
       }),
       createBundlerUserOperation("0x12345678", {
-        factory: sliceKernelBaseV33Addresses.metaFactory,
+        factory: sliceKernelAddresses.factory,
         factoryData: "0x1234"
       }),
       createBundlerUserOperation("0x12345678", {
-        factory: sliceKernelBaseV33Addresses.metaFactory,
+        factory: sliceKernelAddresses.factory,
         factoryData: encodeFunctionData({
-          abi: kernelMetaFactoryAbi,
-          args: [arbitraryTargetAddress, "0x1234", zeroHash],
-          functionName: "deployWithFactory"
+          abi: kernelFactoryAbi,
+          args: [[], 0n],
+          functionName: "deploy"
+        })
+      }),
+      createBundlerUserOperation("0x12345678", {
+        factory: sliceKernelAddresses.factory,
+        factoryData: encodeFunctionData({
+          abi: kernelFactoryAbi,
+          args: [
+            [
+              {
+                internalData: "0x",
+                module: arbitraryTargetAddress,
+                moduleData: "0x1234",
+                moduleType: 1n
+              }
+            ],
+            0n
+          ],
+          functionName: "deploy"
         })
       }),
       createBundlerUserOperation("0x12345678", {
@@ -836,7 +886,7 @@ describe("slice bundler", () => {
       await expect(
         isAcceptedSliceWalletSenderUserOperation({
           chainId: base.id,
-          entryPoint: entryPoint07Address,
+          entryPoint: entryPoint09Address,
           fetchSenderAccount: createSenderAccountFetch(
             undeployedSenderAccountSnapshot
           ),
@@ -847,16 +897,14 @@ describe("slice bundler", () => {
   })
 
   it("pins the accepted Kernel sender code hash to the factory-deployed proxy", () => {
-    expect(keccak256(kernelProxyCode)).toBe(
-      sliceKernelBaseV33SenderCode.codeHash
-    )
+    expect(keccak256(kernelProxyCode)).toBe(sliceKernelSenderCode.codeHash)
   })
 
   it("forwards root-signed recovery validation management on the sender", async () => {
     const callData = encodeErc7579ExecuteBatch([
-      { target: sender, data: encodeUninstallValidation() },
-      { target: sender, data: encodeInstallValidations() },
-      { target: sender, data: encodeGrantAccess() }
+      { target: sender, data: encodeUninstallPermission() },
+      { target: sender, data: encodeInstallPermission() },
+      { target: sender, data: encodeInstallNonceCheckpoint() }
     ])
     const body = createBundlerBody("eth_sendUserOperation", callData, {
       nonce: rootValidationNonce
@@ -892,7 +940,7 @@ describe("slice bundler", () => {
   it("forwards Kernel's direct root self-administration call", async () => {
     const body = createBundlerBody(
       "eth_sendUserOperation",
-      encodeGrantAccess(false),
+      encodeInstallNonceCheckpoint(),
       { nonce: rootValidationNonce }
     )
     const fetchBundler = mock(async () =>
@@ -960,7 +1008,7 @@ describe("slice bundler", () => {
 
   it("rejects recovery administration from unverified sender accounts", async () => {
     const callData = encodeErc7579ExecuteBatch([
-      { target: sender, data: encodeInstallValidations() }
+      { target: sender, data: encodeInstallPermission() }
     ])
     const body = createBundlerBody("eth_sendUserOperation", callData, {
       nonce: rootValidationNonce
@@ -1046,7 +1094,7 @@ describe("slice bundler", () => {
       data: encodeSetProductType()
     })
     const body = createBundlerBody("eth_sendUserOperation", callData, {
-      factory: sliceKernelBaseV33Addresses.metaFactory,
+      factory: sliceKernelAddresses.factory,
       factoryData: "0x1234"
     })
     const fetchBundler = mock(async () =>
@@ -1103,8 +1151,8 @@ describe("slice bundler", () => {
 
   it("rejects recovery validation management without root (passkey) validation", async () => {
     const callData = encodeErc7579ExecuteBatch([
-      { target: sender, data: encodeInstallValidations() },
-      { target: sender, data: encodeGrantAccess() }
+      { target: sender, data: encodeInstallPermission() },
+      { target: sender, data: encodeInstallNonceCheckpoint() }
     ])
     const body = createBundlerBody("eth_sendUserOperation", callData, {
       nonce: permissionValidationNonce
@@ -1128,7 +1176,7 @@ describe("slice bundler", () => {
 
   it("rejects recovery validation management that does not target the sender", async () => {
     const callData = encodeErc7579ExecuteBatch([
-      { target: arbitraryTargetAddress, data: encodeInstallValidations() }
+      { target: arbitraryTargetAddress, data: encodeInstallPermission() }
     ])
     const body = createBundlerBody("eth_sendUserOperation", callData, {
       nonce: rootValidationNonce
@@ -1285,7 +1333,7 @@ describe("recovery cancellation user-operation policy", () => {
     expect(
       accepts(
         encodeSmartWalletExecute({
-          data: encodeGrantAccess(),
+          data: encodeInstallNonceCheckpoint(),
           target: sliceKernelTimelockPolicyAddress
         })
       )
@@ -1315,25 +1363,27 @@ describe("Slice ID security-operation policy", () => {
     expect(
       accepts(
         encodeErc7579ExecuteBatch([
-          { data: encodeInstallValidations(), target: sender },
-          { data: encodeGrantAccess(), target: sender }
+          { data: encodeInstallPermission(), target: sender },
+          { data: encodeInstallNonceCheckpoint(), target: sender }
         ])
       )
     ).toBe(true)
   })
 
   it("accepts direct self-administration only for root validation", () => {
-    expect(accepts(encodeGrantAccess(false), rootValidationNonce)).toBe(true)
-    expect(accepts(encodeGrantAccess(false), permissionValidationNonce)).toBe(
-      false
+    expect(accepts(encodeInstallNonceCheckpoint(), rootValidationNonce)).toBe(
+      true
     )
+    expect(
+      accepts(encodeInstallNonceCheckpoint(), permissionValidationNonce)
+    ).toBe(false)
   })
 
   it("rejects sponsored administration targeting another account", () => {
     expect(
       accepts(
         encodeSmartWalletExecute({
-          data: encodeUninstallValidation(),
+          data: encodeUninstallPermission(),
           target: arbitraryTargetAddress
         })
       )

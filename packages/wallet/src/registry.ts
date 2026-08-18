@@ -1,4 +1,4 @@
-import { assertSliceWalletAccountIndex } from "@slicekit/wallet-primitives/server"
+import { assertSliceWalletAccountIndex } from "@slicekit/wallet-primitives"
 import { type Hex, hexToBytes, isHex, keccak256, stringToHex } from "viem"
 import type {
   RegisterSliceWalletCredentialInput,

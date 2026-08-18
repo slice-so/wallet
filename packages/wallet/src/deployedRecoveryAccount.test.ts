@@ -15,6 +15,7 @@ describe("deployed recovery permission account", () => {
       chain: base,
       transport: custom({
         async request({ method }) {
+          if (method === "eth_getCode") return "0x01"
           throw new Error(`Unexpected RPC request: ${method}`)
         }
       })

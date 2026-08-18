@@ -1,7 +1,8 @@
 import {
   getSliceWalletChainPolicy,
-  sliceWalletKernelAddresses
-} from "@slicekit/wallet-primitives/server"
+  predictSliceWalletKernelAccountAddress
+} from "@slicekit/wallet-primitives"
+import { resolveSliceWalletDeployment } from "@slicekit/wallet-primitives/kernel"
 import {
   type Address,
   bytesToBigInt,
@@ -11,7 +12,6 @@ import {
 } from "viem"
 import { getChainId, getCode, multicall } from "viem/actions"
 import { getAction } from "viem/utils"
-import { predictSliceWalletKernelAccountAddress } from "./accountPrediction"
 import { getSliceWalletDevicePermissionId } from "./deviceValidator"
 import type { SliceWalletPublicClient } from "./types/account"
 import type {
@@ -107,6 +107,12 @@ export const classifySliceWalletCredentialRows = async ({
   client: SliceWalletPublicClient
   rows: readonly SliceWalletRegistryCredential[]
 }): Promise<readonly SliceWalletCredentialRowClassification[]> => {
+  const deployments = rows.map((credential) =>
+    resolveSliceWalletDeployment({
+      chainId,
+      factoryVersion: credential.factoryVersion
+    })
+  )
   try {
     if ((await getAction(client, getChainId, "getChainId")({})) !== chainId) {
       return rows.map((credential) => ({
@@ -165,6 +171,7 @@ export const classifySliceWalletCredentialRows = async ({
               publicKey: credential.publicKey
             },
             index: BigInt(credential.accountIndex),
+            factoryVersion: deployments[index]?.profile.id,
             recoverySignerAddress: credential.recoverySignerAddress
           })
           statuses[index] = isAddressEqual(derived, credential.accountAddress)
@@ -193,7 +200,7 @@ export const classifySliceWalletCredentialRows = async ({
         allowFailure: true,
         contracts: deployedRootIndexes.map((index) => ({
           abi: rootValidatorStorageAbi,
-          address: sliceWalletKernelAddresses.webAuthnRootValidator,
+          address: deployments[index]?.rootValidator,
           args: [rows[index]?.accountAddress],
           functionName: "webAuthnValidatorStorage"
         }))

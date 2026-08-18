@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { assertWalletCallsMatchPolicy } from "@slicekit/wallet-primitives/server"
+import { assertWalletCallsMatchPolicy } from "@slicekit/wallet-primitives"
 import { type Address, encodeFunctionData, type Hex, numberToHex } from "viem"
 import type { SliceWalletProviderValue } from "../types"
 import { SliceWalletProviderRpcError } from "./errors"

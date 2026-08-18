@@ -1,10 +1,10 @@
 import { describe, expect, it } from "bun:test"
-import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives/server"
 import {
   createErc20ApproveCallRule,
   getSliceWalletP256SignerId,
-  getWalletPermissionId
-} from "@slicekit/wallet-primitives/server"
+  getWalletPermissionId,
+  type SliceWalletProtocolValue
+} from "@slicekit/wallet-primitives"
 import type { Address, Hex } from "viem"
 import {
   parseSliceWalletBridgeRecord,
@@ -53,6 +53,7 @@ const session = {
 const authorization = {
   accountIndex: 3,
   appOrigin: "https://shop.example",
+  enableNonce: "0",
   enableSignature: "0x01",
   executionGrant: {
     expiresAt: 200,
@@ -275,6 +276,7 @@ describe("wallet ceremony protocol parser", () => {
       parseSliceWalletPermissionAuthorization({
         accountIndex: authorization.accountIndex,
         appOrigin: authorization.appOrigin,
+        enableNonce: authorization.enableNonce,
         enableSignature: authorization.enableSignature,
         rootCredential,
         session

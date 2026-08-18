@@ -1,12 +1,15 @@
 import { describe, expect, it, mock } from "bun:test"
-import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives/server"
+import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives"
 import type { Hex } from "viem"
 import { formatSliceWalletExistingCredentialAuthorization } from "../registry"
 import type {
   SliceWalletRecoveryHandoffAuthorizationRequest,
   SliceWalletRecoveryHandoffCredentialResponse
 } from "../types"
-import { registerRecoveredSliceWalletCredential } from "./recoveryClient"
+import {
+  isSliceWalletRecoveryHandoffDeploymentProfileMatch,
+  registerRecoveredSliceWalletCredential
+} from "./recoveryClient"
 
 const account = "0x1111111111111111111111111111111111111111" as const
 const recoveryPermissionId = "0x12345678" as const
@@ -16,7 +19,9 @@ const credentialIdHash = `0x${"33".repeat(32)}` as Hex
 const publicKey = `0x04${"44".repeat(64)}` as Hex
 const challenge = `0x${"55".repeat(32)}` as Hex
 
-const createRecoveryWindow = () => {
+const createRecoveryWindow = (
+  authorizationFactoryVersion = "slice-kernel-v4-ep09-r1"
+) => {
   let onWindowMessage:
     | ((event: MessageEvent<SliceWalletProtocolValue>) => void)
     | null = null
@@ -57,14 +62,14 @@ const createRecoveryWindow = () => {
         challenge,
         chainId: 8453,
         credentialIdHash,
-        factoryVersion: "0.3.3",
+        factoryVersion: authorizationFactoryVersion,
         message: formatSliceWalletExistingCredentialAuthorization({
           accountAddress: account,
           accountIndex: 7,
           challenge,
           chainId: 8453,
           credentialIdHash,
-          factoryVersion: "0.3.3",
+          factoryVersion: authorizationFactoryVersion,
           publicKey
         }),
         nonce,
@@ -155,6 +160,41 @@ const createRecoveryWindow = () => {
 }
 
 describe("recovery credential handoff", () => {
+  it("matches only the deployment profile requested by the recovery app", () => {
+    expect(
+      isSliceWalletRecoveryHandoffDeploymentProfileMatch({
+        factoryVersion: "0.4.0",
+        requestFactoryVersion: "slice-kernel-v4-ep09-r1"
+      })
+    ).toBe(true)
+    expect(
+      isSliceWalletRecoveryHandoffDeploymentProfileMatch({
+        factoryVersion: "0.4.0",
+        requestFactoryVersion: "slice-kernel-future"
+      })
+    ).toBe(false)
+  })
+
+  it("does not sign an authorization carrying an unknown profile", async () => {
+    const signMessage = mock(async () => "0x1234" as Hex)
+
+    await expect(
+      registerRecoveredSliceWalletCredential({
+        account,
+        accountIndex: 7,
+        chainId: 8453,
+        factoryVersion: "slice-kernel-v4-ep09-r1",
+        idOrigin: "https://id.slice.so",
+        recoveryPermissionId,
+        recoverySignerAddress,
+        signMessage,
+        timeoutMs: 100,
+        window: createRecoveryWindow("4.0")
+      })
+    ).rejects.toThrow("Unknown Slice Wallet deployment profile")
+    expect(signMessage).not.toHaveBeenCalled()
+  })
+
   it("signs only one authorization while still receiving the final result", async () => {
     const signMessage = mock(async () => {
       await Bun.sleep(5)
@@ -165,6 +205,7 @@ describe("recovery credential handoff", () => {
       account,
       accountIndex: 7,
       chainId: 8453,
+      factoryVersion: "slice-kernel-v4-ep09-r1",
       idOrigin: "https://id.slice.so",
       recoveryPermissionId,
       recoverySignerAddress,

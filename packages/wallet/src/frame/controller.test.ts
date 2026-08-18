@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test"
-import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives/server"
 import {
   createNativeTransferCallRule,
   getWalletPolicyHash,
+  type SliceWalletProtocolValue,
   verifySliceWalletP256
-} from "@slicekit/wallet-primitives/server"
+} from "@slicekit/wallet-primitives"
 import { type Address, type Hex, hexToBytes } from "viem"
 import {
   createSliceCheckoutPolicyDescriptor,

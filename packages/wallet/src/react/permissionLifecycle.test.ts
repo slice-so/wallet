@@ -28,6 +28,7 @@ const registeredCheckoutReplacement = {
     accountAddress: account,
     coSignerAddress: coSigner,
     delegationId: "pending-delegation",
+    enableNonce: "0",
     enableSignature,
     expiresAt: "2099-01-01T00:00:00.000Z",
     kind: "checkout",
@@ -42,6 +43,7 @@ const registeringCheckoutReplacement = {
   session: {
     accountAddress: account,
     coSignerAddress: coSigner,
+    enableNonce: "0",
     enableSignature,
     expiresAt: "2099-01-01T00:00:00.000Z",
     kind: "checkout",

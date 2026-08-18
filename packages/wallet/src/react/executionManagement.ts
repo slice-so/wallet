@@ -1,11 +1,11 @@
 "use client"
 
+import {
+  assertSliceWalletAuthorityDeployment,
+  type SliceWalletPermissionAuthorization,
+  type SliceWalletProtocolValue
+} from "@slicekit/wallet-primitives"
 import { createSliceStoreManagementPolicyDescriptor } from "@slicekit/wallet-primitives/execution"
-import type {
-  SliceWalletPermissionAuthorization,
-  SliceWalletProtocolValue
-} from "@slicekit/wallet-primitives/server"
-import { assertSliceWalletAuthorityDeployment } from "@slicekit/wallet-primitives/server"
 import { useCallback } from "react"
 import { authorizeSliceWalletSession } from "../ceremony/client"
 import { parseSliceWalletFrameSession } from "../ceremony/protocol"
@@ -303,6 +303,7 @@ export const useSliceWalletManagementEnablement = ({
             previousSessions: [],
             session: {
               accountAddress: kernelAccount.address,
+              enableNonce: authorization.enableNonce,
               enableSignature: authorization.enableSignature,
               expiresAt: new Date(session.expiresAt * 1_000).toISOString(),
               kind: "store_management",
@@ -335,6 +336,9 @@ export const useSliceWalletManagementEnablement = ({
               const stored = {
                 accountAddress: kernelAccount.address,
                 delegationId: result.delegationId,
+                enableNonce: (
+                  authorization as SliceWalletPermissionAuthorization
+                ).enableNonce,
                 enableSignature: (
                   authorization as SliceWalletPermissionAuthorization
                 ).enableSignature,

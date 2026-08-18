@@ -3,15 +3,22 @@ import type { SliceWalletParameters } from "../types"
 import { resolveCanonicalSliceWalletConfig } from "./canonicalConfig"
 
 describe("canonical Slice Wallet config", () => {
-  test("defaults to Base while exposing every admitted wallet chain", () => {
-    const config = resolveCanonicalSliceWalletConfig()
+  const localParameters = {
+    chainIds: [31_337],
+    defaultChainId: 31_337,
+    idOrigin: "http://localhost:3003",
+    transports: {
+      31337: {
+        bundlerUrl: "http://localhost:3001/api/bundler",
+        rpcUrl: "http://127.0.0.1:8545"
+      }
+    }
+  } as const satisfies SliceWalletParameters
 
-    expect(config.defaultChainId).toBe(8453)
-    expect(config.chains.map(({ chain }) => chain.id)).toEqual([
-      8453, 1, 10, 42161
-    ])
-    expect(config.requireAdmittedChain).toBe(true)
-    expect(config.ceremonyMode).toBe("auto")
+  test("rejects the production default while no chain is admitted", () => {
+    expect(() => resolveCanonicalSliceWalletConfig()).toThrow(
+      "Slice Wallet chain 8453 is not provisioned."
+    )
   })
 
   test("rejects unsupported chains and security-metadata overrides", () => {
@@ -31,15 +38,18 @@ describe("canonical Slice Wallet config", () => {
     ).toThrow("idOrigin must use id.slice.so")
   })
 
-  test("uses the first configured chain when Base is omitted", () => {
-    const config = resolveCanonicalSliceWalletConfig({ chainIds: [10, 1] })
-
-    expect(config.defaultChainId).toBe(10)
+  test("rejects configured production chains that are not admitted", () => {
+    expect(() =>
+      resolveCanonicalSliceWalletConfig({ chainIds: [10, 1] })
+    ).toThrow("Slice Wallet chain 10 is not provisioned.")
   })
 
   test("accepts only supported ceremony modes", () => {
     expect(
-      resolveCanonicalSliceWalletConfig({ ceremonyMode: "iframe" }).ceremonyMode
+      resolveCanonicalSliceWalletConfig({
+        ...localParameters,
+        ceremonyMode: "iframe"
+      }).ceremonyMode
     ).toBe("iframe")
     const invalidConfig: SliceWalletParameters = {}
     Reflect.set(invalidConfig, "ceremonyMode", "embedded")
@@ -50,22 +60,24 @@ describe("canonical Slice Wallet config", () => {
 
   test("applies only valid transport URL overrides", () => {
     const config = resolveCanonicalSliceWalletConfig({
+      ...localParameters,
       transports: {
-        8453: {
-          bundlerUrl: "https://bundler.example/rpc",
-          rpcUrl: "https://rpc.example"
+        31337: {
+          bundlerUrl: "http://localhost:4337/rpc",
+          rpcUrl: "http://127.0.0.1:8546"
         }
       }
     })
 
-    expect(config.chains.find(({ chain }) => chain.id === 8453)).toMatchObject({
-      bundlerUrl: "https://bundler.example/rpc",
-      rpcUrl: "https://rpc.example/"
+    expect(config.chains[0]).toMatchObject({
+      bundlerUrl: "http://localhost:4337/rpc",
+      rpcUrl: "http://127.0.0.1:8546/"
     })
     expect(() =>
       resolveCanonicalSliceWalletConfig({
+        ...localParameters,
         transports: {
-          8453: {
+          31337: {
             paymasterUrl: "https://paymaster.example"
           }
         }
@@ -73,23 +85,19 @@ describe("canonical Slice Wallet config", () => {
     ).toThrow("only rpcUrl and bundlerUrl")
     expect(() =>
       resolveCanonicalSliceWalletConfig({
-        transports: { 8453: { rpcUrl: "javascript:alert(1)" } }
+        ...localParameters,
+        transports: {
+          31337: {
+            bundlerUrl: "http://localhost:4337",
+            rpcUrl: "javascript:alert(1)"
+          }
+        }
       })
     ).toThrow("RPC URL is not permitted")
   })
 
   test("allows Anvil only with explicit loopback identity and transports", () => {
-    const config = resolveCanonicalSliceWalletConfig({
-      chainIds: [31_337],
-      defaultChainId: 31_337,
-      idOrigin: "http://localhost:3003",
-      transports: {
-        31337: {
-          bundlerUrl: "http://localhost:3001/api/bundler",
-          rpcUrl: "http://127.0.0.1:8545"
-        }
-      }
-    })
+    const config = resolveCanonicalSliceWalletConfig(localParameters)
 
     expect(config.requireAdmittedChain).toBe(false)
     expect(config.chains[0]?.chain.id).toBe(31_337)

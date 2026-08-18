@@ -1,13 +1,13 @@
 "use client"
 
+import type {
+  SliceWalletFrameSession,
+  SliceWalletProtocolValue
+} from "@slicekit/wallet-primitives"
 import {
   getWalletPolicyHash,
   parseSerializedWalletPolicyDescriptor
 } from "@slicekit/wallet-primitives/policy"
-import type {
-  SliceWalletFrameSession,
-  SliceWalletProtocolValue
-} from "@slicekit/wallet-primitives/server"
 import { type SetStateAction, useCallback } from "react"
 import type { Chain } from "viem"
 import { parseSliceWalletFrameSession } from "../ceremony/protocol"
@@ -97,6 +97,7 @@ export const useSliceWalletExecutionHydration = ({
         },
         delegationId: stored.delegationId,
         enableSignature: stored.enableSignature,
+        factoryVersion: credential.factoryVersion,
         frameClient,
         getFactoryArgs: () => kernelAccount.getFactoryArgs(),
         mode: "checkout",
@@ -268,6 +269,7 @@ export const useSliceWalletExecutionHydration = ({
           publicKey: credential.publicKey
         },
         enableSignature: stored.enableSignature,
+        factoryVersion: credential.factoryVersion,
         frameClient,
         getFactoryArgs: () => kernelAccount.getFactoryArgs(),
         mode: "management",

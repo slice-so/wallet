@@ -1,15 +1,15 @@
 "use client"
 
+import {
+  buildSliceWalletPermissionRevocationCalls,
+  getSliceWalletCallsHash,
+  type SliceWalletProtocolValue
+} from "@slicekit/wallet-primitives"
 import { createSliceStoreManagementPolicyDescriptor } from "@slicekit/wallet-primitives/execution"
 import {
   getWalletPolicyHash,
   parseSerializedWalletPolicyDescriptor
 } from "@slicekit/wallet-primitives/policy"
-import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives/server"
-import {
-  buildSliceWalletPermissionRevocationCalls,
-  getSliceWalletCallsHash
-} from "@slicekit/wallet-primitives/server"
 import { type Dispatch, type SetStateAction, useCallback } from "react"
 import { parseSliceWalletFrameSession } from "../ceremony/protocol"
 import type { createSliceWalletCeremonyKernelAccount } from "../ceremony/rootAccountClient"
@@ -312,6 +312,20 @@ export const useSliceWalletExecutionLifecycle = ({
             "The management permission descriptor is unavailable; revoke it from Slice ID."
           )
         }
+        const stored = await readStoredExecutionSession(
+          activeWallet.kernelAccount.address,
+          "store_management"
+        )
+        if (
+          stored === null ||
+          stored.kind !== "store_management" ||
+          stored.permissionId.toLowerCase() !==
+            session.permissionId.toLowerCase()
+        ) {
+          throw new Error(
+            "The management permission metadata is unavailable; revoke it from Slice ID."
+          )
+        }
         if (
           delegation.permissionId === null ||
           delegation.signerPublicKey === null ||
@@ -350,6 +364,7 @@ export const useSliceWalletExecutionLifecycle = ({
         const { calls } = await buildSliceWalletPermissionRevocationCalls({
           account: activeWallet.kernelAccount.address,
           client: publicClient,
+          enableNonce: BigInt(stored.enableNonce),
           session
         })
         control.assertCurrent()

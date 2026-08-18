@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { sliceWalletKernelAddresses } from "@slicekit/wallet-primitives/server"
+import { sliceWalletKernelAddresses } from "@slicekit/wallet-primitives"
 import { decodeAbiParameters } from "viem"
 import { toAccount } from "viem/accounts"
 import {
@@ -42,12 +42,10 @@ describe("root-equivalent device validator", () => {
         },
         { name: "authenticatorIdHash", type: "bytes32" }
       ],
-      signer.getSignerData()
+      signer.data
     )
 
-    expect(signer.signerContractAddress).toBe(
-      sliceWalletKernelAddresses.webAuthnSignerV004
-    )
+    expect(signer.address).toBe(sliceWalletKernelAddresses.webAuthnSignerV004)
     expect(publicKey).toEqual({ pubKeyX: 1n, pubKeyY: 2n })
     expect(authenticatorIdHash).toBe(credential.credentialIdHash)
   })

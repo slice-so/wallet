@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { constants } from "@zerodev/sdk"
+import { kernelDummyEcdsaSignature } from "@slicekit/wallet-primitives/kernel"
 import { concat, encodeAbiParameters, hashTypedData, slice } from "viem"
 import { privateKeyToAccount } from "viem/accounts"
 import { recoverTypedDataAddress } from "viem/utils"
@@ -35,7 +35,7 @@ describe("weighted ECDSA signer", () => {
 
   it("uses a 130-byte dummy signature", () => {
     expect(weightedEcdsaDummySignature).toBe(
-      concat([constants.DUMMY_ECDSA_SIG, constants.DUMMY_ECDSA_SIG])
+      concat([kernelDummyEcdsaSignature, kernelDummyEcdsaSignature])
     )
     expect(weightedEcdsaDummySignature.length).toBe(
       weightedEcdsaSignerSignatureHexLength
@@ -44,7 +44,7 @@ describe("weighted ECDSA signer", () => {
       toWeightedEcdsaSigner({
         coSignerAddress,
         sessionSignerAddress
-      }).getDummySignature().length
+      }).stubSignature.length
     ).toBe(weightedEcdsaSignerSignatureHexLength)
   })
 
@@ -92,7 +92,7 @@ describe("weighted ECDSA signer", () => {
 
     expect(stub.length).toBe(weightedEcdsaSignerSignatureHexLength)
     expect(slice(stub, 0, 65)).toBe(proposalSignature)
-    expect(slice(stub, 65)).toBe(constants.DUMMY_ECDSA_SIG)
+    expect(slice(stub, 65)).toBe(kernelDummyEcdsaSignature)
     // The proposal slot must recover to the registered session guardian so
     // the weighted signer never hits its ZeroWeightSigner revert during
     // eth_estimateUserOperationGas; only the dummy last slot soft-fails.

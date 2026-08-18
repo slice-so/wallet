@@ -34,6 +34,16 @@ The canonical wallet is admitted on Ethereum, OP Mainnet, Base, and Arbitrum One
 
 The public provider remains a beta surface until the signer contract audit, Base deployment canary, real-browser bridge matrix, API security review, and external-origin rollout gate are complete.
 
+## Deployment profiles
+
+The retained `factoryVersion` field is a deployment-profile selector, not only a Kernel version label. The current immutable profile is `slice-kernel-v4-ep09-r1`: Kernel `0.4.0` behind its pinned ERC-1967 proxy and factory, EntryPoint `0.9`, and the current WebAuthn root validator. Its exact legacy aliases, `0.4.0` in registry rows and `Kernel 0.4.0` in recovery bundles, permanently resolve to the same r1 recipe. Unknown values are rejected.
+
+Profiles and aliases are immutable. A future deployment is added under a new profile ID and new manifest facts; it does not edit r1 or reinterpret a persisted credential. New credentials and recovery bundles store the canonical profile ID. Legacy fixed-format recovery codes have no selector field and are explicitly pinned to r1 rather than following whichever profile becomes the default.
+
+Recovery restores WebAuthn root authority through the existing timelocked uninstall/install lifecycle. It does not authorize account self-calls, arbitrary module administration, or implementation upgrades. Any future implementation upgrade requires a separate root-authorized ceremony and an independently audited, code-hash-pinned admission target.
+
+`createSliceKernelPasskeyAccount` intentionally remains a current-profile convenience surface for `SliceAccountClient`. Durable credential reconstruction uses the registered-account APIs and passes the persisted `factoryVersion` selector explicitly.
+
 ## Generic app permissions
 
 Any HTTPS application can request a generic permission. Loopback HTTP origins are accepted for local development. Integration requires no Slice app registration, API key, app ID, or domain approval; Slice ID handles the visible consent ceremony and metadata persistence.

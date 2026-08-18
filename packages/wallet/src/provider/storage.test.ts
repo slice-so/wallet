@@ -2,10 +2,10 @@ import { describe, expect, test } from "bun:test"
 import {
   getWalletPermissionId,
   serializeWalletPolicyDescriptor
-} from "@slicekit/wallet-primitives/server"
+} from "@slicekit/wallet-primitives"
 import { type Address, type Hex, keccak256 } from "viem"
 import {
-  entryPoint07Address,
+  entryPoint09Address,
   getUserOperationHash
 } from "viem/account-abstraction"
 import { getSliceWalletP256SignerId } from "../p256"
@@ -56,7 +56,7 @@ const account = "0x0000000000000000000000000000000000000001" as Address
 const target = "0x0000000000000000000000000000000000000002" as Address
 const publicKey = `0x04${"11".repeat(64)}` as Hex
 const replacementPublicKey = `0x04${"22".repeat(64)}` as Hex
-const installationEntryPoint = entryPoint07Address.toLowerCase() as Address
+const installationEntryPoint = entryPoint09Address.toLowerCase() as Address
 const installationUserOperation = {
   callData: "0x1234",
   callGasLimit: "0x1",
@@ -75,7 +75,7 @@ const installationUserOperation = {
 const installationUserOperationHash = getUserOperationHash({
   chainId: 8453,
   entryPointAddress: installationEntryPoint,
-  entryPointVersion: "0.7",
+  entryPointVersion: "0.9",
   userOperation: deserializeStoredGenericGrantInstallationUserOperation(
     installationUserOperation
   )
@@ -104,6 +104,7 @@ const createGrant = (sessionPublicKey = publicKey) => {
     account,
     chainId: 8453,
     createdAt: 1_800_000_000,
+    enableNonce: "0",
     enableSignature: "0x1234" as Hex,
     expiresAt: 1_800_003_600,
     permissionId: getWalletPermissionId(policy, signerId),
@@ -153,7 +154,7 @@ describe("portable wallet provider storage", () => {
       accountIndex: 7,
       createdAt: "2026-01-01T00:00:00.000Z",
       credentialIdHash: `0x${"33".repeat(32)}`,
-      factoryVersion: "1",
+      factoryVersion: "slice-kernel-v4-ep09-r1",
       publicKey,
       recoveryPermissionId: null,
       recoverySignerAddress: null,
@@ -163,6 +164,23 @@ describe("portable wallet provider storage", () => {
       accountAddress: account,
       accountIndex: 7
     })
+  })
+
+  test("rejects an unknown persisted deployment selector", () => {
+    const storage = new MemoryStorage()
+    expect(() =>
+      writeStoredSliceWalletAccount(storage, {
+        accountAddress: account,
+        accountIndex: 0,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        credentialIdHash: `0x${"33".repeat(32)}`,
+        factoryVersion: "4.0",
+        publicKey,
+        recoveryPermissionId: null,
+        recoverySignerAddress: null,
+        registrationKind: "initial"
+      })
+    ).toThrow("Unknown Slice Wallet deployment profile")
   })
 
   test("persists public grant metadata without private key material", () => {
@@ -363,7 +381,7 @@ describe("portable wallet provider storage", () => {
       },
       {
         ...rotation.installation,
-        entryPoint: entryPoint07Address
+        entryPoint: entryPoint09Address
       },
       {
         ...rotation.installation,

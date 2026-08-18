@@ -44,6 +44,7 @@ export type RegisterSliceWalletCredentialInput = {
   chainId: number
   credentialId: string
   credentialProof: SliceWalletCredentialProof
+  factoryVersion?: string
   publicKey: Hex
   recoverySignerAddress?: Address
   registrationKind: SliceWalletCredentialRegistrationKind

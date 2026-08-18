@@ -108,7 +108,7 @@ export type SliceKernelPasskeyPaymasterClient = Pick<
 >
 
 export type SliceKernelPasskeyBundlerReceipt = Pick<
-  UserOperationReceipt<"0.7">,
+  UserOperationReceipt<"0.9">,
   "reason" | "success"
 > & { receipt: { transactionHash: Hex } }
 
@@ -136,9 +136,9 @@ export type SliceKernelPasskeyBundlerClient = {
         }
       | { callData?: never; calls: readonly SliceAccountClientCall[] }
     )
-  ) => Promise<UserOperation<"0.7">>
+  ) => Promise<UserOperation<"0.9">>
   sendPreparedUserOperation?: (
-    userOperation: UserOperation<"0.7">
+    userOperation: UserOperation<"0.9">
   ) => Promise<Hex>
   sendUserOperation: (
     parameters: SliceKernelPasskeySendUserOperationParameters

@@ -1,5 +1,10 @@
 "use client"
 
+import { buildRecoveryPermissionInitConfig } from "@slicekit/wallet-primitives"
+import {
+  resolveSliceWalletDeploymentProfileId,
+  SliceWalletDeploymentProfileError
+} from "@slicekit/wallet-primitives/kernel"
 import { useCallback, useEffect } from "react"
 import {
   type Address,
@@ -15,9 +20,8 @@ import {
   createSliceKernelPasskeyTransport,
   getSliceBundlerApiUrl
 } from "../execution"
+import { createSliceWalletRegistryClient } from "../index"
 import { readStoredSliceWalletAccount } from "../provider/storage"
-import { buildRecoveryPermissionInitConfig } from "../recovery"
-import { createSliceWalletRegistryClient } from "../registry"
 import type { SliceAccountClient } from "../types/accountClient"
 import type { SliceWalletCeremonyMode } from "../types/ceremony"
 import type { SliceWalletCeremonyBroker } from "../types/pendingCeremony"
@@ -54,6 +58,7 @@ export const toSliceWalletCredentialRecord = (
     accountAddress: value.accountAddress,
     accountIndex: value.accountIndex,
     credentialIdHash: value.credentialIdHash,
+    factoryVersion: resolveSliceWalletDeploymentProfileId(value.factoryVersion),
     publicKey: value.publicKey,
     recoveryPermissionId: value.recoveryPermissionId,
     recoverySignerAddress: value.recoverySignerAddress
@@ -181,6 +186,8 @@ export const useSliceWalletAccountHydration = ({
         credential.recoverySignerAddress === null
           ? undefined
           : await buildRecoveryPermissionInitConfig({
+              chainId: walletChain.id,
+              factoryVersion: credential.factoryVersion,
               client: publicClient,
               recoverySignerAddress: credential.recoverySignerAddress
             })
@@ -202,6 +209,7 @@ export const useSliceWalletAccountHydration = ({
           publicKey: credential.publicKey
         },
         document,
+        factoryVersion: credential.factoryVersion,
         idOrigin: normalizedIdOrigin,
         ...(recovery === undefined ? {} : { initConfig: recovery.initConfig }),
         window
@@ -256,7 +264,9 @@ export const useSliceWalletAccountHydration = ({
       if (
         registered === null ||
         !isAddressEqual(registered.accountAddress, account) ||
-        registered.accountIndex !== metadata.accountIndex
+        registered.accountIndex !== metadata.accountIndex ||
+        resolveSliceWalletDeploymentProfileId(registered.factoryVersion) !==
+          metadata.factoryVersion
       ) {
         throw new Error("Stored Slice Wallet metadata is no longer valid.")
       }
@@ -319,11 +329,13 @@ export const useSliceWalletAccountHydration = ({
           managementLifecycle.markNothingToHydrate(connectedAccount)
         }
         if (fetchWalletRecovery) void refreshRecovery()
-      } catch {
+      } catch (error) {
         if (!active) return
         activeWalletRef.current = null
         setSliceAccountClient(null)
-        setStatus("idle")
+        setStatus(
+          error instanceof SliceWalletDeploymentProfileError ? "error" : "idle"
+        )
         setRecovery(null)
         if (managementEnabled) {
           managementLifecycle.markHydrationError(

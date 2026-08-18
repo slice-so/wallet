@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test"
-import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives/server"
-import { createErc20TransferCallRule } from "@slicekit/wallet-primitives/server"
+import {
+  createErc20TransferCallRule,
+  type SliceWalletProtocolValue
+} from "@slicekit/wallet-primitives"
 import type { Address } from "viem"
 import { parseSliceWalletFrameRequest } from "./protocol"
 

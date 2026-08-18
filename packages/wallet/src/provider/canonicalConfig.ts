@@ -2,7 +2,7 @@ import {
   getSliceWalletChainManifest,
   sliceWalletDevelopmentChainIds,
   sliceWalletSupportedChainIds
-} from "@slicekit/wallet-primitives/server"
+} from "@slicekit/wallet-primitives"
 import { anvil } from "viem/chains"
 import type { SliceWalletParameters } from "../types"
 import type { SliceWalletProviderConfig } from "../types/providerInternal"

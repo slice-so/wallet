@@ -14,6 +14,7 @@ export const createSliceWalletCeremonyKernelAccount = async ({
   client,
   credential,
   document,
+  factoryVersion,
   idOrigin,
   index,
   initConfig,
@@ -46,6 +47,7 @@ export const createSliceWalletCeremonyKernelAccount = async ({
     chainId,
     client,
     credential,
+    ...(factoryVersion === undefined ? {} : { factoryVersion }),
     ...(index === undefined ? {} : { index }),
     ...(initConfig === undefined ? {} : { initConfig }),
     rootSigner: (hash, purpose, request) => {

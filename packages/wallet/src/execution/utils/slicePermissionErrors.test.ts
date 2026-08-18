@@ -35,6 +35,16 @@ describe("getSliceWalletPermissionUnavailableReason", () => {
     ).toBe("invalid")
   })
 
+  it("recognizes a rejected Kernel v4 permission installation", () => {
+    expect(
+      getSliceWalletPermissionUnavailableReason(
+        new Error(
+          "The validateUserOp function on the Smart Account reverted. Details: UserOperation reverted during simulation with reason: AA23 reverted 0x23a6725b Version: viem@2.55.13"
+        )
+      )
+    ).toBe("invalid")
+  })
+
   it("does not treat unrelated validation failures as unavailable permissions", () => {
     expect(
       getSliceWalletPermissionUnavailableReason(

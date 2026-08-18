@@ -1,6 +1,5 @@
 export * from "./account"
 export * from "./accountActivity"
-export * from "./accountPrediction"
 export * from "./ceremony/accountClient"
 export * from "./ceremony/broker"
 export * from "./ceremony/client"

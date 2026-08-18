@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test"
 import {
+  buildRecoveryPermissionInitConfig,
   deserializeWalletPolicyDescriptor,
   getWalletPermissionId,
   serializeWalletPolicyDescriptor
-} from "@slicekit/wallet-primitives/server"
+} from "@slicekit/wallet-primitives"
 import {
   type Address,
   createPublicClient,
@@ -14,12 +15,11 @@ import {
   RpcRequestError
 } from "viem"
 import {
-  entryPoint07Address,
+  entryPoint09Address,
   getUserOperationHash
 } from "viem/account-abstraction"
 import { base, optimism } from "viem/chains"
 import { getSliceWalletP256SignerId } from "../p256"
-import { buildRecoveryPermissionInitConfig } from "../recovery"
 import { parseSliceWalletUncompressedPublicKey } from "../rootValidator"
 import type {
   SliceWalletCeremonyBroker,
@@ -68,7 +68,7 @@ type ChainRuntime = ReturnType<ChainRuntimeFactory>
 
 const account = "0x0000000000000000000000000000000000000001" as const
 const secondAccount = "0x0000000000000000000000000000000000000002" as const
-const installationEntryPoint = entryPoint07Address.toLowerCase() as Address
+const installationEntryPoint = entryPoint09Address.toLowerCase() as Address
 const installationUserOperation = {
   callData: "0x1234",
   callGasLimit: "0x1",
@@ -87,7 +87,7 @@ const installationUserOperation = {
 const userOperationHash = getUserOperationHash({
   chainId: base.id,
   entryPointAddress: installationEntryPoint,
-  entryPointVersion: "0.7",
+  entryPointVersion: "0.9",
   userOperation: deserializeStoredGenericGrantInstallationUserOperation(
     installationUserOperation
   )
@@ -101,7 +101,7 @@ const storedAccount = (
   accountIndex: 0,
   createdAt: "2026-01-01T00:00:00.000Z",
   credentialIdHash,
-  factoryVersion: "1",
+  factoryVersion: "slice-kernel-v4-ep09-r1",
   publicKey: rootPublicKey,
   recoveryPermissionId: null,
   recoverySignerAddress: null,
@@ -167,6 +167,7 @@ const createRotationGrant = (publicKey: Hex): StoredGenericGrant => {
     account,
     chainId: base.id,
     createdAt: 1_800_000_000,
+    enableNonce: "0",
     enableSignature: "0x1234",
     expiresAt: policy.validUntil,
     permissionId: getWalletPermissionId(policy, signerId),
@@ -216,7 +217,7 @@ const createInstallation = (
   userOperationHash: getUserOperationHash({
     chainId: base.id,
     entryPointAddress: installationEntryPoint,
-    entryPointVersion: "0.7",
+    entryPointVersion: "0.9",
     userOperation:
       deserializeStoredGenericGrantInstallationUserOperation(userOperation)
   })
@@ -823,7 +824,7 @@ describe("generic grant replacement ordering", () => {
       getUserOperationHash({
         chainId: base.id,
         entryPointAddress: reloaded.installation.entryPoint,
-        entryPointVersion: "0.7",
+        entryPointVersion: "0.9",
         userOperation: deserializeStoredGenericGrantInstallationUserOperation(
           reloaded.installation.userOperation
         )
@@ -1344,7 +1345,7 @@ describe("registry-outage account identity", () => {
       accountIndex: 0,
       createdAt: "2026-01-01T00:00:00.000Z",
       credentialIdHash,
-      factoryVersion: "1",
+      factoryVersion: "slice-kernel-v4-ep09-r1",
       publicKey: rootPublicKey,
       recoveryPermissionId: null,
       recoverySignerAddress: null,

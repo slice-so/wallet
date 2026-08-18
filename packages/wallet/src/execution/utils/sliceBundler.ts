@@ -1,13 +1,3 @@
-import type {
-  JsonValue,
-  SliceAcceptedSenderCode,
-  SliceBundlerUpstreamErrorClassifier,
-  SliceBundlerUserOperationAuthorizer,
-  SliceJsonRpcId,
-  SliceSenderAccountFetch,
-  SliceUpstreamJsonRpcError,
-  SliceUserOperationPolicyFetch
-} from "@slicekit/wallet-primitives/execution"
 import {
   classifyAltoBundlerRetryReason,
   createJsonRpcError,
@@ -17,11 +7,19 @@ import {
   isAcceptedSliceUserOperation,
   isJsonObject,
   isSliceBundlerUserOperationRequest,
+  type JsonValue,
   normalizeSliceBundlerRpcUrl,
   parseSliceBundlerRequest,
+  type SliceAcceptedSenderCode,
   type SliceBundlerMethod,
   type SliceBundlerRequest,
+  type SliceBundlerUpstreamErrorClassifier,
+  type SliceBundlerUserOperationAuthorizer,
   type SliceBundlerUserOperationRequest,
+  type SliceJsonRpcId,
+  type SliceSenderAccountFetch,
+  type SliceUpstreamJsonRpcError,
+  type SliceUserOperationPolicyFetch,
   sliceBundlerRetryDataCode,
   sliceBundlerRetryRpcCode
 } from "@slicekit/wallet-primitives/execution"
@@ -100,6 +98,7 @@ const getConfiguredSliceBundlerRpcUrl = (
 
 /** Resolves every Slice server-side bundler upstream with one policy. */
 export const getSliceBundlerRpcUrl = ({
+  allowCdpFallback = false,
   bundlerRpcUrl,
   cdpApiKey,
   chainId = base.id,
@@ -117,7 +116,9 @@ export const getSliceBundlerRpcUrl = ({
   }
 
   if (chainId === 31_337) return sliceLocalBundlerRpcUrl
-  if (chainId === base.id) return getSlicePaymasterRpcUrl({ cdpApiKey })
+  if (allowCdpFallback && chainId === base.id) {
+    return getSlicePaymasterRpcUrl({ cdpApiKey })
+  }
   return null
 }
 
@@ -240,6 +241,7 @@ const forwardBundlerRequest = async ({
 export const handleSliceBundlerRequest = async (
   request: Request,
   {
+    allowCdpFallback,
     acceptedSenderCode,
     acceptedChainIds,
     acceptUserOperation,
@@ -282,6 +284,7 @@ export const handleSliceBundlerRequest = async (
   let bundlerRpcUrl: string | null
   try {
     bundlerRpcUrl = getSliceBundlerRpcUrl({
+      allowCdpFallback,
       ...(bundlerRpcUrlOverride === undefined
         ? {}
         : { bundlerRpcUrl: bundlerRpcUrlOverride }),

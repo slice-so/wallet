@@ -1,12 +1,12 @@
+import type {
+  SliceWalletFrameSession,
+  SliceWalletPermissionAuthorization
+} from "@slicekit/wallet-primitives"
 import type { Address, Hex, SignableMessage } from "viem"
 import type {
   CreateSliceWalletRegisteredKernelAccountParameters,
   SliceWalletRootSignatureRequest
 } from "./account"
-import type {
-  SliceWalletFrameSession,
-  SliceWalletPermissionAuthorization
-} from "./frame"
 import type {
   SliceWalletCeremonyBroker,
   SliceWalletPopupRequiredReason
@@ -215,6 +215,7 @@ export type RegisterRecoveredSliceWalletCredentialParameters = {
   ceremonyMode?: SliceWalletCeremonyMode
   chainId: number
   document?: Document
+  factoryVersion: string
   idOrigin: string
   recoveryPermissionId: Hex
   recoverySignerAddress: Address

@@ -21,6 +21,7 @@ const session = {
   accountAddress,
   coSignerAddress: "0x2222222222222222222222222222222222222222",
   delegationId: "delegation-id",
+  enableNonce: "0",
   enableSignature: "0x1234",
   expiresAt: "2099-01-01T00:00:00.000Z",
   kind: "checkout",
@@ -34,6 +35,7 @@ const pendingReplacement = {
   session: {
     accountAddress,
     coSignerAddress: "0x2222222222222222222222222222222222222222",
+    enableNonce: "0",
     enableSignature: "0x1234",
     expiresAt: "2099-01-01T00:00:00.000Z",
     kind: "checkout",
@@ -45,6 +47,7 @@ const pendingReplacement = {
 const managementSession = {
   accountAddress,
   delegationId: "management-a",
+  enableNonce: "0",
   enableSignature: "0x1234",
   expiresAt: "2099-01-01T00:00:00.000Z",
   kind: "store_management",
@@ -57,6 +60,7 @@ const managementPending = {
   previousSessions: [],
   session: {
     accountAddress,
+    enableNonce: "0",
     enableSignature: "0x1234",
     expiresAt: "2099-01-01T00:00:00.000Z",
     kind: "store_management",

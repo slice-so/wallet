@@ -1,13 +1,11 @@
 import { describe, expect, it, mock } from "bun:test"
-import type {
-  SliceWalletPermissionAuthorization,
-  SliceWalletProtocolValue
-} from "@slicekit/wallet-primitives/server"
 import {
   createErc20ApproveCallRule,
   getSliceWalletP256SignerId,
-  getWalletPermissionId
-} from "@slicekit/wallet-primitives/server"
+  getWalletPermissionId,
+  type SliceWalletPermissionAuthorization,
+  type SliceWalletProtocolValue
+} from "@slicekit/wallet-primitives"
 import type { Address, Hex } from "viem"
 import { createSliceWalletCeremonyBroker } from "./broker"
 import {
@@ -47,6 +45,7 @@ const session = {
 const authorization = {
   accountIndex: 0,
   appOrigin: "https://shop.example",
+  enableNonce: "0",
   enableSignature: "0x01",
   executionGrant: {
     expiresAt: 200,

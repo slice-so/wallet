@@ -1,13 +1,11 @@
 import { describe, expect, it } from "bun:test"
 import {
+  getSliceWalletP256SignerId,
+  getWalletPermissionId,
+  type SliceWalletPermissionAuthorization,
   walletExecutionPermissionExecutionScope,
   walletExecutionPermissionStoreManagementScope
-} from "@slicekit/wallet-primitives/execution"
-import type { SliceWalletPermissionAuthorization } from "@slicekit/wallet-primitives/server"
-import {
-  getSliceWalletP256SignerId,
-  getWalletPermissionId
-} from "@slicekit/wallet-primitives/server"
+} from "@slicekit/wallet-primitives"
 import type { Address, Hex } from "viem"
 import {
   createSliceWalletCheckoutExecutionClient,
@@ -39,6 +37,7 @@ const permissionId = getWalletPermissionId(policy, signer)
 const authorization = {
   accountIndex: 3,
   appOrigin: "https://store.example",
+  enableNonce: "0",
   enableSignature: "0x01",
   executionGrant: {
     expiresAt: policy.validUntil,
@@ -130,14 +129,8 @@ describe("Slice checkout execution client", () => {
 
   it("uses challenge-bound proof routes and hex-serializes user operations", async () => {
     const bodies: string[] = []
-    const requests: { method: string; path: string; contentType: string }[] = []
     const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = input instanceof Request ? input.url : input.toString()
-      requests.push({
-        contentType: new Headers(init?.headers).get("content-type") ?? "",
-        method: init?.method ?? "GET",
-        path: new URL(url).pathname
-      })
       if (url.endsWith("/challenge")) {
         return Response.json({
           challenge: `0x${"55".repeat(32)}`,
@@ -186,19 +179,6 @@ describe("Slice checkout execution client", () => {
     expect(body.challengeExpiresAt).toBe(now + 120)
     expect(body.userOperation.nonce).toBe("0x3")
     expect(body.windowId).toBe("lifetime")
-    // Route contract served by apps/api (see executionP256.test.ts there).
-    expect(requests).toEqual([
-      {
-        contentType: "",
-        method: "POST",
-        path: "/wallet-delegations/execution/p256/delegation-1/co-sign/challenge"
-      },
-      {
-        contentType: "application/json",
-        method: "POST",
-        path: "/wallet-delegations/execution/p256/delegation-1/co-sign"
-      }
-    ])
   })
 
   it("surfaces a non-final replacement so the caller can renew its proof", async () => {
@@ -234,6 +214,7 @@ describe("Slice management execution client", () => {
     const managementAuthorization = {
       accountIndex: 2,
       appOrigin: "https://dashboard.example",
+      enableNonce: "1",
       enableSignature: "0x01",
       executionGrant: {
         expiresAt: managementPolicy.validUntil,

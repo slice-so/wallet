@@ -1,7 +1,6 @@
 import type { DelegationChain } from "@slicekit/erc8128"
+import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives"
 import type { Address, Hex } from "viem"
-import type { SliceWalletProtocolValue } from "./frame"
-
 export type SliceWalletPreparedSession = {
   claims: SliceWalletProtocolValue
   authorizationId?: Hex

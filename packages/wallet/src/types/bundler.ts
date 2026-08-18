@@ -6,6 +6,7 @@ import type {
 } from "@slicekit/wallet-primitives/execution"
 
 export type SliceBundlerRpcUrlParameters = {
+  allowCdpFallback?: boolean
   bundlerRpcUrl?: string
   cdpApiKey?: string
   chainId?: number

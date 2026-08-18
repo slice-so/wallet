@@ -1,6 +1,10 @@
 import { describe, expect, it } from "bun:test"
 import { createPublicClient, custom, type Hex, zeroAddress } from "viem"
-import { entryPoint07Abi, toSmartAccount } from "viem/account-abstraction"
+import {
+  entryPoint09Abi,
+  entryPoint09Address,
+  toSmartAccount
+} from "viem/account-abstraction"
 import { base } from "viem/chains"
 import { createSliceWalletAccountBundler } from "./accountBundler"
 import { canonicalizeSliceWalletPaymasterContext } from "./paymasterContext"
@@ -43,9 +47,9 @@ describe("account bundler paymaster context", () => {
       client: publicClient,
       encodeCalls: async () => "0x",
       entryPoint: {
-        abi: entryPoint07Abi,
-        address: "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
-        version: "0.7"
+        abi: entryPoint09Abi,
+        address: entryPoint09Address,
+        version: "0.9"
       },
       getAddress: async () => zeroAddress,
       getFactoryArgs: async () => ({}),

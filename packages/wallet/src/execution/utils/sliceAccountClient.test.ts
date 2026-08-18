@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
+import type { WalletPolicyDescriptor } from "@slicekit/wallet-primitives"
 import { sliceKernelPasskeyBackend } from "@slicekit/wallet-primitives/execution"
-import type { WalletPolicyDescriptor } from "@slicekit/wallet-primitives/server"
 import type { Address, Hex } from "viem"
 import { base } from "viem/chains"
 import type { SliceAccountClientExecutionRequest } from "../../types/accountClient"

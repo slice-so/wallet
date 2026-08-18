@@ -1,14 +1,14 @@
 "use client"
 
 import {
+  buildSliceWalletPermissionRevocationCalls,
+  getSliceWalletCallsHash,
+  type SliceWalletFrameSession
+} from "@slicekit/wallet-primitives"
+import {
   parseSliceWalletExecutionSessionDescriptor,
   type SliceWalletExecutionSessionDescriptor
 } from "@slicekit/wallet-primitives/execution"
-import type { SliceWalletFrameSession } from "@slicekit/wallet-primitives/server"
-import {
-  buildSliceWalletPermissionRevocationCalls,
-  getSliceWalletCallsHash
-} from "@slicekit/wallet-primitives/server"
 import { useCallback } from "react"
 import { type Hex, isHex } from "viem"
 import type { SliceAccountClient } from "../types/accountClient"
@@ -136,6 +136,7 @@ export const useSliceWalletExecutionAuthority = ({
         const built = await buildSliceWalletPermissionRevocationCalls({
           account: session.account,
           client: publicClient,
+          enableNonce: BigInt(descriptor.enableNonce),
           session: parseSliceWalletExecutionSessionDescriptor(descriptor)
         })
         calls.push(...built.calls)

@@ -110,7 +110,7 @@ describe("existing-account registry authorization", () => {
       accountIndex: 0,
       challenge: base.challenge,
       credentialIdHash: base.credentialIdHash,
-      factoryVersion: "0.3.3",
+      factoryVersion: "slice-kernel-v4-ep09-r1",
       publicKey: base.publicKey
     } as const
     const message = formatSliceWalletExistingCredentialAuthorization({

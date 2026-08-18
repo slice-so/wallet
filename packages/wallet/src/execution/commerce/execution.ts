@@ -1,11 +1,11 @@
-import type { SliceWalletExecutionSessionDescriptor } from "@slicekit/wallet-primitives/execution"
+import type { SliceWalletPermissionAuthorization } from "@slicekit/wallet-primitives"
 import {
   parseSliceWalletExecutionSessionDescriptor,
+  type SliceWalletExecutionSessionDescriptor,
   walletExecutionPermissionExecutionScope,
   walletExecutionPermissionStoreManagementScope
 } from "@slicekit/wallet-primitives/execution"
 import { serializeWalletPolicyDescriptor } from "@slicekit/wallet-primitives/policy"
-import type { SliceWalletPermissionAuthorization } from "@slicekit/wallet-primitives/server"
 import { type Address, type Hex, hexToBytes, isAddress, isHex } from "viem"
 import type {
   CreateSliceWalletCheckoutExecutionClientParameters,
@@ -101,11 +101,6 @@ const parseSessionChallenge = (body: {
   }
   return { challenge: body.challenge, expiresAt: body.expiresAt }
 }
-
-export {
-  parseSliceWalletExecutionSessionDescriptor,
-  serializeSliceWalletExecutionSessionDescriptor
-} from "@slicekit/wallet-primitives/execution"
 
 const assertCheckoutAuthorization = (
   authorization: SliceWalletPermissionAuthorization
@@ -385,6 +380,7 @@ export const createSliceWalletCheckoutExecutionClient = ({
                 rootCredentialIdHash:
                   authorization.rootCredential.credentialIdHash,
                 rootPublicKey: authorization.rootCredential.publicKey,
+                enableNonce: authorization.enableNonce,
                 enableSignature: authorization.enableSignature,
                 signerId: session.signerId,
                 signerProof: executionGrant.signerProof,
@@ -526,6 +522,7 @@ export const createSliceWalletManagementExecutionClient = ({
               rootCredentialIdHash:
                 authorization.rootCredential.credentialIdHash,
               rootPublicKey: authorization.rootCredential.publicKey,
+              enableNonce: authorization.enableNonce,
               enableSignature: authorization.enableSignature,
               signerId: session.signerId,
               signerProof: executionGrant.signerProof,

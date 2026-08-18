@@ -1,72 +1,54 @@
 import { productsModuleAbi } from "@slicekit/abi"
 import { getProductsModuleAddress } from "@slicekit/abi/deployments"
 import {
-  sliceKernelBaseV33Addresses,
-  sliceKernelWebAuthnValidatorAddress
-} from "@slicekit/wallet-primitives/execution"
-import { signerToEcdsaValidator } from "@zerodev/ecdsa-validator"
-import { PolicyFlags, toPermissionValidator } from "@zerodev/permissions"
+  getWalletPermissionId,
+  type SliceKernelClient,
+  type SliceKernelPermission,
+  sliceWalletKernelAddresses,
+  toWalletPermissionPolicies
+} from "@slicekit/wallet-primitives"
 import {
-  CallPolicyVersion,
-  ParamCondition,
-  toCallPolicy,
-  toTimestampPolicy
-} from "@zerodev/permissions/policies"
-import { toECDSASigner, toEmptyECDSASigner } from "@zerodev/permissions/signers"
-import {
-  addressToEmptyAccount,
-  createKernelAccount,
-  type KernelSmartAccountImplementation
-} from "@zerodev/sdk"
+  buildKernelInstallTypedData,
+  encodeKernelEnableSignature,
+  encodeKernelPermissionSignature,
+  encodeKernelPermissionUninstallCalls,
+  getKernelPermissionInstallState,
+  getKernelPermissionInstalls,
+  kernelDummyEcdsaSignature,
+  resolveSliceWalletDeployment
+} from "@slicekit/wallet-primitives/kernel"
+import * as Base64 from "ox/Base64"
 import {
   type Abi,
   type AbiFunction,
   type Address,
   concat,
-  encodeAbiParameters,
-  encodeFunctionData,
-  erc20Abi,
   type Hex,
+  keccak256,
   maxUint256,
   pad,
-  parseAbiParameters,
   toFunctionSelector,
+  toHex,
   zeroAddress
 } from "viem"
 import type { UserOperation } from "viem/account-abstraction"
-import { entryPoint07Address } from "viem/account-abstraction"
 import { privateKeyToAccount } from "viem/accounts"
-import type { SliceWalletPasskeyCredential } from "../../types/account"
+import { createKernelV4Account } from "../../kernel/account"
+import { createSliceWalletRootValidator } from "../../rootValidator"
 import type { SliceAccountClientCall } from "../../types/accountClient"
 import type {
   BuildSliceExecutionEnableTypedDataParameters,
   CreateSliceExecutionAccountParameters
 } from "../../types/execution"
-import { createSliceStoreManagementPermissionPolicies } from "../commerce/policies"
-import { encodeWebAuthnRootValidatorData } from "./webAuthn"
+import {
+  createSliceCheckoutPolicyDescriptor,
+  createSliceStoreManagementPolicyDescriptor
+} from "../commerce/policies"
 import {
   buildWeightedEcdsaStubSignature,
   getWeightedEcdsaProposalTypedData,
   toWeightedEcdsaSigner
 } from "./weightedSigner"
-
-/**
- * Buyer execution session key: a browser-held secp256k1 key enabled on the
- * buyer's Kernel account through a ZeroDev permission validator whose call
- * policy is limited to checkout — ProductsModule buy/pay plus ERC-20 approve
- * with the ProductsModule as spender. A stolen key can only buy Slice
- * products; it can never transfer funds out.
- *
- * The account address stays pinned to the canonical Kernel deployment; this
- * client is only the enable/signing engine.
- */
-
-const buyerEntryPoint = {
-  address: entryPoint07Address,
-  version: "0.7"
-} as const
-
-const buyerKernelVersion = "0.3.3" as const
 
 const getAbiFunctionSelector = ({
   abi,
@@ -79,11 +61,9 @@ const getAbiFunctionSelector = ({
     (item): item is AbiFunction =>
       item.type === "function" && item.name === functionName
   )
-
   if (matches.length !== 1) {
     throw new Error(`Expected one ABI function named ${functionName}.`)
   }
-
   return toFunctionSelector(matches[0])
 }
 
@@ -95,115 +75,47 @@ const paySelector = getAbiFunctionSelector({
   abi: productsModuleAbi,
   functionName: "pay"
 })
-const kernelV3ExecuteSelector = toFunctionSelector({
-  inputs: [
-    { name: "mode", type: "bytes32" },
-    { name: "executionCalldata", type: "bytes" }
-  ],
-  name: "execute",
-  outputs: [],
-  stateMutability: "payable",
-  type: "function"
-})
-const permissionValidatorType = "0x02" satisfies Hex
-const kernelPermissionLifecycleAbi = [
-  {
-    inputs: [
-      { name: "vId", type: "bytes21" },
-      { name: "selector", type: "bytes4" },
-      { name: "allow", type: "bool" }
-    ],
-    name: "grantAccess",
-    outputs: [],
-    stateMutability: "payable",
-    type: "function"
-  },
-  {
-    inputs: [
-      { name: "vId", type: "bytes21" },
-      { name: "data", type: "bytes" },
-      { name: "hookData", type: "bytes" }
-    ],
-    name: "uninstallValidation",
-    outputs: [],
-    stateMutability: "payable",
-    type: "function"
-  }
-] as const
 
-const toExecutionValidationId = (permissionId: Hex) =>
-  pad(concat([permissionValidatorType, permissionId]), {
-    dir: "right",
-    size: 21
-  })
-
-const encodeBuyerExecutionEnableUserOperationSignature = ({
-  enableData,
-  enableSignature,
-  userOperationSignature
-}: {
-  enableData: Hex
-  enableSignature: Hex
-  userOperationSignature: Hex
-}) =>
-  concat([
-    zeroAddress,
-    encodeAbiParameters(
-      parseAbiParameters(
-        "bytes validatorData, bytes hookData, bytes selectorData, bytes enableSig, bytes userOpSig"
-      ),
-      [
-        enableData,
-        "0x",
-        concat([
-          kernelV3ExecuteSelector,
-          zeroAddress,
-          zeroAddress,
-          encodeAbiParameters(
-            parseAbiParameters("bytes selectorInitData, bytes hookInitData"),
-            ["0xFF", "0x0000"]
-          )
-        ]),
-        enableSignature,
-        userOperationSignature
-      ]
-    )
-  ])
-
-/** @deprecated Use createSliceCheckoutPolicyDescriptor for canonical buyer-bound checkout policy construction. */
+/** @deprecated Use createSliceCheckoutPolicyDescriptor for buyer-bound policies. */
 export const createBuyerCheckoutCallPolicy = (chainId: number) => {
   const productsModuleAddress = getProductsModuleAddress(chainId)
-  return toCallPolicy({
-    permissions: [
+  return {
+    account: zeroAddress,
+    calls: [
       {
+        parameterRules: [],
         selector: buySelector,
         target: productsModuleAddress,
         valueLimit: maxUint256
       },
       {
+        parameterRules: [],
         selector: paySelector,
         target: productsModuleAddress,
         valueLimit: maxUint256
       },
       {
-        // Wildcard target: any ERC-20, but only approvals whose spender is
-        // the ProductsModule — approvals to any other address are rejected.
-        abi: erc20Abi,
-        args: [
-          { condition: ParamCondition.EQUAL, value: productsModuleAddress },
-          null
+        parameterRules: [
+          {
+            condition: "equal" as const,
+            offset: 0,
+            params: [pad(productsModuleAddress, { size: 32 })]
+          }
         ],
-        functionName: "approve",
-        target: zeroAddress
+        selector: toFunctionSelector("approve(address,uint256)"),
+        target: zeroAddress,
+        valueLimit: 0n
       }
     ],
-    policyVersion: CallPolicyVersion.V0_0_5
-  })
+    chainId,
+    grantKind: "checkout" as const,
+    validAfter: 0,
+    validUntil: Number.MAX_SAFE_INTEGER,
+    version: 1 as const
+  }
 }
 
-const getClientChainId = (
-  client: KernelSmartAccountImplementation["client"]
-) => {
+const getClientChainId = (client: SliceKernelClient) => {
   const chainId = client.chain?.id
   if (chainId === undefined) {
     throw new Error("Kernel permission clients require an explicit chain.")
@@ -211,192 +123,136 @@ const getClientChainId = (
   return chainId
 }
 
-const createBuyerRootValidator = async ({
-  client,
-  credential
-}: {
-  client: KernelSmartAccountImplementation["client"]
-  credential: SliceWalletPasskeyCredential
-}) => {
-  // The sudo validator only supplies identity and enable data here; the
-  // enable signature itself is produced externally by the passkey (mirrors
-  // the store wallet, where the merchant wallet signs externally).
-  const emptySignerValidator = await signerToEcdsaValidator(client, {
-    entryPoint: buyerEntryPoint,
-    kernelVersion: buyerKernelVersion,
-    signer: addressToEmptyAccount(sliceKernelWebAuthnValidatorAddress)
-  })
+const getRegisteredCredential = (
+  credential: CreateSliceExecutionAccountParameters["credential"]
+) => ({
+  credentialIdHash: keccak256(toHex(Base64.toBytes(credential.id))),
+  publicKey: credential.publicKey
+})
 
-  return {
-    ...emptySignerValidator,
-    address: sliceKernelWebAuthnValidatorAddress,
-    getEnableData: async () => encodeWebAuthnRootValidatorData(credential),
-    getIdentifier: () => sliceKernelWebAuthnValidatorAddress,
-    source: "WebAuthnValidator"
-  }
-}
-
-const createBuyerExecutionValidator = async ({
-  client,
-  coSignerAddress,
-  sessionPrivateKey,
-  sessionSignerAddress,
-  validUntil
-}: {
-  client: KernelSmartAccountImplementation["client"]
-  coSignerAddress: Address
-  sessionPrivateKey?: Hex
-  sessionSignerAddress: Address
-  validUntil: number
-}) => {
-  const signer = toWeightedEcdsaSigner({
-    coSignerAddress,
-    sessionPrivateKey,
-    sessionSignerAddress
-  })
-
-  return toPermissionValidator(client, {
-    entryPoint: buyerEntryPoint,
-    flag: PolicyFlags.NOT_FOR_VALIDATE_SIG,
-    kernelVersion: buyerKernelVersion,
-    policies: [
-      createBuyerCheckoutCallPolicy(getClientChainId(client)),
-      toTimestampPolicy({ validUntil })
-    ],
-    signer
-  })
-}
-
-const createStoreManagementExecutionValidator = async ({
-  accountAddress,
-  client,
-  sessionPrivateKey,
-  sessionSignerAddress,
-  startsAt,
-  validUntil
-}: {
-  accountAddress: Address
-  client: KernelSmartAccountImplementation["client"]
-  sessionPrivateKey?: Hex
-  sessionSignerAddress: Address
-  startsAt: number
-  validUntil: number
-}) => {
+const createExecutionPermission = (
+  parameters: CreateSliceExecutionAccountParameters
+): SliceKernelPermission => {
+  const chainId = getClientChainId(parameters.client)
+  const policy =
+    parameters.mode === "checkout"
+      ? createSliceCheckoutPolicyDescriptor({
+          account: parameters.address,
+          chainId,
+          expiresAt: parameters.validUntil,
+          startsAt: 0
+        })
+      : createSliceStoreManagementPolicyDescriptor({
+          account: parameters.address,
+          chainId,
+          expiresAt: parameters.validUntil,
+          startsAt: parameters.startsAt
+        })
   const signer =
-    sessionPrivateKey === undefined
-      ? toEmptyECDSASigner(sessionSignerAddress)
-      : await toECDSASigner({ signer: privateKeyToAccount(sessionPrivateKey) })
-
-  return toPermissionValidator(client, {
-    entryPoint: buyerEntryPoint,
-    flag: PolicyFlags.NOT_FOR_VALIDATE_SIG,
-    kernelVersion: buyerKernelVersion,
-    policies: [
-      ...createSliceStoreManagementPermissionPolicies({
-        account: accountAddress,
-        chainId: getClientChainId(client),
-        expiresAt: validUntil,
-        startsAt
-      })
-    ],
+    parameters.mode === "checkout"
+      ? toWeightedEcdsaSigner({
+          coSignerAddress: parameters.coSignerAddress,
+          ...(parameters.sessionPrivateKey === undefined
+            ? {}
+            : { sessionPrivateKey: parameters.sessionPrivateKey }),
+          sessionSignerAddress: parameters.sessionSignerAddress
+        })
+      : {
+          account:
+            parameters.sessionPrivateKey === undefined
+              ? toWeightedEcdsaSigner({
+                  coSignerAddress: zeroAddress,
+                  sessionSignerAddress: parameters.sessionSignerAddress,
+                  signerContractAddress: sliceWalletKernelAddresses.ecdsaSigner
+                }).account
+              : privateKeyToAccount(parameters.sessionPrivateKey),
+          address: sliceWalletKernelAddresses.ecdsaSigner,
+          data: parameters.sessionSignerAddress,
+          stubSignature: kernelDummyEcdsaSignature
+        }
+  return {
+    id: getWalletPermissionId(policy, parameters.sessionSignerAddress),
+    policies: toWalletPermissionPolicies(policy),
     signer
-  })
+  }
 }
 
 export const createSliceExecutionAccount = async (
   parameters: CreateSliceExecutionAccountParameters
 ) => {
-  const {
-    address,
-    accountIndex,
-    client,
-    credential,
-    enableSignature,
-    getFactoryArgs,
-    sessionPrivateKey,
-    sessionSignerAddress,
-    validUntil
-  } = parameters
-  const [rootValidator, executionValidator] = await Promise.all([
-    createBuyerRootValidator({ client, credential }),
-    parameters.mode === "checkout"
-      ? createBuyerExecutionValidator({
-          client,
-          coSignerAddress: parameters.coSignerAddress,
-          sessionPrivateKey,
-          sessionSignerAddress,
-          validUntil
-        })
-      : createStoreManagementExecutionValidator({
-          accountAddress: address,
-          client,
-          sessionPrivateKey,
-          sessionSignerAddress,
-          startsAt: parameters.startsAt,
-          validUntil
-        })
-  ])
-
-  const account = await createKernelAccount(client, {
-    address,
-    accountImplementationAddress: sliceKernelBaseV33Addresses.implementation,
-    entryPoint: buyerEntryPoint,
-    factoryAddress: sliceKernelBaseV33Addresses.factory,
-    index: accountIndex,
-    kernelVersion: buyerKernelVersion,
-    metaFactoryAddress: sliceKernelBaseV33Addresses.metaFactory,
-    plugins: {
-      ...(enableSignature === undefined
-        ? {}
-        : { pluginEnableSignature: enableSignature }),
-      regular: executionValidator,
-      sudo: rootValidator
-    },
-    useMetaFactory: true
+  const permission = createExecutionPermission(parameters)
+  const chainId = getClientChainId(parameters.client)
+  const deployment = resolveSliceWalletDeployment({
+    chainId,
+    factoryVersion: parameters.factoryVersion
   })
+  const rootValidator = createSliceWalletRootValidator({
+    chainId,
+    credential: getRegisteredCredential(parameters.credential),
+    factoryVersion: deployment.profile.id
+  })
+  const account = await createKernelV4Account({
+    address: parameters.address,
+    client: parameters.client,
+    ...(parameters.enableSignature === undefined
+      ? {}
+      : { enableSignature: parameters.enableSignature }),
+    entryPoint: deployment.entryPoint,
+    ...(deployment.erc6492BootstrapFactory === undefined
+      ? {}
+      : {
+          erc6492BootstrapFactory: deployment.erc6492BootstrapFactory
+        }),
+    factory: deployment.factory,
+    ...(parameters.getFactoryArgs === undefined
+      ? {}
+      : { getFactoryArgs: parameters.getFactoryArgs }),
+    implementation: deployment.implementation,
+    nonce: parameters.accountIndex,
+    permission,
+    rootValidator
+  })
+  if (parameters.mode === "store_management") return account
 
-  if (parameters.mode === "store_management") {
-    return {
-      ...account,
-      ...(getFactoryArgs === undefined ? {} : { getFactoryArgs })
+  const wrapSignature = async (signerSignature: Hex) => {
+    const signature = encodeKernelPermissionSignature({
+      policySignatures: permission.policies.map(() => "0x"),
+      signerSignature
+    })
+    const state = await getKernelPermissionInstallState({
+      account: parameters.address,
+      client: parameters.client,
+      permission
+    })
+    if (state.installed) return signature
+    if (parameters.enableSignature === undefined) {
+      throw new Error(
+        "Kernel permission enable mode requires an enable signature."
+      )
     }
-  }
-
-  const signProposal = async ({
-    sessionKey,
-    userOperation
-  }: {
-    sessionKey: Hex
-    userOperation: Pick<UserOperation<"0.7">, "callData" | "nonce" | "sender">
-  }) =>
-    privateKeyToAccount(sessionKey).signTypedData(
-      getWeightedEcdsaProposalTypedData({
-        account: userOperation.sender,
-        callData: userOperation.callData,
-        chainId: getClientChainId(client),
-        nonce: userOperation.nonce,
-        permissionId: executionValidator.getIdentifier()
-      })
-    )
-
-  const wrapWithEnableEnvelope = async (signature: Hex) => {
-    // This must be the exact permission id, not the broad Kernel action
-    // check: rotating the browser execution key creates a new weighted-signer
-    // config under a new permission.
-    const isEnabled = await executionValidator.isEnabled(
-      address,
-      kernelV3ExecuteSelector
-    )
-    if (isEnabled) return signature
-    if (enableSignature === undefined) return signature
-
-    return encodeBuyerExecutionEnableUserOperationSignature({
-      enableData: await executionValidator.getEnableData(address),
-      enableSignature,
+    return encodeKernelEnableSignature({
+      enableSignature: parameters.enableSignature,
+      installNonce: state.installNonce,
+      packages: getKernelPermissionInstalls(permission),
       userOperationSignature: signature
     })
   }
-
+  const signProposal = (
+    operation: Pick<UserOperation<"0.9">, "callData" | "nonce" | "sender">
+  ) => {
+    if (parameters.sessionPrivateKey === undefined) {
+      throw new Error("Buyer execution account is missing its session key.")
+    }
+    return privateKeyToAccount(parameters.sessionPrivateKey).signTypedData(
+      getWeightedEcdsaProposalTypedData({
+        account: operation.sender,
+        callData: operation.callData,
+        chainId: getClientChainId(parameters.client),
+        nonce: operation.nonce,
+        permissionId: permission.id
+      })
+    )
+  }
   const signUserOperation: typeof account.signUserOperation = async (
     userOperation
   ) => {
@@ -405,77 +261,56 @@ export const createSliceExecutionAccount = async (
         "Buyer execution account is missing its policy co-signer."
       )
     }
-    if (sessionPrivateKey === undefined) {
-      throw new Error("Buyer execution account is missing its session key.")
-    }
-
-    const { chainId: _chainId, ...userOperationFields } = userOperation
-    const unsignedUserOperation = {
-      ...userOperationFields,
-      sender: userOperation.sender ?? address,
+    const { chainId: _chainId, ...fields } = userOperation
+    const operation = {
+      ...fields,
+      sender: fields.sender ?? parameters.address,
       signature: "0x"
-    } satisfies UserOperation<"0.7">
-    const proposalSignature = await signProposal({
-      sessionKey: sessionPrivateKey,
-      userOperation: unsignedUserOperation
-    })
-    const coSignature = await parameters.getCoSignature({
-      userOperation: unsignedUserOperation
-    })
-
-    return wrapWithEnableEnvelope(
-      concat(["0xff", proposalSignature, coSignature])
-    )
+    } as UserOperation<"0.9">
+    const [proposalSignature, coSignature] = await Promise.all([
+      signProposal(operation),
+      parameters.getCoSignature({ userOperation: operation })
+    ])
+    return wrapSignature(concat([proposalSignature, coSignature]))
   }
-
   const getStubSignature: typeof account.getStubSignature = async (
-    userOperation
+    operation
   ) => {
-    // The default all-dummy stub recovers a zero-weight proposal signer and
-    // the weighted signer reverts (ZeroWeightSigner → AA23), which aborts
-    // eth_estimateUserOperationGas. The proposal digest excludes gas fields,
-    // so the session key can sign the real digest before gas is known; the
-    // dummy co-signature in the last slot then soft-fails, which bundlers
-    // accept during estimation.
     if (
-      sessionPrivateKey === undefined ||
-      userOperation?.callData === undefined ||
-      userOperation.nonce === undefined
+      parameters.sessionPrivateKey === undefined ||
+      operation?.callData === undefined ||
+      operation.nonce === undefined
     ) {
-      return account.getStubSignature(userOperation)
+      return wrapSignature(permission.signer.stubSignature)
     }
-
-    const proposalSignature = await signProposal({
-      sessionKey: sessionPrivateKey,
-      userOperation: {
-        callData: userOperation.callData,
-        nonce: userOperation.nonce,
-        sender: userOperation.sender ?? address
-      }
-    })
-
-    return wrapWithEnableEnvelope(
-      concat(["0xff", buildWeightedEcdsaStubSignature(proposalSignature)])
+    return wrapSignature(
+      buildWeightedEcdsaStubSignature(
+        await signProposal({
+          callData: operation.callData,
+          nonce: operation.nonce,
+          sender: operation.sender ?? parameters.address
+        })
+      )
     )
   }
-
-  return {
-    ...account,
-    getStubSignature,
-    signUserOperation,
-    ...(getFactoryArgs === undefined ? {} : { getFactoryArgs })
-  }
+  return { ...account, getStubSignature, signUserOperation }
 }
 
 export const buildSliceExecutionEnableTypedData = async (
   parameters: BuildSliceExecutionEnableTypedDataParameters
-): ReturnType<
-  KernelSmartAccountImplementation["kernelPluginManager"]["getPluginsEnableTypedData"]
-> => {
-  const account = await createSliceExecutionAccount(parameters)
-  return account.kernelPluginManager.getPluginsEnableTypedData(
-    parameters.address
-  )
+) => {
+  const permission = createExecutionPermission(parameters)
+  const { installNonce } = await getKernelPermissionInstallState({
+    account: parameters.address,
+    client: parameters.client,
+    permission
+  })
+  return buildKernelInstallTypedData({
+    account: parameters.address,
+    chainId: getClientChainId(parameters.client),
+    nonce: installNonce,
+    packages: getKernelPermissionInstalls(permission)
+  })
 }
 
 export const buildStoreManagementPermissionUninstallCalls = async ({
@@ -486,45 +321,30 @@ export const buildStoreManagementPermissionUninstallCalls = async ({
   validUntil
 }: {
   account: Address
-  client: KernelSmartAccountImplementation["client"]
+  client: SliceKernelClient
   sessionSignerAddress: Address
   startsAt: number
   validUntil: number
 }): Promise<{ calls: SliceAccountClientCall[]; permissionId: Hex }> => {
-  const validator = await createStoreManagementExecutionValidator({
-    accountAddress: account,
+  const permission = createExecutionPermission({
+    accountIndex: 0n,
+    address: account,
     client,
+    credential: { id: "", publicKey: `0x04${"00".repeat(64)}` },
+    mode: "store_management",
     sessionSignerAddress,
     startsAt,
     validUntil
   })
-  const permissionId = validator.getIdentifier()
-  const isEnabled = await validator.isEnabled(account, kernelV3ExecuteSelector)
-  if (!isEnabled) return { calls: [], permissionId }
-
-  const validationId = toExecutionValidationId(permissionId)
-  const validationData = await validator.getEnableData(account)
+  const { installed } = await getKernelPermissionInstallState({
+    account,
+    client,
+    permission
+  })
   return {
-    calls: [
-      {
-        data: encodeFunctionData({
-          abi: kernelPermissionLifecycleAbi,
-          args: [validationId, kernelV3ExecuteSelector, false],
-          functionName: "grantAccess"
-        }),
-        to: account,
-        value: 0n
-      },
-      {
-        data: encodeFunctionData({
-          abi: kernelPermissionLifecycleAbi,
-          args: [validationId, validationData, "0x"],
-          functionName: "uninstallValidation"
-        }),
-        to: account,
-        value: 0n
-      }
-    ],
-    permissionId
+    calls: installed
+      ? encodeKernelPermissionUninstallCalls(account, permission)
+      : [],
+    permissionId: permission.id
   }
 }

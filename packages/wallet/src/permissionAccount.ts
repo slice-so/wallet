@@ -1,202 +1,37 @@
+import type {
+  SliceKernelPermission,
+  SliceWalletFrameSession,
+  SliceWalletFrameSessionKey
+} from "@slicekit/wallet-primitives"
+import {
+  encodeKernelEnableSignature,
+  encodeKernelPermissionSignature,
+  getKernelPermissionInstallState,
+  getKernelPermissionInstalls,
+  resolveSliceWalletDeployment
+} from "@slicekit/wallet-primitives/kernel"
 import {
   getWalletPermissionId,
   toWalletPermissionPolicies
 } from "@slicekit/wallet-primitives/policy"
-import type {
-  SliceWalletFrameSession,
-  SliceWalletFrameSessionKey
-} from "@slicekit/wallet-primitives/server"
-import {
-  buildSliceWalletPermissionEnableTypedData as buildProtocolPermissionEnableTypedData,
-  sliceWalletEntryPoint,
-  sliceWalletKernelAddresses,
-  sliceWalletKernelVersion
-} from "@slicekit/wallet-primitives/server"
-import { PolicyFlags, toPermissionValidator } from "@zerodev/permissions"
-import {
-  constants,
-  createKernelAccount,
-  type KernelSmartAccountImplementation
-} from "@zerodev/sdk"
 import {
   type Address,
   concat,
-  encodeAbiParameters,
-  encodeFunctionData,
   type Hex,
-  isAddress,
   isAddressEqual,
   isHex,
-  pad,
-  parseAbiParameters,
-  toFunctionSelector,
-  toHex,
+  slice,
   zeroAddress
 } from "viem"
 import type { UserOperation } from "viem/account-abstraction"
-import { getCode, multicall } from "viem/actions"
-import { getAction } from "viem/utils"
+import { createKernelV4Account } from "./kernel/account"
 import {
   toSliceWalletWebAuthnSessionSigner,
   toWeightedP256Signer
 } from "./permissionSigners"
 import { createSliceWalletRootValidator } from "./rootValidator"
 import type { SliceWalletUnsignedUserOperation } from "./types/frame"
-import type {
-  BuildSliceWalletPermissionEnableTypedDataParameters,
-  CreateSliceWalletPermissionAccountParameters
-} from "./types/permission"
-import { resolveSliceWalletValidationInstallConfig } from "./validationLifecycle"
-
-export {
-  areSliceWalletPermissionRevocationCalls,
-  buildSliceWalletPermissionRevocationCalls
-} from "@slicekit/wallet-primitives/server"
-
-const kernelExecuteSelector = toFunctionSelector({
-  inputs: [
-    { name: "mode", type: "bytes32" },
-    { name: "executionCalldata", type: "bytes" }
-  ],
-  name: "execute",
-  outputs: [],
-  stateMutability: "payable",
-  type: "function"
-})
-
-const permissionValidatorType = "0x02" satisfies Hex
-const kernelPermissionLifecycleAbi = [
-  {
-    inputs: [{ name: "pId", type: "bytes4" }],
-    name: "permissionConfig",
-    outputs: [
-      {
-        components: [
-          { name: "permissionFlag", type: "bytes2" },
-          { name: "signer", type: "address" },
-          { name: "policyData", type: "bytes22[]" }
-        ],
-        name: "",
-        type: "tuple"
-      }
-    ],
-    stateMutability: "view",
-    type: "function"
-  },
-  {
-    inputs: [],
-    name: "currentNonce",
-    outputs: [{ name: "", type: "uint32" }],
-    stateMutability: "view",
-    type: "function"
-  },
-  {
-    inputs: [
-      { name: "vId", type: "bytes21" },
-      { name: "selector", type: "bytes4" }
-    ],
-    name: "isAllowedSelector",
-    outputs: [{ name: "", type: "bool" }],
-    stateMutability: "view",
-    type: "function"
-  },
-  {
-    inputs: [
-      { name: "vId", type: "bytes21" },
-      { name: "selector", type: "bytes4" },
-      { name: "allow", type: "bool" }
-    ],
-    name: "grantAccess",
-    outputs: [],
-    stateMutability: "payable",
-    type: "function"
-  },
-  {
-    inputs: [
-      { name: "vIds", type: "bytes21[]" },
-      {
-        components: [
-          { name: "nonce", type: "uint32" },
-          { name: "hook", type: "address" }
-        ],
-        name: "configs",
-        type: "tuple[]"
-      },
-      { name: "validationData", type: "bytes[]" },
-      { name: "hookData", type: "bytes[]" }
-    ],
-    name: "installValidations",
-    outputs: [],
-    stateMutability: "payable",
-    type: "function"
-  },
-  {
-    inputs: [
-      { name: "vId", type: "bytes21" },
-      { name: "data", type: "bytes" },
-      { name: "hookData", type: "bytes" }
-    ],
-    name: "uninstallValidation",
-    outputs: [],
-    stateMutability: "payable",
-    type: "function"
-  },
-  {
-    inputs: [{ name: "vId", type: "bytes21" }],
-    name: "validationConfig",
-    outputs: [
-      {
-        components: [
-          { name: "nonce", type: "uint32" },
-          { name: "hook", type: "address" }
-        ],
-        name: "",
-        type: "tuple"
-      }
-    ],
-    stateMutability: "view",
-    type: "function"
-  }
-] as const
-
-const toExecutionValidationId = (permissionId: Hex) =>
-  pad(concat([permissionValidatorType, permissionId]), {
-    dir: "right",
-    size: 21
-  })
-
-const encodePermissionEnableSignature = ({
-  enableData,
-  enableSignature,
-  userOperationSignature
-}: {
-  enableData: Hex
-  enableSignature: Hex
-  userOperationSignature: Hex
-}) =>
-  concat([
-    zeroAddress,
-    encodeAbiParameters(
-      parseAbiParameters(
-        "bytes validatorData, bytes hookData, bytes selectorData, bytes enableSig, bytes userOpSig"
-      ),
-      [
-        enableData,
-        "0x",
-        concat([
-          kernelExecuteSelector,
-          zeroAddress,
-          zeroAddress,
-          encodeAbiParameters(
-            parseAbiParameters("bytes selectorInitData, bytes hookInitData"),
-            ["0xFF", "0x0000"]
-          )
-        ]),
-        enableSignature,
-        userOperationSignature
-      ]
-    )
-  ])
+import type { CreateSliceWalletPermissionAccountParameters } from "./types/permission"
 
 const assertSessionMode = (
   session: SliceWalletFrameSession,
@@ -220,14 +55,13 @@ export const isSliceWalletPermissionInstalled = ({
   selectorAllowed: boolean
 }) => selectorAllowed && isAddressEqual(configuredSigner, expectedSigner)
 
-const createPermissionValidator = async ({
-  client,
+const createPermission = ({
   mode,
   session
 }: Pick<
   CreateSliceWalletPermissionAccountParameters,
-  "client" | "mode" | "session"
->) => {
+  "mode" | "session"
+>): SliceKernelPermission => {
   assertSessionMode(session, mode)
   const signer =
     mode === "checkout"
@@ -240,86 +74,31 @@ const createPermissionValidator = async ({
           publicKey: session.publicKey,
           signerId: session.signerId
         })
-
-  const validator = await toPermissionValidator(client, {
-    entryPoint: sliceWalletEntryPoint,
-    flag: PolicyFlags.NOT_FOR_VALIDATE_SIG,
-    kernelVersion: sliceWalletKernelVersion,
-    permissionId: getWalletPermissionId(session.policy, session.signerId),
-    policies: [...toWalletPermissionPolicies(session.policy)],
+  return {
+    id: getWalletPermissionId(session.policy, session.signerId),
+    policies: toWalletPermissionPolicies(session.policy),
     signer
-  })
-  return { signerContractAddress: signer.signerContractAddress, validator }
-}
-
-const createPermissionKernelAccount = async ({
-  address,
-  accountIndex,
-  client,
-  credential,
-  enableSignature,
-  mode,
-  rootSigner,
-  session
-}: Pick<
-  CreateSliceWalletPermissionAccountParameters,
-  | "address"
-  | "accountIndex"
-  | "client"
-  | "credential"
-  | "enableSignature"
-  | "mode"
-  | "rootSigner"
-  | "session"
->) => {
-  const [rootValidator, permission] = await Promise.all([
-    createSliceWalletRootValidator({
-      chainId: session.chainId,
-      credential,
-      ...(rootSigner === undefined ? {} : { rootSigner })
-    }),
-    createPermissionValidator({ client, mode, session })
-  ])
-  const account = await createKernelAccount(client, {
-    address,
-    accountImplementationAddress: sliceWalletKernelAddresses.implementation,
-    entryPoint: sliceWalletEntryPoint,
-    factoryAddress: sliceWalletKernelAddresses.factory,
-    index: accountIndex,
-    kernelVersion: sliceWalletKernelVersion,
-    metaFactoryAddress: sliceWalletKernelAddresses.metaFactory,
-    plugins: {
-      ...(enableSignature === undefined
-        ? {}
-        : { pluginEnableSignature: enableSignature }),
-      regular: permission.validator,
-      sudo: rootValidator
-    },
-    useMetaFactory: true
-  })
-  return { account, permissionValidator: permission.validator }
+  }
 }
 
 const toUnsignedUserOperation = (
-  userOperation: UserOperation<"0.7">,
+  userOperation: UserOperation<"0.9">,
   sender: Address
 ): SliceWalletUnsignedUserOperation => ({
   callData: userOperation.callData,
   callGasLimit: userOperation.callGasLimit,
-  ...(typeof userOperation.factory === "string" &&
-  isAddress(userOperation.factory)
-    ? { factory: userOperation.factory }
-    : {}),
+  ...(userOperation.factory === undefined
+    ? {}
+    : { factory: userOperation.factory }),
   ...(userOperation.factoryData === undefined
     ? {}
     : { factoryData: userOperation.factoryData }),
   maxFeePerGas: userOperation.maxFeePerGas,
   maxPriorityFeePerGas: userOperation.maxPriorityFeePerGas,
   nonce: userOperation.nonce,
-  ...(typeof userOperation.paymaster === "string" &&
-  isAddress(userOperation.paymaster)
-    ? { paymaster: userOperation.paymaster }
-    : {}),
+  ...(userOperation.paymaster === undefined
+    ? {}
+    : { paymaster: userOperation.paymaster }),
   ...(userOperation.paymasterData === undefined
     ? {}
     : { paymasterData: userOperation.paymasterData }),
@@ -368,23 +147,62 @@ export const createSliceWalletPermissionAccount = async (
     mode,
     session
   } = parameters
-  // The frame protocol deliberately rejects the rest of the session metadata.
+  const permission = createPermission({ mode, session })
+  const deployment = resolveSliceWalletDeployment({
+    chainId: session.chainId,
+    factoryVersion: parameters.factoryVersion
+  })
+  const rootValidator = createSliceWalletRootValidator({
+    chainId: session.chainId,
+    credential: parameters.credential,
+    factoryVersion: deployment.profile.id,
+    ...(parameters.rootSigner === undefined
+      ? {}
+      : { rootSigner: parameters.rootSigner })
+  })
+  const account = await createKernelV4Account({
+    address,
+    client: parameters.client,
+    ...(enableSignature === undefined ? {} : { enableSignature }),
+    entryPoint: deployment.entryPoint,
+    ...(deployment.erc6492BootstrapFactory === undefined
+      ? {}
+      : {
+          erc6492BootstrapFactory: deployment.erc6492BootstrapFactory
+        }),
+    factory: deployment.factory,
+    ...(getFactoryArgs === undefined ? {} : { getFactoryArgs }),
+    implementation: deployment.implementation,
+    nonce: parameters.accountIndex,
+    permission,
+    rootValidator
+  })
   const frameSessionKey = {
     account: session.account,
     chainId: session.chainId,
     grantKind: session.grantKind
   } satisfies SliceWalletFrameSessionKey
-  const { account, permissionValidator } =
-    await createPermissionKernelAccount(parameters)
 
-  const wrapEnableSignature = async (signature: Hex) => {
-    if (await permissionValidator.isEnabled(address, kernelExecuteSelector)) {
-      return signature
+  const wrapSignature = async (signerSignature: Hex) => {
+    const signature = encodeKernelPermissionSignature({
+      policySignatures: permission.policies.map(() => "0x"),
+      signerSignature
+    })
+    const state = await getKernelPermissionInstallState({
+      account: address,
+      client: parameters.client,
+      permission
+    })
+    if (state.installed) return signature
+    if (enableSignature === undefined) {
+      throw new Error(
+        "Kernel permission enable mode requires an enable signature."
+      )
     }
-    if (enableSignature === undefined) return signature
-    return encodePermissionEnableSignature({
-      enableData: await permissionValidator.getEnableData(address),
+    return encodeKernelEnableSignature({
       enableSignature,
+      installNonce: state.installNonce,
+      packages: getKernelPermissionInstalls(permission),
       userOperationSignature: signature
     })
   }
@@ -392,15 +210,12 @@ export const createSliceWalletPermissionAccount = async (
   const getStubSignature: typeof account.getStubSignature = async (
     userOperation
   ) => {
-    if (userOperation === undefined) {
-      return account.getStubSignature(userOperation)
-    }
     if (
       mode !== "checkout" ||
-      userOperation.callData === undefined ||
+      userOperation?.callData === undefined ||
       userOperation.nonce === undefined
     ) {
-      return account.getStubSignature(userOperation)
+      return wrapSignature(permission.signer.stubSignature)
     }
     const result = getFrameSignatureResult(
       await frameClient.request({
@@ -414,13 +229,8 @@ export const createSliceWalletPermissionAccount = async (
         }
       })
     )
-    return wrapEnableSignature(
-      concat([
-        "0xff",
-        result.signature,
-        constants.DUMMY_ECDSA_SIG,
-        toHex(session.expiresAt, { size: 6 })
-      ])
+    return wrapSignature(
+      concat([result.signature, slice(permission.signer.stubSignature, 64)])
     )
   }
 
@@ -428,13 +238,10 @@ export const createSliceWalletPermissionAccount = async (
     userOperation
   ) => {
     const { chainId: _chainId, ...operation } = userOperation
+    const sender = operation.sender ?? address
     const unsigned = toUnsignedUserOperation(
-      {
-        ...operation,
-        sender: operation.sender ?? address,
-        signature: "0x"
-      },
-      operation.sender ?? address
+      { ...operation, sender, signature: "0x" } as UserOperation<"0.9">,
+      sender
     )
     if (mode !== "checkout") {
       const result = getFrameSignatureResult(
@@ -443,12 +250,9 @@ export const createSliceWalletPermissionAccount = async (
           params: { session: frameSessionKey, userOperation: unsigned }
         })
       )
-      return wrapEnableSignature(concat(["0xff", result.signature]))
+      return wrapSignature(result.signature)
     }
 
-    // The P-256 proposal intentionally excludes gas. The frame proof and API
-    // co-signer bind the finalized full UserOperation hash before this 2-of-2
-    // permission can execute.
     const challenge = await parameters.checkoutCoSigner.createChallenge(
       parameters.delegationId
     )
@@ -485,194 +289,14 @@ export const createSliceWalletPermissionAccount = async (
         "Slice co-signer response does not match the signed operation."
       )
     }
-    return wrapEnableSignature(
+    return wrapSignature(
       concat([
-        "0xff",
         result.signature,
         coSigned.coSignature,
-        toHex(coSigned.validUntil, { size: 6 })
+        `0x${coSigned.validUntil.toString(16).padStart(12, "0")}` as Hex
       ])
     )
   }
 
-  return {
-    ...account,
-    getStubSignature,
-    signUserOperation,
-    ...(getFactoryArgs === undefined ? {} : { getFactoryArgs })
-  }
-}
-
-export const buildSliceWalletPermissionEnableTypedData = async (
-  parameters: BuildSliceWalletPermissionEnableTypedDataParameters
-): ReturnType<
-  KernelSmartAccountImplementation["kernelPluginManager"]["getPluginsEnableTypedData"]
-> => buildProtocolPermissionEnableTypedData(parameters)
-
-export const buildSliceWalletPermissionUninstallCalls = async ({
-  account,
-  client,
-  session
-}: {
-  account: Address
-  client: KernelSmartAccountImplementation["client"]
-  session: SliceWalletFrameSession
-}) => {
-  const { validator } = await createPermissionValidator({
-    client,
-    mode: session.grantKind,
-    session
-  })
-  const permissionId = validator.getIdentifier()
-  if (!(await validator.isEnabled(account, kernelExecuteSelector))) {
-    return { calls: [], permissionId }
-  }
-  const validationId = toExecutionValidationId(permissionId)
-  const validationData = await validator.getEnableData(account)
-  return {
-    calls: [
-      {
-        data: encodeFunctionData({
-          abi: kernelPermissionLifecycleAbi,
-          args: [validationId, kernelExecuteSelector, false],
-          functionName: "grantAccess"
-        }),
-        to: account,
-        value: 0n
-      },
-      {
-        data: encodeFunctionData({
-          abi: kernelPermissionLifecycleAbi,
-          args: [validationId, validationData, "0x"],
-          functionName: "uninstallValidation"
-        }),
-        to: account,
-        value: 0n
-      }
-    ],
-    permissionId
-  }
-}
-
-export const buildSliceWalletPermissionInstallCalls = async ({
-  account,
-  client,
-  session
-}: {
-  account: Address
-  client: KernelSmartAccountImplementation["client"]
-  session: SliceWalletFrameSession
-}) => {
-  const { signerContractAddress, validator } = await createPermissionValidator({
-    client,
-    mode: session.grantKind,
-    session
-  })
-  const permissionId = validator.getIdentifier()
-  const validationId = toExecutionValidationId(permissionId)
-  let currentNonce: number
-  let validationConfig: { hook: Address; nonce: number }
-  let permissionConfig: { signer: Address }
-  let selectorAllowed: boolean
-  try {
-    ;[currentNonce, validationConfig, permissionConfig, selectorAllowed] =
-      await getAction(
-        client,
-        multicall,
-        "multicall"
-      )({
-        allowFailure: false,
-        contracts: [
-          {
-            abi: kernelPermissionLifecycleAbi,
-            address: account,
-            functionName: "currentNonce"
-          },
-          {
-            abi: kernelPermissionLifecycleAbi,
-            address: account,
-            args: [validationId],
-            functionName: "validationConfig"
-          },
-          {
-            abi: kernelPermissionLifecycleAbi,
-            address: account,
-            args: [permissionId],
-            functionName: "permissionConfig"
-          },
-          {
-            abi: kernelPermissionLifecycleAbi,
-            address: account,
-            args: [validationId, kernelExecuteSelector],
-            functionName: "isAllowedSelector"
-          }
-        ]
-      })
-  } catch (error) {
-    const code = await getAction(
-      client,
-      getCode,
-      "getCode"
-    )({ address: account })
-    if (code !== undefined && code !== "0x") throw error
-    currentNonce = 1
-    validationConfig = { hook: zeroAddress, nonce: 0 }
-    permissionConfig = { signer: zeroAddress }
-    selectorAllowed = false
-  }
-  const signerConfigured = isAddressEqual(
-    permissionConfig.signer,
-    signerContractAddress
-  )
-  if (
-    isSliceWalletPermissionInstalled({
-      configuredSigner: permissionConfig.signer,
-      expectedSigner: signerContractAddress,
-      selectorAllowed
-    })
-  ) {
-    return { calls: [], permissionId }
-  }
-  if (
-    !isAddressEqual(permissionConfig.signer, zeroAddress) &&
-    !signerConfigured
-  ) {
-    throw new Error("Wallet permission id is occupied by another signer.")
-  }
-  const grantAccess = {
-    data: encodeFunctionData({
-      abi: kernelPermissionLifecycleAbi,
-      args: [validationId, kernelExecuteSelector, true],
-      functionName: "grantAccess"
-    }),
-    to: account,
-    value: 0n
-  }
-  if (signerConfigured) {
-    return { calls: [grantAccess], permissionId }
-  }
-  const installConfig = resolveSliceWalletValidationInstallConfig({
-    currentNonce,
-    validationNonce: validationConfig.nonce
-  })
-  return {
-    calls: [
-      {
-        data: encodeFunctionData({
-          abi: kernelPermissionLifecycleAbi,
-          args: [
-            [validationId],
-            [installConfig],
-            [await validator.getEnableData(account)],
-            ["0x"]
-          ],
-          functionName: "installValidations"
-        }),
-        to: account,
-        value: 0n
-      },
-      grantAccess
-    ],
-    permissionId
-  }
+  return { ...account, getStubSignature, signUserOperation }
 }

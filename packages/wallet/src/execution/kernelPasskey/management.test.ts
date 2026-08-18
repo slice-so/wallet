@@ -1,9 +1,8 @@
-import { describe, expect, it } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import {
   sliceWalletKernelAddresses,
   toWalletPermissionPolicies
-} from "@slicekit/wallet-primitives/server"
-import { ParamCondition } from "@zerodev/permissions/policies"
+} from "@slicekit/wallet-primitives"
 import { toFunctionSelector, zeroAddress } from "viem"
 import { base } from "viem/chains"
 import {
@@ -11,15 +10,13 @@ import {
   createSliceStoreManagementPolicyDescriptor
 } from "../commerce/policies"
 
-const account = "0x2222222222222222222222222222222222222222"
 const parameters = {
-  account,
+  account: "0x2222222222222222222222222222222222222222",
   chainId: base.id,
   expiresAt: 2_000_000_000,
   startsAt: 1_900_000_000
 } as const
 
-const releaseSelector = toFunctionSelector("release(address,address,bool)")
 const roleMutationSelectors = [
   toFunctionSelector("grantRoles(bytes32,address)"),
   toFunctionSelector("revokeRoles(bytes32,address)"),
@@ -28,60 +25,39 @@ const roleMutationSelectors = [
 ] as const
 
 describe("store management permission policies", () => {
-  it("encodes identical policy bytes through commerce and Kernel entry paths", () => {
+  test("uses the same Kernel v4 module encodings at both entry points", () => {
     const descriptorPolicies = toWalletPermissionPolicies(
       createSliceStoreManagementPolicyDescriptor(parameters)
     )
-    const kernelPolicies =
-      createSliceStoreManagementPermissionPolicies(parameters)
-
-    expect(kernelPolicies.map((policy) => policy.getPolicyData())).toEqual(
-      descriptorPolicies.map((policy) => policy.getPolicyData())
+    const policies = createSliceStoreManagementPermissionPolicies(parameters)
+    expect(policies).toEqual(descriptorPolicies)
+    expect(policies.map((policy) => policy.kind)).toEqual([
+      "call",
+      "slicer-registry",
+      "timestamp"
+    ])
+    expect(policies[1]?.address).toBe(
+      sliceWalletKernelAddresses.slicerRegistryPolicy
     )
-    expect(
-      kernelPolicies.map((policy) => policy.getPolicyInfoInBytes())
-    ).toEqual(descriptorPolicies.map((policy) => policy.getPolicyInfoInBytes()))
-    expect(kernelPolicies).toHaveLength(3)
-    expect(kernelPolicies[1]?.policyParams).toMatchObject({
-      policyAddress: sliceWalletKernelAddresses.slicerRegistryPolicy,
-      type: "sudo"
-    })
-    expect({
-      policyData: kernelPolicies.map((policy) => policy.getPolicyData()),
-      policyInfoInBytes: kernelPolicies.map((policy) =>
-        policy.getPolicyInfoInBytes()
-      )
-    }).toMatchSnapshot()
   })
 
-  it("omits role changes and pins wildcard release arguments", () => {
-    const [callPolicy] =
-      createSliceStoreManagementPermissionPolicies(parameters)
-    if (callPolicy?.policyParams.type !== "call") {
-      throw new Error("Store management policy must start with a call policy.")
-    }
-
-    const roleMutations = callPolicy.policyParams.permissions?.filter(
-      (permission) =>
-        roleMutationSelectors.some(
-          (selector) => selector === permission.selector
+  test("omits role changes and pins wildcard release arguments", () => {
+    const descriptor = createSliceStoreManagementPolicyDescriptor(parameters)
+    expect(
+      descriptor.calls.filter((call) =>
+        roleMutationSelectors.includes(
+          call.selector as (typeof roleMutationSelectors)[number]
         )
+      )
+    ).toEqual([])
+    const release = descriptor.calls.find(
+      (call) =>
+        call.selector === toFunctionSelector("release(address,address,bool)")
     )
-    const release = callPolicy.policyParams.permissions?.find(
-      (permission) => permission.selector === releaseSelector
-    )
-
-    expect(roleMutations).toEqual([])
     expect(release).toMatchObject({
-      rules: [
-        {
-          condition: ParamCondition.EQUAL,
-          offset: 0
-        },
-        {
-          condition: ParamCondition.EQUAL,
-          offset: 64
-        }
+      parameterRules: [
+        { condition: "equal", offset: 0 },
+        { condition: "equal", offset: 64 }
       ],
       target: zeroAddress,
       valueLimit: 0n
