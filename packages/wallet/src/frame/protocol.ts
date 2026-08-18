@@ -1,0 +1,503 @@
+import { assertSliceWalletGrantScope } from "@slicekit/wallet-protocol"
+import type {
+  WalletGrantKind,
+  WalletPolicyCallRule,
+  WalletPolicyDescriptor,
+  WalletPolicyParameterRule
+} from "@slicekit/wallet-protocol/policy"
+import { normalizeWalletPolicyDescriptor } from "@slicekit/wallet-protocol/policy"
+import type {
+  SliceWalletCheckoutGrant,
+  SliceWalletFrameSessionKey,
+  SliceWalletProtocolValue
+} from "@slicekit/wallet-protocol/server"
+import {
+  type Address,
+  type Hex,
+  isAddress,
+  isAddressEqual,
+  isHex,
+  zeroAddress
+} from "viem"
+import type {
+  SliceWalletFrameRequest,
+  SliceWalletFrameResponse,
+  SliceWalletUnsignedUserOperation
+} from "../types"
+
+type ProtocolRecord = { readonly [key: string]: SliceWalletProtocolValue }
+
+const isRecord = (value: SliceWalletProtocolValue): value is ProtocolRecord =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+
+const record = (value: SliceWalletProtocolValue, label: string) => {
+  if (!isRecord(value)) throw new Error(`${label} must be an object.`)
+  return value
+}
+
+const assertKeys = (
+  value: ProtocolRecord,
+  required: readonly string[],
+  optional: readonly string[] = []
+) => {
+  const allowed = new Set([...required, ...optional])
+  if (Object.keys(value).some((key) => !allowed.has(key))) {
+    throw new Error("Slice wallet protocol contains an unknown field.")
+  }
+  if (required.some((key) => !(key in value))) {
+    throw new Error("Slice wallet protocol is missing a required field.")
+  }
+}
+
+const stringValue = (value: SliceWalletProtocolValue, label: string) => {
+  if (typeof value !== "string") throw new Error(`${label} must be a string.`)
+  return value
+}
+
+const integerValue = (value: SliceWalletProtocolValue, label: string) => {
+  if (typeof value !== "number" || !Number.isSafeInteger(value)) {
+    throw new Error(`${label} must be a safe integer.`)
+  }
+  return value
+}
+
+const bigintValue = (value: SliceWalletProtocolValue, label: string) => {
+  if (typeof value !== "bigint" || value < 0n) {
+    throw new Error(`${label} must be a non-negative bigint.`)
+  }
+  return value
+}
+
+const addressValue = (value: SliceWalletProtocolValue, label: string) => {
+  const parsed = stringValue(value, label)
+  if (!isAddress(parsed)) throw new Error(`${label} must be an address.`)
+  return parsed as Address
+}
+
+const hexValue = (value: SliceWalletProtocolValue, label: string) => {
+  const parsed = stringValue(value, label)
+  if (!isHex(parsed, { strict: true })) throw new Error(`${label} must be hex.`)
+  return parsed as Hex
+}
+
+const grantKindValue = (value: SliceWalletProtocolValue): WalletGrantKind => {
+  if (value !== "checkout" && value !== "generic" && value !== "management") {
+    throw new Error("Unsupported wallet grant kind.")
+  }
+  return value
+}
+
+const parseCheckoutGrant = (
+  value: SliceWalletProtocolValue
+): SliceWalletCheckoutGrant => {
+  const input = record(value, "Checkout grant")
+  assertKeys(
+    input,
+    ["allowanceUsdMicros", "coSignerAddress"],
+    ["budgetPeriodSec"]
+  )
+  const allowanceUsdMicros = stringValue(
+    input.allowanceUsdMicros,
+    "Checkout allowance"
+  )
+  if (!/^\d+$/.test(allowanceUsdMicros) || BigInt(allowanceUsdMicros) <= 0n) {
+    throw new Error("Checkout allowance must be a positive integer.")
+  }
+  const budgetPeriodSec =
+    input.budgetPeriodSec === undefined
+      ? undefined
+      : integerValue(input.budgetPeriodSec, "Checkout budget period")
+  if (budgetPeriodSec !== undefined && budgetPeriodSec <= 0) {
+    throw new Error("Checkout budget period must be positive.")
+  }
+  const coSignerAddress = addressValue(
+    input.coSignerAddress,
+    "Checkout co-signer"
+  )
+  if (isAddressEqual(coSignerAddress, zeroAddress)) {
+    throw new Error("Checkout co-signer cannot be the zero address.")
+  }
+  return {
+    allowanceUsdMicros,
+    ...(budgetPeriodSec === undefined ? {} : { budgetPeriodSec }),
+    coSignerAddress
+  }
+}
+
+const arrayValue = (
+  value: SliceWalletProtocolValue,
+  label: string
+): readonly SliceWalletProtocolValue[] => {
+  if (!Array.isArray(value)) throw new Error(`${label} must be an array.`)
+  return value
+}
+
+const parseSessionKey = (
+  value: SliceWalletProtocolValue
+): SliceWalletFrameSessionKey => {
+  const input = record(value, "Session key")
+  assertKeys(input, ["account", "chainId", "grantKind"])
+  const grantKind = grantKindValue(input.grantKind)
+  return {
+    account: addressValue(input.account, "Session account"),
+    chainId: integerValue(input.chainId, "Session chain id"),
+    grantKind
+  }
+}
+
+const parseParameterRule = (
+  value: SliceWalletProtocolValue
+): WalletPolicyParameterRule => {
+  const input = record(value, "Policy parameter rule")
+  assertKeys(input, ["condition", "offset", "params"])
+  if (
+    input.condition !== "equal" &&
+    input.condition !== "greater_than" &&
+    input.condition !== "less_than_or_equal" &&
+    input.condition !== "not_equal"
+  ) {
+    throw new Error("Unsupported policy parameter condition.")
+  }
+  return {
+    condition: input.condition,
+    offset: integerValue(input.offset, "Policy parameter offset"),
+    params: arrayValue(input.params, "Policy parameter values").map((item) =>
+      hexValue(item, "Policy parameter value")
+    )
+  }
+}
+
+const parseCallRule = (
+  value: SliceWalletProtocolValue
+): WalletPolicyCallRule => {
+  const input = record(value, "Policy call rule")
+  assertKeys(input, ["parameterRules", "selector", "target", "valueLimit"])
+  return {
+    parameterRules: arrayValue(
+      input.parameterRules,
+      "Policy parameter rules"
+    ).map(parseParameterRule),
+    selector: hexValue(input.selector, "Policy selector"),
+    target: addressValue(input.target, "Policy target"),
+    valueLimit: bigintValue(input.valueLimit, "Policy value limit")
+  }
+}
+
+export const parseSliceWalletPolicyDescriptor = (
+  value: SliceWalletProtocolValue
+): WalletPolicyDescriptor => {
+  const input = record(value, "Policy descriptor")
+  assertKeys(
+    input,
+    [
+      "account",
+      "calls",
+      "chainId",
+      "grantKind",
+      "validAfter",
+      "validUntil",
+      "version"
+    ],
+    ["rateLimit"]
+  )
+  if (input.version !== 1) throw new Error("Unsupported wallet policy version.")
+
+  let rateLimit: WalletPolicyDescriptor["rateLimit"]
+  if (input.rateLimit !== undefined) {
+    const value = record(input.rateLimit, "Policy rate limit")
+    assertKeys(value, ["count", "intervalSec"])
+    rateLimit = {
+      count: integerValue(value.count, "Policy rate count"),
+      intervalSec: integerValue(value.intervalSec, "Policy rate interval")
+    }
+  }
+
+  return normalizeWalletPolicyDescriptor({
+    account: addressValue(input.account, "Policy account"),
+    ...(rateLimit === undefined ? {} : { rateLimit }),
+    calls: arrayValue(input.calls, "Policy calls").map(parseCallRule),
+    chainId: integerValue(input.chainId, "Policy chain id"),
+    grantKind: grantKindValue(input.grantKind),
+    validAfter: integerValue(input.validAfter, "Policy valid-after"),
+    validUntil: integerValue(input.validUntil, "Policy valid-until"),
+    version: 1
+  })
+}
+
+export const parseSliceWalletUnsignedUserOperation = (
+  value: SliceWalletProtocolValue
+): SliceWalletUnsignedUserOperation => {
+  const input = record(value, "Unsigned user operation")
+  assertKeys(
+    input,
+    [
+      "callData",
+      "callGasLimit",
+      "maxFeePerGas",
+      "maxPriorityFeePerGas",
+      "nonce",
+      "preVerificationGas",
+      "sender",
+      "verificationGasLimit"
+    ],
+    [
+      "factory",
+      "factoryData",
+      "paymaster",
+      "paymasterData",
+      "paymasterPostOpGasLimit",
+      "paymasterVerificationGasLimit"
+    ]
+  )
+
+  const optionalAddress = (key: "factory" | "paymaster") =>
+    input[key] === undefined ? {} : { [key]: addressValue(input[key], key) }
+  const optionalHex = (key: "factoryData" | "paymasterData") =>
+    input[key] === undefined ? {} : { [key]: hexValue(input[key], key) }
+  const optionalBigint = (
+    key: "paymasterPostOpGasLimit" | "paymasterVerificationGasLimit"
+  ) => (input[key] === undefined ? {} : { [key]: bigintValue(input[key], key) })
+
+  return {
+    callData: hexValue(input.callData, "User operation calldata"),
+    callGasLimit: bigintValue(input.callGasLimit, "User operation call gas"),
+    ...optionalAddress("factory"),
+    ...optionalHex("factoryData"),
+    maxFeePerGas: bigintValue(input.maxFeePerGas, "User operation max fee"),
+    maxPriorityFeePerGas: bigintValue(
+      input.maxPriorityFeePerGas,
+      "User operation priority fee"
+    ),
+    nonce: bigintValue(input.nonce, "User operation nonce"),
+    ...optionalAddress("paymaster"),
+    ...optionalHex("paymasterData"),
+    ...optionalBigint("paymasterPostOpGasLimit"),
+    ...optionalBigint("paymasterVerificationGasLimit"),
+    preVerificationGas: bigintValue(
+      input.preVerificationGas,
+      "User operation pre-verification gas"
+    ),
+    sender: addressValue(input.sender, "User operation sender"),
+    verificationGasLimit: bigintValue(
+      input.verificationGasLimit,
+      "User operation verification gas"
+    )
+  } as SliceWalletUnsignedUserOperation
+}
+
+export const parseSliceWalletFrameRequest = (
+  value: SliceWalletProtocolValue
+): SliceWalletFrameRequest => {
+  const input = record(value, "Frame request")
+  assertKeys(input, ["id", "method", "params", "version"])
+  if (input.version !== 1)
+    throw new Error("Unsupported wallet protocol version.")
+  const id = stringValue(input.id, "Request id")
+  const method = stringValue(input.method, "Request method")
+  const params = record(input.params, "Request parameters")
+
+  if (method === "createSession") {
+    assertKeys(params, ["policy"], ["checkout"])
+    const policy = parseSliceWalletPolicyDescriptor(params.policy)
+    const checkout =
+      params.checkout === undefined
+        ? undefined
+        : parseCheckoutGrant(params.checkout)
+    if ((policy.grantKind === "checkout") !== (checkout !== undefined)) {
+      throw new Error(
+        "Checkout policy and checkout grant metadata must be provided together."
+      )
+    }
+    return {
+      id,
+      method,
+      params: {
+        ...(checkout === undefined ? {} : { checkout }),
+        policy
+      },
+      version: 1
+    }
+  }
+  if (
+    method === "getSession" ||
+    method === "getPendingSession" ||
+    method === "clearSession" ||
+    method === "commitSession" ||
+    method === "discardSession" ||
+    method === "consumeAuthorization"
+  ) {
+    return { id, method, params: parseSessionKey(params), version: 1 }
+  }
+  if (method === "lockAccount" || method === "getAccountLockState") {
+    assertKeys(params, ["account"])
+    return {
+      id,
+      method,
+      params: { account: addressValue(params.account, "Wallet account") },
+      version: 1
+    }
+  }
+  if (method === "signCheckoutProposal") {
+    assertKeys(params, ["callData", "nonce", "sender", "session", "validUntil"])
+    return {
+      id,
+      method,
+      params: {
+        callData: hexValue(params.callData, "Checkout call data"),
+        nonce: bigintValue(params.nonce, "Checkout account nonce"),
+        sender: addressValue(params.sender, "Checkout sender"),
+        session: parseSessionKey(params.session),
+        validUntil: integerValue(params.validUntil, "Checkout validity")
+      },
+      version: 1
+    }
+  }
+  if (method === "signGrantProof") {
+    assertKeys(params, ["expiresAt", "nonce", "scopes", "session"])
+    return {
+      id,
+      method,
+      params: {
+        expiresAt: integerValue(params.expiresAt, "Grant expiration"),
+        nonce: hexValue(params.nonce, "Grant nonce"),
+        scopes: arrayValue(params.scopes, "Grant scopes").map((scope) =>
+          assertSliceWalletGrantScope(stringValue(scope, "Grant scope"))
+        ),
+        session: parseSessionKey(params.session)
+      },
+      version: 1
+    }
+  }
+  if (method === "signCoSignRequest") {
+    assertKeys(params, [
+      "challenge",
+      "challengeExpiresAt",
+      "challengeIssuedAt",
+      "delegationId",
+      "session",
+      "validUntil",
+      "windowEndExclusive",
+      "windowId",
+      "windowStart",
+      "userOperation"
+    ])
+    return {
+      id,
+      method,
+      params: {
+        challenge: hexValue(params.challenge, "Co-sign challenge"),
+        challengeExpiresAt: integerValue(
+          params.challengeExpiresAt,
+          "Co-sign challenge expiration"
+        ),
+        challengeIssuedAt: integerValue(
+          params.challengeIssuedAt,
+          "Co-sign challenge issuance"
+        ),
+        delegationId: stringValue(params.delegationId, "Delegation id"),
+        session: parseSessionKey(params.session),
+        userOperation: parseSliceWalletUnsignedUserOperation(
+          params.userOperation
+        ),
+        validUntil: integerValue(params.validUntil, "Co-sign validity"),
+        windowEndExclusive: integerValue(
+          params.windowEndExclusive,
+          "Co-sign window end"
+        ),
+        windowId: stringValue(params.windowId, "Co-sign spend window id"),
+        windowStart: integerValue(params.windowStart, "Co-sign window start")
+      },
+      version: 1
+    }
+  }
+  if (method === "signSessionRequest") {
+    assertKeys(params, [
+      "action",
+      "challenge",
+      "delegationId",
+      "expiresAt",
+      "session"
+    ])
+    if (
+      params.action !== "finalize_replacement" &&
+      params.action !== "predecessor_descriptors" &&
+      params.action !== "revoke" &&
+      params.action !== "status"
+    ) {
+      throw new Error("Unsupported wallet session request action.")
+    }
+    return {
+      id,
+      method,
+      params: {
+        action: params.action,
+        challenge: hexValue(params.challenge, "Session request challenge"),
+        delegationId: stringValue(params.delegationId, "Delegation id"),
+        expiresAt: integerValue(params.expiresAt, "Session request expiration"),
+        session: parseSessionKey(params.session)
+      },
+      version: 1
+    }
+  }
+  if (method === "signScopedUserOperation") {
+    assertKeys(params, ["session", "userOperation"])
+    return {
+      id,
+      method,
+      params: {
+        session: parseSessionKey(params.session),
+        userOperation: parseSliceWalletUnsignedUserOperation(
+          params.userOperation
+        )
+      },
+      version: 1
+    }
+  }
+
+  throw new Error("Unsupported wallet frame method.")
+}
+
+export const parseSliceWalletFrameResponse = (
+  value: SliceWalletProtocolValue
+): SliceWalletFrameResponse => {
+  const input = record(value, "Frame response")
+  const id = stringValue(input.id, "Response id")
+  if (input.version !== 1) {
+    throw new Error("Unsupported wallet protocol version.")
+  }
+  if ("error" in input) {
+    assertKeys(input, ["error", "id", "version"])
+    const error = record(input.error, "Frame response error")
+    assertKeys(error, ["code", "message"])
+    if (
+      typeof error.code !== "string" &&
+      (typeof error.code !== "number" || !Number.isSafeInteger(error.code))
+    ) {
+      throw new Error("Frame response error code is invalid.")
+    }
+    return {
+      error: {
+        code: error.code,
+        message: stringValue(error.message, "Frame response error message")
+      },
+      id,
+      version: 1
+    }
+  }
+  assertKeys(input, ["id", "result", "version"])
+  if (
+    input.result !== null &&
+    typeof input.result !== "string" &&
+    (typeof input.result !== "object" || Array.isArray(input.result))
+  ) {
+    throw new Error("Frame response result is invalid.")
+  }
+  return {
+    id,
+    result: input.result as Extract<
+      SliceWalletFrameResponse,
+      { result: object | string | null }
+    >["result"],
+    version: 1
+  }
+}

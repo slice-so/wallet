@@ -1,0 +1,40 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      "dependsOn": ["test:inputs", "test:e2e:two-chain"]
+    },
+    "admit:canary": {
+      "cache": false,
+      "env": ["PRIVATE_KEY", "SLICEGLOBAL_INTERNAL_ALCHEMY_ID"]
+    },
+    "build": {
+      "dependsOn": ["^build", "@slice/contracts#wallet-deployments:inputs"],
+      "envMode": "loose",
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "build.ts",
+        "$TURBO_ROOT$/build.ts",
+        "$TURBO_ROOT$/build-declarations.ts",
+        "package.json"
+      ],
+      "outputs": ["dist/**"]
+    },
+    "type-check": {
+      "dependsOn": [
+        "type-check:inputs",
+        "@slice/contracts#wallet-deployments:inputs"
+      ]
+    },
+    "test:e2e:two-chain": {
+      "dependsOn": ["test:inputs", "@slice/contracts#test:inputs"],
+      "env": [
+        "RPC_URL_BASE",
+        "WALLET_E2E_BUNDLER_PORT_A",
+        "WALLET_E2E_BUNDLER_PORT_B",
+        "WALLET_E2E_RPC_PORT_A",
+        "WALLET_E2E_RPC_PORT_B"
+      ]
+    }
+  }
+}
