@@ -6,4 +6,4 @@ export {
   hashSliceWalletAppPermissionRootAuthorizationFields,
   hashSliceWalletCoSignRequest,
   hashSliceWalletSessionRequest
-} from "@slicekit/wallet-protocol/server"
+} from "@slicekit/wallet-primitives/server"

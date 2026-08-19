@@ -1,11 +1,9 @@
-import { createSliceStoreManagementPolicyDescriptor } from "@slicekit/wallet-protocol/execution"
-import { getWalletPolicyHash } from "@slicekit/wallet-protocol/policy"
+import { createSliceStoreManagementPolicyDescriptor } from "@slicekit/wallet-primitives/execution"
+import { getWalletPolicyHash } from "@slicekit/wallet-primitives/policy"
+import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives/server"
 import type { Address } from "viem"
 import { parseSliceWalletFrameSession } from "../ceremony/protocol"
-import type {
-  SliceWalletProtocolValue,
-  SliceWalletSignerFrameClient
-} from "../types"
+import type { SliceWalletSignerFrameClient } from "../types"
 import type {
   StoredSliceWalletExecutionSession,
   StoredSliceWalletPendingReplacement,

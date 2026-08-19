@@ -1,7 +1,11 @@
 "use client"
 
-import { createSliceCheckoutPolicyDescriptor } from "@slicekit/wallet-protocol/execution"
-import { serializeWalletPolicyDescriptor } from "@slicekit/wallet-protocol/policy"
+import { createSliceCheckoutPolicyDescriptor } from "@slicekit/wallet-primitives/execution"
+import { serializeWalletPolicyDescriptor } from "@slicekit/wallet-primitives/policy"
+import type {
+  SliceWalletPermissionAuthorization,
+  SliceWalletProtocolValue
+} from "@slicekit/wallet-primitives/server"
 import { useCallback } from "react"
 import { type Address, isAddress } from "viem"
 import { authorizeSliceWalletSession } from "../ceremony/client"
@@ -9,8 +13,6 @@ import { parseSliceWalletFrameSession } from "../ceremony/protocol"
 import type { createSliceWalletCeremonyKernelAccount } from "../ceremony/rootAccountClient"
 import type {
   SliceWalletCeremonyBroker,
-  SliceWalletPermissionAuthorization,
-  SliceWalletProtocolValue,
   SliceWalletSignerFrameClient
 } from "../types"
 import type { SliceAccountClient } from "../types/accountClient"

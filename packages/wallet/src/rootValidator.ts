@@ -1,9 +1,10 @@
+import type { SliceWalletRegisteredRootCredential } from "@slicekit/wallet-primitives/server"
 import {
   encodeSliceWalletRootValidatorData,
   sliceWalletEntryPoint,
   sliceWalletKernelAddresses,
   sliceWalletKernelVersion
-} from "@slicekit/wallet-protocol/server"
+} from "@slicekit/wallet-primitives/server"
 import { createKernelAccount, type KernelValidator } from "@zerodev/sdk"
 import {
   type Address,
@@ -25,7 +26,6 @@ import { assertSliceWalletExecutionSafety } from "./executionSafety"
 import type {
   CreateSliceWalletRegisteredKernelAccountParameters,
   SliceWalletKernelTypedData,
-  SliceWalletRegisteredRootCredential,
   SliceWalletRootSigner
 } from "./types/account"
 
@@ -186,8 +186,6 @@ const toUnsignedUserOperation = (
   sender: userOperation.sender,
   verificationGasLimit: userOperation.verificationGasLimit
 })
-
-export { encodeSliceWalletRootValidatorData } from "@slicekit/wallet-protocol/server"
 
 export const sliceWalletWebAuthnDummySignature = encodeAbiParameters(
   [

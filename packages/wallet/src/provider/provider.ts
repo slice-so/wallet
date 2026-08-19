@@ -1,8 +1,8 @@
-import { getSliceWalletChainPolicy } from "@slicekit/wallet-protocol/server"
+import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives/server"
+import { getSliceWalletChainPolicy } from "@slicekit/wallet-primitives/server"
 import { type Address, type Hex, isAddress, isHex, numberToHex } from "viem"
 import type {
   SliceWalletEip1193Provider,
-  SliceWalletProtocolValue,
   SliceWalletProviderEventMap,
   SliceWalletProviderRequestArguments,
   SliceWalletProviderValue

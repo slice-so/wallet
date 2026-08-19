@@ -1,0 +1,24 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build", "@slice/contracts#wallet-deployments:inputs"],
+      "envMode": "loose",
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "build.ts",
+        "$TURBO_ROOT$/build.ts",
+        "$TURBO_ROOT$/build-declarations.ts",
+        "config/chains.policy.json",
+        "scripts/generate-chains.ts"
+      ],
+      "outputs": ["dist/**"]
+    },
+    "type-check": {
+      "dependsOn": [
+        "type-check:inputs",
+        "@slice/contracts#wallet-deployments:inputs"
+      ]
+    }
+  }
+}

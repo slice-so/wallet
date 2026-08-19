@@ -5,8 +5,9 @@ import {
   createNativeTransferCallRule,
   getWalletPermissionValidAfter,
   normalizeWalletPolicyDescriptor
-} from "@slicekit/wallet-protocol/policy"
-import { maximumBrowserGenericGrantTtlSec } from "@slicekit/wallet-protocol/server"
+} from "@slicekit/wallet-primitives/policy"
+import type { WalletPolicyDescriptor } from "@slicekit/wallet-primitives/server"
+import { maximumBrowserGenericGrantTtlSec } from "@slicekit/wallet-primitives/server"
 import {
   type Address,
   type Hex,
@@ -19,8 +20,7 @@ import {
 } from "viem"
 import type {
   SliceWalletGenericPermission,
-  SliceWalletProviderValue,
-  WalletPolicyDescriptor
+  SliceWalletProviderValue
 } from "../types"
 import type {
   ParsedSliceWalletSendCalls,

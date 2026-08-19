@@ -1,33 +1,3 @@
-export {
-  assertSliceWalletAccountIndex,
-  sliceWalletAccountIndexCap,
-  sliceWalletMaxAccountIndex
-} from "@slicekit/wallet-protocol"
-export * from "@slicekit/wallet-protocol/policy"
-export {
-  assertSliceWalletAuthorityDeployment,
-  decodeErc7579WalletCalls,
-  decodeSliceWalletRootUserOperationCalls,
-  formatSliceWalletExecutionGrantMessage,
-  getSliceWalletCallsHash,
-  getSliceWalletChainManifest,
-  getSliceWalletChainPolicy,
-  getSliceWalletPolicyBytes,
-  hashSliceWalletAppPermissionRegistrationFields,
-  hashSliceWalletAppPermissionRequestFields,
-  hashSliceWalletAppPermissionRootAuthorizationFields,
-  hashSliceWalletCoSignRequest,
-  hashSliceWalletSessionRequest,
-  maximumBrowserGenericGrantTtlSec,
-  sliceWalletChainManifests,
-  sliceWalletDefaultRpId,
-  sliceWalletDevelopmentChainIds,
-  sliceWalletEntryPoint,
-  sliceWalletKernelAddresses,
-  sliceWalletKernelVersion,
-  sliceWalletProtocolVersion,
-  sliceWalletSupportedChainIds
-} from "@slicekit/wallet-protocol/server"
 export * from "./account"
 export * from "./accountActivity"
 export * from "./accountPrediction"

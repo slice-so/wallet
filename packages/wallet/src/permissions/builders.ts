@@ -1,4 +1,4 @@
-import { maximumBrowserGenericGrantTtlSec } from "@slicekit/wallet-protocol/server"
+import { maximumBrowserGenericGrantTtlSec } from "@slicekit/wallet-primitives/server"
 import {
   type Address,
   getAddress,

@@ -3,7 +3,7 @@ import {
   sliceWalletEntryPoint,
   sliceWalletKernelAddresses,
   sliceWalletKernelVersion
-} from "@slicekit/wallet-protocol/server"
+} from "@slicekit/wallet-primitives/server"
 import { PolicyFlags, toPermissionValidator } from "@zerodev/permissions"
 import { toSudoPolicy } from "@zerodev/permissions/policies"
 import { createKernelAccount, KernelV3_3AccountAbi } from "@zerodev/sdk"

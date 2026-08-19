@@ -3,11 +3,12 @@
 import {
   parseSliceWalletExecutionSessionDescriptor,
   type SliceWalletExecutionSessionDescriptor
-} from "@slicekit/wallet-protocol/execution"
+} from "@slicekit/wallet-primitives/execution"
+import type { SliceWalletFrameSession } from "@slicekit/wallet-primitives/server"
 import {
   buildSliceWalletPermissionRevocationCalls,
   getSliceWalletCallsHash
-} from "@slicekit/wallet-protocol/server"
+} from "@slicekit/wallet-primitives/server"
 import { useCallback } from "react"
 import { type Hex, isHex } from "viem"
 import type { SliceAccountClient } from "../types/accountClient"
@@ -15,10 +16,7 @@ import type {
   SliceWalletCheckoutExecutionClient,
   SliceWalletManagementExecutionClient
 } from "../types/commerce"
-import type {
-  SliceWalletFrameSession,
-  SliceWalletSignerFrameClient
-} from "../types/frame"
+import type { SliceWalletSignerFrameClient } from "../types/frame"
 import type { SliceWalletProviderAdapters } from "../types/react"
 import { retrySliceWalletFinalityAction } from "./permissionLifecycle"
 

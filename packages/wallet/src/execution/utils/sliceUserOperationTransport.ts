@@ -2,13 +2,7 @@ import {
   isJsonObject,
   type JsonValue,
   type SliceUpstreamJsonRpcError
-} from "@slicekit/wallet-protocol/execution"
-
-export {
-  createSliceProxyResponse as createProxyResponse,
-  createSliceSenderAccountFetch,
-  createSliceSlicerAddressResolver
-} from "@slicekit/wallet-protocol/execution"
+} from "@slicekit/wallet-primitives/execution"
 
 export const readUpstreamJsonRpcError = async (
   response: Response

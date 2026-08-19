@@ -1,10 +1,15 @@
+import type {
+  SliceTimelockPolicyParameters,
+  SliceWalletRegisteredRootCredential
+} from "@slicekit/wallet-primitives/server"
 import {
   assertRecoveryPermissionInitConfig as assertProtocolRecoveryPermissionInitConfig,
   buildRecoveryPermissionInitConfig as buildProtocolRecoveryPermissionInitConfig,
+  encodeSliceWalletRootValidatorData,
   sliceWalletEntryPoint,
   sliceWalletKernelAddresses,
   sliceWalletKernelVersion
-} from "@slicekit/wallet-protocol/server"
+} from "@slicekit/wallet-primitives/server"
 import { PolicyFlags, toPermissionValidator } from "@zerodev/permissions"
 import { CallPolicyVersion, toCallPolicy } from "@zerodev/permissions/policies"
 import { toECDSASigner, toEmptyECDSASigner } from "@zerodev/permissions/signers"
@@ -41,18 +46,13 @@ import {
 import { privateKeyToAccount, toAccount } from "viem/accounts"
 import { readContract } from "viem/actions"
 import { getAction } from "viem/utils"
-import {
-  createSliceWalletRootValidator,
-  encodeSliceWalletRootValidatorData
-} from "./rootValidator"
-import type { SliceWalletRegisteredRootCredential } from "./types/account"
+import { createSliceWalletRootValidator } from "./rootValidator"
 import type {
   CreateDeployedRecoveryPermissionAccountParameters,
   CreateRecoveryPermissionAccountParameters,
   RecoveryUserOperationGas,
   SliceRecoveryProposalStatus,
   SliceTimelockPolicy,
-  SliceTimelockPolicyParameters,
   SliceWalletRecoveryCall
 } from "./types/recovery"
 import type { SliceWalletRegistryCredential } from "./types/registry"

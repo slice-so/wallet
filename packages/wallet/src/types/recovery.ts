@@ -1,11 +1,11 @@
-import type { SliceTimelockPolicyParameters } from "@slicekit/wallet-protocol/server"
+import type {
+  SliceTimelockPolicyParameters,
+  SliceWalletRegisteredRootCredential
+} from "@slicekit/wallet-primitives/server"
 import type { Policy, PolicyFlags } from "@zerodev/permissions"
 import type { KernelSmartAccountImplementation } from "@zerodev/sdk"
 import type { Address, Hex } from "viem"
-import type { SliceWalletRegisteredRootCredential } from "./account"
 import type { SliceWalletRegistryCredential } from "./registry"
-
-export type { SliceTimelockPolicyParameters } from "@slicekit/wallet-protocol/server"
 
 export type SliceRecoveryProposalStatus =
   | "none"

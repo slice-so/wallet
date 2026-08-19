@@ -1,13 +1,17 @@
 import {
   getWalletPermissionId,
   toWalletPermissionPolicies
-} from "@slicekit/wallet-protocol/policy"
+} from "@slicekit/wallet-primitives/policy"
+import type {
+  SliceWalletFrameSession,
+  SliceWalletFrameSessionKey
+} from "@slicekit/wallet-primitives/server"
 import {
   buildSliceWalletPermissionEnableTypedData as buildProtocolPermissionEnableTypedData,
   sliceWalletEntryPoint,
   sliceWalletKernelAddresses,
   sliceWalletKernelVersion
-} from "@slicekit/wallet-protocol/server"
+} from "@slicekit/wallet-primitives/server"
 import { PolicyFlags, toPermissionValidator } from "@zerodev/permissions"
 import {
   constants,
@@ -37,11 +41,7 @@ import {
   toWeightedP256Signer
 } from "./permissionSigners"
 import { createSliceWalletRootValidator } from "./rootValidator"
-import type {
-  SliceWalletFrameSession,
-  SliceWalletFrameSessionKey,
-  SliceWalletUnsignedUserOperation
-} from "./types/frame"
+import type { SliceWalletUnsignedUserOperation } from "./types/frame"
 import type {
   BuildSliceWalletPermissionEnableTypedDataParameters,
   CreateSliceWalletPermissionAccountParameters
@@ -51,7 +51,7 @@ import { resolveSliceWalletValidationInstallConfig } from "./validationLifecycle
 export {
   areSliceWalletPermissionRevocationCalls,
   buildSliceWalletPermissionRevocationCalls
-} from "@slicekit/wallet-protocol/server"
+} from "@slicekit/wallet-primitives/server"
 
 const kernelExecuteSelector = toFunctionSelector({
   inputs: [

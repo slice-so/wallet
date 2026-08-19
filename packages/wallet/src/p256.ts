@@ -3,7 +3,7 @@ import {
   getSliceWalletP256SignerId,
   normalizeSliceWalletP256Scalars,
   normalizeSliceWalletP256Signature
-} from "@slicekit/wallet-protocol/server"
+} from "@slicekit/wallet-primitives/server"
 import {
   bytesToBigInt,
   bytesToHex,
@@ -22,7 +22,7 @@ export {
   hashSliceWalletWeightedP256Proposal,
   normalizeSliceWalletP256Signature,
   verifySliceWalletP256
-} from "@slicekit/wallet-protocol/server"
+} from "@slicekit/wallet-primitives/server"
 
 export const generateSliceWalletP256KeyPair = async (
   cryptoImpl: Crypto = crypto

@@ -1,6 +1,6 @@
 "use client"
 
-import { getSliceWalletChainManifest } from "@slicekit/wallet-protocol/server"
+import { getSliceWalletChainManifest } from "@slicekit/wallet-primitives/server"
 import {
   createContext,
   useCallback,

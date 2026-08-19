@@ -2,7 +2,7 @@ import {
   sliceWalletEntryPoint,
   sliceWalletKernelAddresses,
   sliceWalletKernelVersion
-} from "@slicekit/wallet-protocol/server"
+} from "@slicekit/wallet-primitives/server"
 import { createKernelAccount, type KernelValidator } from "@zerodev/sdk"
 import type { Address } from "viem"
 import {

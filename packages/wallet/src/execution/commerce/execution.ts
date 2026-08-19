@@ -1,20 +1,20 @@
+import type { SliceWalletExecutionSessionDescriptor } from "@slicekit/wallet-primitives/execution"
 import {
   parseSliceWalletExecutionSessionDescriptor,
   walletExecutionPermissionExecutionScope,
   walletExecutionPermissionStoreManagementScope
-} from "@slicekit/wallet-protocol/execution"
-import { serializeWalletPolicyDescriptor } from "@slicekit/wallet-protocol/policy"
+} from "@slicekit/wallet-primitives/execution"
+import { serializeWalletPolicyDescriptor } from "@slicekit/wallet-primitives/policy"
+import type { SliceWalletPermissionAuthorization } from "@slicekit/wallet-primitives/server"
 import { type Address, type Hex, hexToBytes, isAddress, isHex } from "viem"
 import type {
   CreateSliceWalletCheckoutExecutionClientParameters,
   SliceWalletCheckoutExecutionClient,
   SliceWalletCheckoutExecutionDelegationState,
   SliceWalletCheckoutExecutionGrantRegistration,
-  SliceWalletExecutionSessionDescriptor,
   SliceWalletManagementExecutionClient,
   SliceWalletManagementExecutionGrantRegistration
 } from "../../types/commerce"
-import type { SliceWalletPermissionAuthorization } from "../../types/frame"
 import type { SliceWalletCheckoutCoSignerClient } from "../../types/permission"
 
 const sliceApiOrigin = "https://api.slice.so"
@@ -105,7 +105,7 @@ const parseSessionChallenge = (body: {
 export {
   parseSliceWalletExecutionSessionDescriptor,
   serializeSliceWalletExecutionSessionDescriptor
-} from "@slicekit/wallet-protocol/execution"
+} from "@slicekit/wallet-primitives/execution"
 
 const assertCheckoutAuthorization = (
   authorization: SliceWalletPermissionAuthorization

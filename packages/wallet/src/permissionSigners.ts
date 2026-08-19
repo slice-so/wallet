@@ -1,5 +1,5 @@
-import { sliceKernelWeightedP256SignerAddress } from "@slicekit/wallet-protocol/execution"
-import { sliceWalletKernelAddresses } from "@slicekit/wallet-protocol/server"
+import { sliceKernelWeightedP256SignerAddress } from "@slicekit/wallet-primitives/execution"
+import { sliceWalletKernelAddresses } from "@slicekit/wallet-primitives/server"
 import type { ModularSigner } from "@zerodev/permissions"
 import { addressToEmptyAccount, constants } from "@zerodev/sdk"
 import {

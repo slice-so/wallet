@@ -1,35 +1,3 @@
-export * from "@slicekit/wallet-protocol/policy"
-export {
-  assertSliceWalletAccountIndex,
-  assertSliceWalletAuthorityDeployment,
-  decodeErc7579WalletCalls,
-  decodeSliceWalletRootUserOperationCalls,
-  decodeSliceWalletWebAuthnAssertion,
-  formatSliceWalletExecutionGrantMessage,
-  getSliceWalletCallsHash,
-  getSliceWalletChainManifest,
-  getSliceWalletChainPolicy,
-  getSliceWalletP256SignerId,
-  getSliceWalletPolicyBytes,
-  hashSliceWalletAppPermissionRegistrationFields,
-  hashSliceWalletAppPermissionRequestFields,
-  hashSliceWalletAppPermissionRootAuthorizationFields,
-  hashSliceWalletCoSignRequest,
-  hashSliceWalletSessionRequest,
-  hashSliceWalletWeightedP256CoSign,
-  hashSliceWalletWeightedP256Proposal,
-  maximumBrowserGenericGrantTtlSec,
-  normalizeSliceWalletP256Signature,
-  sliceWalletAccountIndexCap,
-  sliceWalletDefaultRpId,
-  sliceWalletEntryPoint,
-  sliceWalletKernelAddresses,
-  sliceWalletKernelVersion,
-  sliceWalletMaxAccountIndex,
-  sliceWalletProtocolVersion,
-  sliceWalletSupportedChainIds,
-  verifySliceWalletP256
-} from "@slicekit/wallet-protocol/server"
 export * from "./account"
 export {
   deriveSliceWalletRecoveryBootstrap,
@@ -57,8 +25,7 @@ export * from "./registry"
 export * from "./rootValidator"
 export type {
   CreateSliceWalletKernelAccountParameters,
-  SliceWalletPublicClient,
-  SliceWalletRegisteredRootCredential
+  SliceWalletPublicClient
 } from "./types/account"
 export type {
   SliceWalletFrameSession,
@@ -68,10 +35,6 @@ export type {
   BuildSliceWalletPermissionEnableTypedDataParameters,
   SliceWalletCheckoutCoSignerClient
 } from "./types/permission"
-export type {
-  SerializedWalletPolicyDescriptor,
-  WalletPolicyDescriptor
-} from "./types/policy"
 export type {
   RegisterSliceWalletCredentialInput,
   SliceWalletCredentialProof,

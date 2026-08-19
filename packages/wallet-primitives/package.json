@@ -1,0 +1,86 @@
+{
+  "name": "@slicekit/wallet-primitives",
+  "version": "0.0.1",
+  "description": "Runtime-neutral Slice Wallet primitives: policies, chain manifests, hashes, and execution admission",
+  "license": "(MIT OR Apache-2.0)",
+  "type": "module",
+  "main": "./dist/esm/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "development": {
+        "types": "./src/index.ts",
+        "import": "./src/index.ts",
+        "default": "./src/index.ts"
+      },
+      "types": "./dist/esm/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "default": "./dist/esm/index.js"
+    },
+    "./execution": {
+      "development": {
+        "types": "./src/execution.ts",
+        "import": "./src/execution.ts",
+        "default": "./src/execution.ts"
+      },
+      "types": "./dist/esm/execution.d.ts",
+      "import": "./dist/esm/execution.js",
+      "default": "./dist/esm/execution.js"
+    },
+    "./policy": {
+      "development": {
+        "types": "./src/policy.ts",
+        "import": "./src/policy.ts",
+        "default": "./src/policy.ts"
+      },
+      "types": "./dist/esm/policy.d.ts",
+      "import": "./dist/esm/policy.js",
+      "default": "./dist/esm/policy.js"
+    },
+    "./server": {
+      "development": {
+        "types": "./src/server.ts",
+        "import": "./src/server.ts",
+        "default": "./src/server.ts"
+      },
+      "types": "./dist/esm/server.d.ts",
+      "import": "./dist/esm/server.js",
+      "default": "./dist/esm/server.js"
+    }
+  },
+  "files": [
+    "./dist",
+    "./LICENSE-MIT",
+    "./LICENSE-APACHE"
+  ],
+  "scripts": {
+    "build": "bun run generate:chains:check && bun run build.ts",
+    "generate:chains": "bun scripts/generate-chains.ts",
+    "generate:chains:check": "bun scripts/generate-chains.ts --check",
+    "test": "bun --conditions=development test",
+    "type-check": "bun run generate:chains:check && tsc -p tsconfig.json --noEmit",
+    "format": "biome format --write",
+    "lint": "biome lint --write && bun scripts/check-import-boundaries.ts",
+    "check": "biome check --write && bun scripts/check-import-boundaries.ts"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@slicekit/abi": "workspace:*",
+    "@slicekit/erc8128": "workspace:*",
+    "@zerodev/permissions": "5.6.3",
+    "ox": "catalog:",
+    "viem": "catalog:"
+  },
+  "devDependencies": {
+    "@slice/typescript-config": "workspace:*",
+    "@types/node": "catalog:"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/slice-so/wallet"
+  }
+}

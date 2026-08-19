@@ -1,4 +1,4 @@
-import type { SliceWalletRegisteredRootCredential } from "@slicekit/wallet-protocol/server"
+import type { SliceWalletRegisteredRootCredential } from "@slicekit/wallet-primitives/server"
 import type {
   CreateKernelAccountReturnType,
   KernelSmartAccountImplementation
@@ -18,8 +18,6 @@ import type {
   ToWebAuthnAccountParameters
 } from "viem/account-abstraction"
 import type { SliceWalletUnsignedUserOperation } from "./frame"
-
-export type { SliceWalletRegisteredRootCredential } from "@slicekit/wallet-protocol/server"
 
 export type SliceWalletActivityTokenDescriptor = {
   address: Address

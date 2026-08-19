@@ -1,11 +1,9 @@
 import type {
   SliceAcceptedSenderCode,
   SliceBundlerUserOperationAuthorizer,
-  SliceSenderAccountFetch
-} from "@slicekit/wallet-protocol/execution"
-import type { SliceUserOperationPolicyFetch } from "./userOperation"
-
-export type * from "@slicekit/wallet-protocol/execution"
+  SliceSenderAccountFetch,
+  SliceUserOperationPolicyFetch
+} from "@slicekit/wallet-primitives/execution"
 
 export type SliceBundlerRpcUrlParameters = {
   bundlerRpcUrl?: string

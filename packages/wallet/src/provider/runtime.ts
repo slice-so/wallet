@@ -4,13 +4,18 @@ import {
   getWalletPermissionId,
   getWalletPolicyHash,
   serializeWalletPolicyDescriptor
-} from "@slicekit/wallet-protocol/policy"
+} from "@slicekit/wallet-primitives/policy"
+import type {
+  SliceWalletFrameSession,
+  WalletCall,
+  WalletPolicyDescriptor
+} from "@slicekit/wallet-primitives/server"
 import {
   assertSliceWalletAuthorityDeployment,
   getSliceWalletChainManifest,
   getSliceWalletP256SignerId,
   predictSliceWalletKernelAccountAddressFromInitConfig
-} from "@slicekit/wallet-protocol/server"
+} from "@slicekit/wallet-primitives/server"
 import {
   type Address,
   BaseError,
@@ -58,16 +63,13 @@ import {
 import type {
   SliceWalletCeremonyBroker,
   SliceWalletConnectedAccount,
-  SliceWalletFrameSession,
   SliceWalletGenericPermission,
   SliceWalletPendingCeremony,
   SliceWalletPermissionGrant,
   SliceWalletProviderValue,
   SliceWalletRegistryCredential,
   SliceWalletSessionConnectInput,
-  SliceWalletSignerFrameClient,
-  WalletCall,
-  WalletPolicyDescriptor
+  SliceWalletSignerFrameClient
 } from "../types"
 import type {
   SliceWalletProviderChainConfig,

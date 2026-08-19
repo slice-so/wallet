@@ -3,4 +3,4 @@ export {
   buildSliceCheckoutAllowanceEnvelope,
   getSliceCheckoutSpendIntent,
   validateSliceWalletCheckoutSessionCalls
-} from "@slicekit/wallet-protocol/execution"
+} from "@slicekit/wallet-primitives/execution"

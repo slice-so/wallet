@@ -3,12 +3,13 @@ import {
   getWalletPolicyHash,
   parseSerializedWalletPolicyDescriptor,
   serializeWalletPolicyDescriptor
-} from "@slicekit/wallet-protocol/policy"
+} from "@slicekit/wallet-primitives/policy"
+import type { WalletPolicyJsonValue } from "@slicekit/wallet-primitives/server"
 import {
   assertSliceWalletAccountIndex,
   getSliceWalletP256SignerId,
   maximumBrowserGenericGrantTtlSec
-} from "@slicekit/wallet-protocol/server"
+} from "@slicekit/wallet-primitives/server"
 import {
   type Address,
   type Hex,
@@ -29,8 +30,7 @@ import {
 import type {
   SliceWalletGenericPermission,
   SliceWalletProviderValue,
-  SliceWalletRegistryCredential,
-  WalletPolicyJsonValue
+  SliceWalletRegistryCredential
 } from "../types"
 import type {
   StoredGenericGrant,

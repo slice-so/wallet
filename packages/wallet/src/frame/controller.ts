@@ -1,17 +1,22 @@
 import {
   assertSliceCheckoutPolicyDescriptor,
   assertSliceStoreManagementPolicyDescriptor
-} from "@slicekit/wallet-protocol/execution"
+} from "@slicekit/wallet-primitives/execution"
 import {
   assertWalletCallsMatchPolicy,
   getWalletPermissionId,
   getWalletPolicyHash
-} from "@slicekit/wallet-protocol/policy"
+} from "@slicekit/wallet-primitives/policy"
+import type {
+  SliceWalletFrameSession,
+  SliceWalletFrameSessionKey,
+  SliceWalletProtocolValue
+} from "@slicekit/wallet-primitives/server"
 import {
   maximumBrowserGenericGrantTtlSec,
   sliceWalletDefaultRpId,
   sliceWalletEntryPoint
-} from "@slicekit/wallet-protocol/server"
+} from "@slicekit/wallet-primitives/server"
 import {
   bytesToHex,
   type Hex,
@@ -42,9 +47,6 @@ import type {
   SliceWalletFrameConnectRequest,
   SliceWalletFrameRequest,
   SliceWalletFrameResponse,
-  SliceWalletFrameSession,
-  SliceWalletFrameSessionKey,
-  SliceWalletProtocolValue,
   SliceWalletSignerFrameControllerOptions,
   SliceWalletStoredSession,
   SliceWalletWindowMessage

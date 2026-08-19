@@ -1,7 +1,7 @@
 import {
   getSliceWalletChainPolicy,
   sliceWalletKernelAddresses
-} from "@slicekit/wallet-protocol/server"
+} from "@slicekit/wallet-primitives/server"
 import {
   type Address,
   bytesToBigInt,

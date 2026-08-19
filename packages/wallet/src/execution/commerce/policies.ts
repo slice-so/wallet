@@ -5,4 +5,4 @@ export {
   createSliceStoreManagementPermissionPolicies,
   createSliceStoreManagementPolicyDescriptor,
   sliceStoreManagementOperations
-} from "@slicekit/wallet-protocol/execution"
+} from "@slicekit/wallet-primitives/execution"

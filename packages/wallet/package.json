@@ -58,16 +58,6 @@
       "import": "./dist/esm/frame.js",
       "default": "./dist/esm/frame.js"
     },
-    "./policy": {
-      "development": {
-        "types": "./src/policy.ts",
-        "import": "./src/policy.ts",
-        "default": "./src/policy.ts"
-      },
-      "types": "./dist/esm/policy.d.ts",
-      "import": "./dist/esm/policy.js",
-      "default": "./dist/esm/policy.js"
-    },
     "./permissions": {
       "development": {
         "types": "./src/permissions.ts",
@@ -151,7 +141,7 @@
   "dependencies": {
     "@slicekit/abi": "workspace:*",
     "@slicekit/erc8128": "workspace:*",
-    "@slicekit/wallet-protocol": "workspace:*",
+    "@slicekit/wallet-primitives": "workspace:*",
     "@zerodev/ecdsa-validator": "^5.4.9",
     "@zerodev/permissions": "5.6.3",
     "@zerodev/sdk": "5.5.10",

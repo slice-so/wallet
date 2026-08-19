@@ -1,7 +1,7 @@
 import {
   assertSliceWalletAccountIndex,
   predictSliceWalletKernelAccountAddressFromInitConfig
-} from "@slicekit/wallet-protocol/server"
+} from "@slicekit/wallet-primitives/server"
 import { createPublicClient, custom, defineChain } from "viem"
 import { buildRecoveryPermissionInitConfig } from "./recovery"
 import type { PredictSliceWalletKernelAccountAddressParameters } from "./types/recovery"
@@ -9,7 +9,7 @@ import type { PredictSliceWalletKernelAccountAddressParameters } from "./types/r
 export {
   predictSliceWalletKernelAccountAddressFromInitConfig,
   sliceWalletKernelProxyInitCodeHash
-} from "@slicekit/wallet-protocol/server"
+} from "@slicekit/wallet-primitives/server"
 
 const createOfflineClient = (chainId: number) =>
   createPublicClient({

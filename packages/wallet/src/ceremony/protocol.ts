@@ -1,8 +1,15 @@
-import { getWalletPermissionId } from "@slicekit/wallet-protocol/policy"
+import { getWalletPermissionId } from "@slicekit/wallet-primitives/policy"
+import type {
+  SliceWalletCheckoutGrant,
+  SliceWalletFrameSession,
+  SliceWalletPermissionAuthorization,
+  SliceWalletProtocolValue,
+  WalletGrantKind
+} from "@slicekit/wallet-primitives/server"
 import {
   assertSliceWalletAccountIndex,
   getSliceWalletP256SignerId
-} from "@slicekit/wallet-protocol/server"
+} from "@slicekit/wallet-primitives/server"
 import { type Address, type Hex, hexToBytes, isAddress, isHex } from "viem"
 import {
   parseSliceWalletPolicyDescriptor,
@@ -21,12 +28,7 @@ import type {
   SliceWalletCeremonyRootResponse,
   SliceWalletCeremonyRootSignRequest,
   SliceWalletCeremonySessionRequestMessage,
-  SliceWalletCheckoutGrant,
-  SliceWalletFrameSession,
-  SliceWalletPermissionAuthorization,
-  SliceWalletProtocolValue,
-  SliceWalletRootSignatureRequest,
-  WalletGrantKind
+  SliceWalletRootSignatureRequest
 } from "../types"
 
 type ProtocolRecord = { readonly [key: string]: SliceWalletProtocolValue }

@@ -1,4 +1,3 @@
-import type { Address } from "viem"
 import type {
   JsonObject,
   JsonValue,
@@ -8,10 +7,10 @@ import type {
   SliceUpstreamJsonRpcError,
   SliceUserOperation,
   SliceUserOperationPolicyFetch
-} from "../../types/userOperation"
+} from "@slicekit/wallet-primitives/execution"
 import {
   createJsonRpcError,
-  createProxyResponse,
+  createSliceProxyResponse as createProxyResponse,
   createSliceSlicerAddressResolver,
   isAcceptedSliceUserOperation,
   isAddressString,
@@ -19,9 +18,10 @@ import {
   isJsonRpcId,
   isSupportedSliceEntryPointRequest,
   parseSliceUserOperation,
-  readUpstreamJsonRpcError,
   sliceUserOperationPolicyDescription
-} from "./sliceUserOperationPolicy"
+} from "@slicekit/wallet-primitives/execution"
+import type { Address } from "viem"
+import { readUpstreamJsonRpcError } from "./sliceUserOperationTransport"
 
 type SlicePaymasterSponsorshipRequest = {
   jsonrpc: "2.0"

@@ -1,0 +1,8 @@
+{
+  "extends": "@slice/typescript-config/base.json",
+  "compilerOptions": {
+    "customConditions": ["development"],
+    "lib": ["ES2025", "DOM"]
+  },
+  "include": ["*.ts", "scripts/**/*.ts", "src/**/*"]
+}

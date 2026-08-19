@@ -1,16 +1,16 @@
-import { assertSliceWalletGrantScope } from "@slicekit/wallet-protocol"
+import { assertSliceWalletGrantScope } from "@slicekit/wallet-primitives"
 import type {
   WalletGrantKind,
   WalletPolicyCallRule,
   WalletPolicyDescriptor,
   WalletPolicyParameterRule
-} from "@slicekit/wallet-protocol/policy"
-import { normalizeWalletPolicyDescriptor } from "@slicekit/wallet-protocol/policy"
+} from "@slicekit/wallet-primitives/policy"
+import { normalizeWalletPolicyDescriptor } from "@slicekit/wallet-primitives/policy"
 import type {
   SliceWalletCheckoutGrant,
   SliceWalletFrameSessionKey,
   SliceWalletProtocolValue
-} from "@slicekit/wallet-protocol/server"
+} from "@slicekit/wallet-primitives/server"
 import {
   type Address,
   type Hex,

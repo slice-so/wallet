@@ -1,6 +1,21 @@
+import type {
+  JsonValue,
+  SliceAcceptedSenderCode,
+  SliceBundlerUpstreamErrorClassifier,
+  SliceBundlerUserOperationAuthorizer,
+  SliceJsonRpcId,
+  SliceSenderAccountFetch,
+  SliceUpstreamJsonRpcError,
+  SliceUserOperationPolicyFetch
+} from "@slicekit/wallet-primitives/execution"
 import {
   classifyAltoBundlerRetryReason,
+  createJsonRpcError,
+  createSliceProxyResponse as createProxyResponse,
+  createSliceSlicerAddressResolver,
   getSliceBundlerRequestUserOperationHash,
+  isAcceptedSliceUserOperation,
+  isJsonObject,
   isSliceBundlerUserOperationRequest,
   normalizeSliceBundlerRpcUrl,
   parseSliceBundlerRequest,
@@ -9,31 +24,12 @@ import {
   type SliceBundlerUserOperationRequest,
   sliceBundlerRetryDataCode,
   sliceBundlerRetryRpcCode
-} from "@slicekit/wallet-protocol/execution"
+} from "@slicekit/wallet-primitives/execution"
 import type { Address, Hex } from "viem"
 import { base } from "viem/chains"
-import type {
-  SliceBundlerRpcUrlParameters,
-  SliceBundlerUpstreamErrorClassifier,
-  SliceBundlerUserOperationAuthorizer
-} from "../../types/bundler"
-import type {
-  JsonValue,
-  SliceAcceptedSenderCode,
-  SliceJsonRpcId,
-  SliceSenderAccountFetch,
-  SliceUpstreamJsonRpcError,
-  SliceUserOperationPolicyFetch
-} from "../../types/userOperation"
+import type { SliceBundlerRpcUrlParameters } from "../../types/bundler"
 import { getSlicePaymasterRpcUrl } from "./slicePaymaster"
-import {
-  createJsonRpcError,
-  createProxyResponse,
-  createSliceSlicerAddressResolver,
-  isAcceptedSliceUserOperation,
-  isJsonObject,
-  readUpstreamJsonRpcError
-} from "./sliceUserOperationPolicy"
+import { readUpstreamJsonRpcError } from "./sliceUserOperationTransport"
 
 type SliceBundlerConfig = SliceBundlerRpcUrlParameters & {
   /** Adds a narrower condition after the built-in or replacement policy. */
@@ -73,13 +69,12 @@ type HandleSliceBundlerRequestOptions = SliceBundlerConfig & {
 export const sliceBundlerApiPath = "/api/bundler"
 
 /** Session-key checkout budget error code surfaced by the co-sign endpoint. */
-export { sliceAllowanceExceededCode } from "@slicekit/wallet-protocol/execution"
 export const sliceAllowanceExceededRpcCode = -32030
 export {
   classifyAltoBundlerRetryReason,
   sliceBundlerRetryDataCode,
   sliceBundlerRetryRpcCode
-} from "@slicekit/wallet-protocol/execution"
+} from "@slicekit/wallet-primitives/execution"
 
 const sliceLocalBundlerRpcUrl = "http://localhost:4337"
 

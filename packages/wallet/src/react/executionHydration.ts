@@ -3,7 +3,11 @@
 import {
   getWalletPolicyHash,
   parseSerializedWalletPolicyDescriptor
-} from "@slicekit/wallet-protocol/policy"
+} from "@slicekit/wallet-primitives/policy"
+import type {
+  SliceWalletFrameSession,
+  SliceWalletProtocolValue
+} from "@slicekit/wallet-primitives/server"
 import { type SetStateAction, useCallback } from "react"
 import type { Chain } from "viem"
 import { parseSliceWalletFrameSession } from "../ceremony/protocol"
@@ -15,11 +19,7 @@ import {
   type SliceWalletCheckoutExecutionDelegationSnapshot
 } from "../execution"
 import { createSliceWalletPermissionAccount } from "../permissionAccount"
-import type {
-  SliceWalletFrameSession,
-  SliceWalletProtocolValue,
-  SliceWalletSignerFrameClient
-} from "../types/frame"
+import type { SliceWalletSignerFrameClient } from "../types/frame"
 import type {
   SliceWalletCredentialRecord,
   SliceWalletExecutionSession,

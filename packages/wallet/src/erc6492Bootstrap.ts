@@ -2,7 +2,7 @@ import {
   getSliceWalletChainPolicy,
   sliceWalletDevelopmentChainIds,
   sliceWalletKernelAddresses
-} from "@slicekit/wallet-protocol/server"
+} from "@slicekit/wallet-primitives/server"
 import {
   bytesToHex,
   encodeFunctionData,

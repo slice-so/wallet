@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import { sliceWalletSupportedChainIds } from "@slicekit/wallet-primitives/server"
 import {
   type Address,
   concatHex,
@@ -14,8 +15,7 @@ import {
 } from "viem"
 import { getAlchemyRpcUrl } from "../../../scripts/lib/alchemyRpc"
 import deployments from "../../contracts/wallet/deployments/addresses.json"
-import policy from "../../slicekit-wallet-protocol/config/chains.policy.json"
-import { sliceWalletSupportedChainIds } from "../src/chains"
+import policy from "../../wallet-primitives/config/chains.policy.json"
 import { installSanitizedScriptFailureHandlers } from "./lib/scriptFailure"
 
 installSanitizedScriptFailureHandlers()

@@ -1,23 +1,14 @@
-import { sliceKernelBaseV33Config } from "@slicekit/wallet-protocol/execution"
-import { assertWalletCallsMatchPolicy } from "@slicekit/wallet-protocol/policy"
+import {
+  sliceKernelBaseV33Config,
+  sliceKernelPasskeyBackend
+} from "@slicekit/wallet-primitives/execution"
+import { assertWalletCallsMatchPolicy } from "@slicekit/wallet-primitives/policy"
+import type { WalletPolicyDescriptor } from "@slicekit/wallet-primitives/server"
 import type { Address, Hex } from "viem"
 import type {
   SliceAccountClient,
   SliceAccountClientTransport
 } from "../../types/accountClient"
-import type { WalletPolicyDescriptor } from "../../types/policy"
-import { sliceKernelPasskeyBackend } from "./sliceKernelAddresses"
-
-export { sliceKernelBaseV33Config } from "@slicekit/wallet-protocol/execution"
-export {
-  sliceKernelBaseV33Addresses,
-  sliceKernelPasskeyBackend,
-  sliceKernelTimelockPolicyAddress,
-  sliceKernelV33Version,
-  sliceKernelWebAuthnValidatorAddress,
-  sliceKernelWeightedEcdsaSignerAddress,
-  sliceKernelWeightedP256SignerAddress
-} from "./sliceKernelAddresses"
 
 export class SliceAccountClientExecutionError extends Error {
   readonly fallbackReason: "outside-policy" | null

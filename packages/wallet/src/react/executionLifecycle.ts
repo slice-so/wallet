@@ -1,22 +1,20 @@
 "use client"
 
-import { createSliceStoreManagementPolicyDescriptor } from "@slicekit/wallet-protocol/execution"
+import { createSliceStoreManagementPolicyDescriptor } from "@slicekit/wallet-primitives/execution"
 import {
   getWalletPolicyHash,
   parseSerializedWalletPolicyDescriptor
-} from "@slicekit/wallet-protocol/policy"
+} from "@slicekit/wallet-primitives/policy"
+import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives/server"
 import {
   buildSliceWalletPermissionRevocationCalls,
   getSliceWalletCallsHash
-} from "@slicekit/wallet-protocol/server"
+} from "@slicekit/wallet-primitives/server"
 import { type Dispatch, type SetStateAction, useCallback } from "react"
 import { parseSliceWalletFrameSession } from "../ceremony/protocol"
 import type { createSliceWalletCeremonyKernelAccount } from "../ceremony/rootAccountClient"
 import type { SliceAccountClient } from "../types/accountClient"
-import type {
-  SliceWalletProtocolValue,
-  SliceWalletSignerFrameClient
-} from "../types/frame"
+import type { SliceWalletSignerFrameClient } from "../types/frame"
 import type {
   SliceWalletCredentialRecord,
   SliceWalletExecutionSession,

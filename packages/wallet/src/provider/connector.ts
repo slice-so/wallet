@@ -1,4 +1,4 @@
-import { sliceWalletChainManifests } from "@slicekit/wallet-protocol/server"
+import { sliceWalletChainManifests } from "@slicekit/wallet-primitives/server"
 import { createConnector } from "@wagmi/core"
 import { type Address, isAddress } from "viem"
 import { anvil } from "viem/chains"

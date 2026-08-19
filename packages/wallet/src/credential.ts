@@ -1,4 +1,4 @@
-import { sliceWalletDefaultRpId } from "@slicekit/wallet-protocol/server"
+import { sliceWalletDefaultRpId } from "@slicekit/wallet-primitives/server"
 import {
   type CreateWebAuthnCredentialReturnType,
   createWebAuthnCredential
