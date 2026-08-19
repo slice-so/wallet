@@ -20,7 +20,7 @@ describe("Slice wallet import boundaries", () => {
       sourceRoot,
       sourceText: [
         'import "@slicekit/abi"',
-        'export * from "@slice/indexer-shared"',
+        'export * from "@slice/database"',
         'const external = import("../../outside")',
         'type External = import("@slice/database").SliceWallet'
       ].join("\n")
@@ -28,7 +28,7 @@ describe("Slice wallet import boundaries", () => {
 
     expect(violations).toEqual([
       'src/nested/fixture.ts imports internal Slice package "@slicekit/abi"',
-      'src/nested/fixture.ts imports internal Slice package "@slice/indexer-shared"',
+      'src/nested/fixture.ts imports internal Slice package "@slice/database"',
       'src/nested/fixture.ts escapes the wallet source boundary via "../../outside"',
       'src/nested/fixture.ts imports internal Slice package "@slice/database"'
     ])
