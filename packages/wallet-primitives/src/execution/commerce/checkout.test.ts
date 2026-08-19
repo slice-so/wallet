@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test"
 import { productsModuleAbi } from "@slicekit/abi"
+import { getProductsModuleAddress } from "@slicekit/abi/deployments"
 import { type Address, encodeFunctionData, maxUint256, zeroAddress } from "viem"
 import { base } from "viem/chains"
-import { getProductsModuleAddress } from "../generated/commerceFacts"
 import {
   assertSliceCheckoutCalls,
   buildSliceCheckoutAllowanceEnvelope,

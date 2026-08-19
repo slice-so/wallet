@@ -1,3 +1,4 @@
+import { getProductsModuleAddress } from "@slicekit/abi/deployments"
 import {
   type Address,
   encodeFunctionData,
@@ -14,7 +15,6 @@ import type {
   SliceCheckoutAllowanceTotal,
   SliceCheckoutSpendIntent
 } from "../../types/commerce"
-import { getProductsModuleAddress } from "../generated/commerceFacts"
 import { getSliceCheckoutSpendIntentFromCalls } from "../utils/sliceCallPolicy"
 
 export const buildSliceCheckoutAllowanceEnvelope = ({

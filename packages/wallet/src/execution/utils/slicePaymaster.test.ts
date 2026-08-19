@@ -4,15 +4,17 @@ import {
   productsModuleAbi,
   registryProductActionAbi
 } from "@slicekit/abi"
+import {
+  getFundsModuleAddress,
+  getProductsModuleAddress,
+  sliceHookAddressList
+} from "@slicekit/abi/deployments"
 import type { SliceSenderAccountSnapshot } from "@slicekit/wallet-primitives/execution"
 import {
   ambireAccountExecutionAbi,
   coinbaseSmartWalletExecutionAbi,
   erc7579AccountExecutionAbi,
   erc7579BatchExecutionAbiParameters,
-  generatedHookAddressList,
-  getFundsModuleAddress,
-  getProductsModuleAddress,
   kernelValidationManagementAbi,
   metaMaskDelegatorExecutionAbi,
   sliceKernelBaseV33Addresses
@@ -92,7 +94,7 @@ const cdpBasePaymasterAddress =
   "0x2FAEB0760D4230Ef2aC21496Bb4F0b47D634FD4c" satisfies Address
 const indexedSlicerAddress =
   "0x742d35cc6634c0532925a3b844bc9e7d1333d262" satisfies Address
-const generatedHookAddress = generatedHookAddressList[0] as Address
+const generatedHookAddress = sliceHookAddressList[0] as Address
 const USDCAddress = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as Address
 const erc7579BatchDefaultMode =
   "0x0100000000000000000000000000000000000000000000000000000000000000" satisfies Hex

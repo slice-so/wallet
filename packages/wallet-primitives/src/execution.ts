@@ -1,7 +1,6 @@
 export * from "./execution/allowance"
 export * from "./execution/chainPolicy"
 export * from "./execution/commerce"
-export * from "./execution/generated/commerceFacts"
 export * from "./execution/grant"
 export * from "./execution/session"
 export * from "./execution/utils/sliceBundlerRequest"

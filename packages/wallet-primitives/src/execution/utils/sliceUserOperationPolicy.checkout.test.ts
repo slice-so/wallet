@@ -1,10 +1,10 @@
 import { describe, expect, it } from "bun:test"
 import { productsModuleAbi } from "@slicekit/abi"
+import { getProductsModuleAddress } from "@slicekit/abi/deployments"
 import { type Address, encodeFunctionData, erc20Abi, zeroAddress } from "viem"
 import { entryPoint07Address } from "viem/account-abstraction"
 import { anvil, base } from "viem/chains"
 import { buildSliceCheckoutAllowanceEnvelope } from "../commerce/checkout"
-import { getProductsModuleAddress } from "../generated/commerceFacts"
 import { coinbaseSmartWalletExecutionAbi } from "./slicePaymasterAbis"
 import {
   getSliceUserOperationCheckoutSpendIntent,

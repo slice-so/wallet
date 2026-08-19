@@ -15,6 +15,12 @@ import {
   sliceCoreAbi
 } from "@slicekit/abi"
 import {
+  getFundsModuleAddress,
+  getProductsModuleAddress,
+  getSliceCoreAddress,
+  isSliceHookAddress
+} from "@slicekit/abi/deployments"
+import {
   type Address,
   decodeFunctionData,
   erc20Abi,
@@ -30,12 +36,6 @@ import type {
   SliceCheckoutSpendIntent,
   SliceSmartAccountCall
 } from "../../types/commerce"
-import {
-  getFundsModuleAddress,
-  getProductsModuleAddress,
-  getSliceCoreAddress,
-  isGeneratedHookAddress
-} from "../generated/commerceFacts"
 import { sliceKernelTimelockPolicyAddress } from "./sliceKernelAddresses"
 import {
   kernelTimelockPolicyCancelAbi,
@@ -144,7 +144,7 @@ const isAcceptedGeneratedHookCalldata = ({
   target,
   value
 }: SliceSmartAccountCall) => {
-  if (value !== 0n || !isGeneratedHookAddress(target)) return false
+  if (value !== 0n || !isSliceHookAddress(target)) return false
 
   try {
     const decoded = decodeFunctionData({ abi: registryProductActionAbi, data })

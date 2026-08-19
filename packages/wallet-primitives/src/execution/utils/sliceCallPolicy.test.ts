@@ -5,6 +5,12 @@ import {
   sliceCoreAbi
 } from "@slicekit/abi"
 import {
+  getFundsModuleAddress,
+  getProductsModuleAddress,
+  getSliceCoreAddress,
+  sliceHookAddressList
+} from "@slicekit/abi/deployments"
+import {
   type Address,
   encodeFunctionData,
   erc20Abi,
@@ -16,12 +22,6 @@ import type {
   SliceCallsBatchClassified,
   SliceSmartAccountCall
 } from "../../types/commerce"
-import {
-  generatedHookAddressList,
-  getFundsModuleAddress,
-  getProductsModuleAddress,
-  getSliceCoreAddress
-} from "../generated/commerceFacts"
 import {
   classifySliceSmartAccountCall,
   classifySliceSmartAccountCallsBatch,
@@ -45,7 +45,7 @@ const mixedCaseUnknownTarget =
 const productsModule = getProductsModuleAddress(base.id)
 const fundsModule = getFundsModuleAddress(base.id)
 const sliceCore = getSliceCoreAddress(base.id)
-const generatedHook = generatedHookAddressList[0] as Address
+const generatedHook = sliceHookAddressList[0] as Address
 const cdpBasePaymaster =
   "0x2FAEB0760D4230Ef2aC21496Bb4F0b47D634FD4c" satisfies Address
 const recoveryValidationId = `0x02${"11".repeat(20)}` as Hex

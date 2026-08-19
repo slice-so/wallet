@@ -1,5 +1,6 @@
 import { describe, expect, it, mock } from "bun:test"
 import { productsModuleAbi } from "@slicekit/abi"
+import { getProductsModuleAddress } from "@slicekit/abi/deployments"
 import type {
   SliceSenderAccountSnapshot,
   SliceUserOperation
@@ -8,7 +9,6 @@ import {
   coinbaseSmartWalletExecutionAbi,
   erc7579AccountExecutionAbi,
   erc7579BatchExecutionAbiParameters,
-  getProductsModuleAddress,
   isAcceptedSliceIdSecurityOperationUserOperation,
   isAcceptedSliceIdUserFundedRegistryOperationUserOperation,
   isAcceptedSliceRecoveryCancellationUserOperation,

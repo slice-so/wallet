@@ -1,5 +1,9 @@
 /** ERC-4337 envelope adapter over the decision core in sliceCallPolicy.ts. */
 
+import {
+  defaultSliceChainId,
+  supportedSliceCheckoutChainIds
+} from "@slicekit/abi/deployments"
 import { ERC8128_REVOCATION_REGISTRY_ADDRESS } from "@slicekit/erc8128"
 import {
   type Address,
@@ -31,10 +35,6 @@ import type {
   SliceSlicerAddressResolver,
   SliceUserOperation
 } from "../../types/userOperation"
-import {
-  defaultSliceChainId,
-  supportedSliceCheckoutChainIds
-} from "../generated/commerceFacts"
 import {
   classifySliceSmartAccountCall,
   classifySliceSmartAccountCallsBatch,

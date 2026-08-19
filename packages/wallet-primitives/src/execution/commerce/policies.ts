@@ -6,6 +6,12 @@ import {
   slicerAbi
 } from "@slicekit/abi"
 import {
+  getFundsModuleAddress,
+  getProductsModuleAddress,
+  getSliceCoreAddress,
+  sliceHookAddressList
+} from "@slicekit/abi/deployments"
+import {
   type Abi,
   type AbiFunction,
   type Address,
@@ -28,13 +34,6 @@ import type {
   CreateSliceCheckoutPolicyParameters,
   CreateSliceStoreManagementPolicyParameters
 } from "../../types/commerce"
-import {
-  generatedHookAddressList,
-  getFundsModuleAddress,
-  getProductsModuleAddress,
-  getSliceCoreAddress
-} from "../generated/commerceFacts"
-
 export const sliceStoreManagementOperations = [
   "batchWithdraw",
   "addProduct",
@@ -101,7 +100,7 @@ const productManagementSelectors = sliceStoreManagementOperations
   )
   .map((functionName) => getSelector({ abi: productsModuleAbi, functionName }))
 
-const generatedHookAddresses = generatedHookAddressList
+const generatedHookAddresses = sliceHookAddressList
 
 const uniqueAddresses = (values: readonly Address[]) => [
   ...new Map(values.map((value) => [value.toLowerCase(), value])).values()

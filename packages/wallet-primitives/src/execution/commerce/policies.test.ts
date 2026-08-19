@@ -5,16 +5,16 @@ import {
   sliceCoreAbi,
   slicerAbi
 } from "@slicekit/abi"
+import {
+  getFundsModuleAddress,
+  getProductsModuleAddress,
+  getSliceCoreAddress
+} from "@slicekit/abi/deployments"
 import { type Address, encodeFunctionData, zeroAddress } from "viem"
 import {
   assertWalletCallsMatchPolicy,
   walletPolicyWildcardTarget
 } from "../../policy"
-import {
-  getFundsModuleAddress,
-  getProductsModuleAddress,
-  getSliceCoreAddress
-} from "../generated/commerceFacts"
 import {
   assertSliceStoreManagementPolicyDescriptor,
   createSliceStoreManagementPolicyDescriptor

@@ -1,6 +1,6 @@
 import { productsModuleAbi } from "@slicekit/abi"
+import { getProductsModuleAddress } from "@slicekit/abi/deployments"
 import {
-  getProductsModuleAddress,
   sliceKernelBaseV33Addresses,
   sliceKernelWebAuthnValidatorAddress
 } from "@slicekit/wallet-primitives/execution"

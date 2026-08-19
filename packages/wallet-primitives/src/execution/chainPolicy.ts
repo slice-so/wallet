@@ -1,9 +1,9 @@
+import { supportedSliceCheckoutChainIds } from "@slicekit/abi/deployments"
 import type { UserOperation } from "viem/account-abstraction"
 import {
   getSliceWalletChainManifest,
   sliceWalletSupportedChainIds
 } from "../chains"
-import { supportedSliceCheckoutChainIds } from "./generated/commerceFacts"
 
 const baseChainId = 8453
 const developmentChainIds = new Set([31_337, 31_338])
