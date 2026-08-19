@@ -1,5 +1,12 @@
 import {
   classifyAltoBundlerRetryReason,
+  getSliceBundlerRequestUserOperationHash,
+  isSliceBundlerUserOperationRequest,
+  normalizeSliceBundlerRpcUrl,
+  parseSliceBundlerRequest,
+  type SliceBundlerMethod,
+  type SliceBundlerRequest,
+  type SliceBundlerUserOperationRequest,
   sliceBundlerRetryDataCode,
   sliceBundlerRetryRpcCode
 } from "@slicekit/wallet-protocol/execution"
@@ -11,13 +18,11 @@ import type {
   SliceBundlerUserOperationAuthorizer
 } from "../../types/bundler"
 import type {
-  JsonObject,
   JsonValue,
   SliceAcceptedSenderCode,
   SliceJsonRpcId,
   SliceSenderAccountFetch,
   SliceUpstreamJsonRpcError,
-  SliceUserOperation,
   SliceUserOperationPolicyFetch
 } from "../../types/userOperation"
 import { getSlicePaymasterRpcUrl } from "./slicePaymaster"
@@ -26,54 +31,9 @@ import {
   createProxyResponse,
   createSliceSlicerAddressResolver,
   isAcceptedSliceUserOperation,
-  isAddressString,
-  isHexString,
   isJsonObject,
-  isJsonRpcId,
-  parseSliceUserOperation,
   readUpstreamJsonRpcError
 } from "./sliceUserOperationPolicy"
-
-type SliceBundlerSendMethod =
-  | "eth_sendUserOperation"
-  | "eth_estimateUserOperationGas"
-type SliceBundlerHashMethod =
-  | "eth_getUserOperationReceipt"
-  | "eth_getUserOperationByHash"
-type SliceBundlerSupportedEntryPointsMethod = "eth_supportedEntryPoints"
-type SliceBundlerMethod =
-  | SliceBundlerSendMethod
-  | SliceBundlerHashMethod
-  | SliceBundlerSupportedEntryPointsMethod
-
-type SliceBundlerUserOperationRequest = {
-  jsonrpc: "2.0"
-  id?: SliceJsonRpcId
-  method: SliceBundlerSendMethod
-  params: [SliceUserOperation, Address]
-  raw: JsonObject
-}
-
-type SliceBundlerHashRequest = {
-  jsonrpc: "2.0"
-  id?: SliceJsonRpcId
-  method: SliceBundlerHashMethod
-  params: [Hex]
-  raw: JsonObject
-}
-
-type SliceBundlerSupportedEntryPointsRequest = {
-  jsonrpc: "2.0"
-  id?: SliceJsonRpcId
-  method: SliceBundlerSupportedEntryPointsMethod
-  params: []
-  raw: JsonObject
-}
-
-type SliceBundlerRequest =
-  | SliceBundlerHashRequest
-  | SliceBundlerSupportedEntryPointsRequest
-  | SliceBundlerUserOperationRequest
 
 type SliceBundlerConfig = SliceBundlerRpcUrlParameters & {
   /** Adds a narrower condition after the built-in or replacement policy. */
@@ -123,44 +83,6 @@ export {
 
 const sliceLocalBundlerRpcUrl = "http://localhost:4337"
 
-const supportedBundlerMethods = [
-  "eth_sendUserOperation",
-  "eth_estimateUserOperationGas",
-  "eth_getUserOperationReceipt",
-  "eth_getUserOperationByHash",
-  "eth_supportedEntryPoints"
-] as const
-const userOperationBundlerMethods = [
-  "eth_sendUserOperation",
-  "eth_estimateUserOperationGas"
-] as const
-const hashBundlerMethods = [
-  "eth_getUserOperationReceipt",
-  "eth_getUserOperationByHash"
-] as const
-
-const normalizeSliceBundlerRpcUrl = (value: string) => {
-  const normalized = value.trim()
-  if (normalized.length === 0) return null
-  if (normalized.length > 2_048) {
-    throw new Error("Slice bundler RPC URL is too long.")
-  }
-
-  const url = new URL(normalized)
-  const localHttp =
-    url.protocol === "http:" &&
-    (url.hostname === "localhost" || url.hostname === "127.0.0.1")
-  if (
-    (url.protocol !== "https:" && !localHttp) ||
-    url.username !== "" ||
-    url.password !== "" ||
-    url.hash !== ""
-  ) {
-    throw new Error("Slice bundler RPC URL is not permitted.")
-  }
-  return normalized
-}
-
 const getConfiguredSliceBundlerRpcUrl = (
   serializedRpcUrls: string | undefined,
   chainId: number
@@ -206,99 +128,6 @@ export const getSliceBundlerRpcUrl = ({
 
 export const getSliceBundlerApiUrl = (origin: string | URL) =>
   new URL(sliceBundlerApiPath, origin).toString()
-
-const isSliceBundlerMethod = (
-  value: JsonValue | undefined
-): value is SliceBundlerMethod =>
-  typeof value === "string" &&
-  supportedBundlerMethods.includes(value as SliceBundlerMethod)
-
-const isUserOperationBundlerMethod = (
-  value: SliceBundlerMethod
-): value is SliceBundlerSendMethod =>
-  userOperationBundlerMethods.includes(value as SliceBundlerSendMethod)
-
-const isUserOperationBundlerRequest = (
-  request: SliceBundlerRequest
-): request is SliceBundlerUserOperationRequest =>
-  isUserOperationBundlerMethod(request.method)
-
-const isHashBundlerMethod = (
-  value: SliceBundlerMethod
-): value is SliceBundlerHashMethod =>
-  hashBundlerMethods.includes(value as SliceBundlerHashMethod)
-
-const isUserOperationHash = (value: JsonValue | undefined): value is Hex =>
-  isHexString(value) && value.length === 66
-
-const getBundlerRequestUserOperationHash = (
-  request: SliceBundlerRequest
-): Hex | null => {
-  if (
-    request.method !== "eth_getUserOperationReceipt" &&
-    request.method !== "eth_getUserOperationByHash"
-  ) {
-    return null
-  }
-
-  const [userOperationHash] = request.params
-  return userOperationHash
-}
-
-const parseSliceBundlerRequest = (
-  body: JsonValue
-): SliceBundlerRequest | null => {
-  if (!isJsonObject(body)) return null
-  if (body.jsonrpc !== "2.0") return null
-  if (!isJsonRpcId(body.id)) return null
-  if (!isSliceBundlerMethod(body.method)) return null
-  if (!Array.isArray(body.params)) return null
-
-  if (body.method === "eth_supportedEntryPoints") {
-    if (body.params.length !== 0) return null
-    return {
-      jsonrpc: "2.0",
-      id: body.id,
-      method: body.method,
-      params: [],
-      raw: body
-    }
-  }
-
-  if (isHashBundlerMethod(body.method)) {
-    if (body.params.length !== 1) return null
-    const [userOperationHash] = body.params
-    if (!isUserOperationHash(userOperationHash)) return null
-    return {
-      jsonrpc: "2.0",
-      id: body.id,
-      method: body.method,
-      params: [userOperationHash],
-      raw: body
-    }
-  }
-
-  if (!isUserOperationBundlerMethod(body.method)) return null
-  if (body.params.length !== 2) return null
-
-  const [rawUserOperation, rawEntryPoint] = body.params
-  const userOperation = parseSliceUserOperation(rawUserOperation)
-  if (!userOperation) return null
-  if (!isAddressString(rawEntryPoint)) return null
-
-  return {
-    jsonrpc: "2.0",
-    id: body.id,
-    method: body.method,
-    params: [userOperation, rawEntryPoint],
-    raw: {
-      ...body,
-      params: body.params.map((param, index) =>
-        index === 0 ? userOperation : param
-      )
-    }
-  }
-}
 
 const isAcceptedBundlerUserOperationRequest = async (
   request: SliceBundlerUserOperationRequest,
@@ -380,7 +209,8 @@ const forwardBundlerRequest = async ({
   })
   const upstreamError = await readUpstreamJsonRpcError(response)
   if (upstreamError) {
-    const userOperationHash = getBundlerRequestUserOperationHash(bundlerRequest)
+    const userOperationHash =
+      getSliceBundlerRequestUserOperationHash(bundlerRequest)
     onUpstreamError?.({
       error: upstreamError,
       id: bundlerRequest.id,
@@ -481,7 +311,7 @@ export const handleSliceBundlerRequest = async (
   }
 
   if (
-    isUserOperationBundlerRequest(bundlerRequest) &&
+    isSliceBundlerUserOperationRequest(bundlerRequest) &&
     !(await isAcceptedBundlerUserOperationRequest(bundlerRequest, {
       ...(acceptedSenderCode === undefined ? {} : { acceptedSenderCode }),
       ...(acceptedChainIds === undefined ? {} : { acceptedChainIds }),

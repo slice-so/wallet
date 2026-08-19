@@ -181,7 +181,6 @@
     }
   },
   "devDependencies": {
-    "@slice/indexer-shared": "workspace:*",
     "@slice/typescript-config": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
