@@ -13,7 +13,6 @@ const forbiddenExactOrPrefix = [
   "@slicekit/commerce",
   "@slicekit/id",
   "@slicekit/id-primitives",
-  "@slicekit/common",
   "@zerodev/sdk",
   "@zerodev/ecdsa-validator",
   "connectkit",

@@ -2,7 +2,7 @@
   "extends": ["//"],
   "tasks": {
     "test": {
-      "dependsOn": ["test:inputs", "test:e2e:two-chain"]
+      "dependsOn": ["test:inputs", "test:e2e:two-chain", "test:fork"]
     },
     "admit:canary": {
       "cache": false,
@@ -35,6 +35,10 @@
         "WALLET_E2E_RPC_PORT_A",
         "WALLET_E2E_RPC_PORT_B"
       ]
+    },
+    "test:fork": {
+      "dependsOn": ["test:inputs", "@slice/contracts#test:inputs"],
+      "env": ["BASE_FORK_BUNDLER_PORT", "BASE_FORK_PORT", "RPC_URL_BASE"]
     }
   }
 }

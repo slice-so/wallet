@@ -127,7 +127,8 @@
   "scripts": {
     "admit:canary": "bun --conditions=development scripts/create-user-operation-canary.ts",
     "build": "bun run build.ts",
-    "test": "bun --conditions=development test",
+    "test": "bun --conditions=development test --path-ignore-patterns='**/*.fork.test.ts'",
+    "test:fork": "bash ./scripts/run-kernel-passkey-fork-test.sh",
     "test:e2e:two-chain": "bash ./scripts/run-wallet-two-chain-e2e.sh",
     "verify:chains": "bun scripts/verify-chain-deployments.ts",
     "type-check": "tsc -p tsconfig.json --noEmit",
@@ -172,6 +173,7 @@
   },
   "devDependencies": {
     "@slice/typescript-config": "workspace:*",
+    "@slicekit/commerce": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@wagmi/core": "catalog:",
