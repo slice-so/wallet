@@ -3,10 +3,23 @@
   "configVersion": 1,
   "workspaces": {
     "": {
+      "name": "slice-wallet-workspace",
+      "devDependencies": {
+        "@biomejs/biome": "^2.4.15",
+        "@types/node": "~25.6.2",
+        "bun-types": "1.3.14",
+        "rollup": "^4.60.4",
+        "rollup-plugin-dts": "^6.4.1",
+        "typescript": "6.0.3",
+      },
+    },
+    "packages/wallet": {
       "name": "@slicekit/wallet",
+      "version": "0.0.1",
       "dependencies": {
         "@slicekit/abi": "0.0.24",
         "@slicekit/erc8128": "0.4.0",
+        "@slicekit/wallet-primitives": "workspace:*",
         "@zerodev/ecdsa-validator": "^5.4.9",
         "@zerodev/permissions": "5.6.3",
         "@zerodev/sdk": "5.5.10",
@@ -16,15 +29,10 @@
         "viem": "^2.48.0",
       },
       "devDependencies": {
-        "@biomejs/biome": "^2.4.15",
         "@types/node": "~25.6.2",
         "@types/react": "~19.2.14",
         "@wagmi/core": "^3.4.3",
-        "bun-types": "1.3.14",
         "fake-indexeddb": "^6.2.4",
-        "rollup": "^4.60.4",
-        "rollup-plugin-dts": "^6.4.1",
-        "typescript": "6.0.3",
         "wagmi": "^3.6.11",
       },
       "peerDependencies": {
@@ -39,6 +47,20 @@
         "react",
         "wagmi",
       ],
+    },
+    "packages/wallet-primitives": {
+      "name": "@slicekit/wallet-primitives",
+      "version": "0.0.1",
+      "dependencies": {
+        "@slicekit/abi": "0.0.24",
+        "@slicekit/erc8128": "0.4.0",
+        "@zerodev/permissions": "5.6.3",
+        "ox": "^0.14.29",
+        "viem": "^2.48.0",
+      },
+      "devDependencies": {
+        "@types/node": "~25.6.2",
+      },
     },
   },
   "packages": {
@@ -156,6 +178,10 @@
 
     "@slicekit/erc8128": ["@slicekit/erc8128@0.4.0", "", { "dependencies": { "@noble/hashes": "^2.2.0", "@noble/secp256k1": "^3.1.0", "viem": "^2.48.0" } }, "sha512-JF0udO4L1YxUoCx8k6y7DZF7lUyRDohkw9vsEmDG1wMynXQRKzul0FMrxfqpLwwFL88iAJuxajJxNTfBFWRHhw=="],
 
+    "@slicekit/wallet": ["@slicekit/wallet@workspace:packages/wallet"],
+
+    "@slicekit/wallet-primitives": ["@slicekit/wallet-primitives@workspace:packages/wallet-primitives"],
+
     "@tanstack/query-core": ["@tanstack/query-core@5.101.4", "", {}, "sha512-gNwcvOJcRbLWPOLG/2OBm+zM+Yv+MKsXKEOWC57USuZDEsI71hEErQsiEGx5wX9rzWWkfwM0fVSPoiIFSsxfiw=="],
 
     "@tanstack/react-query": ["@tanstack/react-query@5.101.4", "", { "dependencies": { "@tanstack/query-core": "5.101.4" }, "peerDependencies": { "react": "^18 || ^19" } }, "sha512-yRg2pfOCxIs4ZJW3XYYHU/WgtD04FHSnfHlpRT7h7pR77hwkdRG4wxbKe4aq6P0RvXUTBSQpQeadS1SUYUe+KA=="],
@@ -252,7 +278,7 @@
 
     "utf8": ["utf8@3.0.0", "", {}, "sha512-E8VjFIQ/TyQgp+TZfS6l8yp/xWppSAHzidGiRrqe4bK4XP9pTRyKFgGJpO3SN7zdX4DeomTrwaseCHovfpFcqQ=="],
 
-    "viem": ["viem@2.55.18", "", { "dependencies": { "@noble/curves": "1.9.1", "@noble/hashes": "1.8.0", "@scure/bip32": "1.7.0", "@scure/bip39": "1.6.0", "abitype": "1.2.3", "isows": "1.0.7", "ox": "0.14.33", "ws": "8.21.0" }, "peerDependencies": { "typescript": ">=5.0.4" }, "optionalPeers": ["typescript"] }, "sha512-7XJtcMueFo4dQz+VK5mhY3GV9lvQkyrMbM/P/IghE0d8oZ/xbhgMXdTpc+ra4ZtDOGsLKu+0/EOD7BetVmVBsw=="],
+    "viem": ["viem@2.55.19", "", { "dependencies": { "@noble/curves": "1.9.1", "@noble/hashes": "1.8.0", "@scure/bip32": "1.7.0", "@scure/bip39": "1.6.0", "abitype": "1.2.3", "isows": "1.0.7", "ox": "0.14.34", "ws": "8.21.0" }, "peerDependencies": { "typescript": ">=5.0.4" }, "optionalPeers": ["typescript"] }, "sha512-4QPIX0eYPLsOBk53NKswVMkQoxuP7GlOBnB4wM6dkDokREO4QENNc3bmyPKK1PBTViXh0TPJCHLjIuU20Qi3fg=="],
 
     "wagmi": ["wagmi@3.7.6", "", { "dependencies": { "@wagmi/connectors": "8.1.0", "@wagmi/core": "3.6.4", "use-sync-external-store": "1.4.0" }, "peerDependencies": { "@tanstack/react-query": ">=5.0.0", "react": ">=18", "typescript": ">=5.9.3", "viem": "2.x" }, "optionalPeers": ["typescript"] }, "sha512-Zm/ppGHV6GYX9by3ERs1KVcNqpMZ4Vdno48Avdz9U+3QCjC5iFatOwruA9IMOl8poL7n/pJGQOcR1xj8N5c69w=="],
 
@@ -292,12 +318,8 @@
 
     "viem/abitype": ["abitype@1.2.3", "", { "peerDependencies": { "typescript": ">=5.0.4", "zod": "^3.22.0 || ^4.0.0" }, "optionalPeers": ["typescript", "zod"] }, "sha512-Ofer5QUnuUdTFsBRwARMoWKOH1ND5ehwYhJ3OJ/BQO+StkwQjHw0XyVh4vDttzHB7QOFhPHa/o413PJ82gU/Tg=="],
 
-    "viem/ox": ["ox@0.14.33", "", { "dependencies": { "@adraffy/ens-normalize": "^1.11.0", "@noble/ciphers": "^1.3.0", "@noble/curves": "1.9.1", "@noble/hashes": "^1.8.0", "@scure/bip32": "^1.7.0", "@scure/bip39": "^1.6.0", "abitype": "^1.2.3", "eventemitter3": "5.0.1" }, "peerDependencies": { "typescript": ">=5.4.0" }, "optionalPeers": ["typescript"] }, "sha512-rooA/4o7bBof4Ge2VH/eovfNPb/AEEYyrNj03wggc55g5HZD8Pjs/OeWhttgjic3dDcqn0r29bDuvQEdTiUemQ=="],
-
     "ethereum-cryptography/@scure/bip32/@scure/base": ["@scure/base@1.1.9", "", {}, "sha512-8YKhl8GHiNI/pU2VMaofa2Tor7PJRAjwQLBBuilkJ9L5+13yVbC7JO/wS7piioAvPSwR3JKM1IJ/u4xQzbcXKg=="],
 
     "ethereum-cryptography/@scure/bip39/@scure/base": ["@scure/base@1.1.9", "", {}, "sha512-8YKhl8GHiNI/pU2VMaofa2Tor7PJRAjwQLBBuilkJ9L5+13yVbC7JO/wS7piioAvPSwR3JKM1IJ/u4xQzbcXKg=="],
-
-    "viem/ox/abitype": ["abitype@1.3.0", "", { "peerDependencies": { "typescript": ">=5.0.4", "zod": "^3.22.0 || ^4.0.0" }, "optionalPeers": ["typescript", "zod"] }, "sha512-fk6Te+bojIFrMvMZrnOO+SxCB+RUksTGOzq/60ZRvs1L+BVzvi2bqt9L3W/17ZLdZsyM1FuYf65P5nlmoiH1Bg=="],
   }
 }

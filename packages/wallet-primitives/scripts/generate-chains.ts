@@ -3,7 +3,7 @@
 import { spawnSync } from "node:child_process"
 import { readFileSync, writeFileSync } from "node:fs"
 import { resolve } from "node:path"
-import deployments from "../../contracts/wallet/deployments/addresses.json"
+import deployments from "../config/deployments.json"
 import policy from "../config/chains.policy.json"
 import {
   hasAdmittedManagementAuthority,

@@ -1,5 +1,5 @@
-import { buildPackage } from "../../build"
-import { bundleDeclarationTypes } from "../../build-declarations"
+import { buildPackage } from "../../tooling/build"
+import { bundleDeclarationTypes } from "../../tooling/build-declarations"
 import { dependencies } from "./package.json"
 
 await buildPackage({

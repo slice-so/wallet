@@ -69,15 +69,14 @@
     "access": "public"
   },
   "dependencies": {
-    "@slicekit/abi": "workspace:*",
-    "@slicekit/erc8128": "workspace:*",
+    "@slicekit/abi": "0.0.24",
+    "@slicekit/erc8128": "0.4.0",
     "@zerodev/permissions": "5.6.3",
-    "ox": "catalog:",
-    "viem": "catalog:"
+    "ox": "^0.14.29",
+    "viem": "^2.48.0"
   },
   "devDependencies": {
-    "@slice/typescript-config": "workspace:*",
-    "@types/node": "catalog:"
+    "@types/node": "~25.6.2"
   },
   "repository": {
     "type": "git",

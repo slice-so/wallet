@@ -3,7 +3,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { rollup } from "rollup"
 import { dts } from "rollup-plugin-dts"
-import type { DeclarationBundleOptions } from "./build.shared.ts"
+import type { DeclarationBundleOptions } from "./build"
 
 const isExternalImport = (source: string, external: string[]) =>
   external.some(

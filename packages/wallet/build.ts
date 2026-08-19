@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs"
-import { buildPackage } from "../../build"
-import { bundleDeclarationTypes } from "../../build-declarations"
+import { buildPackage } from "../../tooling/build"
+import { bundleDeclarationTypes } from "../../tooling/build-declarations"
 import { dependencies, peerDependencies } from "./package.json"
 
 await buildPackage({

@@ -125,12 +125,8 @@
     "./LICENSE-APACHE"
   ],
   "scripts": {
-    "admit:canary": "bun --conditions=development scripts/create-user-operation-canary.ts",
     "build": "bun run build.ts",
-    "test": "bun --conditions=development test --path-ignore-patterns='**/*.fork.test.ts'",
-    "test:fork": "bash ./scripts/run-kernel-passkey-fork-test.sh",
-    "test:e2e:two-chain": "bash ./scripts/run-wallet-two-chain-e2e.sh",
-    "verify:chains": "bun scripts/verify-chain-deployments.ts",
+    "test": "bun --conditions=development test",
     "type-check": "tsc -p tsconfig.json --noEmit",
     "format": "biome format --write",
     "lint": "biome lint --write && bun scripts/check-import-boundaries.ts",
@@ -140,22 +136,22 @@
     "access": "public"
   },
   "dependencies": {
-    "@slicekit/abi": "workspace:*",
-    "@slicekit/erc8128": "workspace:*",
+    "@slicekit/abi": "0.0.24",
+    "@slicekit/erc8128": "0.4.0",
     "@slicekit/wallet-primitives": "workspace:*",
     "@zerodev/ecdsa-validator": "^5.4.9",
     "@zerodev/permissions": "5.6.3",
     "@zerodev/sdk": "5.5.10",
-    "hash-wasm": "catalog:",
-    "ox": "catalog:",
+    "hash-wasm": "4.12.0",
+    "ox": "^0.14.29",
     "tslib": "^2.8.1",
-    "viem": "catalog:"
+    "viem": "^2.48.0"
   },
   "peerDependencies": {
-    "@tanstack/react-query": "catalog:",
-    "@wagmi/core": "catalog:",
+    "@tanstack/react-query": "^5.100.11",
+    "@wagmi/core": "^3.4.3",
     "react": ">=18",
-    "wagmi": "catalog:"
+    "wagmi": "^3.6.11"
   },
   "peerDependenciesMeta": {
     "@tanstack/react-query": {
@@ -172,13 +168,11 @@
     }
   },
   "devDependencies": {
-    "@slice/typescript-config": "workspace:*",
-    "@slicekit/commerce": "workspace:*",
-    "@types/node": "catalog:",
-    "@types/react": "catalog:",
-    "@wagmi/core": "catalog:",
+    "@types/node": "~25.6.2",
+    "@types/react": "~19.2.14",
+    "@wagmi/core": "^3.4.3",
     "fake-indexeddb": "^6.2.4",
-    "wagmi": "catalog:"
+    "wagmi": "^3.6.11"
   },
   "repository": {
     "type": "git",
