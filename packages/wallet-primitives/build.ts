@@ -12,6 +12,7 @@ await buildPackage({
   ],
   external: Object.keys(dependencies),
   root: "./src",
+  sourcemap: "none",
   splitting: true,
   target: "browser"
 })

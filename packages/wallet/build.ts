@@ -21,6 +21,7 @@ await buildPackage({
   ],
   external: [...Object.keys(dependencies), ...Object.keys(peerDependencies)],
   root: "./src",
+  sourcemap: "none",
   splitting: true,
   target: "browser"
 })
