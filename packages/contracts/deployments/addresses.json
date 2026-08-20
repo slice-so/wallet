@@ -39,7 +39,7 @@
     },
     "ecdsaSigner": { "address": "0x6A6F069E2a08c2468e7724Ab3250CdBFBA14D4FF" },
     "erc6492BootstrapFactory": {
-      "address": "0x4765Db45368788d3e07A9F756c13D948C32e6ed9"
+      "address": "0x776D66A5889CEEf1A85deCB9c40e43C36c829d97"
     },
     "callPolicy": {
       "address": "0x85770b902D1e503D5f5141d9eaC16d0d08eEaDd2",
@@ -56,18 +56,15 @@
     "soladyP256Verifier": {
       "address": "0x000000000000D01eA45F9eFD5c54f037Fa57Ea1a"
     },
-    "weightedEcdsaSigner": {
-      "address": "0x4836168BdFbF1D19D5a13aEb07A01Bc423BAa71F"
-    },
     "weightedP256Signer": {
-      "address": "0x5b8EC08F8e6eafc4dbF95E171EAbb137174b82f1",
+      "address": "0x963B1377e87701a94357b924c9C1cF2d9263FB06",
       "version": "1"
     },
     "timelockPolicy": {
-      "address": "0x030546170A5B6d11f14612D309EA61BD718365c8"
+      "address": "0x50D5667ced5Db7F67a3BcE741cd3471b313F9DC8"
     },
     "slicerRegistryPolicy": {
-      "address": "0x3eE2795eeE0570594f6d0a74234712930E5a2F0f"
+      "address": "0x20Cc5bF73f9276Bc520395958E45a3D41B299420"
     },
     "authorizationRevocationRegistry": {
       "address": "0xB2A9330825D6AabBf7Cc7004Bc0916291C3322AD"
@@ -93,10 +90,9 @@
         "sudoPolicy": "0x7be56b30ee64b743005cf51ac4a63f14a9045f68243d8fb275ed36038ba4e1a4",
         "p256Verifier": "0x3cd725b6ba67b40b7979190c41a015e82cf21e098eb61832ba623f8538bab7fc",
         "soladyP256Verifier": "0x9933b3f70809361dcfebe1f731b129890454cc29af5b32840dcae92400a8826b",
-        "weightedEcdsaSigner": null,
-        "weightedP256Signer": "0x3497bb26d46d0856d92d1a0f3e5aaeebc696b497b583f2235b9b1a5557e1c483",
-        "timelockPolicy": "0x7f50edc1acbb3fd5013040472364885be07828d738a119ee015a18383d37e476",
-        "slicerRegistryPolicy": "0x22991f881ef61d0c3fe5768a1988651594d9ea84ccaa3778e2247ca69c436fc0",
+        "weightedP256Signer": null,
+        "timelockPolicy": null,
+        "slicerRegistryPolicy": null,
         "authorizationRevocationRegistry": "0x5a93f9fbc9de24c9d2b5fe7e9fd81ac3b59a8bb6919977a844c24227b7d58804"
       },
       "verification": {
@@ -125,10 +121,9 @@
         "sudoPolicy": "0x7be56b30ee64b743005cf51ac4a63f14a9045f68243d8fb275ed36038ba4e1a4",
         "p256Verifier": "0x3cd725b6ba67b40b7979190c41a015e82cf21e098eb61832ba623f8538bab7fc",
         "soladyP256Verifier": "0x9933b3f70809361dcfebe1f731b129890454cc29af5b32840dcae92400a8826b",
-        "weightedEcdsaSigner": null,
-        "weightedP256Signer": "0x0d93c27b2e497fdda498a97287f85eecbe6cdb1c4b88d60b34f47d27ac8c66e2",
-        "timelockPolicy": "0x7f50edc1acbb3fd5013040472364885be07828d738a119ee015a18383d37e476",
-        "slicerRegistryPolicy": "0x22991f881ef61d0c3fe5768a1988651594d9ea84ccaa3778e2247ca69c436fc0",
+        "weightedP256Signer": null,
+        "timelockPolicy": null,
+        "slicerRegistryPolicy": null,
         "authorizationRevocationRegistry": "0x5a93f9fbc9de24c9d2b5fe7e9fd81ac3b59a8bb6919977a844c24227b7d58804"
       },
       "verification": {
@@ -157,10 +152,9 @@
         "sudoPolicy": "0x7be56b30ee64b743005cf51ac4a63f14a9045f68243d8fb275ed36038ba4e1a4",
         "p256Verifier": "0x3cd725b6ba67b40b7979190c41a015e82cf21e098eb61832ba623f8538bab7fc",
         "soladyP256Verifier": "0x9933b3f70809361dcfebe1f731b129890454cc29af5b32840dcae92400a8826b",
-        "weightedEcdsaSigner": "0x4dc99619784e85a5592ef36d528afe6d7ed6278b75f1ab4c60aa1b964f68262c",
-        "weightedP256Signer": "0x7368c7060603c3fd2610d4f18cdf68bf24a160a9a4fdcffc2242cc25f90d456b",
-        "timelockPolicy": "0x7f50edc1acbb3fd5013040472364885be07828d738a119ee015a18383d37e476",
-        "slicerRegistryPolicy": "0x22991f881ef61d0c3fe5768a1988651594d9ea84ccaa3778e2247ca69c436fc0",
+        "weightedP256Signer": null,
+        "timelockPolicy": null,
+        "slicerRegistryPolicy": null,
         "authorizationRevocationRegistry": "0x5a93f9fbc9de24c9d2b5fe7e9fd81ac3b59a8bb6919977a844c24227b7d58804"
       },
       "verification": {
@@ -189,10 +183,9 @@
         "sudoPolicy": "0x7be56b30ee64b743005cf51ac4a63f14a9045f68243d8fb275ed36038ba4e1a4",
         "p256Verifier": "0x3cd725b6ba67b40b7979190c41a015e82cf21e098eb61832ba623f8538bab7fc",
         "soladyP256Verifier": "0x9933b3f70809361dcfebe1f731b129890454cc29af5b32840dcae92400a8826b",
-        "weightedEcdsaSigner": null,
-        "weightedP256Signer": "0x7e890abcda1f9394d7b819b8675c56ec27141fb4384fbfb9d21af494f35f47a8",
-        "timelockPolicy": "0x7f50edc1acbb3fd5013040472364885be07828d738a119ee015a18383d37e476",
-        "slicerRegistryPolicy": "0x22991f881ef61d0c3fe5768a1988651594d9ea84ccaa3778e2247ca69c436fc0",
+        "weightedP256Signer": null,
+        "timelockPolicy": null,
+        "slicerRegistryPolicy": null,
         "authorizationRevocationRegistry": "0x5a93f9fbc9de24c9d2b5fe7e9fd81ac3b59a8bb6919977a844c24227b7d58804"
       },
       "verification": {

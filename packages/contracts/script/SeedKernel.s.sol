@@ -5,7 +5,6 @@ import {Script} from "forge-std/Script.sol";
 import {Erc6492BootstrapFactory} from "../src/factories/Erc6492BootstrapFactory.sol";
 import {SlicerRegistryPolicy} from "../src/policies/SlicerRegistryPolicy.sol";
 import {TimelockPolicy} from "../src/policies/TimelockPolicy.sol";
-import {WeightedECDSASigner} from "../src/signers/WeightedECDSASigner.sol";
 import {WeightedP256Signer} from "../src/signers/WeightedP256Signer.sol";
 
 abstract contract SeedHelpers is Script {
@@ -44,12 +43,11 @@ contract SeedKernelScript is SeedHelpers {
     address private constant KERNEL_RATE_LIMIT_POLICY = 0xf63d4139B25c836334edD76641356c6b74C86873;
     address private constant AUTHORIZATION_REVOCATION_REGISTRY = 0xB2A9330825D6AabBf7Cc7004Bc0916291C3322AD;
 
-    bytes32 private constant SLICE_WEIGHTED_ECDSA_SIGNER_SALT = keccak256("slice.kernel.weighted-ecdsa-signer.v1");
     bytes32 private constant SLICE_WEIGHTED_P256_SIGNER_SALT = keccak256("slice.kernel.weighted-p256-signer.v1");
     bytes32 private constant SLICE_TIMELOCK_POLICY_SALT = keccak256("slice.kernel.timelock-policy.v1");
     bytes32 private constant SLICE_SLICER_REGISTRY_POLICY_SALT = keccak256("slice.kernel.slicer-registry-policy.v1");
     bytes32 private constant SLICE_ERC6492_BOOTSTRAP_FACTORY_SALT =
-        keccak256("slice.kernel.erc6492-bootstrap-factory.v2");
+        keccak256("slice.kernel.erc6492-bootstrap-factory.v1");
 
     function _deployReleaseContract(string memory manifest, string memory path, address expected) private {
         if (expected.code.length != 0) return;
@@ -69,9 +67,6 @@ contract SeedKernelScript is SeedHelpers {
     }
 
     function run() external {
-        address sliceWeightedEcdsaSigner = vm.computeCreate2Address(
-            SLICE_WEIGHTED_ECDSA_SIGNER_SALT, keccak256(type(WeightedECDSASigner).creationCode)
-        );
         address sliceWeightedP256Signer =
             vm.computeCreate2Address(SLICE_WEIGHTED_P256_SIGNER_SALT, keccak256(type(WeightedP256Signer).creationCode));
         address sliceTimelockPolicy =
@@ -118,9 +113,6 @@ contract SeedKernelScript is SeedHelpers {
             _setCode(targets[i], runtimeCodes[i]);
         }
         if (revocationRegistryCode.length != 0) _setCode(AUTHORIZATION_REVOCATION_REGISTRY, revocationRegistryCode);
-        _deployLocalContract(
-            SLICE_WEIGHTED_ECDSA_SIGNER_SALT, type(WeightedECDSASigner).creationCode, sliceWeightedEcdsaSigner
-        );
         _deployLocalContract(
             SLICE_WEIGHTED_P256_SIGNER_SALT, type(WeightedP256Signer).creationCode, sliceWeightedP256Signer
         );

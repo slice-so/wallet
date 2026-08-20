@@ -36,10 +36,10 @@ contract Erc6492BootstrapFactoryTest is Test {
     }
 
     function testPinsCanonicalDeploymentAddress() public view {
-        bytes32 salt = keccak256("slice.kernel.erc6492-bootstrap-factory.v2");
+        bytes32 salt = keccak256("slice.kernel.erc6492-bootstrap-factory.v1");
         assertEq(
             vm.computeCreate2Address(salt, keccak256(type(Erc6492BootstrapFactory).creationCode)),
-            0x4765Db45368788d3e07A9F756c13D948C32e6ed9
+            0x776D66A5889CEEf1A85deCB9c40e43C36c829d97
         );
     }
 }
