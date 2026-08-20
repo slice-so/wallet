@@ -33,8 +33,8 @@ It deliberately does not own:
 - Wagmi connectors, Wagmi permission actions, application authentication,
   delegated API sessions, or identity UI — those belong to `@slicekit/id`;
 - Solidity modules and deployment facts — those live in the sibling
-  [`contracts`](https://github.com/slice-so/wallet/tree/main/contracts) project
-  in the public Wallet repository.
+  [`contracts`](https://github.com/slice-so/wallet/tree/main/packages/contracts)
+  project in the public Wallet repository.
 
 Install this package directly when building a wallet host, Slice ID signer
 surface, recovery surface, custom provider/Viem integration, or wallet

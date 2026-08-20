@@ -70,7 +70,7 @@ when all authority-specific deployment evidence is complete.
 
 ## Development
 
-From the public Wallet repository root:
+From this directory:
 
 ```bash
 forge soldeer install
@@ -78,11 +78,10 @@ forge build
 forge test
 ```
 
-Or run `forge soldeer install`, `forge build`, and `forge test` directly from
-this directory. Foundry-generated `dependencies/`, `cache/`, `out/`, and
-`broadcast/` directories are not exported by the repository sync.
+Foundry-generated `dependencies/`, `cache/`, `out/`, and `broadcast/`
+directories are not exported by the repository sync.
 
 ## License
 
-The Solidity project is available under the [MIT License](./LICENSE). The npm
-packages at the repository root retain their Apache-2.0-or-MIT dual license.
+The Solidity project is available under the [MIT License](./LICENSE). The
+TypeScript package retains its Apache-2.0-or-MIT dual license.
