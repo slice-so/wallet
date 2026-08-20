@@ -1,5 +1,62 @@
 # @slicekit/wallet
 
+## 0.1.0
+### Minor Changes
+
+
+
+- [`a8dbf83`](https://github.com/slice-so/monorepo/commit/a8dbf83de625cabb976d35c374c77e8938e94138) Thanks [@jacopo-eth](https://github.com/jacopo-eth)! - Upgrade Slice Wallet to Kernel v4 on EntryPoint v0.9 without ZeroDev SDKs.
+  
+  - `@slicekit/wallet-primitives`: new `@slicekit/wallet-primitives/kernel` entry
+    owning the Kernel v4 ABIs and constants, deployment profiles
+    (`slice-kernel-v4-ep09-r1`), factory/proxy address derivation, install-package,
+    nonce and permission encoding, permission install state, and the
+    `InstallPackages` typed data. Permission enable/revocation builders, account
+    prediction, recovery init config, and factory validation now encode Kernel v4
+    installs; `buildSliceWalletPermissionEnableTypedData` takes `enableNonce` and
+    frame sessions/execution descriptors carry `enableNonce`. The
+    `@zerodev/permissions` dependency is gone. Adds the ERC-7677 paymaster request
+    parser and `sliceKernelConfig` to `@slicekit/wallet-primitives/execution`.
+  - `@slicekit/wallet`: Kernel v4 `SmartAccount` implementation with ERC-7739
+    signature wrapping and ERC-6492 bootstrap, weighted P-256 and WebAuthn
+    modular signers, rewritten recovery/permission accounts, deployment-profile
+    aware registration (`factoryVersion`), `allowCdpFallback` for the bundler,
+    explicit paymaster upstreams, and no `@zerodev/*` dependencies. Protocol
+    builders moved to `@slicekit/wallet-primitives` are no longer exported here.
+  - `@slicekit/id`: the React provider treats the new `unavailable` wallet status
+    as not connected.
+
+
+- [`a8dbf83`](https://github.com/slice-so/monorepo/commit/a8dbf83de625cabb976d35c374c77e8938e94138) Thanks [@jacopo-eth](https://github.com/jacopo-eth)! - Shared-domain ownership refactor for the public Slice repositories.
+  
+  - `@slicekit/commerce` (new): the commerce domain model previously spread across
+    the internal `@slicekit/common` package — types, value sets, pricing math and
+    formatting policy, currency/country rules, order status rules, metadata
+    schemas, protocol constants, and the product category taxonomy
+    (`@slicekit/commerce/categories`).
+  - `@slicekit/abi`: new `@slicekit/abi/deployments` entry with chain ids,
+    commerce and hook deployment facts, token addresses, wagmi contract configs,
+    and hook-manifest lookups generated from canonical JSON inputs.
+  - `@slicekit/core`: domain types and helpers now come from `@slicekit/commerce`
+    and contract configs from `@slicekit/abi/deployments`; the package no longer
+    re-exports them. The API client resolves the Slice API base URL itself.
+  - `@slicekit/react`: pagination types come from `@slicekit/commerce`.
+  - `@slicekit/wallet-primitives` (renamed from `@slicekit/wallet-protocol`):
+    adds app-permission, root/permission authorization, factory validation,
+    execution grant, chain policy and allowance primitives.
+  - `@slicekit/wallet`: no longer re-exports primitives; import them from
+    `@slicekit/wallet-primitives`. The `./policy` subpath is removed.
+  - `@slicekit/id-primitives` (new): delegation contracts, server verifier,
+    session primitives and server-safe types split out of `@slicekit/id`.
+  - `@slicekit/id`: keeps the browser client, React, wagmi and Next integrations;
+    `./delegation` and `./server` moved to `@slicekit/id-primitives`.
+  - `@slicekit/erc8128`: adds `assertErc8128PrivateKey`.
+
+### Patch Changes
+
+- Updated dependencies [[`711a498`](https://github.com/slice-so/monorepo/commit/711a498c2566732166a36d8b2e8371491d475143)]:
+  - @slicekit/wallet-primitives@0.1.1
+
 ## 0.0.2
 ### Patch Changes
 

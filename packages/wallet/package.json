@@ -1,6 +1,6 @@
 {
   "name": "@slicekit/wallet",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "description": "Self-custodial passkey smart wallet SDK: Kernel v4 accounts, scoped app permissions, promptless checkout, EIP-1193/6963/5792 provider and wagmi connector",
   "license": "(MIT OR Apache-2.0)",
   "type": "module",
