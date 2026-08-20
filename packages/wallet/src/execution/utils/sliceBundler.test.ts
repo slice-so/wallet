@@ -46,8 +46,7 @@ import {
   handleSliceBundlerRequest
 } from "./sliceBundler"
 
-const cdpApiKey = "key_123"
-const bundlerUrl = `https://api.developer.coinbase.com/rpc/v1/base/${cdpApiKey}`
+const bundlerUrl = "https://bundler.example/rpc"
 const sender = "0x0000000000000000000000000000000000000001" satisfies Address
 const productsModuleAddress = getProductsModuleAddress(base.id)
 const arbitraryTargetAddress =
@@ -241,7 +240,7 @@ const handleTestBundlerRequest = (
     Partial<Pick<HandleSliceBundlerRequestOptions, "fetchSlicer">>
 ) =>
   handleSliceBundlerRequest(request, {
-    allowCdpFallback: true,
+    bundlerRpcUrl: bundlerUrl,
     fetchSlicer: unexpectedSlicerValidationFetch(),
     ...options
   })
@@ -323,49 +322,33 @@ describe("slice bundler", () => {
     })
   })
 
-  it("resolves bundler URLs through the shared environment policy", () => {
-    expect(getSliceBundlerRpcUrl({ allowCdpFallback: true, cdpApiKey })).toBe(
+  it("validates application-resolved bundler URLs", () => {
+    expect(getSliceBundlerRpcUrl({ bundlerRpcUrl: bundlerUrl })).toBe(
       bundlerUrl
     )
-    expect(
-      getSliceBundlerRpcUrl({ allowCdpFallback: true, cdpApiKey: "  " })
-    ).toBeNull()
-    expect(getSliceBundlerRpcUrl({ cdpApiKey })).toBeNull()
+    expect(getSliceBundlerRpcUrl({ bundlerRpcUrl: "  " })).toBeNull()
+    expect(getSliceBundlerRpcUrl({})).toBeNull()
     expect(getSliceBundlerRpcUrl({ chainId: 31_337 })).toBe(
       "http://localhost:4337"
     )
-    expect(
+    expect(() =>
       getSliceBundlerRpcUrl({
-        cdpApiKey,
-        chainId: 10,
-        serializedBundlerRpcUrls: JSON.stringify({
-          10: "https://optimism-bundler.example/rpc"
-        })
+        bundlerRpcUrl: "http://remote-bundler.example",
+        chainId: 10
       })
-    ).toBe("https://optimism-bundler.example/rpc")
+    ).toThrow("Slice bundler RPC URL is not permitted.")
     expect(
       getSliceBundlerRpcUrl({
         bundlerRpcUrl: "https://custom-bundler.example/rpc",
-        cdpApiKey,
         chainId: 8453
       })
     ).toBe("https://custom-bundler.example/rpc")
-    expect(getSliceBundlerRpcUrl({ cdpApiKey, chainId: 10 })).toBeNull()
-    expect(() =>
-      getSliceBundlerRpcUrl({
-        cdpApiKey,
-        chainId: 10,
-        serializedBundlerRpcUrls: JSON.stringify({
-          10: "http://remote-bundler.example"
-        })
-      })
-    ).toThrow("Slice bundler RPC URL is not permitted.")
     expect(getSliceBundlerApiUrl("https://shop.test")).toBe(
       "https://shop.test/api/bundler"
     )
   })
 
-  it("forwards to the bundlerRpcUrl override instead of CDP when configured", async () => {
+  it("forwards to the configured bundler RPC URL", async () => {
     const overrideUrl = "http://localhost:4337"
     const callData = encodeSmartWalletExecute({
       target: productsModuleAddress,
@@ -391,7 +374,6 @@ describe("slice bundler", () => {
       }),
       {
         bundlerRpcUrl: overrideUrl,
-        cdpApiKey,
         fetchBundler
       }
     )
@@ -435,7 +417,7 @@ describe("slice bundler", () => {
           method: "POST"
         }),
         {
-          cdpApiKey,
+          bundlerRpcUrl: bundlerUrl,
           fetchBundler
         }
       )
@@ -472,6 +454,7 @@ describe("slice bundler", () => {
       }),
       {
         acceptedChainIds: [anvil.id],
+        bundlerRpcUrl: undefined,
         chainId: anvil.id,
         fetchBundler
       }
@@ -497,7 +480,6 @@ describe("slice bundler", () => {
       {
         authorizeUserOperation,
         bundlerRpcUrl: "https://optimism-bundler.example/rpc",
-        cdpApiKey,
         chainId: 10,
         fetchBundler: mock(async () =>
           Response.json({ id: 1, jsonrpc: "2.0", result: userOperationHash })
@@ -553,7 +535,7 @@ describe("slice bundler", () => {
           method: "POST"
         }),
         {
-          cdpApiKey,
+          bundlerRpcUrl: bundlerUrl,
           fetchBundler
         }
       )
@@ -590,7 +572,7 @@ describe("slice bundler", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        bundlerRpcUrl: bundlerUrl,
         fetchBundler,
         onUpstreamError
       }
@@ -634,7 +616,7 @@ describe("slice bundler", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        bundlerRpcUrl: bundlerUrl,
         fetchBundler,
         onUpstreamError
       }
@@ -668,7 +650,7 @@ describe("slice bundler", () => {
           method: "POST"
         }),
         {
-          cdpApiKey,
+          bundlerRpcUrl: bundlerUrl,
           fetchBundler
         }
       )
@@ -723,7 +705,7 @@ describe("slice bundler", () => {
           method: "POST"
         }),
         {
-          cdpApiKey,
+          bundlerRpcUrl: bundlerUrl,
           fetchBundler
         }
       )
@@ -758,7 +740,7 @@ describe("slice bundler", () => {
         body: JSON.stringify(body),
         method: "POST"
       }),
-      { authorizeUserOperation, cdpApiKey, fetchBundler }
+      { authorizeUserOperation, bundlerRpcUrl: bundlerUrl, fetchBundler }
     )
 
     expect(response.status).toBe(200)
@@ -789,7 +771,7 @@ describe("slice bundler", () => {
       {
         acceptUserOperation,
         authorizeUserOperation: () => true,
-        cdpApiKey,
+        bundlerRpcUrl: bundlerUrl,
         fetchBundler
       }
     )
@@ -924,7 +906,7 @@ describe("slice bundler", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        bundlerRpcUrl: bundlerUrl,
         fetchBundler,
         fetchSenderAccount
       }
@@ -958,7 +940,7 @@ describe("slice bundler", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        bundlerRpcUrl: bundlerUrl,
         fetchBundler,
         fetchSenderAccount
       }
@@ -992,7 +974,7 @@ describe("slice bundler", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        bundlerRpcUrl: bundlerUrl,
         fetchBundler,
         fetchSenderAccount: createSenderAccountFetch(
           kernelSenderAccountSnapshot
@@ -1025,7 +1007,7 @@ describe("slice bundler", () => {
           method: "POST"
         }),
         {
-          cdpApiKey,
+          bundlerRpcUrl: bundlerUrl,
           fetchBundler,
           ...(fetchSenderAccount === undefined ? {} : { fetchSenderAccount })
         }
@@ -1056,7 +1038,7 @@ describe("slice bundler", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        bundlerRpcUrl: bundlerUrl,
         fetchBundler: acceptedFetchBundler,
         fetchSenderAccount: createSenderAccountFetch(
           kernelSenderAccountSnapshot
@@ -1074,7 +1056,7 @@ describe("slice bundler", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        bundlerRpcUrl: bundlerUrl,
         fetchBundler: rejectedFetchBundler,
         fetchSenderAccount: createSenderAccountFetch(
           unknownSenderAccountSnapshot
@@ -1109,7 +1091,7 @@ describe("slice bundler", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        bundlerRpcUrl: bundlerUrl,
         fetchBundler,
         fetchSenderAccount: createSenderAccountFetch(
           undeployedSenderAccountSnapshot
@@ -1138,7 +1120,7 @@ describe("slice bundler", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        bundlerRpcUrl: bundlerUrl,
         fetchBundler
       }
     )
@@ -1163,7 +1145,7 @@ describe("slice bundler", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        bundlerRpcUrl: bundlerUrl,
         fetchBundler
       }
     )
@@ -1187,7 +1169,7 @@ describe("slice bundler", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        bundlerRpcUrl: bundlerUrl,
         fetchBundler
       }
     )
@@ -1213,7 +1195,7 @@ describe("slice bundler", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        bundlerRpcUrl: bundlerUrl,
         fetchBundler
       }
     )
@@ -1222,7 +1204,7 @@ describe("slice bundler", () => {
     expect(fetchBundler).not.toHaveBeenCalled()
   })
 
-  it("returns a JSON-RPC error when CDP is not configured", async () => {
+  it("returns a JSON-RPC error when the bundler is not configured", async () => {
     const body = {
       jsonrpc: "2.0",
       id: 1,
@@ -1237,7 +1219,7 @@ describe("slice bundler", () => {
         method: "POST"
       }),
       {
-        cdpApiKey: " ",
+        bundlerRpcUrl: " ",
         fetchBundler
       }
     )
@@ -1270,7 +1252,7 @@ describe("slice bundler", () => {
         body: JSON.stringify(body),
         method: "POST"
       }),
-      { acceptUserOperation, cdpApiKey, fetchBundler }
+      { acceptUserOperation, bundlerRpcUrl: bundlerUrl, fetchBundler }
     )
 
     expect(response.status).toBe(403)

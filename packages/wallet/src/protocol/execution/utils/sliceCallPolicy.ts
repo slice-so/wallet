@@ -4,9 +4,6 @@
  * envelope concerns belong here. The boundary is enforced by
  * scripts/check-import-boundaries.ts.
  *
- * Executor-related policy facts, such as the CDP Base paymaster being an
- * accepted approval spender, remain policy data and must be reviewed when the
- * executor changes (CDP paymaster today; payer or paymaster-frame later).
  */
 
 import {
@@ -31,7 +28,6 @@ import {
   slice,
   zeroAddress
 } from "viem"
-import { anvil, base } from "viem/chains"
 import { sliceWalletKernelAddresses } from "../../constants"
 import {
   kernelValidationManagementAbi,
@@ -90,9 +86,6 @@ const acceptedKernelSignerModules = [
 const kernelNoHookInstalledSentinel: Address =
   "0x0000000000000000000000000000000000000001"
 
-const cdpBasePaymasterAddress =
-  "0x2FAEB0760D4230Ef2aC21496Bb4F0b47D634FD4c" satisfies Address
-
 const normalizeAddress = (address: string) => address.toLowerCase()
 
 const isAcceptedProductsModuleFunction = (functionName: string) =>
@@ -131,14 +124,14 @@ const isAcceptedSliceCoreCalldata = (data: Hex) => {
 }
 
 const isAcceptedTokenApproval = ({
-  chainId,
+  acceptedTokenApprovalSpenders,
   data,
   fundsModuleAddress,
   productsModuleAddress,
   target,
   value
 }: SliceSmartAccountCall & {
-  chainId: number
+  acceptedTokenApprovalSpenders: readonly Address[]
   fundsModuleAddress: Address
   productsModuleAddress: Address
 }) => {
@@ -152,8 +145,9 @@ const isAcceptedTokenApproval = ({
     return (
       normalizeAddress(spender) === normalizeAddress(productsModuleAddress) ||
       normalizeAddress(spender) === normalizeAddress(fundsModuleAddress) ||
-      ((chainId === base.id || chainId === anvil.id) &&
-        normalizeAddress(spender) === normalizeAddress(cdpBasePaymasterAddress))
+      acceptedTokenApprovalSpenders.some((candidate) =>
+        isAddressEqual(candidate, spender)
+      )
     )
   } catch {
     return false
@@ -313,10 +307,12 @@ const isAcceptedRecoveryTimelockCancelCall = ({
 export const classifySliceSmartAccountCall = (
   call: SliceSmartAccountCall,
   {
+    acceptedTokenApprovalSpenders = [],
     allowAccountAdministration,
     chainId,
     sender
   }: {
+    acceptedTokenApprovalSpenders?: readonly Address[]
     allowAccountAdministration: boolean
     chainId: number
     sender: Address
@@ -356,7 +352,7 @@ export const classifySliceSmartAccountCall = (
   if (
     isAcceptedTokenApproval({
       ...call,
-      chainId,
+      acceptedTokenApprovalSpenders,
       fundsModuleAddress,
       productsModuleAddress
     })
@@ -369,6 +365,7 @@ export const classifySliceSmartAccountCall = (
 export const classifySliceSmartAccountCallsBatch = (
   calls: readonly SliceSmartAccountCall[],
   context: {
+    acceptedTokenApprovalSpenders?: readonly Address[]
     allowAccountAdministration: boolean
     chainId: number
     sender: Address

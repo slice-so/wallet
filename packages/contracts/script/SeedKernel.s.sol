@@ -97,7 +97,7 @@ contract SeedKernelScript is SeedHelpers {
         uint256 localFork;
         if (!seedFromActiveFork) {
             localFork = vm.activeFork();
-            uint256 baseFork = vm.createFork(vm.envOr("RPC_URL_BASE", string("https://mainnet.base.org")));
+            uint256 baseFork = vm.createFork(vm.rpcUrl("base"));
             vm.selectFork(baseFork);
         }
 

@@ -6,11 +6,8 @@ import type {
 } from "../protocol/execution"
 
 export type SliceBundlerRpcUrlParameters = {
-  allowCdpFallback?: boolean
   bundlerRpcUrl?: string
-  cdpApiKey?: string
   chainId?: number
-  serializedBundlerRpcUrls?: string
 }
 export type SliceBundlerRequestOptions = {
   acceptedSenderCode?: readonly SliceAcceptedSenderCode[]

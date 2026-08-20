@@ -1,0 +1,40 @@
+[profile.default]
+bytecode_hash = "none"
+optimizer = true
+optimizer_runs = 1000000
+solc = "0.8.36"
+dynamic_test_linking = true
+libs = ["dependencies"]
+ignored_warnings_from = ["dependencies"]
+
+[profile.ci]
+verbosity = 4
+
+[profile.ci.fuzz]
+runs = 10000
+
+[invariant]
+fail_on_revert = true
+runs = 64
+depth = 100
+shrink_run_limit = 5000
+
+[rpc_endpoints]
+base = "https://base-mainnet.g.alchemy.com/v2/${SLICEGLOBAL_INTERNAL_ALCHEMY_ID}"
+
+[soldeer]
+recursive_deps = true
+remappings_generate = false
+remappings_regenerate = false
+
+[dependencies]
+forge-std = "1.9.7"
+solady = "0.1.26"
+
+[lint]
+ignore = ["dependencies/**/*.sol", "test/**/*.sol"]
+exclude_lints = [
+  "block-timestamp",
+  "mixed-case-function",
+  "mixed-case-variable",
+]

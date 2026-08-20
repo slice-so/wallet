@@ -19,10 +19,11 @@ if [[ -f "${wallet_dir}/.env" ]]; then
   set +a
 fi
 
-if [[ -z "${RPC_URL_BASE:-}" ]]; then
-  echo "RPC_URL_BASE is required." >&2
+if [[ -z "${SLICEGLOBAL_INTERNAL_ALCHEMY_ID:-}" ]]; then
+  echo "SLICEGLOBAL_INTERNAL_ALCHEMY_ID is required." >&2
   exit 1
 fi
+base_rpc_url="https://base-mainnet.g.alchemy.com/v2/${SLICEGLOBAL_INTERNAL_ALCHEMY_ID}"
 
 fork_port="${BASE_FORK_PORT:-8547}"
 fork_url="http://127.0.0.1:${fork_port}"
@@ -43,7 +44,7 @@ kernel_release_manifest_json="$(curl -fsSL \
   forge build src/policies/SlicerRegistryPolicy.sol
 )
 
-anvil --fork-url "${RPC_URL_BASE}" --no-storage-caching --port "${fork_port}" --silent &
+anvil --fork-url "${base_rpc_url}" --no-storage-caching --port "${fork_port}" --silent &
 anvil_pid="$!"
 bundler_pid=""
 

@@ -80,8 +80,7 @@ type TestUserOperationQuantityFields = Partial<
   >
 >
 
-const cdpApiKey = "key_123"
-const paymasterUrl = `https://api.developer.coinbase.com/rpc/v1/base/${cdpApiKey}`
+const paymasterUrl = "https://paymaster.example/rpc"
 const policyBaseUrl = "https://api.slice.so"
 const sender = "0x0000000000000000000000000000000000000001"
 const arbitraryTokenAddress = "0x0000000000000000000000000000000000001234"
@@ -95,7 +94,7 @@ const zeroHash =
   "0x0000000000000000000000000000000000000000000000000000000000000000" satisfies Hex
 const productsModuleAddress = getProductsModuleAddress(base.id)
 const fundsModuleAddress = getFundsModuleAddress(base.id)
-const cdpBasePaymasterAddress =
+const arbitraryApprovalSpender =
   "0x2FAEB0760D4230Ef2aC21496Bb4F0b47D634FD4c" satisfies Address
 const indexedSlicerAddress =
   "0x742d35cc6634c0532925a3b844bc9e7d1333d262" satisfies Address
@@ -419,9 +418,12 @@ const handleTestPaymasterRequest = (
   })
 
 describe("slice paymaster", () => {
-  it("resolves the CDP paymaster URL from the API key", () => {
-    expect(getSlicePaymasterRpcUrl({ cdpApiKey })).toBe(paymasterUrl)
-    expect(getSlicePaymasterRpcUrl({ cdpApiKey: "  " })).toBeNull()
+  it("validates application-resolved paymaster URLs", () => {
+    expect(getSlicePaymasterRpcUrl(paymasterUrl)).toBe(paymasterUrl)
+    expect(getSlicePaymasterRpcUrl("  ")).toBeNull()
+    expect(() => getSlicePaymasterRpcUrl("http://remote.example/rpc")).toThrow(
+      "Slice paymaster RPC URL is not permitted."
+    )
   })
 
   it("forwards valid Slice paymaster requests", async () => {
@@ -452,7 +454,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster
       }
     )
@@ -493,7 +495,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster,
         onUpstreamError
       }
@@ -534,7 +536,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster,
         onUpstreamError
       }
@@ -570,7 +572,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster
       }
     )
@@ -616,7 +618,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster
       }
     )
@@ -655,7 +657,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster,
         fetchSlicer
       }
@@ -681,7 +683,7 @@ describe("slice paymaster", () => {
         body: JSON.stringify(body),
         method: "POST"
       }),
-      { cdpApiKey, fetchPaymaster, fetchSlicer }
+      { paymasterRpcUrl: paymasterUrl, fetchPaymaster, fetchSlicer }
     )
 
     expect(response.status).toBe(403)
@@ -708,7 +710,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster,
         fetchSlicer
       }
@@ -748,7 +750,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster
       }
     )
@@ -810,7 +812,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster
       }
     )
@@ -846,7 +848,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster
       }
     )
@@ -883,7 +885,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster
       }
     )
@@ -896,7 +898,7 @@ describe("slice paymaster", () => {
     const approveCallData = encodeFunctionData({
       abi: erc20Abi,
       functionName: "approve",
-      args: [cdpBasePaymasterAddress, 1n]
+      args: [productsModuleAddress, 1n]
     })
     const body = createPaymasterBody(
       encodeErc7579ExecuteBatch([
@@ -930,7 +932,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster
       }
     )
@@ -956,7 +958,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster
       }
     )
@@ -993,7 +995,7 @@ describe("slice paymaster", () => {
           method: "POST"
         }),
         {
-          cdpApiKey,
+          paymasterRpcUrl: paymasterUrl,
           fetchPaymaster
         }
       )
@@ -1021,7 +1023,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster
       }
     )
@@ -1059,7 +1061,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster
       }
     )
@@ -1097,7 +1099,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         eip7702DelegateAllowlist: [cdpEip7702ProxyAddress],
         fetchPaymaster
       }
@@ -1125,7 +1127,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster
       }
     )
@@ -1152,7 +1154,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         eip7702DelegateAllowlist: [cdpEip7702ProxyAddress],
         fetchPaymaster
       }
@@ -1180,7 +1182,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         eip7702DelegateAllowlist: [untrustedEip7702DelegateAddress],
         fetchPaymaster
       }
@@ -1221,7 +1223,7 @@ describe("slice paymaster", () => {
           method: "POST"
         }),
         {
-          cdpApiKey,
+          paymasterRpcUrl: paymasterUrl,
           fetchPaymaster
         }
       )
@@ -1251,7 +1253,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster
       }
     )
@@ -1287,7 +1289,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         eip7702DelegateAllowlist: [cdpEip7702ProxyAddress],
         fetchPaymaster: allowedFetchPaymaster
       }
@@ -1308,7 +1310,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster: rejectedFetchPaymaster
       }
     )
@@ -1343,7 +1345,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster: acceptedFetchPaymaster
       }
     )
@@ -1362,7 +1364,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster: rejectedFetchPaymaster
       }
     )
@@ -1406,7 +1408,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster
       }
     )
@@ -1444,7 +1446,7 @@ describe("slice paymaster", () => {
       }),
       {
         allowAcceptedPaymentTokens: false,
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster
       }
     )
@@ -1468,7 +1470,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster
       }
     )
@@ -1505,7 +1507,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster
       }
     )
@@ -1559,7 +1561,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster
       }
     )
@@ -1568,11 +1570,11 @@ describe("slice paymaster", () => {
     expect(fetchPaymaster).toHaveBeenCalledTimes(1)
   })
 
-  it("allows ERC20 approval to the CDP paymaster with a Slice call", async () => {
+  it("rejects an arbitrary ERC20 approval even with a Slice call", async () => {
     const approveCallData = encodeFunctionData({
       abi: erc20Abi,
       functionName: "approve",
-      args: [cdpBasePaymasterAddress, 1n]
+      args: [arbitraryApprovalSpender, 1n]
     })
     const body = createPaymasterBody(
       encodeSmartWalletExecuteBatch([
@@ -1586,17 +1588,42 @@ describe("slice paymaster", () => {
         }
       ])
     )
-    const fetchPaymaster = mock(
-      async (input: RequestInfo | URL, init?: RequestInit) => {
-        expect(input).toBe(paymasterUrl)
-        expect(init?.body).toBe(JSON.stringify(body))
+    const fetchPaymaster = mock<typeof fetch>()
 
-        return Response.json({
-          jsonrpc: "2.0",
-          id: 1,
-          result: { paymasterAndData: "0x1234" }
-        })
+    const response = await handleTestPaymasterRequest(
+      new Request("https://shop.test/api/paymaster", {
+        body: JSON.stringify(body),
+        method: "POST"
+      }),
+      {
+        paymasterRpcUrl: paymasterUrl,
+        fetchPaymaster
       }
+    )
+
+    expect(response.status).toBe(403)
+    expect(fetchPaymaster).not.toHaveBeenCalled()
+  })
+
+  it("accepts an application-declared paymaster approval spender with a Slice call", async () => {
+    const body = createPaymasterBody(
+      encodeSmartWalletExecuteBatch([
+        {
+          target: arbitraryTokenAddress,
+          data: encodeFunctionData({
+            abi: erc20Abi,
+            functionName: "approve",
+            args: [arbitraryApprovalSpender, 1n]
+          })
+        },
+        {
+          target: productsModuleAddress,
+          data: encodeSetProductType()
+        }
+      ])
+    )
+    const fetchPaymaster = mock(async () =>
+      Response.json({ jsonrpc: "2.0", id: 1, result: {} })
     )
 
     const response = await handleTestPaymasterRequest(
@@ -1605,7 +1632,8 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        acceptedTokenApprovalSpenders: [arbitraryApprovalSpender],
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster
       }
     )
@@ -1614,11 +1642,11 @@ describe("slice paymaster", () => {
     expect(fetchPaymaster).toHaveBeenCalledTimes(1)
   })
 
-  it("rejects CDP paymaster approval-only requests", async () => {
+  it("rejects arbitrary approval-only requests", async () => {
     const approveCallData = encodeFunctionData({
       abi: erc20Abi,
       functionName: "approve",
-      args: [cdpBasePaymasterAddress, 1n]
+      args: [arbitraryApprovalSpender, 1n]
     })
     const body = createPaymasterBody(
       encodeSmartWalletExecute({
@@ -1634,7 +1662,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster
       }
     )
@@ -1679,7 +1707,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster
       }
     )
@@ -1716,7 +1744,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster,
         fetchSenderAccount
       }
@@ -1747,7 +1775,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster,
         fetchSenderAccount
       }
@@ -1774,7 +1802,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster
       }
     )
@@ -1809,7 +1837,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster,
         fetchSlicer
       }
@@ -1836,7 +1864,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster
       }
     )
@@ -1860,7 +1888,7 @@ describe("slice paymaster", () => {
         method: "POST"
       }),
       {
-        cdpApiKey,
+        paymasterRpcUrl: paymasterUrl,
         fetchPaymaster
       }
     )

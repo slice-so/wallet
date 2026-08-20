@@ -7,7 +7,6 @@ import {
   createSliceSlicerAddressResolver,
   getSliceBundlerRequestUserOperationHash,
   isAcceptedSliceUserOperation,
-  isJsonObject,
   isSliceBundlerUserOperationRequest,
   type JsonValue,
   normalizeSliceBundlerRpcUrl,
@@ -27,13 +26,13 @@ import {
   sliceBundlerRetryRpcCode
 } from "../../protocol/execution"
 import type { SliceBundlerRpcUrlParameters } from "../../types/bundler"
-import { getSlicePaymasterRpcUrl } from "./slicePaymaster"
 
 type SliceBundlerConfig = SliceBundlerRpcUrlParameters & {
   /** Adds a narrower condition after the built-in or replacement policy. */
   acceptUserOperation?: SliceBundlerUserOperationAuthorizer
   acceptedChainIds?: readonly number[]
   acceptedSenderCode?: readonly SliceAcceptedSenderCode[]
+  acceptedTokenApprovalSpenders?: readonly Address[]
   /**
    * Replaces the Slice-commerce call classifier. This is reserved for public
    * wallet transports that validate the canonical account but do not sponsor
@@ -70,49 +69,17 @@ export const sliceBundlerApiPath = "/api/bundler"
 export const sliceAllowanceExceededRpcCode = -32030
 const sliceLocalBundlerRpcUrl = "http://localhost:4337"
 
-const getConfiguredSliceBundlerRpcUrl = (
-  serializedRpcUrls: string | undefined,
-  chainId: number
-) => {
-  if (serializedRpcUrls === undefined || serializedRpcUrls.trim() === "") {
-    return null
-  }
-
-  const parsed = JSON.parse(serializedRpcUrls) as JsonValue
-  if (!isJsonObject(parsed)) {
-    throw new Error("Slice bundler RPC URLs must be an object.")
-  }
-  const configured = parsed[String(chainId)]
-  if (configured === undefined) return null
-  if (typeof configured !== "string") {
-    throw new Error(`Slice bundler RPC URL for chain ${chainId} is invalid.`)
-  }
-  return normalizeSliceBundlerRpcUrl(configured)
-}
-
-/** Resolves every Slice server-side bundler upstream with one policy. */
+/** Validates an application-resolved bundler URL, with a local Anvil default. */
 export const getSliceBundlerRpcUrl = ({
-  allowCdpFallback = false,
   bundlerRpcUrl,
-  cdpApiKey,
-  chainId = base.id,
-  serializedBundlerRpcUrls
+  chainId = base.id
 }: SliceBundlerRpcUrlParameters) => {
-  const chainOverride = getConfiguredSliceBundlerRpcUrl(
-    serializedBundlerRpcUrls,
-    chainId
-  )
-  if (chainOverride !== null) return chainOverride
-
   if (bundlerRpcUrl !== undefined) {
     const override = normalizeSliceBundlerRpcUrl(bundlerRpcUrl)
     if (override !== null) return override
   }
 
   if (chainId === 31_337) return sliceLocalBundlerRpcUrl
-  if (allowCdpFallback && chainId === base.id) {
-    return getSlicePaymasterRpcUrl({ cdpApiKey })
-  }
   return null
 }
 
@@ -124,6 +91,7 @@ const isAcceptedBundlerUserOperationRequest = async (
   {
     acceptedSenderCode,
     acceptedChainIds,
+    acceptedTokenApprovalSpenders,
     acceptUserOperation,
     authorizeUserOperation,
     chainId,
@@ -136,6 +104,7 @@ const isAcceptedBundlerUserOperationRequest = async (
     SliceBundlerConfig,
     | "acceptedSenderCode"
     | "acceptedChainIds"
+    | "acceptedTokenApprovalSpenders"
     | "acceptUserOperation"
     | "authorizeUserOperation"
     | "eip7702DelegateAllowlist"
@@ -158,6 +127,9 @@ const isAcceptedBundlerUserOperationRequest = async (
       ? await isAcceptedSliceUserOperation({
           ...(acceptedChainIds === undefined ? {} : { acceptedChainIds }),
           ...(acceptedSenderCode === undefined ? {} : { acceptedSenderCode }),
+          ...(acceptedTokenApprovalSpenders === undefined
+            ? {}
+            : { acceptedTokenApprovalSpenders }),
           chainId,
           eip7702DelegateAllowlist,
           entryPoint,
@@ -235,13 +207,12 @@ const forwardBundlerRequest = async ({
 export const handleSliceBundlerRequest = async (
   request: Request,
   {
-    allowCdpFallback,
     acceptedSenderCode,
     acceptedChainIds,
+    acceptedTokenApprovalSpenders,
     acceptUserOperation,
     authorizeUserOperation,
     bundlerRpcUrl: bundlerRpcUrlOverride,
-    cdpApiKey,
     chainId = base.id,
     classifyUpstreamError,
     eip7702DelegateAllowlist = [],
@@ -250,8 +221,7 @@ export const handleSliceBundlerRequest = async (
     fetchSlicer,
     onUpstreamError,
     policyBaseUrl,
-    requireVerifiedSender,
-    serializedBundlerRpcUrls
+    requireVerifiedSender
   }: HandleSliceBundlerRequestOptions
 ) => {
   let body: JsonValue
@@ -278,15 +248,10 @@ export const handleSliceBundlerRequest = async (
   let bundlerRpcUrl: string | null
   try {
     bundlerRpcUrl = getSliceBundlerRpcUrl({
-      allowCdpFallback,
       ...(bundlerRpcUrlOverride === undefined
         ? {}
         : { bundlerRpcUrl: bundlerRpcUrlOverride }),
-      cdpApiKey,
-      chainId,
-      ...(serializedBundlerRpcUrls === undefined
-        ? {}
-        : { serializedBundlerRpcUrls })
+      chainId
     })
   } catch {
     bundlerRpcUrl = null
@@ -307,6 +272,9 @@ export const handleSliceBundlerRequest = async (
     !(await isAcceptedBundlerUserOperationRequest(bundlerRequest, {
       ...(acceptedSenderCode === undefined ? {} : { acceptedSenderCode }),
       ...(acceptedChainIds === undefined ? {} : { acceptedChainIds }),
+      ...(acceptedTokenApprovalSpenders === undefined
+        ? {}
+        : { acceptedTokenApprovalSpenders }),
       ...(acceptUserOperation === undefined ? {} : { acceptUserOperation }),
       ...(authorizeUserOperation === undefined
         ? {}

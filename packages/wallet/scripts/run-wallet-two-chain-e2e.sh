@@ -18,11 +18,6 @@ if [[ -f "${sdk_wallet_dir}/.env" ]]; then
   set +a
 fi
 
-if [[ -z "${RPC_URL_BASE:-}" ]]; then
-  echo "RPC_URL_BASE is required to seed the local Kernel deployments." >&2
-  exit 1
-fi
-
 rpc_port_a="${WALLET_E2E_RPC_PORT_A:-8555}"
 rpc_port_b="${WALLET_E2E_RPC_PORT_B:-8556}"
 bundler_port_a="${WALLET_E2E_BUNDLER_PORT_A:-4355}"

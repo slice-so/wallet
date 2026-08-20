@@ -50,8 +50,6 @@ const productsModule = getProductsModuleAddress(base.id)
 const fundsModule = getFundsModuleAddress(base.id)
 const sliceCore = getSliceCoreAddress(base.id)
 const generatedHook = sliceHookAddressList[0] as Address
-const cdpBasePaymaster =
-  "0x2FAEB0760D4230Ef2aC21496Bb4F0b47D634FD4c" satisfies Address
 const recoveryProposalId = `0x${"22".repeat(32)}` as Hex
 const unprivilegedContext = {
   allowAccountAdministration: false,
@@ -220,8 +218,7 @@ describe("classifySliceSmartAccountCall", () => {
   it("accepts approvals only for the exact auxiliary spenders", () => {
     const acceptedSpenders = [
       productsModule,
-      fundsModule,
-      cdpBasePaymaster
+      fundsModule
     ] as const satisfies readonly Address[]
 
     for (const spender of acceptedSpenders) {
@@ -244,6 +241,24 @@ describe("classifySliceSmartAccountCall", () => {
         target: token
       })
     ).toBe("unknown")
+
+    expect(
+      classifySliceSmartAccountCall(
+        {
+          data: encodeFunctionData({
+            abi: erc20Abi,
+            args: [unknownTarget, 1n],
+            functionName: "approve"
+          }),
+          target: token,
+          value: 0n
+        },
+        {
+          ...unprivilegedContext,
+          acceptedTokenApprovalSpenders: [unknownTarget]
+        }
+      )
+    ).toBe("auxiliary")
   })
 
   it("classifies every supported Kernel administration function only for root authority", () => {

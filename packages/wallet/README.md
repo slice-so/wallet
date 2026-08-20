@@ -96,6 +96,13 @@ Server and infrastructure consumers should import only the explicit
 need. The package root is the client/account surface and is not an umbrella
 barrel for server runtimes.
 
+Bundler and paymaster helpers receive fully resolved upstream URLs. Wallet does
+not select or authenticate hosted providers. A host that supports token-funded
+sponsorship may pass that provider's approval addresses through
+`acceptedTokenApprovalSpenders`; Wallet treats those addresses as auxiliary
+approval targets only when the same operation also contains an accepted Slice
+intent.
+
 ## Provider
 
 Use `createSliceWalletProvider()` from `@slicekit/wallet/provider`. The canonical factory fixes the identity origin and all account security metadata; applications may select admitted chains and override only RPC and bundler transports. A request may supply its own ERC-7677 paymaster URL and canonical JSON-compatible context. Applications using Wagmi integrate through `@slicekit/id/wagmi`, which adapts this public provider.

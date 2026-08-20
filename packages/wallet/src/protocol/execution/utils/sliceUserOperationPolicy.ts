@@ -701,6 +701,7 @@ const getSliceUserOperationCalls = ({
 export const isAcceptedSliceUserOperation = async ({
   acceptedSenderCode = defaultAcceptedSenderCode,
   acceptedChainIds = [defaultSliceChainId],
+  acceptedTokenApprovalSpenders = [],
   chainId,
   eip7702DelegateAllowlist = [],
   entryPoint,
@@ -711,6 +712,7 @@ export const isAcceptedSliceUserOperation = async ({
 }: {
   acceptedSenderCode?: readonly SliceAcceptedSenderCode[]
   acceptedChainIds?: readonly number[]
+  acceptedTokenApprovalSpenders?: readonly Address[]
   chainId: string | number
   eip7702DelegateAllowlist?: readonly Address[]
   entryPoint: Address
@@ -754,6 +756,7 @@ export const isAcceptedSliceUserOperation = async ({
   })
   if (calls === null) return false
   const batch = classifySliceSmartAccountCallsBatch(calls, {
+    acceptedTokenApprovalSpenders,
     allowAccountAdministration: isRootValidation,
     chainId: parsedChainId,
     sender: userOperation.sender

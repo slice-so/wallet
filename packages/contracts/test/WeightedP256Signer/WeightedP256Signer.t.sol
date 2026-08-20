@@ -353,7 +353,7 @@ contract WeightedP256SignerTest is Test {
 
 /// @notice End-to-end signature check against Base's real RIP-7212 P-256 verifier (no test double).
 /// @dev Exercises the sha256-wrap -> P256.verifySignature path with real EC math. Gated on
-///      RPC_URL_BASE so a local `forge test` without a Base RPC skips instead of failing.
+///      SLICEGLOBAL_INTERNAL_ALCHEMY_ID so local tests without credentials skip.
 contract WeightedP256SignerForkTest is Test {
     using P256VerifierEtcher for Vm;
 
@@ -373,9 +373,9 @@ contract WeightedP256SignerForkTest is Test {
     address private coSigner;
 
     function setUp() public {
-        string memory rpc = vm.envOr("RPC_URL_BASE", string(""));
-        if (bytes(rpc).length == 0) return;
-        vm.createSelectFork(rpc);
+        string memory alchemyId = vm.envOr("SLICEGLOBAL_INTERNAL_ALCHEMY_ID", string(""));
+        if (bytes(alchemyId).length == 0) return;
+        vm.createSelectFork(vm.rpcUrl("base"));
         vm.etchBaseVerifier();
         signer = new WeightedP256SignerHarness();
         (sessionX, sessionY) = vm.publicKeyP256(SESSION_PRIVATE_KEY);
