@@ -2,8 +2,9 @@
 
 Slice Wallet is a self-custodial smart wallet rooted in a passkey. A WebAuthn
 credential controls a Kernel v4 account on ERC-4337 EntryPoint v0.9, with the
-same counterfactual address on Ethereum, OP Mainnet, Base, and Arbitrum One —
-no seed phrase, no root EOA, no vendor SDKs.
+same counterfactual address on Ethereum, OP Mainnet, Base, and Arbitrum One.
+There is no root EOA behind the passkey, and no wallet vendor underneath: the
+account stack uses no ZeroDev or other third-party wallet-infrastructure SDKs.
 
 What sets it apart:
 
