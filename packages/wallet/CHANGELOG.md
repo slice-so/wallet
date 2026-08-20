@@ -1,5 +1,13 @@
 # @slicekit/wallet
 
+## 0.0.2
+### Patch Changes
+
+- Updated dependencies [[`ce26fc0`](https://github.com/slice-so/monorepo/commit/ce26fc084603fc18de759762673d1c7b2dd219c3)]:
+  - @slicekit/abi@0.1.0
+  - @slicekit/erc8128@0.4.1
+  - @slicekit/wallet-primitives@0.1.0
+
 ## 0.0.1
 ### Patch Changes
 
