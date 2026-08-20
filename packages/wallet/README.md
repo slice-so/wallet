@@ -29,6 +29,15 @@ Kernel v4 encoding — lives in
 [`@slicekit/wallet-primitives`](../wallet-primitives), so servers verify
 exactly the bytes this SDK signs.
 
+## Installation
+
+```bash
+npm install @slicekit/wallet
+```
+
+The `react` and `wagmi` entry points additionally require their peer
+dependencies (`react`, `wagmi`, `@wagmi/core`, `@tanstack/react-query`).
+
 ## Security Boundary
 
 - Root passkey operations run only in a visible trusted ceremony.
