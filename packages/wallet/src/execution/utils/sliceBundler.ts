@@ -1,3 +1,5 @@
+import type { Address, Hex } from "viem"
+import { base } from "viem/chains"
 import {
   classifyAltoBundlerRetryReason,
   createJsonRpcError,
@@ -10,6 +12,7 @@ import {
   type JsonValue,
   normalizeSliceBundlerRpcUrl,
   parseSliceBundlerRequest,
+  readUpstreamJsonRpcError,
   type SliceAcceptedSenderCode,
   type SliceBundlerMethod,
   type SliceBundlerRequest,
@@ -22,12 +25,9 @@ import {
   type SliceUserOperationPolicyFetch,
   sliceBundlerRetryDataCode,
   sliceBundlerRetryRpcCode
-} from "@slicekit/wallet-primitives/execution"
-import type { Address, Hex } from "viem"
-import { base } from "viem/chains"
+} from "../../protocol/execution"
 import type { SliceBundlerRpcUrlParameters } from "../../types/bundler"
 import { getSlicePaymasterRpcUrl } from "./slicePaymaster"
-import { readUpstreamJsonRpcError } from "./sliceUserOperationTransport"
 
 type SliceBundlerConfig = SliceBundlerRpcUrlParameters & {
   /** Adds a narrower condition after the built-in or replacement policy. */
@@ -68,12 +68,6 @@ export const sliceBundlerApiPath = "/api/bundler"
 
 /** Session-key checkout budget error code surfaced by the co-sign endpoint. */
 export const sliceAllowanceExceededRpcCode = -32030
-export {
-  classifyAltoBundlerRetryReason,
-  sliceBundlerRetryDataCode,
-  sliceBundlerRetryRpcCode
-} from "@slicekit/wallet-primitives/execution"
-
 const sliceLocalBundlerRpcUrl = "http://localhost:4337"
 
 const getConfiguredSliceBundlerRpcUrl = (

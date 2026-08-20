@@ -2,29 +2,6 @@ import { describe, expect, it, mock } from "bun:test"
 import { productsModuleAbi } from "@slicekit/abi"
 import { getProductsModuleAddress } from "@slicekit/abi/deployments"
 import {
-  coinbaseSmartWalletExecutionAbi,
-  erc7579AccountExecutionAbi,
-  erc7579BatchExecutionAbiParameters,
-  isAcceptedSliceIdSecurityOperationUserOperation,
-  isAcceptedSliceIdUserFundedRegistryOperationUserOperation,
-  isAcceptedSliceRecoveryCancellationUserOperation,
-  isAcceptedSliceWalletSenderUserOperation,
-  kernelTimelockPolicyCancelAbi,
-  type SliceSenderAccountSnapshot,
-  type SliceUserOperation,
-  sliceIdAuthorizationRevocationRegistryAddress,
-  sliceKernelAddresses,
-  sliceKernelSenderCode,
-  sliceKernelTimelockPolicyAddress,
-  sliceKernelWebAuthnValidatorAddress,
-  sliceWalletKernelAddresses
-} from "@slicekit/wallet-primitives"
-import {
-  kernelFactoryAbi,
-  kernelPermissionExecuteSelector,
-  kernelValidationManagementAbi
-} from "@slicekit/wallet-primitives/kernel"
-import {
   type Address,
   concat,
   encodeAbiParameters,
@@ -34,18 +11,39 @@ import {
   keccak256,
   numberToHex,
   pad,
-  zeroAddress,
-  zeroHash
+  zeroAddress
 } from "viem"
 import { entryPoint09Address } from "viem/account-abstraction"
 import { anvil, base } from "viem/chains"
 import {
   classifyAltoBundlerRetryReason,
-  getSliceBundlerApiUrl,
-  getSliceBundlerRpcUrl,
-  handleSliceBundlerRequest,
   sliceBundlerRetryDataCode,
   sliceBundlerRetryRpcCode
+} from "../../protocol/execution"
+import {
+  coinbaseSmartWalletExecutionAbi,
+  erc7579AccountExecutionAbi,
+  erc7579BatchExecutionAbiParameters,
+  isAcceptedSliceRecoveryCancellationUserOperation,
+  isAcceptedSliceWalletSenderUserOperation,
+  kernelTimelockPolicyCancelAbi,
+  type SliceSenderAccountSnapshot,
+  type SliceUserOperation,
+  sliceKernelAddresses,
+  sliceKernelSenderCode,
+  sliceKernelTimelockPolicyAddress,
+  sliceKernelWebAuthnValidatorAddress,
+  sliceWalletKernelAddresses
+} from "../../protocol/index"
+import {
+  kernelFactoryAbi,
+  kernelPermissionExecuteSelector,
+  kernelValidationManagementAbi
+} from "../../protocol/kernel"
+import {
+  getSliceBundlerApiUrl,
+  getSliceBundlerRpcUrl,
+  handleSliceBundlerRequest
 } from "./sliceBundler"
 
 const cdpApiKey = "key_123"
@@ -1348,147 +1346,6 @@ describe("recovery cancellation user-operation policy", () => {
           target: sliceKernelTimelockPolicyAddress
         })
       )
-    ).toBe(false)
-  })
-})
-
-describe("Slice ID security-operation policy", () => {
-  const accepts = (callData: Hex, nonce = permissionValidationNonce) =>
-    isAcceptedSliceIdSecurityOperationUserOperation({
-      chainId: base.id,
-      userOperation: createBundlerUserOperation(callData, { nonce })
-    })
-
-  it("accepts device-authorized validation lifecycle calls on the sender", () => {
-    expect(
-      accepts(
-        encodeErc7579ExecuteBatch([
-          { data: encodeInstallPermission(), target: sender },
-          { data: encodeInstallNonceCheckpoint(), target: sender }
-        ])
-      )
-    ).toBe(true)
-  })
-
-  it("accepts direct self-administration only for root validation", () => {
-    expect(accepts(encodeInstallNonceCheckpoint(), rootValidationNonce)).toBe(
-      true
-    )
-    expect(
-      accepts(encodeInstallNonceCheckpoint(), permissionValidationNonce)
-    ).toBe(false)
-  })
-
-  it("rejects sponsored administration targeting another account", () => {
-    expect(
-      accepts(
-        encodeSmartWalletExecute({
-          data: encodeUninstallPermission(),
-          target: arbitraryTargetAddress
-        })
-      )
-    ).toBe(false)
-  })
-})
-
-describe("Slice ID user-funded revocation policy", () => {
-  const registryAbi = [
-    {
-      inputs: [{ name: "authorizationId", type: "bytes32" }],
-      name: "revoke",
-      outputs: [],
-      stateMutability: "nonpayable",
-      type: "function"
-    },
-    {
-      inputs: [],
-      name: "advanceEpoch",
-      outputs: [{ name: "newEpoch", type: "uint64" }],
-      stateMutability: "nonpayable",
-      type: "function"
-    },
-    {
-      inputs: [
-        { name: "root", type: "address" },
-        { name: "authorizationId", type: "bytes32" },
-        { name: "signature", type: "bytes" }
-      ],
-      name: "revokeBySig",
-      outputs: [],
-      stateMutability: "nonpayable",
-      type: "function"
-    }
-  ] as const
-  const revokeData = encodeFunctionData({
-    abi: registryAbi,
-    args: [zeroHash],
-    functionName: "revoke"
-  })
-  const accepts = ({
-    callData = encodeErc7579ExecuteBatch([
-      {
-        data: revokeData,
-        target: sliceIdAuthorizationRevocationRegistryAddress
-      }
-    ]),
-    chainId = 31_337,
-    nonce = rootValidationNonce
-  }: {
-    callData?: Hex
-    chainId?: number
-    nonce?: Hex
-  } = {}) =>
-    isAcceptedSliceIdUserFundedRegistryOperationUserOperation({
-      chainId,
-      userOperation: createBundlerUserOperation(callData, { nonce })
-    })
-
-  it("accepts only root-validated registry calls on the authority chain", () => {
-    expect(accepts()).toBe(true)
-    expect(accepts({ chainId: 1 })).toBe(true)
-    expect(accepts({ chainId: base.id })).toBe(true)
-    expect(accepts({ chainId: 10 })).toBe(true)
-    expect(accepts({ chainId: 42161 })).toBe(true)
-    expect(accepts({ chainId: 137 })).toBe(false)
-    expect(accepts({ nonce: permissionValidationNonce })).toBe(false)
-  })
-
-  it("rejects relayed, mixed, and oversized batches", () => {
-    const revokeBySig = encodeFunctionData({
-      abi: registryAbi,
-      args: [sender, zeroHash, "0x"],
-      functionName: "revokeBySig"
-    })
-    expect(
-      accepts({
-        callData: encodeErc7579ExecuteBatch([
-          {
-            data: revokeBySig,
-            target: sliceIdAuthorizationRevocationRegistryAddress
-          }
-        ])
-      })
-    ).toBe(false)
-    expect(
-      accepts({
-        callData: encodeErc7579ExecuteBatch([
-          {
-            data: revokeData,
-            target: sliceIdAuthorizationRevocationRegistryAddress
-          },
-          { data: "0x", target: arbitraryTargetAddress }
-        ])
-      })
-    ).toBe(false)
-    expect(
-      accepts({
-        callData: encodeErc7579ExecuteBatch(
-          Array.from({ length: 11 }, () => ({
-            data: revokeData,
-            target: sliceIdAuthorizationRevocationRegistryAddress
-          }))
-        )
-      })
     ).toBe(false)
   })
 })

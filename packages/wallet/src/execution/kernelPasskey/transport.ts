@@ -1,8 +1,3 @@
-import { sliceKernelConfig } from "@slicekit/wallet-primitives"
-import {
-  type SliceBundlerRetryReason,
-  sliceKernelPasskeyBackend
-} from "@slicekit/wallet-primitives/execution"
 import {
   type Address,
   BaseError,
@@ -23,6 +18,13 @@ import {
   type UserOperation
 } from "viem/account-abstraction"
 import { base } from "viem/chains"
+import {
+  type SliceBundlerRetryReason,
+  sliceBundlerRetryDataCode,
+  sliceBundlerRetryRpcCode,
+  sliceKernelPasskeyBackend
+} from "../../protocol/execution"
+import { sliceKernelConfig } from "../../protocol/index"
 import type {
   CreateSliceKernelPasskeyBundlerClient,
   CreateSliceKernelPasskeyPaymasterClient,
@@ -34,10 +36,6 @@ import type {
   SliceKernelPasskeyPaymasterClient
 } from "../../types/accountClient"
 import { SliceAccountClientExecutionError } from "../utils/sliceAccountClient"
-import {
-  sliceBundlerRetryDataCode,
-  sliceBundlerRetryRpcCode
-} from "../utils/sliceBundler"
 
 type SliceKernelPasskeyPrepareUserOperationParameters = {
   account: SmartAccount

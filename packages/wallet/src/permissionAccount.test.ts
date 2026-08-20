@@ -1,14 +1,14 @@
 import { describe, expect, test } from "bun:test"
+import { createPublicClient, custom, decodeFunctionData } from "viem"
+import { base } from "viem/chains"
+import { isSliceWalletPermissionInstalled } from "./permissionAccount"
 import {
   buildSliceWalletPermissionInstallCalls,
   buildSliceWalletPermissionRevocationCalls,
   createNativeTransferCallRule,
   type SliceWalletFrameSession
-} from "@slicekit/wallet-primitives"
-import { kernelAccountAbi } from "@slicekit/wallet-primitives/kernel"
-import { createPublicClient, custom, decodeFunctionData } from "viem"
-import { base } from "viem/chains"
-import { isSliceWalletPermissionInstalled } from "./permissionAccount"
+} from "./protocol/index"
+import { kernelAccountAbi } from "./protocol/kernel"
 
 const signer = "0x1111111111111111111111111111111111111111" as const
 const account = "0x2222222222222222222222222222222222222222" as const

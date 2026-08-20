@@ -1,19 +1,3 @@
-import type {
-  SliceKernelPermission,
-  SliceWalletFrameSession,
-  SliceWalletFrameSessionKey
-} from "@slicekit/wallet-primitives"
-import {
-  encodeKernelEnableSignature,
-  encodeKernelPermissionSignature,
-  getKernelPermissionInstallState,
-  getKernelPermissionInstalls,
-  resolveSliceWalletDeployment
-} from "@slicekit/wallet-primitives/kernel"
-import {
-  getWalletPermissionId,
-  toWalletPermissionPolicies
-} from "@slicekit/wallet-primitives/policy"
 import {
   type Address,
   concat,
@@ -29,6 +13,22 @@ import {
   toSliceWalletWebAuthnSessionSigner,
   toWeightedP256Signer
 } from "./permissionSigners"
+import type {
+  SliceKernelPermission,
+  SliceWalletFrameSession,
+  SliceWalletFrameSessionKey
+} from "./protocol/index"
+import {
+  encodeKernelEnableSignature,
+  encodeKernelPermissionSignature,
+  getKernelPermissionInstallState,
+  getKernelPermissionInstalls,
+  resolveSliceWalletDeployment
+} from "./protocol/kernel"
+import {
+  getWalletPermissionId,
+  toWalletPermissionPolicies
+} from "./protocol/policy"
 import { createSliceWalletRootValidator } from "./rootValidator"
 import type { SliceWalletUnsignedUserOperation } from "./types/frame"
 import type { CreateSliceWalletPermissionAccountParameters } from "./types/permission"

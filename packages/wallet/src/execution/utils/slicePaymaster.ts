@@ -1,3 +1,4 @@
+import type { Address } from "viem"
 import {
   createJsonRpcError,
   createSliceProxyResponse as createProxyResponse,
@@ -7,6 +8,7 @@ import {
   isSupportedSliceAcceptedPaymentTokensRequest,
   type JsonValue,
   parseSlicePaymasterRequest,
+  readUpstreamJsonRpcError,
   type SliceAcceptedSenderCode,
   type SliceJsonRpcId,
   type SlicePaymasterMethod,
@@ -18,9 +20,7 @@ import {
   type SliceUserOperationPolicyFetch,
   slicePaymasterAcceptedPaymentTokensMethod,
   sliceUserOperationPolicyDescription
-} from "@slicekit/wallet-primitives/execution"
-import type { Address } from "viem"
-import { readUpstreamJsonRpcError } from "./sliceUserOperationTransport"
+} from "../../protocol/execution"
 
 type SlicePaymasterConfig = {
   acceptUserOperation?: (input: {

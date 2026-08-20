@@ -1,9 +1,9 @@
 import { describe, expect, it } from "bun:test"
+import type { Address } from "viem"
 import {
   createErc20TransferCallRule,
   type SliceWalletProtocolValue
-} from "@slicekit/wallet-primitives"
-import type { Address } from "viem"
+} from "../protocol/index"
 import { parseSliceWalletFrameRequest } from "./protocol"
 
 const account = "0x1000000000000000000000000000000000000001" as Address

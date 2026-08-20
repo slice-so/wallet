@@ -1,6 +1,6 @@
-import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives"
-import { resolveSliceWalletDeploymentProfileId } from "@slicekit/wallet-primitives/kernel"
 import { type Address, type Hex, hexToBytes, isAddress, isHex } from "viem"
+import type { SliceWalletProtocolValue } from "../protocol/index"
+import { resolveSliceWalletDeploymentProfileId } from "../protocol/kernel"
 import type {
   SliceWalletRecoveryHandoffAuthorizationRequest,
   SliceWalletRecoveryHandoffAuthorizationResponse,

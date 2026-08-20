@@ -1,12 +1,14 @@
-import { assertSliceWalletAccountIndex } from "@slicekit/wallet-primitives"
 import { type Hex, hexToBytes, isHex, keccak256, stringToHex } from "viem"
+import {
+  assertSliceWalletAccountIndex,
+  type RegisterSliceWalletCredentialInput,
+  type SliceWalletCredentialProof,
+  type SliceWalletCredentialRegistrationKind
+} from "./protocol/index"
 import type {
-  RegisterSliceWalletCredentialInput,
   SliceWalletCredentialAccountsChallenge,
   SliceWalletCredentialListAuthorization,
   SliceWalletCredentialListChallenge,
-  SliceWalletCredentialProof,
-  SliceWalletCredentialRegistrationKind,
   SliceWalletRegistryChallenge,
   SliceWalletRegistryCredential
 } from "./types/registry"
@@ -224,7 +226,9 @@ export const createSliceWalletRegistryClient = ({
           method: "POST"
         })
       ),
-    registerCredential: (input: RegisterSliceWalletCredentialInput) =>
+    registerCredential: <Input extends RegisterSliceWalletCredentialInput>(
+      input: Input
+    ) =>
       readJson<SliceWalletRegistryCredential>(
         fetchImpl(url("/v1/registry/credentials"), {
           body: JSON.stringify(input),

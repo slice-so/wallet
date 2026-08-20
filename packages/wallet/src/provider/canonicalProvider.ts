@@ -3,7 +3,6 @@ import type {
   SliceWalletParameters
 } from "../types"
 import { resolveCanonicalSliceWalletConfig } from "./canonicalConfig"
-import { announceSliceWalletProvider } from "./discovery"
 import { createSliceWalletProviderInternal } from "./provider"
 
 export const createSliceWalletProvider = (
@@ -11,26 +10,19 @@ export const createSliceWalletProvider = (
 ): SliceWalletEip1193Provider => {
   const config = resolveCanonicalSliceWalletConfig(parameters)
   const provider = createSliceWalletProviderInternal(config)
-  const stopAnnouncement =
-    config.announce === true
-      ? announceSliceWalletProvider({ provider })
-      : () => {}
 
   return {
     cancelPendingCeremony: provider.cancelPendingCeremony,
-    connectWithSession: provider.connectWithSession,
+    connectWithExtension: provider.connectWithExtension,
     continueInPopup: provider.continueInPopup,
-    destroy: () => {
-      stopAnnouncement()
-      provider.destroy()
-    },
+    destroy: provider.destroy,
     get pendingCeremony() {
       return provider.pendingCeremony
     },
     on: provider.on,
     removeListener: provider.removeListener,
     request: provider.request,
-    requestSession: provider.requestSession,
+    requestExtension: provider.requestExtension,
     subscribePendingCeremony: provider.subscribePendingCeremony,
     switchAccount: provider.switchAccount
   }

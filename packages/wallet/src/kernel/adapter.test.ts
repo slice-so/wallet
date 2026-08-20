@@ -1,19 +1,4 @@
 import { describe, expect, test } from "bun:test"
-import type {
-  SliceKernelPermission,
-  SliceKernelValidator,
-  SliceWalletKernelTypedDataValue
-} from "@slicekit/wallet-primitives"
-import {
-  decodeKernelNonce,
-  encodeKernelPermissionUninstallCalls,
-  getKernelPermissionInstalls,
-  getKernelPermissionNonceKey,
-  getKernelValidatorNonceKey,
-  kernelAccountAbi,
-  kernelEntryPoint,
-  kernelModuleType
-} from "@slicekit/wallet-primitives/kernel"
 import {
   createPublicClient,
   custom,
@@ -23,6 +8,21 @@ import {
 import type { UserOperation } from "viem/account-abstraction"
 import { privateKeyToAccount } from "viem/accounts"
 import { base } from "viem/chains"
+import type {
+  SliceKernelPermission,
+  SliceKernelValidator,
+  SliceWalletKernelTypedDataValue
+} from "../protocol/index"
+import {
+  decodeKernelNonce,
+  encodeKernelPermissionUninstallCalls,
+  getKernelPermissionInstalls,
+  getKernelPermissionNonceKey,
+  getKernelValidatorNonceKey,
+  kernelAccountAbi,
+  kernelEntryPoint,
+  kernelModuleType
+} from "../protocol/kernel"
 import { createKernelV4Account } from "./account"
 import { decodeKernelCalls, encodeKernelCalls } from "./execution"
 import { signKernelMessage, signKernelTypedData } from "./signatures"

@@ -1,14 +1,14 @@
 import { describe, expect, test } from "bun:test"
-import {
-  getWalletPermissionId,
-  serializeWalletPolicyDescriptor
-} from "@slicekit/wallet-primitives"
 import { type Address, type Hex, keccak256 } from "viem"
 import {
   entryPoint09Address,
   getUserOperationHash
 } from "viem/account-abstraction"
-import { getSliceWalletP256SignerId } from "../p256"
+import {
+  getSliceWalletP256SignerId,
+  getWalletPermissionId,
+  serializeWalletPolicyDescriptor
+} from "../protocol/index"
 import type { StoredGenericGrantInstallationUserOperation } from "../types/providerInternal"
 import { parseSliceWalletGrantPermissions } from "./protocol"
 import {

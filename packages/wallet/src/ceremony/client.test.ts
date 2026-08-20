@@ -1,12 +1,12 @@
 import { describe, expect, it, mock } from "bun:test"
+import type { Address, Hex } from "viem"
 import {
   createErc20ApproveCallRule,
   getSliceWalletP256SignerId,
   getWalletPermissionId,
   type SliceWalletPermissionAuthorization,
   type SliceWalletProtocolValue
-} from "@slicekit/wallet-primitives"
-import type { Address, Hex } from "viem"
+} from "../protocol/index"
 import { createSliceWalletCeremonyBroker } from "./broker"
 import {
   authorizeSliceWalletSession,

@@ -1,10 +1,10 @@
-import type { WalletPolicyDescriptor } from "@slicekit/wallet-primitives"
+import type { Address, Hex } from "viem"
 import {
   sliceKernelConfig,
   sliceKernelPasskeyBackend
-} from "@slicekit/wallet-primitives/execution"
-import { assertWalletCallsMatchPolicy } from "@slicekit/wallet-primitives/policy"
-import type { Address, Hex } from "viem"
+} from "../../protocol/execution"
+import type { WalletPolicyDescriptor } from "../../protocol/index"
+import { assertWalletCallsMatchPolicy } from "../../protocol/policy"
 import type {
   SliceAccountClient,
   SliceAccountClientTransport

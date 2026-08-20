@@ -1,5 +1,5 @@
-import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives"
-import { resolveSliceWalletDeploymentProfileId } from "@slicekit/wallet-primitives/kernel"
+import type { SliceWalletProtocolValue } from "../protocol/index"
+import { resolveSliceWalletDeploymentProfileId } from "../protocol/kernel"
 import { formatSliceWalletExistingCredentialAuthorization } from "../registry"
 import type {
   RegisterRecoveredSliceWalletCredentialParameters,

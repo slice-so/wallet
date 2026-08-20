@@ -1,8 +1,5 @@
-import {
-  getSliceWalletChainPolicy,
-  type SliceWalletProtocolValue
-} from "@slicekit/wallet-primitives"
 import { type Address, type Hex, isAddress, isHex, numberToHex } from "viem"
+import { getSliceWalletChainPolicy } from "../protocol/index"
 import type {
   SliceWalletEip1193Provider,
   SliceWalletProviderEventMap,
@@ -30,22 +27,24 @@ type FullProviderRuntime = ReturnType<typeof createSliceWalletProviderRuntime>
 type ProviderRuntime = Omit<
   FullProviderRuntime,
   | "connect"
-  | "connectWithSession"
+  | "connectWithExtension"
   | "getChainRuntime"
-  | "requestSession"
+  | "requestExtension"
   | "switchAccount"
   | "waitForSuccessfulUserOperation"
 > & {
   connect: () => Promise<{ rootAccount: { address: Address } }>
-  connectWithSession: (
-    session: Parameters<FullProviderRuntime["connectWithSession"]>[0]
+  connectWithExtension: (
+    extension: Parameters<FullProviderRuntime["connectWithExtension"]>[0]
   ) => Promise<{
-    session?: Awaited<
-      ReturnType<FullProviderRuntime["connectWithSession"]>
-    >["session"]
+    extension?: Awaited<
+      ReturnType<FullProviderRuntime["connectWithExtension"]>
+    >["extension"]
     wallet: { rootAccount: { address: Address } }
   }>
-  requestSession: () => ReturnType<FullProviderRuntime["requestSession"]>
+  requestExtension: (
+    extension: Parameters<FullProviderRuntime["requestExtension"]>[0]
+  ) => ReturnType<FullProviderRuntime["requestExtension"]>
   switchAccount: () => Promise<{ rootAccount: { address: Address } }>
   waitForSuccessfulUserOperation: (
     hash: Hex,
@@ -54,16 +53,6 @@ type ProviderRuntime = Omit<
 }
 type ProviderDependencies = {
   createRuntime?: (config: SliceWalletProviderConfig) => ProviderRuntime
-}
-
-const isProtocolValue = (
-  value: SliceWalletProviderValue
-): value is SliceWalletProtocolValue => {
-  if (Array.isArray(value)) return value.every(isProtocolValue)
-  if (typeof value !== "object" || value === null) return true
-  return Object.values(value).every(
-    (entry) => entry !== undefined && isProtocolValue(entry)
-  )
 }
 
 const paramsArray = (
@@ -160,9 +149,6 @@ const parseWalletConnect = (
       "wallet_connect capabilities must be an object."
     )
   }
-  let session:
-    | Parameters<SliceWalletEip1193Provider["connectWithSession"]>[0]
-    | undefined
   let grantPermissions:
     | {
         optional: boolean
@@ -170,60 +156,6 @@ const parseWalletConnect = (
       }
     | undefined
   for (const [name, capability] of Object.entries(input.capabilities)) {
-    if (name === "session") {
-      if (
-        typeof capability !== "object" ||
-        capability === null ||
-        Array.isArray(capability)
-      ) {
-        throw invalidProviderRequest(
-          "wallet_connect session capability is invalid."
-        )
-      }
-      const sessionCapability = capability as {
-        readonly [key: string]: SliceWalletProviderValue | undefined
-      }
-      if (
-        Object.keys(sessionCapability).some(
-          (key) =>
-            ![
-              "claims",
-              "nonce",
-              "optional",
-              "pendingId",
-              "sessionSigner"
-            ].includes(key)
-        ) ||
-        sessionCapability.optional !== true ||
-        sessionCapability.claims === undefined ||
-        !isProtocolValue(sessionCapability.claims) ||
-        typeof sessionCapability.sessionSigner !== "string" ||
-        !isAddress(sessionCapability.sessionSigner) ||
-        (sessionCapability.nonce !== undefined &&
-          (typeof sessionCapability.nonce !== "string" ||
-            !/^[A-Za-z0-9_-]{16,256}$/.test(sessionCapability.nonce))) ||
-        (sessionCapability.pendingId !== undefined &&
-          (typeof sessionCapability.pendingId !== "string" ||
-            !/^[A-Za-z0-9_-]{1,64}$/.test(sessionCapability.pendingId)))
-      ) {
-        throw invalidProviderRequest(
-          "wallet_connect session capability is invalid."
-        )
-      }
-      session = {
-        prepared: {
-          claims: sessionCapability.claims,
-          ...(sessionCapability.nonce === undefined
-            ? {}
-            : { nonce: sessionCapability.nonce }),
-          ...(sessionCapability.pendingId === undefined
-            ? {}
-            : { pendingId: sessionCapability.pendingId }),
-          sessionSigner: sessionCapability.sessionSigner
-        }
-      }
-      continue
-    }
     if (name === "grantPermissions") {
       if (
         typeof capability !== "object" ||
@@ -269,10 +201,7 @@ const parseWalletConnect = (
       `Unsupported wallet_connect capability: ${name}.`
     )
   }
-  return {
-    ...(grantPermissions === undefined ? {} : { grantPermissions }),
-    ...(session === undefined ? {} : { session })
-  }
+  return grantPermissions === undefined ? {} : { grantPermissions }
 }
 
 const assertEthAccountsRequest = (
@@ -441,10 +370,10 @@ export const createSliceWalletProviderInternal = (
     return account
   }
 
-  const connectWithSession: SliceWalletEip1193Provider["connectWithSession"] =
-    async (session) => {
+  const connectWithExtension: SliceWalletEip1193Provider["connectWithExtension"] =
+    async (extension) => {
       const before = await runtime.getAccounts()
-      const result = await runtime.connectWithSession(session)
+      const result = await runtime.connectWithExtension(extension)
       const account = result.wallet.rootAccount.address
       if (before.length === 0) {
         emit("connect", { chainId: numberToHex(runtime.chainId) })
@@ -452,12 +381,15 @@ export const createSliceWalletProviderInternal = (
       }
       return {
         account,
-        ...(result.session === undefined ? {} : { session: result.session })
+        ...(result.extension === undefined
+          ? {}
+          : { extension: result.extension })
       }
     }
 
-  const requestSession: SliceWalletEip1193Provider["requestSession"] = () =>
-    runtime.requestSession()
+  const requestExtension: SliceWalletEip1193Provider["requestExtension"] = (
+    extension
+  ) => runtime.requestExtension(extension)
 
   const subscribePendingCeremony: SliceWalletEip1193Provider["subscribePendingCeremony"] =
     (listener) => runtime.subscribePendingCeremony(listener)
@@ -475,11 +407,7 @@ export const createSliceWalletProviderInternal = (
     if (method === "wallet_connect") {
       const parsed = parseWalletConnect(params)
       const wasConnected = (await runtime.getAccounts()).length > 0
-      const connected =
-        parsed.session === undefined
-          ? { account: await connect() }
-          : await connectWithSession(parsed.session)
-      const account = connected.account
+      const account = await connect()
       let grantedPermission: SliceWalletProviderValue | undefined
       if (parsed.grantPermissions !== undefined) {
         try {
@@ -506,10 +434,7 @@ export const createSliceWalletProviderInternal = (
             capabilities: {
               ...(grantedPermission === undefined
                 ? {}
-                : { grantPermissions: grantedPermission }),
-              ...(connected.session === undefined
-                ? {}
-                : { session: connected.session })
+                : { grantPermissions: grantedPermission })
             }
           }
         ]
@@ -522,11 +447,6 @@ export const createSliceWalletProviderInternal = (
     if (method === "wallet_switchAccount") {
       assertNoParams(params, method)
       return switchAccount()
-    }
-    if (method === "wallet_requestSession") {
-      assertNoParams(params, method)
-      await getConnectedAccount(runtime)
-      return requestSession()
     }
     if (method === "wallet_requestPermissions") {
       assertEthAccountsRequest(params)
@@ -741,7 +661,7 @@ export const createSliceWalletProviderInternal = (
 
   return {
     cancelPendingCeremony: () => runtime.cancelPendingCeremony(),
-    connectWithSession,
+    connectWithExtension,
     continueInPopup: () => runtime.continueInPopup(),
     destroy: () => {
       runtime.destroy()
@@ -759,7 +679,7 @@ export const createSliceWalletProviderInternal = (
       return runtime.pendingCeremony
     },
     request,
-    requestSession,
+    requestExtension,
     subscribePendingCeremony,
     switchAccount
   }

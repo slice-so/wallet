@@ -1,9 +1,3 @@
-import type { SliceKernelCall } from "@slicekit/wallet-primitives"
-import {
-  kernelAccountAbi,
-  kernelBatchExecutionMode,
-  kernelSingleExecutionMode
-} from "@slicekit/wallet-primitives/kernel"
 import {
   concat,
   decodeAbiParameters,
@@ -17,6 +11,12 @@ import {
   slice,
   toHex
 } from "viem"
+import type { SliceKernelCall } from "../protocol/index"
+import {
+  kernelAccountAbi,
+  kernelBatchExecutionMode,
+  kernelSingleExecutionMode
+} from "../protocol/kernel"
 
 const kernelCallsAbiParameter = {
   components: [

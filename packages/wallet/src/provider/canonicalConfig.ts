@@ -1,9 +1,9 @@
+import { anvil } from "viem/chains"
 import {
   getSliceWalletChainManifest,
   sliceWalletDevelopmentChainIds,
   sliceWalletSupportedChainIds
-} from "@slicekit/wallet-primitives"
-import { anvil } from "viem/chains"
+} from "../protocol/index"
 import type { SliceWalletParameters } from "../types"
 import type { SliceWalletProviderConfig } from "../types/providerInternal"
 import { invalidProviderRequest } from "./errors"
@@ -60,25 +60,17 @@ export const resolveCanonicalSliceWalletConfig = (
   parameters: SliceWalletParameters = {}
 ): SliceWalletProviderConfig => {
   const allowedParameterKeys = new Set([
-    "announce",
     "ceremonyMode",
     "chainIds",
     "defaultChainId",
     "grantPermissions",
     "idOrigin",
-    "session",
     "transports"
   ])
   if (Object.keys(parameters).some((key) => !allowedParameterKeys.has(key))) {
     throw invalidProviderRequest(
       "Slice Wallet config contains an unknown field."
     )
-  }
-  if (
-    parameters.announce !== undefined &&
-    typeof parameters.announce !== "boolean"
-  ) {
-    throw invalidProviderRequest("Slice Wallet announce must be boolean.")
   }
   if (
     parameters.ceremonyMode !== undefined &&
@@ -200,21 +192,6 @@ export const resolveCanonicalSliceWalletConfig = (
           : normalizeTransportUrl(overrides.rpcUrl, "RPC URL")
     }
   })
-  const session = parameters.session
-  if (
-    session !== undefined &&
-    (typeof session !== "object" ||
-      session === null ||
-      Array.isArray(session) ||
-      Object.keys(session).some(
-        (key) => !["onSession", "prepare"].includes(key)
-      ) ||
-      typeof session.prepare !== "function" ||
-      (session.onSession !== undefined &&
-        typeof session.onSession !== "function"))
-  ) {
-    throw invalidProviderRequest("Slice Wallet session config is invalid.")
-  }
   const grantPermissions = parameters.grantPermissions
   if (
     grantPermissions !== undefined &&
@@ -234,13 +211,11 @@ export const resolveCanonicalSliceWalletConfig = (
     )
   }
   return {
-    announce: parameters.announce ?? true,
     ceremonyMode: parameters.ceremonyMode ?? "auto",
     chains,
     defaultChainId,
     idOrigin,
     requireAdmittedChain: !chainIds.includes(anvil.id),
-    ...(grantPermissions === undefined ? {} : { grantPermissions }),
-    ...(session === undefined ? {} : { session })
+    ...(grantPermissions === undefined ? {} : { grantPermissions })
   }
 }

@@ -1,14 +1,3 @@
-import type {
-  SliceKernelPermission,
-  SliceKernelValidator,
-  SliceWalletKernelTypedData,
-  SliceWalletKernelTypedDataValue
-} from "@slicekit/wallet-primitives"
-import {
-  encodeKernelPermissionSignature,
-  getKernelDomain,
-  kernelVersion
-} from "@slicekit/wallet-primitives/kernel"
 import {
   type Address,
   concat,
@@ -19,6 +8,17 @@ import {
   zeroHash
 } from "viem"
 import { wrapTypedDataSignature } from "viem/experimental/erc7739"
+import type {
+  SliceKernelPermission,
+  SliceKernelValidator,
+  SliceWalletKernelTypedData,
+  SliceWalletKernelTypedDataValue
+} from "../protocol/index"
+import {
+  encodeKernelPermissionSignature,
+  getKernelDomain,
+  kernelVersion
+} from "../protocol/kernel"
 
 const kernelPersonalSignTypes = {
   PersonalSign: [{ name: "prefixed", type: "bytes" }]

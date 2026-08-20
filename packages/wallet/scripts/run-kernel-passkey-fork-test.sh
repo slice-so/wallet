@@ -38,7 +38,6 @@ kernel_release_manifest_json="$(curl -fsSL \
 
 (
   cd "${contracts_wallet_dir}"
-  forge build src/signers/WeightedECDSASigner.sol
   forge build src/signers/WeightedP256Signer.sol
   forge build src/policies/TimelockPolicy.sol
   forge build src/policies/SlicerRegistryPolicy.sol

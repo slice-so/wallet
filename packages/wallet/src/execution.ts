@@ -4,7 +4,7 @@ export * from "./execution/utils/sliceAccountClient"
 export * from "./execution/utils/sliceBundler"
 export * from "./execution/utils/slicePaymaster"
 export * from "./execution/utils/slicePermissionErrors"
-export * from "./execution/utils/sliceUserOperationTransport"
+export * from "./protocol/execution"
 export type {
   CreateSliceKernelPasskeyAccountParameters,
   CreateSliceKernelPasskeyBundlerClient,
@@ -31,11 +31,3 @@ export type {
   SliceBundlerRpcUrlParameters
 } from "./types/bundler"
 export type * from "./types/commerce"
-export type {
-  BuildSliceExecutionEnableTypedDataParameters,
-  CreateSliceExecutionAccountParameters
-} from "./types/execution"
-export type {
-  WeightedEcdsaProposalTypedDataParameters,
-  WeightedEcdsaSignerParameters
-} from "./types/weightedSigner"

@@ -10,20 +10,6 @@ import {
   sliceHookAddressList
 } from "@slicekit/abi/deployments"
 import {
-  ambireAccountExecutionAbi,
-  coinbaseSmartWalletExecutionAbi,
-  erc7579AccountExecutionAbi,
-  erc7579BatchExecutionAbiParameters,
-  metaMaskDelegatorExecutionAbi,
-  type SliceSenderAccountSnapshot,
-  sliceKernelAddresses,
-  sliceWalletKernelAddresses
-} from "@slicekit/wallet-primitives"
-import {
-  kernelPermissionExecuteSelector,
-  kernelValidationManagementAbi
-} from "@slicekit/wallet-primitives/kernel"
-import {
   type Address,
   concat,
   encodeAbiParameters,
@@ -42,6 +28,20 @@ import {
   entryPoint09Address
 } from "viem/account-abstraction"
 import { base } from "viem/chains"
+import {
+  ambireAccountExecutionAbi,
+  coinbaseSmartWalletExecutionAbi,
+  erc7579AccountExecutionAbi,
+  erc7579BatchExecutionAbiParameters,
+  metaMaskDelegatorExecutionAbi,
+  type SliceSenderAccountSnapshot,
+  sliceKernelAddresses,
+  sliceWalletKernelAddresses
+} from "../../protocol/index"
+import {
+  kernelPermissionExecuteSelector,
+  kernelValidationManagementAbi
+} from "../../protocol/kernel"
 import {
   getSlicePaymasterRpcUrl,
   handleSlicePaymasterRequest

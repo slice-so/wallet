@@ -1,15 +1,20 @@
 import { describe, expect, test } from "bun:test"
+import { type Address, type Hex, hexToBytes } from "viem"
+import {
+  createSliceCheckoutPolicyDescriptor,
+  createSliceStoreManagementPolicyDescriptor
+} from "../protocol/execution"
 import {
   createNativeTransferCallRule,
   getWalletPolicyHash,
   type SliceWalletProtocolValue,
   verifySliceWalletP256
-} from "@slicekit/wallet-primitives"
-import { type Address, type Hex, hexToBytes } from "viem"
+} from "../protocol/index"
 import {
-  createSliceCheckoutPolicyDescriptor,
-  createSliceStoreManagementPolicyDescriptor
-} from "../execution/commerce/policies"
+  hashSliceWalletAppPermissionRegistrationFields,
+  hashSliceWalletAppPermissionRequestFields,
+  hashSliceWalletSessionRequest
+} from "../protocol/server"
 import type {
   SliceWalletFrameResponse,
   SliceWalletMessageWindow,
@@ -18,11 +23,6 @@ import type {
   SliceWalletWindowMessage
 } from "../types/frame"
 import { attachSliceWalletSignerFrame } from "./controller"
-import {
-  hashSliceWalletAppPermissionRegistrationFields,
-  hashSliceWalletAppPermissionRequestFields,
-  hashSliceWalletSessionRequest
-} from "./messages"
 
 const account = "0x1000000000000000000000000000000000000001" as Address
 const recipient = "0x2000000000000000000000000000000000000002" as Address

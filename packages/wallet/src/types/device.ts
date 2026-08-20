@@ -1,8 +1,8 @@
+import type { Address, Hex, LocalAccount } from "viem"
 import type {
   SliceKernelModularSigner,
   SliceWalletRegisteredRootCredential
-} from "@slicekit/wallet-primitives"
-import type { Address, Hex, LocalAccount } from "viem"
+} from "../protocol/index"
 import type { SliceWalletPublicClient } from "./account"
 export type SliceWalletDeviceCredential = {
   credentialIdHash: Hex

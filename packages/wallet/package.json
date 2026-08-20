@@ -18,6 +18,16 @@
       "import": "./dist/esm/index.js",
       "default": "./dist/esm/index.js"
     },
+    "./protocol": {
+      "development": {
+        "types": "./src/protocol/index.ts",
+        "import": "./src/protocol/index.ts",
+        "default": "./src/protocol/index.ts"
+      },
+      "types": "./dist/esm/protocol/index.d.ts",
+      "import": "./dist/esm/protocol/index.js",
+      "default": "./dist/esm/protocol/index.js"
+    },
     "./execution": {
       "development": {
         "types": "./src/execution.ts",
@@ -27,6 +37,26 @@
       "types": "./dist/esm/execution.d.ts",
       "import": "./dist/esm/execution.js",
       "default": "./dist/esm/execution.js"
+    },
+    "./kernel": {
+      "development": {
+        "types": "./src/protocol/kernel.ts",
+        "import": "./src/protocol/kernel.ts",
+        "default": "./src/protocol/kernel.ts"
+      },
+      "types": "./dist/esm/protocol/kernel.d.ts",
+      "import": "./dist/esm/protocol/kernel.js",
+      "default": "./dist/esm/protocol/kernel.js"
+    },
+    "./policy": {
+      "development": {
+        "types": "./src/protocol/policy.ts",
+        "import": "./src/protocol/policy.ts",
+        "default": "./src/protocol/policy.ts"
+      },
+      "types": "./dist/esm/protocol/policy.d.ts",
+      "import": "./dist/esm/protocol/policy.js",
+      "default": "./dist/esm/protocol/policy.js"
     },
     "./argon2id": {
       "development": {
@@ -78,16 +108,6 @@
       "import": "./dist/esm/recovery.js",
       "default": "./dist/esm/recovery.js"
     },
-    "./react": {
-      "development": {
-        "types": "./src/react.ts",
-        "import": "./src/react.ts",
-        "default": "./src/react.ts"
-      },
-      "types": "./dist/esm/react.d.ts",
-      "import": "./dist/esm/react.js",
-      "default": "./dist/esm/react.js"
-    },
     "./provider": {
       "development": {
         "types": "./src/provider.ts",
@@ -116,12 +136,14 @@
   ],
   "scripts": {
     "admit:canary": "bun --conditions=development scripts/create-user-operation-canary.ts",
-    "build": "bun run build.ts",
+    "build": "bun run generate:chains:check && bun run build.ts",
+    "generate:chains": "bun scripts/generate-chains.ts",
+    "generate:chains:check": "bun scripts/generate-chains.ts --check",
     "test": "bun --conditions=development test --path-ignore-patterns='**/*.fork.test.ts'",
     "test:fork": "bash ./scripts/run-kernel-passkey-fork-test.sh",
     "test:e2e:two-chain": "bash ./scripts/run-wallet-two-chain-e2e.sh",
     "verify:chains": "bun scripts/verify-chain-deployments.ts",
-    "type-check": "tsc -p tsconfig.json --noEmit",
+    "type-check": "bun run generate:chains:check && tsc -p tsconfig.json --noEmit",
     "format": "biome format --write",
     "lint": "biome lint --write && bun scripts/check-import-boundaries.ts",
     "check": "biome check --write --unsafe && bun scripts/check-import-boundaries.ts"
@@ -131,26 +153,15 @@
   },
   "dependencies": {
     "@slicekit/abi": "workspace:*",
-    "@slicekit/erc8128": "workspace:*",
-    "@slicekit/wallet-primitives": "workspace:*",
     "hash-wasm": "catalog:",
     "ox": "catalog:",
     "tslib": "^2.8.1",
     "viem": "catalog:"
   },
-  "peerDependencies": {
-    "react": ">=18"
-  },
-  "peerDependenciesMeta": {
-    "react": {
-      "optional": true
-    }
-  },
   "devDependencies": {
     "@slice/typescript-config": "workspace:*",
     "@slicekit/commerce": "workspace:*",
     "@types/node": "catalog:",
-    "@types/react": "catalog:",
     "fake-indexeddb": "^6.2.4"
   },
   "repository": {

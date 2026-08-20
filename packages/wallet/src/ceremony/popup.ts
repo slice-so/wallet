@@ -1,9 +1,9 @@
-import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives"
 import { bytesToHex, type Hex } from "viem"
 import {
   sliceWalletBrokerRequiredDialogRoutes,
   sliceWalletDialogCeremonyRoutes
 } from "../ceremonyRoutes"
+import type { SliceWalletProtocolValue } from "../protocol/index"
 import type { SliceWalletCeremonyMode } from "../types"
 import { SliceWalletUserRejectedRequestError } from "../userRejectedRequest"
 import { SliceWalletUserGestureRequiredError } from "./broker"

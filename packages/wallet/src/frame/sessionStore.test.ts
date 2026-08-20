@@ -1,8 +1,8 @@
 import { describe, expect, it, spyOn } from "bun:test"
-import type { SliceWalletFrameSession } from "@slicekit/wallet-primitives"
 import { IDBDatabase as FakeIDBDatabase, IDBFactory } from "fake-indexeddb"
 import type { Address } from "viem"
 import { generateSliceWalletP256KeyPair } from "../p256"
+import type { SliceWalletFrameSession } from "../protocol/index"
 import {
   createSliceWalletIndexedDbSessionStore,
   createSliceWalletMemorySessionStore

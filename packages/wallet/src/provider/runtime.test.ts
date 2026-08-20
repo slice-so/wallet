@@ -1,11 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test"
 import {
-  buildRecoveryPermissionInitConfig,
-  deserializeWalletPolicyDescriptor,
-  getWalletPermissionId,
-  serializeWalletPolicyDescriptor
-} from "@slicekit/wallet-primitives"
-import {
   type Address,
   createPublicClient,
   custom,
@@ -19,7 +13,13 @@ import {
   getUserOperationHash
 } from "viem/account-abstraction"
 import { base, optimism } from "viem/chains"
-import { getSliceWalletP256SignerId } from "../p256"
+import {
+  buildRecoveryPermissionInitConfig,
+  deserializeWalletPolicyDescriptor,
+  getSliceWalletP256SignerId,
+  getWalletPermissionId,
+  serializeWalletPolicyDescriptor
+} from "../protocol/index"
 import { parseSliceWalletUncompressedPublicKey } from "../rootValidator"
 import type {
   SliceWalletCeremonyBroker,
@@ -1469,7 +1469,7 @@ const createRuntimeFixture = (
       chooseAccount: mock(async () => null as never),
       commitAccount: mock(() => null as never),
       connect: mock(async () => null as never),
-      connectWithSession: mock(async () => null as never),
+      connectWithExtension: mock(async () => null as never),
       createGrant: mock(async () => null as never),
       destroy: mock(() => undefined),
       forwardRpc: mock(async () => ({ handled: false as const })),
@@ -1489,7 +1489,7 @@ const createRuntimeFixture = (
       lockAccount,
       paymasterAvailable: false,
       revokeGrant,
-      requestSession: mock(async () => ({
+      requestExtension: mock(async () => ({
         status: "preparation_failed" as const
       })),
       rotateGrant: mock(async () => null as never),

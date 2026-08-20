@@ -11,7 +11,7 @@ const removeListener: SliceWalletEip1193Provider["removeListener"] = () =>
   undefined
 const internalProvider = {
   cancelPendingCeremony: broker.cancel,
-  connectWithSession: async () => ({ account }),
+  connectWithExtension: async () => ({ account }),
   continueInPopup: broker.continueInPopup,
   destroy,
   on,
@@ -20,7 +20,7 @@ const internalProvider = {
   },
   removeListener,
   request: async () => undefined,
-  requestSession: async () => ({ status: "preparation_failed" as const }),
+  requestExtension: async () => ({ status: "preparation_failed" as const }),
   subscribePendingCeremony: broker.subscribe,
   switchAccount: async () => account
 } satisfies SliceWalletEip1193Provider
@@ -35,7 +35,6 @@ afterAll(() => mock.restore())
 describe("canonical Slice Wallet provider", () => {
   test("tracks the internal pending ceremony without changing forwarded identities", async () => {
     const provider = createSliceWalletProvider({
-      announce: false,
       chainIds: [anvil.id],
       defaultChainId: anvil.id,
       idOrigin: "http://localhost:3003",
@@ -61,14 +60,14 @@ describe("canonical Slice Wallet provider", () => {
     expect(provider.cancelPendingCeremony).toBe(
       internalProvider.cancelPendingCeremony
     )
-    expect(provider.connectWithSession).toBe(
-      internalProvider.connectWithSession
+    expect(provider.connectWithExtension).toBe(
+      internalProvider.connectWithExtension
     )
     expect(provider.continueInPopup).toBe(internalProvider.continueInPopup)
     expect(provider.on).toBe(internalProvider.on)
     expect(provider.removeListener).toBe(internalProvider.removeListener)
     expect(provider.request).toBe(internalProvider.request)
-    expect(provider.requestSession).toBe(internalProvider.requestSession)
+    expect(provider.requestExtension).toBe(internalProvider.requestExtension)
     expect(provider.subscribePendingCeremony).toBe(
       internalProvider.subscribePendingCeremony
     )

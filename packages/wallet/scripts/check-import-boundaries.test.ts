@@ -22,6 +22,7 @@ describe("Slice wallet import boundaries", () => {
         'import "@slicekit/abi"',
         'export * from "@slice/database"',
         'import { toCallPolicy } from "@zerodev/permissions/policies"',
+        'import { useAccount } from "wagmi"',
         'const external = import("../../outside")',
         'type External = import("@slice/database").SliceWallet'
       ].join("\n")
@@ -31,31 +32,42 @@ describe("Slice wallet import boundaries", () => {
       'src/nested/fixture.ts imports internal Slice package "@slicekit/abi"',
       'src/nested/fixture.ts imports internal Slice package "@slice/database"',
       'src/nested/fixture.ts imports a ZeroDev SDK "@zerodev/permissions/policies"',
+      'src/nested/fixture.ts imports browser integration module "wagmi"',
       'src/nested/fixture.ts escapes the wallet source boundary via "../../outside"',
       'src/nested/fixture.ts imports internal Slice package "@slice/database"'
     ])
   })
 
-  it("allows the shared delegation contract in exported wallet types", () => {
+  it("keeps the protocol subtree runtime-neutral and self-contained", () => {
+    const filePath = resolve(sourceRoot, "protocol/execution/fixture.ts")
     expect(
       getSliceWalletSourceImportBoundaryViolations({
-        filePath: resolve(sourceRoot, "types/session.ts"),
+        filePath,
         packageRoot,
         sourceRoot,
-        sourceText: 'import type { DelegationGrant } from "@slicekit/erc8128"'
+        sourceText: [
+          'import { getProductsModuleAddress } from "@slicekit/abi/deployments"',
+          'import { isAddress } from "viem"',
+          'import { policy } from "../policy"'
+        ].join("\n")
       })
     ).toEqual([])
-  })
 
-  it("allows canonical ERC-8128 runtime constants in the execution layer", () => {
     expect(
       getSliceWalletSourceImportBoundaryViolations({
-        filePath: resolve(sourceRoot, "execution/policy.ts"),
+        filePath,
         packageRoot,
         sourceRoot,
-        sourceText:
-          'import { ERC8128_REVOCATION_REGISTRY_ADDRESS } from "@slicekit/erc8128"'
+        sourceText: [
+          'import { createWallet } from "../../index"',
+          'import { authenticate } from "@slicekit/id"',
+          'import { useAccount } from "wagmi"'
+        ].join("\n")
       })
-    ).toEqual([])
+    ).toEqual([
+      'src/protocol/execution/fixture.ts escapes the wallet protocol boundary via "../../index"',
+      'src/protocol/execution/fixture.ts imports internal Slice package "@slicekit/id"',
+      'src/protocol/execution/fixture.ts imports browser integration module "wagmi"'
+    ])
   })
 })

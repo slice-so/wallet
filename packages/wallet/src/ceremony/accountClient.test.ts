@@ -1,7 +1,6 @@
 import { describe, expect, it, mock } from "bun:test"
-import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives"
 import type { Hex } from "viem"
-import type { SliceWalletCeremonySessionResult } from "../types"
+import type { SliceWalletProtocolValue } from "../protocol/index"
 import { connectSliceWalletAccount } from "./accountClient"
 
 const account = "0x1111111111111111111111111111111111111111" as const
@@ -11,7 +10,7 @@ const publicKey = `0x04${"33".repeat(64)}` as const
 const createWindow = (
   respond: (
     message: SliceWalletProtocolValue,
-    reply: (session: SliceWalletCeremonySessionResult) => void,
+    reply: (extension: SliceWalletProtocolValue) => void,
     reject: () => void
   ) => void
 ) => {
@@ -36,13 +35,13 @@ const createWindow = (
         throw new Error("The ceremony channel is missing its message port.")
       }
       const nonce = (message as { nonce: Hex }).nonce
-      const reply = (session: SliceWalletCeremonySessionResult) =>
+      const reply = (extension: SliceWalletProtocolValue) =>
         port.postMessage({
           account,
           accountIndex: 0,
           credentialIdHash,
           nonce,
-          session,
+          extension,
           type: "slice-wallet:ceremony-account",
           version: 1
         })
@@ -119,8 +118,8 @@ const registryFetch = Object.assign(
   { preconnect: globalThis.fetch.preconnect }
 ) satisfies typeof fetch
 
-describe("Slice wallet account session coordination", () => {
-  it("rejects cancellation without waiting for session preparation", async () => {
+describe("Slice wallet account ceremony-extension coordination", () => {
+  it("rejects cancellation without waiting for extension preparation", async () => {
     const window = createWindow((message, _reply, reject) => {
       if (
         typeof message === "object" &&
@@ -136,7 +135,7 @@ describe("Slice wallet account session coordination", () => {
       chainId: 8453,
       fetch: registryFetch,
       idOrigin: "https://id.slice.so",
-      session: {
+      extension: {
         prepare: () => new Promise(() => undefined)
       },
       timeoutMs: 100,
@@ -165,7 +164,7 @@ describe("Slice wallet account session coordination", () => {
       chainId: 8453,
       fetch: registryFetch,
       idOrigin: "https://id.slice.so",
-      session: {
+      extension: {
         prepare: async () => {
           throw new Error("nonce service unavailable")
         }
@@ -174,7 +173,7 @@ describe("Slice wallet account session coordination", () => {
       window
     })
 
-    expect(connected.session).toEqual({ status: "preparation_failed" })
+    expect(connected.extension).toEqual({ status: "preparation_failed" })
   })
 
   it("returns timed_out when consent preparation misses the coordinator window", async () => {
@@ -196,7 +195,7 @@ describe("Slice wallet account session coordination", () => {
       chainId: 8453,
       fetch: registryFetch,
       idOrigin: "https://id.slice.so",
-      session: {
+      extension: {
         prepare: async () => {
           await Bun.sleep(15)
           return {
@@ -211,6 +210,6 @@ describe("Slice wallet account session coordination", () => {
       window
     })
 
-    expect(connected.session).toEqual({ status: "timed_out" })
+    expect(connected.extension).toEqual({ status: "timed_out" })
   })
 })

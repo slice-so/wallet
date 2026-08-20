@@ -1,14 +1,6 @@
 #!/usr/bin/env bun
 
 import {
-  buildRecoveryPermissionInitConfig,
-  predictSliceWalletKernelAccountAddress
-} from "@slicekit/wallet-primitives"
-import {
-  kernelFactoryAbi,
-  kernelModuleType
-} from "@slicekit/wallet-primitives/kernel"
-import {
   type Address,
   concatHex,
   createPublicClient,
@@ -22,8 +14,13 @@ import {
 } from "viem"
 import { getAlchemyRpcUrl } from "../../../scripts/lib/alchemyRpc"
 import deployments from "../../contracts/wallet/deployments/addresses.json"
-import policy from "../../wallet-primitives/config/chains.policy.json"
-import { encodeSliceWalletRootValidatorData } from "../src/rootValidator"
+import policy from "../config/chains.policy.json"
+import { encodeSliceWalletRootValidatorData } from "../src/protocol/accountPrediction"
+import {
+  buildRecoveryPermissionInitConfig,
+  predictSliceWalletKernelAccountAddress
+} from "../src/protocol/index"
+import { kernelFactoryAbi, kernelModuleType } from "../src/protocol/kernel"
 import { installSanitizedScriptFailureHandlers } from "./lib/scriptFailure"
 
 installSanitizedScriptFailureHandlers()

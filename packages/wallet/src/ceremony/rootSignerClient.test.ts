@@ -1,6 +1,6 @@
 import { describe, expect, it, mock } from "bun:test"
-import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives"
 import type { Address, Hex } from "viem"
+import type { SliceWalletProtocolValue } from "../protocol/index"
 import type { SliceWalletRootSignatureRequest } from "../types"
 import { createSliceWalletCeremonyBroker } from "./broker"
 import { parseSliceWalletCeremonyRootSignRequest } from "./protocol"

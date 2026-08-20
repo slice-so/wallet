@@ -1,8 +1,8 @@
+import type { Address, Hex } from "viem"
 import type {
   SliceWalletFrameSession,
   SliceWalletRegisteredRootCredential
-} from "@slicekit/wallet-primitives"
-import type { Address, Hex } from "viem"
+} from "../protocol/index"
 import type { SliceWalletPublicClient, SliceWalletRootSigner } from "./account"
 import type {
   SliceWalletSignerFrameClient,

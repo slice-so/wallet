@@ -1,7 +1,7 @@
 import { describe, expect, it, mock } from "bun:test"
-import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives"
 import { createPublicClient, custom, type Hex, hashMessage } from "viem"
 import { base } from "viem/chains"
+import type { SliceWalletProtocolValue } from "../protocol/index"
 import { createSliceWalletCeremonyBroker } from "./broker"
 import { createSliceWalletCeremonyKernelAccount } from "./rootAccountClient"
 

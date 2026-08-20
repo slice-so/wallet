@@ -1,10 +1,10 @@
+import { bytesToHex, type Hex } from "viem"
 import type {
   SliceWalletFrameSession,
   SliceWalletPermissionAuthorization,
   SliceWalletProtocolValue
-} from "@slicekit/wallet-primitives"
-import { getWalletPolicyHash } from "@slicekit/wallet-primitives/policy"
-import { bytesToHex, type Hex } from "viem"
+} from "../protocol/index"
+import { getWalletPolicyHash } from "../protocol/policy"
 import type {
   AuthorizeSliceWalletSessionParameters,
   AuthorizeSliceWalletSessionsParameters

@@ -1,9 +1,5 @@
 import { describe, expect, it, mock } from "bun:test"
 import {
-  type SliceBundlerRetryReason,
-  sliceKernelPasskeyBackend
-} from "@slicekit/wallet-primitives"
-import {
   type Address,
   createPublicClient,
   type Hex,
@@ -17,6 +13,12 @@ import {
   type UserOperation
 } from "viem/account-abstraction"
 import { anvil, base } from "viem/chains"
+import {
+  type SliceBundlerRetryReason,
+  sliceBundlerRetryDataCode,
+  sliceBundlerRetryRpcCode,
+  sliceKernelPasskeyBackend
+} from "../../protocol/execution"
 import type { SliceWalletKernelAccount } from "../../types/account"
 import type {
   SliceKernelPasskeyBundlerClient,
@@ -25,10 +27,6 @@ import type {
   SliceKernelPasskeySendUserOperationParameters
 } from "../../types/accountClient"
 import { SliceAccountClientExecutionError } from "../utils/sliceAccountClient"
-import {
-  sliceBundlerRetryDataCode,
-  sliceBundlerRetryRpcCode
-} from "../utils/sliceBundler"
 import { createSliceKernelPasskeyTransport } from "./transport"
 
 const accountAddress =

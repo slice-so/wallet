@@ -1,3 +1,4 @@
+import type { Address, Hex } from "viem"
 import type {
   SliceWalletCheckoutGrant,
   SliceWalletFrameSession,
@@ -5,12 +6,8 @@ import type {
   SliceWalletPermissionAuthorization,
   SliceWalletProtocolValue,
   WalletGrantKind
-} from "@slicekit/wallet-primitives"
-import type {
-  WalletCall,
-  WalletPolicyDescriptor
-} from "@slicekit/wallet-primitives/policy"
-import type { Address, Hex } from "viem"
+} from "../protocol/index"
+import type { WalletCall, WalletPolicyDescriptor } from "../protocol/policy"
 
 /** Frame-internal record. It must never cross the parent protocol. */
 export type SliceWalletStoredSession = {

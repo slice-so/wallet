@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
-import { sliceWalletCurrentDeploymentProfileId } from "@slicekit/wallet-primitives"
 import { concatBytes, stringToBytes, toBytes } from "viem"
+import { sliceWalletCurrentDeploymentProfileId } from "./protocol/index"
 import {
   decryptSliceWalletRecoveryBundle,
   encryptSliceWalletRecoveryBundle,

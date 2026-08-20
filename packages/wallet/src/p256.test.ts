@@ -10,10 +10,10 @@ import {
 import {
   encodeSliceWalletSyntheticWebAuthnSignature,
   generateSliceWalletP256KeyPair,
-  getSliceWalletP256SignerId,
   isSliceWalletRip7212Available,
   signSliceWalletP256
 } from "./p256"
+import { getSliceWalletP256SignerId } from "./protocol/index"
 
 describe("P-256 session keys", () => {
   it("selects RIP-7212 only from generated chain policy", () => {

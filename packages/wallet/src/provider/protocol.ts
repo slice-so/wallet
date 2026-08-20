@@ -1,16 +1,4 @@
 import {
-  maximumBrowserGenericGrantTtlSec,
-  type WalletPolicyDescriptor
-} from "@slicekit/wallet-primitives"
-import {
-  createErc20ApproveCallRule,
-  createErc20TransferCallRule,
-  createErc20TransferFromCallRule,
-  createNativeTransferCallRule,
-  getWalletPermissionValidAfter,
-  normalizeWalletPolicyDescriptor
-} from "@slicekit/wallet-primitives/policy"
-import {
   type Address,
   type Hex,
   hexToBigInt,
@@ -20,6 +8,18 @@ import {
   numberToHex,
   toFunctionSelector
 } from "viem"
+import {
+  maximumBrowserGenericGrantTtlSec,
+  type WalletPolicyDescriptor
+} from "../protocol/index"
+import {
+  createErc20ApproveCallRule,
+  createErc20TransferCallRule,
+  createErc20TransferFromCallRule,
+  createNativeTransferCallRule,
+  getWalletPermissionValidAfter,
+  normalizeWalletPolicyDescriptor
+} from "../protocol/policy"
 import type {
   SliceWalletGenericPermission,
   SliceWalletProviderValue

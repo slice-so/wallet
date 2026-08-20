@@ -1,10 +1,6 @@
 #!/usr/bin/env bun
 
 import {
-  getSliceWalletChainPolicy,
-  sliceWalletSupportedChainIds
-} from "@slicekit/wallet-primitives"
-import {
   type Address,
   createPublicClient,
   createWalletClient,
@@ -22,6 +18,10 @@ import {
 import { privateKeyToAccount } from "viem/accounts"
 import { getAlchemyRpcUrl } from "../../../scripts/lib/alchemyRpc"
 import { createSliceWalletKernelAccount } from "../src/account"
+import {
+  getSliceWalletChainPolicy,
+  sliceWalletSupportedChainIds
+} from "../src/protocol/index"
 import { canaryCredential, canaryGetFn, canaryRpId } from "./lib/canaryWebAuthn"
 import { installSanitizedScriptFailureHandlers } from "./lib/scriptFailure"
 

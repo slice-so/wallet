@@ -1,4 +1,3 @@
-import { resolveSliceWalletDeployment } from "@slicekit/wallet-primitives/kernel"
 import {
   type Address,
   bytesToHex,
@@ -7,6 +6,7 @@ import {
   isAddress,
   isHex
 } from "viem"
+import { resolveSliceWalletDeployment } from "./protocol/kernel"
 import type {
   SliceWalletArgon2id,
   SliceWalletRecoveryBundleEnvelope,

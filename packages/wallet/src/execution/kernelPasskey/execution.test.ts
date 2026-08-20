@@ -1,10 +1,10 @@
 import { describe, expect, it } from "bun:test"
+import { Base64 } from "ox"
+import { decodeAbiParameters, keccak256, toHex } from "viem"
 import {
   getKernelNonceValidation,
   isKernelRootValidationNonce
-} from "@slicekit/wallet-primitives"
-import { Base64 } from "ox"
-import { decodeAbiParameters, keccak256, toHex } from "viem"
+} from "../../protocol/index"
 import {
   encodeWebAuthnRootValidatorData,
   encodeWebAuthnValidatorSignature

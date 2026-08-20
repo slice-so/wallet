@@ -3,7 +3,7 @@ import type {
   SliceBundlerUserOperationAuthorizer,
   SliceSenderAccountFetch,
   SliceUserOperationPolicyFetch
-} from "@slicekit/wallet-primitives/execution"
+} from "../protocol/execution"
 
 export type SliceBundlerRpcUrlParameters = {
   allowCdpFallback?: boolean

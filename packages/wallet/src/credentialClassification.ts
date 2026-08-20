@@ -1,9 +1,4 @@
 import {
-  getSliceWalletChainPolicy,
-  predictSliceWalletKernelAccountAddress
-} from "@slicekit/wallet-primitives"
-import { resolveSliceWalletDeployment } from "@slicekit/wallet-primitives/kernel"
-import {
   type Address,
   bytesToBigInt,
   hexToBytes,
@@ -13,6 +8,11 @@ import {
 import { getChainId, getCode, multicall } from "viem/actions"
 import { getAction } from "viem/utils"
 import { getSliceWalletDevicePermissionId } from "./deviceValidator"
+import {
+  getSliceWalletChainPolicy,
+  predictSliceWalletKernelAccountAddress
+} from "./protocol/index"
+import { resolveSliceWalletDeployment } from "./protocol/kernel"
 import type { SliceWalletPublicClient } from "./types/account"
 import type {
   SliceWalletCredentialRowClassification,

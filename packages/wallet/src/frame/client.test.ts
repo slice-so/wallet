@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives"
+import type { SliceWalletProtocolValue } from "../protocol/index"
 import {
   acquireSliceWalletSignerFrame,
   connectSliceWalletSignerFrame

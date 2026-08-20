@@ -1,11 +1,4 @@
 import { describe, expect, it } from "bun:test"
-import { buildRecoveryPermissionInitConfig } from "@slicekit/wallet-primitives"
-import {
-  decodeSliceWalletWebAuthnAssertion,
-  predictSliceWalletKernelAccountAddress,
-  sliceWalletKernelAddresses,
-  verifySliceWalletRootAuthorization
-} from "@slicekit/wallet-primitives/server"
 import {
   type Address,
   bytesToBigInt,
@@ -22,6 +15,13 @@ import {
   encodeSliceWalletSyntheticWebAuthnSignature,
   generateSliceWalletP256KeyPair
 } from "./p256"
+import { buildRecoveryPermissionInitConfig } from "./protocol/index"
+import {
+  decodeSliceWalletWebAuthnAssertion,
+  predictSliceWalletKernelAccountAddress,
+  sliceWalletKernelAddresses,
+  verifySliceWalletRootAuthorization
+} from "./protocol/server"
 import { createSliceWalletRegisteredKernelAccount } from "./rootValidator"
 
 const account = "0x7100000000000000000000000000000000000001" as Address

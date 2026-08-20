@@ -1,12 +1,12 @@
-import type { SliceWalletPermissionAuthorization } from "@slicekit/wallet-primitives"
+import { type Address, type Hex, hexToBytes, isAddress, isHex } from "viem"
 import {
   parseSliceWalletExecutionSessionDescriptor,
   type SliceWalletExecutionSessionDescriptor,
   walletExecutionPermissionExecutionScope,
   walletExecutionPermissionStoreManagementScope
-} from "@slicekit/wallet-primitives/execution"
-import { serializeWalletPolicyDescriptor } from "@slicekit/wallet-primitives/policy"
-import { type Address, type Hex, hexToBytes, isAddress, isHex } from "viem"
+} from "../../protocol/execution"
+import type { SliceWalletPermissionAuthorization } from "../../protocol/index"
+import { serializeWalletPolicyDescriptor } from "../../protocol/policy"
 import type {
   CreateSliceWalletCheckoutExecutionClientParameters,
   SliceWalletCheckoutExecutionClient,

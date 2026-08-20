@@ -1,8 +1,8 @@
-import { sliceWalletDefaultRpId } from "@slicekit/wallet-primitives"
 import {
   type CreateWebAuthnCredentialReturnType,
   createWebAuthnCredential
 } from "viem/account-abstraction"
+import { sliceWalletDefaultRpId } from "./protocol/index"
 import type { CreateSliceWalletPasskeyParameters } from "./types"
 
 export const createSliceWalletPasskey = ({

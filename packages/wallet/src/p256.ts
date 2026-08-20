@@ -1,10 +1,4 @@
 import {
-  getSliceWalletChainPolicy,
-  getSliceWalletP256SignerId,
-  normalizeSliceWalletP256Scalars,
-  normalizeSliceWalletP256Signature
-} from "@slicekit/wallet-primitives"
-import {
   bytesToBigInt,
   bytesToHex,
   concat,
@@ -14,15 +8,13 @@ import {
   sha256,
   stringToBytes
 } from "viem"
-import type { SliceWalletP256KeyPair } from "./types"
-
-export {
+import {
+  getSliceWalletChainPolicy,
   getSliceWalletP256SignerId,
-  hashSliceWalletWeightedP256CoSign,
-  hashSliceWalletWeightedP256Proposal,
-  normalizeSliceWalletP256Signature,
-  verifySliceWalletP256
-} from "@slicekit/wallet-primitives/server"
+  normalizeSliceWalletP256Scalars,
+  normalizeSliceWalletP256Signature
+} from "./protocol/index"
+import type { SliceWalletP256KeyPair } from "./types"
 
 export const generateSliceWalletP256KeyPair = async (
   cryptoImpl: Crypto = crypto

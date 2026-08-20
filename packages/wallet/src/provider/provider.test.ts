@@ -82,7 +82,7 @@ const createRuntime = () => {
   )
   const getGrants = mock(async () => [publicGrant])
   const revokeGrant = mock(async () => {})
-  const requestSession = mock(async () => ({
+  const requestExtension = mock(async () => ({
     status: "preparation_failed" as const
   }))
   const rotateGrant = mock(async () => publicGrant)
@@ -95,7 +95,7 @@ const createRuntime = () => {
       return chainId
     },
     connect,
-    connectWithSession: mock(async () => ({
+    connectWithExtension: mock(async () => ({
       wallet: { rootAccount: { address: account } }
     })),
     cancelPendingCeremony: mock(() => {}),
@@ -117,7 +117,7 @@ const createRuntime = () => {
     pendingCeremony: null,
     revokeGrant,
     revokePermissions,
-    requestSession,
+    requestExtension,
     subscribePendingCeremony: mock(() => () => undefined),
     rotateGrant,
     sendCalls,
@@ -142,7 +142,7 @@ const createRuntime = () => {
     getGrants,
     revokeGrant,
     revokePermissions,
-    requestSession,
+    requestExtension,
     rotateGrant,
     sendCalls,
     runtime
@@ -226,18 +226,16 @@ describe("Slice Wallet provider dispatch", () => {
     }
   })
 
-  test("requests consent for an already-connected account without reconnecting", async () => {
-    const { provider, requestSession, runtime } = createProvider()
+  test("runs an opaque extension for an already-connected account without reconnecting", async () => {
+    const { provider, requestExtension, runtime } = createProvider()
+    const extension = { prepared: { kind: "slice-id" } } as const
 
-    expect(await provider.requestSession()).toEqual({
+    expect(await provider.requestExtension(extension)).toEqual({
       status: "preparation_failed"
     })
-    expect(await request(provider, "wallet_requestSession", [])).toEqual({
-      status: "preparation_failed"
-    })
-    expect(requestSession).toHaveBeenCalledTimes(2)
+    expect(requestExtension).toHaveBeenCalledWith(extension)
     expect(runtime.connect).not.toHaveBeenCalled()
-    expect(runtime.connectWithSession).not.toHaveBeenCalled()
+    expect(runtime.connectWithExtension).not.toHaveBeenCalled()
   })
 
   test("pins wallet_connect v1 and returns only granted capabilities", async () => {
@@ -335,69 +333,29 @@ describe("Slice Wallet provider dispatch", () => {
     expect(optional.createGrant).not.toHaveBeenCalled()
   })
 
-  test("accepts only closed pre-prepared wallet_connect session claims", async () => {
+  test("does not interpret authentication capabilities", async () => {
     const { provider, runtime } = createProvider()
-    const sessionSigner = "0x0000000000000000000000000000000000000002" as const
-    const claims = {
-      audience: "https://api.example",
-      scopes: ["orders:read"],
-      ttlSeconds: 60
-    } as const
     expect(
       await request(provider, "wallet_connect", [
         {
           capabilities: {
-            session: {
-              claims,
-              nonce: "abcdefghijklmnop",
-              optional: true,
-              pendingId: "pending-id",
-              sessionSigner
-            }
+            session: { optional: true }
           },
           version: "1"
         }
       ])
     ).toEqual({ accounts: [{ address: account, capabilities: {} }] })
-    expect(runtime.connectWithSession).toHaveBeenCalledWith({
-      prepared: {
-        claims,
-        nonce: "abcdefghijklmnop",
-        pendingId: "pending-id",
-        sessionSigner
-      }
-    })
+    expect(runtime.connectWithExtension).not.toHaveBeenCalled()
     await expectRpcError(
       request(provider, "wallet_connect", [
         {
           capabilities: {
-            session: {
-              claims,
-              optional: true,
-              pendingId: "a".repeat(65),
-              sessionSigner
-            }
+            session: { optional: false }
           },
           version: "1"
         }
       ]),
-      -32602
-    )
-    await expectRpcError(
-      request(provider, "wallet_connect", [
-        {
-          capabilities: {
-            session: {
-              audience: "https://api.example",
-              claims,
-              optional: true,
-              sessionSigner
-            }
-          },
-          version: "1"
-        }
-      ]),
-      -32602
+      5700
     )
   })
 

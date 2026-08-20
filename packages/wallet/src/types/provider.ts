@@ -1,14 +1,14 @@
 import type { Address, Hex } from "viem"
+import type { SliceWalletProtocolValue } from "../protocol/index"
 import type { SliceWalletCeremonyMode } from "./ceremony"
+import type {
+  SliceWalletCeremonyExtensionInput,
+  SliceWalletExtensionConnectResult
+} from "./ceremonyExtension"
 import type {
   SliceWalletCeremonyContinuationResult,
   SliceWalletPendingCeremony
 } from "./pendingCeremony"
-import type {
-  SliceWalletCeremonySessionResult,
-  SliceWalletSessionConnectInput,
-  SliceWalletSessionConnectResult
-} from "./session"
 
 export type SliceWalletProviderValue =
   | bigint
@@ -42,9 +42,9 @@ export type SliceWalletProviderEventMap = {
 export type SliceWalletEip1193Provider = {
   cancelPendingCeremony: () => void
   continueInPopup: () => Promise<SliceWalletCeremonyContinuationResult>
-  connectWithSession: (
-    session: SliceWalletSessionConnectInput
-  ) => Promise<SliceWalletSessionConnectResult>
+  connectWithExtension: (
+    extension: SliceWalletCeremonyExtensionInput
+  ) => Promise<SliceWalletExtensionConnectResult>
   destroy: () => void
   readonly pendingCeremony: SliceWalletPendingCeremony | null
   on: <Event extends keyof SliceWalletProviderEventMap>(
@@ -58,7 +58,9 @@ export type SliceWalletEip1193Provider = {
   request: (
     request: SliceWalletProviderRequestArguments
   ) => Promise<SliceWalletProviderValue | undefined>
-  requestSession: () => Promise<SliceWalletCeremonySessionResult>
+  requestExtension: (
+    extension: SliceWalletCeremonyExtensionInput
+  ) => Promise<SliceWalletProtocolValue>
   subscribePendingCeremony: (
     listener: (pending: SliceWalletPendingCeremony | null) => void
   ) => () => void
@@ -71,7 +73,6 @@ export type SliceWalletTransportOverrides = {
 }
 
 export type SliceWalletParameters = {
-  announce?: boolean
   ceremonyMode?: SliceWalletCeremonyMode
   chainIds?: readonly number[]
   defaultChainId?: number
@@ -79,12 +80,6 @@ export type SliceWalletParameters = {
     optional?: boolean
   }
   idOrigin?: string
-  session?: {
-    onSession?: (
-      result: SliceWalletCeremonySessionResult | undefined
-    ) => void | Promise<void>
-    prepare: NonNullable<SliceWalletSessionConnectInput["prepare"]>
-  }
   transports?: Readonly<Record<number, SliceWalletTransportOverrides>>
 }
 
@@ -168,16 +163,4 @@ export type SliceWalletPermissionCapabilities = {
     "erc20-transfer-from"
   ]
   version: "1"
-}
-
-export type SliceWalletEip6963ProviderInfo = {
-  icon: string
-  name: "Slice Wallet"
-  rdns: "so.slice.wallet"
-  uuid: string
-}
-
-export type SliceWalletEip6963ProviderDetail = {
-  info: SliceWalletEip6963ProviderInfo
-  provider: SliceWalletEip1193Provider
 }

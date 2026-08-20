@@ -1,10 +1,10 @@
-import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives"
+import type { SliceWalletProtocolValue } from "../protocol/index"
 import { createSliceWalletRegistryClient } from "../registry"
 import type {
   ConnectSliceWalletAccountParameters,
-  RequestSliceWalletSessionParameters,
+  RequestSliceWalletCeremonyExtensionParameters,
   SliceWalletCeremonyAccountMessage,
-  SliceWalletCeremonySessionRequestMessage,
+  SliceWalletCeremonyExtensionRequestMessage,
   SliceWalletConnectedAccount
 } from "../types"
 import { toSliceWalletCeremonyError } from "../userRejectedRequest"
@@ -27,7 +27,7 @@ const runSliceWalletAccountCeremony = async ({
   document,
   fetch,
   idOrigin,
-  session,
+  extension,
   timeoutMs,
   window,
   requestedAccount
@@ -67,12 +67,6 @@ const runSliceWalletAccountCeremony = async ({
       popupName: "slice-wallet-connect",
       window
     })
-    let preparedSession:
-      | Extract<
-          SliceWalletCeremonySessionRequestMessage,
-          { status: "prepared" }
-        >["request"]
-      | null = null
     const resultPromise = waitForSliceWalletCeremonyMessage({
       parse: (value: SliceWalletProtocolValue) => {
         const message = parseSliceWalletCeremonyAccountResponse(value)
@@ -92,33 +86,33 @@ const runSliceWalletAccountCeremony = async ({
       timeoutMs
     })
     void resultPromise.catch(() => undefined)
-    if (session === undefined) {
+    if (extension === undefined) {
       port.postMessage({
         status: "none",
-        type: "slice-wallet:ceremony-session-request"
-      } satisfies SliceWalletCeremonySessionRequestMessage)
+        type: "slice-wallet:ceremony-extension-request"
+      } satisfies SliceWalletCeremonyExtensionRequestMessage)
     } else {
       if (
-        (session.prepare === undefined) ===
-        (session.prepared === undefined)
+        (extension.prepare === undefined) ===
+        (extension.prepared === undefined)
       ) {
         throw new Error(
-          "Session connect requires exactly one preparation mode."
+          "Ceremony extensions require exactly one preparation mode."
         )
       }
       port.postMessage({
         status: "preparing",
-        type: "slice-wallet:ceremony-session-request"
-      } satisfies SliceWalletCeremonySessionRequestMessage)
+        type: "slice-wallet:ceremony-extension-request"
+      } satisfies SliceWalletCeremonyExtensionRequestMessage)
       const preparationPromise = (async () => {
         try {
-          return session.prepared ?? (await session.prepare?.())
+          return extension.prepared ?? (await extension.prepare?.())
         } catch {
           return undefined
         }
       })()
       const terminalResultPromise = resultPromise.then((result) =>
-        result.session !== undefined && result.session.status !== "granted"
+        result.extension !== undefined
           ? { result, type: "result" as const }
           : new Promise<never>(() => undefined)
       )
@@ -131,31 +125,24 @@ const runSliceWalletAccountCeremony = async ({
       ])
       if (first.type === "result") return first.result
       const preparation = first.preparation
-      if (preparation === undefined || session.signal?.aborted === true) {
+      if (preparation === undefined || extension.signal?.aborted === true) {
         port.postMessage({
           status: "preparation_failed",
-          type: "slice-wallet:ceremony-session-request"
-        } satisfies SliceWalletCeremonySessionRequestMessage)
+          type: "slice-wallet:ceremony-extension-request"
+        } satisfies SliceWalletCeremonyExtensionRequestMessage)
       } else {
-        const preparedRequest = preparation
-        preparedSession = preparedRequest
         port.postMessage({
-          request: preparedRequest,
+          request: preparation,
           status: "prepared",
-          type: "slice-wallet:ceremony-session-request"
-        } satisfies SliceWalletCeremonySessionRequestMessage)
+          type: "slice-wallet:ceremony-extension-request"
+        } satisfies SliceWalletCeremonyExtensionRequestMessage)
       }
     }
     const result = await resultPromise
-    if (
-      result.type === "slice-wallet:ceremony-account" &&
-      result.session?.status === "granted" &&
-      (preparedSession === null ||
-        result.session.sessionSigner.toLowerCase() !==
-          preparedSession.sessionSigner.toLowerCase() ||
-        result.session.pendingId !== preparedSession.pendingId)
-    ) {
-      throw new Error("Slice Wallet session result does not match preparation.")
+    if (result.extension !== undefined && extension === undefined) {
+      throw new Error(
+        "Slice Wallet returned an unrequested ceremony extension."
+      )
     }
     return result
   }
@@ -191,12 +178,12 @@ const runSliceWalletAccountCeremony = async ({
     requestedAccount !== undefined &&
     credential.accountAddress.toLowerCase() !== requestedAccount.toLowerCase()
   ) {
-    throw new Error("Slice Wallet session was signed by a different account.")
+    throw new Error("Slice Wallet ceremony used a different account.")
   }
   return {
     ...credential,
     ...(account.recovery === undefined ? {} : { recovery: account.recovery }),
-    ...(account.session === undefined ? {} : { session: account.session })
+    ...(account.extension === undefined ? {} : { extension: account.extension })
   }
 }
 
@@ -204,16 +191,16 @@ export const connectSliceWalletAccount = (
   parameters: ConnectSliceWalletAccountParameters
 ) => runSliceWalletAccountCeremony(parameters)
 
-export const requestSliceWalletSession = async ({
+export const requestSliceWalletCeremonyExtension = async ({
   account,
   ...parameters
-}: RequestSliceWalletSessionParameters) => {
+}: RequestSliceWalletCeremonyExtensionParameters) => {
   const connected = await runSliceWalletAccountCeremony({
     ...parameters,
     requestedAccount: account
   })
-  if (connected.session === undefined) {
-    throw new Error("Slice Wallet session request returned no result.")
+  if (connected.extension === undefined) {
+    throw new Error("Slice Wallet ceremony extension returned no result.")
   }
-  return connected.session
+  return connected.extension
 }

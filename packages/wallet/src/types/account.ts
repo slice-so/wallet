@@ -1,10 +1,4 @@
 import type {
-  SliceKernelAccount,
-  SliceKernelInstall,
-  SliceWalletKernelTypedData,
-  SliceWalletRegisteredRootCredential
-} from "@slicekit/wallet-primitives"
-import type {
   Address,
   Chain,
   Client,
@@ -18,6 +12,12 @@ import type {
   P256Credential,
   ToWebAuthnAccountParameters
 } from "viem/account-abstraction"
+import type {
+  SliceKernelAccount,
+  SliceKernelInstall,
+  SliceWalletKernelTypedData,
+  SliceWalletRegisteredRootCredential
+} from "../protocol/index"
 import type { SliceWalletUnsignedUserOperation } from "./frame"
 export type SliceWalletActivityTokenDescriptor = {
   address: Address

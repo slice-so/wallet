@@ -42,8 +42,10 @@ export const getSliceWalletSourceImportBoundaryViolations = ({
 }) => {
   const violations: string[] = []
   const relativePath = relative(packageRoot, filePath).split(sep).join("/")
-  const isExecution = relativePath.startsWith("src/execution/")
-  const isTypes = relativePath.startsWith("src/types/")
+  const isProtocol = relativePath.startsWith("src/protocol/")
+  const isExecution =
+    relativePath.startsWith("src/execution/") ||
+    relativePath.startsWith("src/protocol/execution/")
   const sourceFile = ts.createSourceFile(
     filePath,
     sourceText,
@@ -60,18 +62,19 @@ export const getSliceWalletSourceImportBoundaryViolations = ({
     ) {
       return
     }
-    if (specifier === "@slicekit/erc8128" && (isExecution || isTypes)) return
     if (
-      specifier === "@slicekit/wallet-primitives" ||
-      specifier.startsWith("@slicekit/wallet-primitives/")
+      specifier === "react" ||
+      specifier.startsWith("react/") ||
+      specifier === "wagmi" ||
+      specifier.startsWith("wagmi/") ||
+      specifier === "@wagmi/core" ||
+      specifier.startsWith("@wagmi/core/") ||
+      specifier === "connectkit" ||
+      specifier.startsWith("connectkit/")
     ) {
-      return
-    }
-    if (
-      isExecution &&
-      (specifier === "react" || specifier.startsWith("react/"))
-    ) {
-      violations.push(`${relativePath} imports React from the execution layer`)
+      violations.push(
+        `${relativePath} imports browser integration module "${specifier}"`
+      )
       return
     }
     if (specifier.startsWith("@slice/") || specifier.startsWith("@slicekit/")) {
@@ -80,8 +83,8 @@ export const getSliceWalletSourceImportBoundaryViolations = ({
       )
       return
     }
-    // Kernel v4 encoding is owned by @slicekit/wallet-primitives/kernel and the
-    // in-package SmartAccount implementation; the ZeroDev SDKs must not return.
+    // Kernel v4 encoding and the SmartAccount implementation are owned here;
+    // the ZeroDev SDKs must not return.
     if (specifier.startsWith("@zerodev/")) {
       violations.push(`${relativePath} imports a ZeroDev SDK "${specifier}"`)
       return
@@ -89,6 +92,17 @@ export const getSliceWalletSourceImportBoundaryViolations = ({
     if (!specifier.startsWith(".")) return
 
     const resolvedImport = resolve(filePath, "..", specifier)
+    const protocolRoot = resolve(sourceRoot, "protocol")
+    if (
+      isProtocol &&
+      resolvedImport !== protocolRoot &&
+      !resolvedImport.startsWith(`${protocolRoot}${sep}`)
+    ) {
+      violations.push(
+        `${relativePath} escapes the wallet protocol boundary via "${specifier}"`
+      )
+      return
+    }
     const reactRoot = resolve(sourceRoot, "react")
     if (
       isExecution &&

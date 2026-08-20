@@ -1,17 +1,4 @@
 import {
-  assertSliceWalletGrantScope,
-  type SliceWalletCheckoutGrant,
-  type SliceWalletFrameSessionKey,
-  type SliceWalletProtocolValue
-} from "@slicekit/wallet-primitives"
-import {
-  normalizeWalletPolicyDescriptor,
-  type WalletGrantKind,
-  type WalletPolicyCallRule,
-  type WalletPolicyDescriptor,
-  type WalletPolicyParameterRule
-} from "@slicekit/wallet-primitives/policy"
-import {
   type Address,
   type Hex,
   isAddress,
@@ -19,6 +6,19 @@ import {
   isHex,
   zeroAddress
 } from "viem"
+import {
+  assertSliceWalletGrantScope,
+  type SliceWalletCheckoutGrant,
+  type SliceWalletFrameSessionKey,
+  type SliceWalletProtocolValue
+} from "../protocol/index"
+import {
+  normalizeWalletPolicyDescriptor,
+  type WalletGrantKind,
+  type WalletPolicyCallRule,
+  type WalletPolicyDescriptor,
+  type WalletPolicyParameterRule
+} from "../protocol/policy"
 import type {
   SliceWalletFrameRequest,
   SliceWalletFrameResponse,

@@ -1,18 +1,5 @@
 import { describe, expect, test } from "bun:test"
 import {
-  assertRecoveryPermissionInitConfig,
-  buildRecoveryPermissionInitConfig,
-  createRecoveryCallPolicy,
-  sliceRecoveryTimelockDelaySec,
-  sliceRecoveryTimelockExpirationSec,
-  sliceWalletKernelAddresses,
-  toSliceTimelockPolicy
-} from "@slicekit/wallet-primitives"
-import {
-  kernelWebAuthnValidatorLifecycleAbi,
-  resolveSliceWalletDeployment
-} from "@slicekit/wallet-primitives/kernel"
-import {
   type Address,
   concat,
   decodeAbiParameters,
@@ -29,6 +16,20 @@ import {
   buildDevicePromotionCalls,
   toSliceWalletDeviceSigner
 } from "./deviceValidator"
+import { encodeSliceWalletRootValidatorData } from "./protocol/accountPrediction"
+import {
+  assertRecoveryPermissionInitConfig,
+  buildRecoveryPermissionInitConfig,
+  createRecoveryCallPolicy,
+  sliceRecoveryTimelockDelaySec,
+  sliceRecoveryTimelockExpirationSec,
+  sliceWalletKernelAddresses,
+  toSliceTimelockPolicy
+} from "./protocol/index"
+import {
+  kernelWebAuthnValidatorLifecycleAbi,
+  resolveSliceWalletDeployment
+} from "./protocol/kernel"
 import {
   buildRecoveryCancelCall,
   buildRecoveryNoOpCallData,
@@ -36,7 +37,6 @@ import {
   encodeRecoveryProposalSignature,
   encodeRecoveryProposalUserOperationSignature
 } from "./recovery"
-import { encodeSliceWalletRootValidatorData } from "./rootValidator"
 
 const account = "0x1111111111111111111111111111111111111111"
 const credential = {

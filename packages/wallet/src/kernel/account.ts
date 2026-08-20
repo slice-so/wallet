@@ -1,23 +1,3 @@
-import type {
-  SliceKernelAccount,
-  SliceKernelClient,
-  SliceKernelInstall,
-  SliceKernelPermission,
-  SliceKernelValidator
-} from "@slicekit/wallet-primitives"
-import {
-  encodeKernelEnableSignature,
-  encodeKernelPermissionSignature,
-  getKernelEntryPointNonce,
-  getKernelFactoryArgs,
-  getKernelPermissionInstallState,
-  getKernelPermissionInstalls,
-  getKernelPermissionNonceKey,
-  getKernelRootNonceKey,
-  kernelEntryPoint,
-  kernelModuleType,
-  predictKernelAddress
-} from "@slicekit/wallet-primitives/kernel"
 import {
   type Address,
   createNonceManager,
@@ -32,6 +12,26 @@ import {
 } from "viem/account-abstraction"
 import { getChainId } from "viem/actions"
 import { getAction } from "viem/utils"
+import type {
+  SliceKernelAccount,
+  SliceKernelClient,
+  SliceKernelInstall,
+  SliceKernelPermission,
+  SliceKernelValidator
+} from "../protocol/index"
+import {
+  encodeKernelEnableSignature,
+  encodeKernelPermissionSignature,
+  getKernelEntryPointNonce,
+  getKernelFactoryArgs,
+  getKernelPermissionInstallState,
+  getKernelPermissionInstalls,
+  getKernelPermissionNonceKey,
+  getKernelRootNonceKey,
+  kernelEntryPoint,
+  kernelModuleType,
+  predictKernelAddress
+} from "../protocol/kernel"
 import { compactKernelErc6492Signature } from "./erc6492Bootstrap"
 import { decodeKernelCalls, encodeKernelCalls } from "./execution"
 import {

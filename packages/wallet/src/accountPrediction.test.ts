@@ -1,12 +1,5 @@
 import { describe, expect, test } from "bun:test"
 import {
-  buildRecoveryPermissionInitConfig,
-  predictSliceWalletKernelAccountAddress,
-  sliceWalletKernelAddresses,
-  sliceWalletKernelProxyInitCodeHash
-} from "@slicekit/wallet-primitives"
-import { kernelFactoryAbi } from "@slicekit/wallet-primitives/kernel"
-import {
   createPublicClient,
   custom,
   decodeFunctionData,
@@ -15,6 +8,13 @@ import {
   parseErc6492Signature,
   serializeErc6492Signature
 } from "viem"
+import {
+  buildRecoveryPermissionInitConfig,
+  predictSliceWalletKernelAccountAddress,
+  sliceWalletKernelAddresses,
+  sliceWalletKernelProxyInitCodeHash
+} from "./protocol/index"
+import { kernelFactoryAbi } from "./protocol/kernel"
 import { createSliceWalletRegisteredKernelAccount } from "./rootValidator"
 
 const parameters = {
@@ -29,10 +29,10 @@ const parameters = {
 } as const
 
 const vectors = [
-  [0n, "0x543f58773eaF2B7B4afa7E1da81633a02C112666"],
-  [1n, "0xe435FCe145dED6DEEFe9134098580056A5E6468F"],
-  [7n, "0x13B42957CE54Ae99226A67e118EB08aA583e5522"],
-  [31n, "0xaC17903A1E4EDBe5fE466405BBc56d0f8405970a"]
+  [0n, "0xC5A8dFe2e816F248872Fba4C54cD14C9Dd97De87"],
+  [1n, "0x3D68B7B7550C3bF65f4DA046ebe6fbD24BC1f37a"],
+  [7n, "0x34623E7ecA87C5b6E6968a49d2ecd3AD6cee5BA1"],
+  [31n, "0x18340ea1474E222305a84ed8f684D50ff76C6294"]
 ] as const
 
 const client = createPublicClient({

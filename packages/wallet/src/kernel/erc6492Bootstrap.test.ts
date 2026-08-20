@@ -1,6 +1,4 @@
 import { describe, expect, test } from "bun:test"
-import { sliceWalletKernelAddresses } from "@slicekit/wallet-primitives"
-import { kernelFactoryAbi } from "@slicekit/wallet-primitives/kernel"
 import {
   bytesToHex,
   concatHex,
@@ -10,6 +8,8 @@ import {
   parseErc6492Signature,
   serializeErc6492Signature
 } from "viem"
+import { sliceWalletKernelAddresses } from "../protocol/index"
+import { kernelFactoryAbi } from "../protocol/kernel"
 import {
   compactKernelErc6492Signature,
   compressKernelErc6492BootstrapCalldata

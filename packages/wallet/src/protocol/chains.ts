@@ -1,0 +1,646 @@
+// Auto-generated from contracts deployment facts and wallet chain policy.
+// Run: bun run generate:chains
+
+import type { Hex } from "viem"
+import type {
+  SliceWalletChainManifest,
+  SliceWalletContractDeployments
+} from "./types/chains"
+
+const parseBigIntFields = (
+  manifest: Omit<SliceWalletChainManifest, "executionSafety"> & {
+    executionSafety: {
+      readonly [Key in keyof SliceWalletChainManifest["executionSafety"]]: string
+    }
+  }
+): SliceWalletChainManifest => ({
+  ...manifest,
+  executionSafety: Object.freeze({
+    maxCallGasLimit: BigInt(manifest.executionSafety.maxCallGasLimit),
+    maxFeePerGas: BigInt(manifest.executionSafety.maxFeePerGas),
+    maxNativeCostWei: BigInt(manifest.executionSafety.maxNativeCostWei),
+    maxPaymasterPostOpGasLimit: BigInt(
+      manifest.executionSafety.maxPaymasterPostOpGasLimit
+    ),
+    maxPaymasterVerificationGasLimit: BigInt(
+      manifest.executionSafety.maxPaymasterVerificationGasLimit
+    ),
+    maxPrefundWei: BigInt(manifest.executionSafety.maxPrefundWei),
+    maxPreVerificationGas: BigInt(
+      manifest.executionSafety.maxPreVerificationGas
+    ),
+    maxPriorityFeePerGas: BigInt(manifest.executionSafety.maxPriorityFeePerGas),
+    maxVerificationGasLimit: BigInt(
+      manifest.executionSafety.maxVerificationGasLimit
+    )
+  })
+})
+
+const freezeManifest = (manifest: SliceWalletChainManifest) => {
+  Object.freeze(manifest.authorityAdmission)
+  Object.freeze(manifest.chain.nativeCurrency)
+  Object.freeze(manifest.chain.rpcUrls.default.http)
+  Object.freeze(manifest.chain.rpcUrls.default)
+  Object.freeze(manifest.chain.rpcUrls)
+  if (manifest.chain.blockExplorers !== undefined) {
+    Object.freeze(manifest.chain.blockExplorers.default)
+    Object.freeze(manifest.chain.blockExplorers)
+  }
+  Object.freeze(manifest.chain)
+  for (const contract of Object.values(manifest.contracts)) {
+    Object.freeze(contract)
+  }
+  Object.freeze(manifest.contracts)
+  Object.freeze(manifest.defaultTransports)
+  Object.freeze(manifest.funding.sponsoredSecurityOperations)
+  Object.freeze(manifest.funding)
+  return Object.freeze(manifest)
+}
+
+const canonicalContracts = {
+  entryPoint: {
+    address: "0x433709009B8330FDa32311DF1C2AFA402eD8D009",
+    version: "0.9"
+  },
+  kernelStaker: {
+    address: "0x58e2fd56990250b0ee784d15905c9856209226ae",
+    initCodeHash:
+      "0x15ffa4371818c1b8e2ce98d157e1d6c0c2e230c7d473af14ddb621cd4cb09bae"
+  },
+  kernelImplementation: {
+    address: "0xc842fe2ac44046ae3cef033a16c67a9bc287cbd2",
+    initCodeHash:
+      "0x91b218fcd1d196f8d2e4ad7b34c1cf2175f50ecfb9e280f6fe5eb9069ab6bcb3",
+    version: "0.4.0"
+  },
+  kernelImmutableEcdsa: {
+    address: "0x6f0999265b6e1dfbe875f104548b875a99a65d37",
+    initCodeHash:
+      "0x674820f5863657e1af42697645a152caa510f4acab17dda817de8f73561e051e"
+  },
+  kernelFactory: {
+    address: "0xa299a4efee7bbfb2ea5668b30218c45fff78356c",
+    initCodeHash:
+      "0x9aaa8f211d7cdbb662c6add6c5068dd0bd992c403d09a62be36b82446c251495"
+  },
+  webAuthnRootValidator: {
+    address: "0x7ab16Ff354AcB328452F1D445b3Ddee9a91e9e69",
+    version: "0.0.3"
+  },
+  webAuthnSigner: {
+    address: "0x65DEeC8fEe717dc044D0CFD63cCf55F02cCaC2b3",
+    version: "0.0.4"
+  },
+  ecdsaSigner: {
+    address: "0x6A6F069E2a08c2468e7724Ab3250CdBFBA14D4FF"
+  },
+  erc6492BootstrapFactory: {
+    address: "0x776D66A5889CEEf1A85deCB9c40e43C36c829d97"
+  },
+  callPolicy: {
+    address: "0x85770b902D1e503D5f5141d9eaC16d0d08eEaDd2",
+    version: "0.0.5"
+  },
+  timestampPolicy: {
+    address: "0xB9f8f524bE6EcD8C945b1b87f9ae5C192FdCE20F"
+  },
+  rateLimitPolicy: {
+    address: "0xf63d4139B25c836334edD76641356c6b74C86873"
+  },
+  sudoPolicy: {
+    address: "0x67b436caD8a6D025DF6C82C5BB43fbF11fC5B9B7"
+  },
+  p256Verifier: {
+    address: "0xc2b78104907F722DABAc4C69f826a522B2754De4"
+  },
+  soladyP256Verifier: {
+    address: "0x000000000000D01eA45F9eFD5c54f037Fa57Ea1a"
+  },
+  weightedP256Signer: {
+    address: "0x963B1377e87701a94357b924c9C1cF2d9263FB06",
+    version: "1"
+  },
+  timelockPolicy: {
+    address: "0x50D5667ced5Db7F67a3BcE741cd3471b313F9DC8"
+  },
+  slicerRegistryPolicy: {
+    address: "0x20Cc5bF73f9276Bc520395958E45a3D41B299420"
+  },
+  authorizationRevocationRegistry: {
+    address: "0xB2A9330825D6AabBf7Cc7004Bc0916291C3322AD"
+  }
+} as const
+const deployments = [
+  {
+    admitted: false,
+    authorityAdmission: {
+      checkout: false,
+      generic: false,
+      management: false
+    },
+    chain: {
+      blockExplorers: {
+        default: {
+          name: "Ethereum Explorer",
+          url: "https://etherscan.io"
+        }
+      },
+      id: 1,
+      name: "Ethereum",
+      nativeCurrency: {
+        decimals: 18,
+        name: "Ether",
+        symbol: "ETH"
+      },
+      rpcUrls: {
+        default: {
+          http: ["https://eth.merkle.io"]
+        }
+      }
+    },
+    defaultTransports: {
+      bundlerUrl: "https://api.slice.so/wallet-rpc/1/bundler",
+      paymasterUrl: "https://api.slice.so/wallet-rpc/1/paymaster",
+      rpcUrl: "https://eth.merkle.io"
+    },
+    executionSafety: {
+      maxCallGasLimit: "3000000",
+      maxFeePerGas: "100000000000",
+      maxNativeCostWei: "50000000000000000",
+      maxPaymasterPostOpGasLimit: "500000",
+      maxPaymasterVerificationGasLimit: "1000000",
+      maxPrefundWei: "100000000000000000",
+      maxPreVerificationGas: "500000",
+      maxPriorityFeePerGas: "5000000000",
+      maxVerificationGasLimit: "5000000"
+    },
+    funding: {
+      defaultPath: "self-funded-or-request-paymaster",
+      sliceSponsorshipForExternalOrigins: false,
+      sponsoredSecurityOperations: []
+    },
+    rip7212Available: true,
+    runtimeCodeHashes: {
+      entryPoint:
+        "0x14ee3fe0191de027aecf20ffd7dbd985f5023b898fa429485d2dfe2286b42750",
+      kernelStaker: null,
+      kernelImplementation: null,
+      kernelImmutableEcdsa: null,
+      kernelFactory: null,
+      webAuthnRootValidator:
+        "0x726d987ac55574f77f5184326631c5c51142f94c16c9b9281b751f97519c9eea",
+      webAuthnSigner:
+        "0x62b28fd017f103166adc173fd9c173ff3f74238bcf1646fcca69bed4630f7380",
+      ecdsaSigner:
+        "0x510a0a1ab8b3f256a5c90b5fff51a9fd98656bd1c8a29fbd7857faa70c400ccd",
+      erc6492BootstrapFactory: null,
+      callPolicy:
+        "0x5934c38b0fac23319486e13370cfb9835a1b70cd10c6821351c669dfac74b356",
+      timestampPolicy:
+        "0x1e7146c888fec3f757e9ed5473b766cdb8a782e1e10c39f65cbc68f4ab83c4d2",
+      rateLimitPolicy:
+        "0xb4fffdb494637e8e5bfc15d6500202c252392b498e518668f896dc6da0221183",
+      sudoPolicy:
+        "0x7be56b30ee64b743005cf51ac4a63f14a9045f68243d8fb275ed36038ba4e1a4",
+      p256Verifier:
+        "0x3cd725b6ba67b40b7979190c41a015e82cf21e098eb61832ba623f8538bab7fc",
+      soladyP256Verifier:
+        "0x9933b3f70809361dcfebe1f731b129890454cc29af5b32840dcae92400a8826b",
+      weightedP256Signer: null,
+      timelockPolicy: null,
+      slicerRegistryPolicy: null,
+      authorizationRevocationRegistry:
+        "0x5a93f9fbc9de24c9d2b5fe7e9fd81ac3b59a8bb6919977a844c24227b7d58804"
+    }
+  },
+  {
+    admitted: false,
+    authorityAdmission: {
+      checkout: false,
+      generic: false,
+      management: false
+    },
+    chain: {
+      blockExplorers: {
+        default: {
+          name: "OP Mainnet Explorer",
+          url: "https://optimistic.etherscan.io"
+        }
+      },
+      id: 10,
+      name: "OP Mainnet",
+      nativeCurrency: {
+        decimals: 18,
+        name: "Ether",
+        symbol: "ETH"
+      },
+      rpcUrls: {
+        default: {
+          http: ["https://mainnet.optimism.io"]
+        }
+      }
+    },
+    defaultTransports: {
+      bundlerUrl: "https://api.slice.so/wallet-rpc/10/bundler",
+      paymasterUrl: "https://api.slice.so/wallet-rpc/10/paymaster",
+      rpcUrl: "https://mainnet.optimism.io"
+    },
+    executionSafety: {
+      maxCallGasLimit: "3000000",
+      maxFeePerGas: "20000000000",
+      maxNativeCostWei: "10000000000000000",
+      maxPaymasterPostOpGasLimit: "500000",
+      maxPaymasterVerificationGasLimit: "1000000",
+      maxPrefundWei: "20000000000000000",
+      maxPreVerificationGas: "500000",
+      maxPriorityFeePerGas: "2000000000",
+      maxVerificationGasLimit: "5000000"
+    },
+    funding: {
+      defaultPath: "self-funded-or-request-paymaster",
+      sliceSponsorshipForExternalOrigins: false,
+      sponsoredSecurityOperations: []
+    },
+    rip7212Available: true,
+    runtimeCodeHashes: {
+      entryPoint:
+        "0x8500fa816e3e71f78b1ad6e164b455c900b0b7f835e77916f8c43974a24050c2",
+      kernelStaker: null,
+      kernelImplementation: null,
+      kernelImmutableEcdsa: null,
+      kernelFactory: null,
+      webAuthnRootValidator:
+        "0x726d987ac55574f77f5184326631c5c51142f94c16c9b9281b751f97519c9eea",
+      webAuthnSigner:
+        "0x62b28fd017f103166adc173fd9c173ff3f74238bcf1646fcca69bed4630f7380",
+      ecdsaSigner:
+        "0x510a0a1ab8b3f256a5c90b5fff51a9fd98656bd1c8a29fbd7857faa70c400ccd",
+      erc6492BootstrapFactory: null,
+      callPolicy:
+        "0x5934c38b0fac23319486e13370cfb9835a1b70cd10c6821351c669dfac74b356",
+      timestampPolicy:
+        "0x1e7146c888fec3f757e9ed5473b766cdb8a782e1e10c39f65cbc68f4ab83c4d2",
+      rateLimitPolicy:
+        "0xb4fffdb494637e8e5bfc15d6500202c252392b498e518668f896dc6da0221183",
+      sudoPolicy:
+        "0x7be56b30ee64b743005cf51ac4a63f14a9045f68243d8fb275ed36038ba4e1a4",
+      p256Verifier:
+        "0x3cd725b6ba67b40b7979190c41a015e82cf21e098eb61832ba623f8538bab7fc",
+      soladyP256Verifier:
+        "0x9933b3f70809361dcfebe1f731b129890454cc29af5b32840dcae92400a8826b",
+      weightedP256Signer: null,
+      timelockPolicy: null,
+      slicerRegistryPolicy: null,
+      authorizationRevocationRegistry:
+        "0x5a93f9fbc9de24c9d2b5fe7e9fd81ac3b59a8bb6919977a844c24227b7d58804"
+    }
+  },
+  {
+    admitted: false,
+    authorityAdmission: {
+      checkout: false,
+      generic: false,
+      management: false
+    },
+    chain: {
+      blockExplorers: {
+        default: {
+          name: "Base Explorer",
+          url: "https://basescan.org"
+        }
+      },
+      id: 8453,
+      name: "Base",
+      nativeCurrency: {
+        decimals: 18,
+        name: "Ether",
+        symbol: "ETH"
+      },
+      rpcUrls: {
+        default: {
+          http: ["https://mainnet.base.org"]
+        }
+      }
+    },
+    defaultTransports: {
+      bundlerUrl: "https://api.slice.so/wallet-rpc/8453/bundler",
+      paymasterUrl: "https://api.slice.so/wallet-rpc/8453/paymaster",
+      rpcUrl: "https://mainnet.base.org"
+    },
+    executionSafety: {
+      maxCallGasLimit: "3000000",
+      maxFeePerGas: "20000000000",
+      maxNativeCostWei: "10000000000000000",
+      maxPaymasterPostOpGasLimit: "500000",
+      maxPaymasterVerificationGasLimit: "1000000",
+      maxPrefundWei: "20000000000000000",
+      maxPreVerificationGas: "500000",
+      maxPriorityFeePerGas: "2000000000",
+      maxVerificationGasLimit: "5000000"
+    },
+    funding: {
+      defaultPath: "self-funded-or-request-paymaster",
+      sliceSponsorshipForExternalOrigins: false,
+      sponsoredSecurityOperations: [
+        "device-add",
+        "device-remove",
+        "recovery-cancel",
+        "session-install"
+      ]
+    },
+    rip7212Available: true,
+    runtimeCodeHashes: {
+      entryPoint:
+        "0x826b7ec542db9f3345234a25c2a6330a61f99483dedb6e6709928cc97e4e4d5d",
+      kernelStaker: null,
+      kernelImplementation: null,
+      kernelImmutableEcdsa: null,
+      kernelFactory: null,
+      webAuthnRootValidator:
+        "0x726d987ac55574f77f5184326631c5c51142f94c16c9b9281b751f97519c9eea",
+      webAuthnSigner:
+        "0x62b28fd017f103166adc173fd9c173ff3f74238bcf1646fcca69bed4630f7380",
+      ecdsaSigner:
+        "0x510a0a1ab8b3f256a5c90b5fff51a9fd98656bd1c8a29fbd7857faa70c400ccd",
+      erc6492BootstrapFactory: null,
+      callPolicy:
+        "0x5934c38b0fac23319486e13370cfb9835a1b70cd10c6821351c669dfac74b356",
+      timestampPolicy:
+        "0x1e7146c888fec3f757e9ed5473b766cdb8a782e1e10c39f65cbc68f4ab83c4d2",
+      rateLimitPolicy:
+        "0xb4fffdb494637e8e5bfc15d6500202c252392b498e518668f896dc6da0221183",
+      sudoPolicy:
+        "0x7be56b30ee64b743005cf51ac4a63f14a9045f68243d8fb275ed36038ba4e1a4",
+      p256Verifier:
+        "0x3cd725b6ba67b40b7979190c41a015e82cf21e098eb61832ba623f8538bab7fc",
+      soladyP256Verifier:
+        "0x9933b3f70809361dcfebe1f731b129890454cc29af5b32840dcae92400a8826b",
+      weightedP256Signer: null,
+      timelockPolicy: null,
+      slicerRegistryPolicy: null,
+      authorizationRevocationRegistry:
+        "0x5a93f9fbc9de24c9d2b5fe7e9fd81ac3b59a8bb6919977a844c24227b7d58804"
+    }
+  },
+  {
+    admitted: false,
+    authorityAdmission: {
+      checkout: false,
+      generic: false,
+      management: false
+    },
+    chain: {
+      blockExplorers: {
+        default: {
+          name: "Arbitrum One Explorer",
+          url: "https://arbiscan.io"
+        }
+      },
+      id: 42161,
+      name: "Arbitrum One",
+      nativeCurrency: {
+        decimals: 18,
+        name: "Ether",
+        symbol: "ETH"
+      },
+      rpcUrls: {
+        default: {
+          http: ["https://arb1.arbitrum.io/rpc"]
+        }
+      }
+    },
+    defaultTransports: {
+      bundlerUrl: "https://api.slice.so/wallet-rpc/42161/bundler",
+      paymasterUrl: "https://api.slice.so/wallet-rpc/42161/paymaster",
+      rpcUrl: "https://arb1.arbitrum.io/rpc"
+    },
+    executionSafety: {
+      maxCallGasLimit: "3000000",
+      maxFeePerGas: "20000000000",
+      maxNativeCostWei: "10000000000000000",
+      maxPaymasterPostOpGasLimit: "500000",
+      maxPaymasterVerificationGasLimit: "1000000",
+      maxPrefundWei: "20000000000000000",
+      maxPreVerificationGas: "500000",
+      maxPriorityFeePerGas: "2000000000",
+      maxVerificationGasLimit: "5000000"
+    },
+    funding: {
+      defaultPath: "self-funded-or-request-paymaster",
+      sliceSponsorshipForExternalOrigins: false,
+      sponsoredSecurityOperations: []
+    },
+    rip7212Available: true,
+    runtimeCodeHashes: {
+      entryPoint:
+        "0x366bdda453c3f5701b236ddf48347220c1ea6404a7f01861d79a30d25bb6eb74",
+      kernelStaker: null,
+      kernelImplementation: null,
+      kernelImmutableEcdsa: null,
+      kernelFactory: null,
+      webAuthnRootValidator:
+        "0x726d987ac55574f77f5184326631c5c51142f94c16c9b9281b751f97519c9eea",
+      webAuthnSigner:
+        "0x62b28fd017f103166adc173fd9c173ff3f74238bcf1646fcca69bed4630f7380",
+      ecdsaSigner:
+        "0x510a0a1ab8b3f256a5c90b5fff51a9fd98656bd1c8a29fbd7857faa70c400ccd",
+      erc6492BootstrapFactory: null,
+      callPolicy:
+        "0x5934c38b0fac23319486e13370cfb9835a1b70cd10c6821351c669dfac74b356",
+      timestampPolicy:
+        "0x1e7146c888fec3f757e9ed5473b766cdb8a782e1e10c39f65cbc68f4ab83c4d2",
+      rateLimitPolicy:
+        "0xb4fffdb494637e8e5bfc15d6500202c252392b498e518668f896dc6da0221183",
+      sudoPolicy:
+        "0x7be56b30ee64b743005cf51ac4a63f14a9045f68243d8fb275ed36038ba4e1a4",
+      p256Verifier:
+        "0x3cd725b6ba67b40b7979190c41a015e82cf21e098eb61832ba623f8538bab7fc",
+      soladyP256Verifier:
+        "0x9933b3f70809361dcfebe1f731b129890454cc29af5b32840dcae92400a8826b",
+      weightedP256Signer: null,
+      timelockPolicy: null,
+      slicerRegistryPolicy: null,
+      authorizationRevocationRegistry:
+        "0x5a93f9fbc9de24c9d2b5fe7e9fd81ac3b59a8bb6919977a844c24227b7d58804"
+    }
+  }
+] as const
+
+const buildContracts = (
+  runtimeCodeHashes: Readonly<
+    Record<keyof typeof canonicalContracts, Hex | null>
+  >
+) =>
+  ({
+    entryPoint: {
+      ...canonicalContracts.entryPoint,
+      runtimeCodeHash: runtimeCodeHashes.entryPoint ?? null
+    },
+    kernelStaker: {
+      ...canonicalContracts.kernelStaker,
+      runtimeCodeHash: runtimeCodeHashes.kernelStaker ?? null
+    },
+    kernelImplementation: {
+      ...canonicalContracts.kernelImplementation,
+      runtimeCodeHash: runtimeCodeHashes.kernelImplementation ?? null
+    },
+    kernelImmutableEcdsa: {
+      ...canonicalContracts.kernelImmutableEcdsa,
+      runtimeCodeHash: runtimeCodeHashes.kernelImmutableEcdsa ?? null
+    },
+    kernelFactory: {
+      ...canonicalContracts.kernelFactory,
+      runtimeCodeHash: runtimeCodeHashes.kernelFactory ?? null
+    },
+    webAuthnRootValidator: {
+      ...canonicalContracts.webAuthnRootValidator,
+      runtimeCodeHash: runtimeCodeHashes.webAuthnRootValidator ?? null
+    },
+    webAuthnSigner: {
+      ...canonicalContracts.webAuthnSigner,
+      runtimeCodeHash: runtimeCodeHashes.webAuthnSigner ?? null
+    },
+    ecdsaSigner: {
+      ...canonicalContracts.ecdsaSigner,
+      runtimeCodeHash: runtimeCodeHashes.ecdsaSigner ?? null
+    },
+    erc6492BootstrapFactory: {
+      ...canonicalContracts.erc6492BootstrapFactory,
+      runtimeCodeHash: runtimeCodeHashes.erc6492BootstrapFactory ?? null
+    },
+    callPolicy: {
+      ...canonicalContracts.callPolicy,
+      runtimeCodeHash: runtimeCodeHashes.callPolicy ?? null
+    },
+    timestampPolicy: {
+      ...canonicalContracts.timestampPolicy,
+      runtimeCodeHash: runtimeCodeHashes.timestampPolicy ?? null
+    },
+    rateLimitPolicy: {
+      ...canonicalContracts.rateLimitPolicy,
+      runtimeCodeHash: runtimeCodeHashes.rateLimitPolicy ?? null
+    },
+    sudoPolicy: {
+      ...canonicalContracts.sudoPolicy,
+      runtimeCodeHash: runtimeCodeHashes.sudoPolicy ?? null
+    },
+    p256Verifier: {
+      ...canonicalContracts.p256Verifier,
+      runtimeCodeHash: runtimeCodeHashes.p256Verifier ?? null
+    },
+    soladyP256Verifier: {
+      ...canonicalContracts.soladyP256Verifier,
+      runtimeCodeHash: runtimeCodeHashes.soladyP256Verifier ?? null
+    },
+    weightedP256Signer: {
+      ...canonicalContracts.weightedP256Signer,
+      runtimeCodeHash: runtimeCodeHashes.weightedP256Signer ?? null
+    },
+    timelockPolicy: {
+      ...canonicalContracts.timelockPolicy,
+      runtimeCodeHash: runtimeCodeHashes.timelockPolicy ?? null
+    },
+    slicerRegistryPolicy: {
+      ...canonicalContracts.slicerRegistryPolicy,
+      runtimeCodeHash: runtimeCodeHashes.slicerRegistryPolicy ?? null
+    },
+    authorizationRevocationRegistry: {
+      ...canonicalContracts.authorizationRevocationRegistry,
+      runtimeCodeHash: runtimeCodeHashes.authorizationRevocationRegistry ?? null
+    }
+  }) satisfies SliceWalletContractDeployments
+
+const productionManifests = Object.fromEntries(
+  deployments.map(({ runtimeCodeHashes, ...deployment }) => {
+    const manifest = {
+      ...deployment,
+      contracts: buildContracts(runtimeCodeHashes)
+    }
+    return [manifest.chain.id, freezeManifest(parseBigIntFields(manifest))]
+  })
+) as Readonly<Record<number, SliceWalletChainManifest>>
+
+const canonicalDevelopmentManifest = productionManifests[8453]
+if (canonicalDevelopmentManifest === undefined) {
+  throw new Error("The canonical Base wallet manifest is missing.")
+}
+
+const developmentManifest = freezeManifest({
+  ...canonicalDevelopmentManifest,
+  admitted: true,
+  authorityAdmission: { checkout: true, generic: true, management: true },
+  chain: {
+    ...canonicalDevelopmentManifest.chain,
+    blockExplorers: {
+      default: { name: "Anvil RPC", url: "http://127.0.0.1:8545" }
+    },
+    id: 31337,
+    name: "Anvil",
+    rpcUrls: { default: { http: ["http://127.0.0.1:8545"] } }
+  },
+  contracts: Object.fromEntries(
+    Object.entries(canonicalDevelopmentManifest.contracts).map(
+      ([name, contract]) => [
+        name,
+        {
+          ...contract,
+          runtimeCodeHash:
+            name === "weightedP256Signer" ? null : contract.runtimeCodeHash
+        }
+      ]
+    )
+  ) as SliceWalletChainManifest["contracts"],
+  defaultTransports: {
+    bundlerUrl: "http://127.0.0.1:4337",
+    paymasterUrl: "http://127.0.0.1:4338",
+    rpcUrl: "http://127.0.0.1:8545"
+  },
+  rip7212Available: false
+})
+
+export const sliceWalletChainManifests = Object.freeze({
+  ...productionManifests,
+  [developmentManifest.chain.id]: developmentManifest
+} as Readonly<Record<number, SliceWalletChainManifest>>)
+
+export const sliceWalletSupportedChainIds = Object.freeze(
+  deployments
+    .filter((deployment) => deployment.admitted)
+    .map((deployment) => deployment.chain.id)
+)
+
+export const sliceWalletDevelopmentChainIds = Object.freeze([
+  developmentManifest.chain.id
+])
+
+export const getSliceWalletChainManifest = (chainId: number) => {
+  const manifest = sliceWalletChainManifests[chainId]
+  if (manifest === undefined || !manifest.admitted) {
+    throw new Error(`Slice Wallet chain ${chainId} is not provisioned.`)
+  }
+  return manifest
+}
+
+export const getSliceWalletChainPolicy = (chainId: number) => {
+  const manifest = sliceWalletChainManifests[chainId]
+  if (manifest === undefined) {
+    throw new Error(`Slice Wallet chain ${chainId} is unsupported.`)
+  }
+  return manifest
+}
+
+export const assertSliceWalletAuthorityDeployment = ({
+  authority,
+  chainId
+}: {
+  authority: keyof SliceWalletChainManifest["authorityAdmission"]
+  chainId: number
+}) => {
+  const manifest = getSliceWalletChainManifest(chainId)
+  if (!manifest.authorityAdmission[authority]) {
+    throw new Error(
+      `Slice Wallet ${authority} authority is not verified on chain ${chainId}.`
+    )
+  }
+  return manifest
+}

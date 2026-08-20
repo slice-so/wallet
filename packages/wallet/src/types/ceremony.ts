@@ -1,21 +1,19 @@
+import type { Address, Hex, SignableMessage } from "viem"
 import type {
   SliceWalletFrameSession,
-  SliceWalletPermissionAuthorization
-} from "@slicekit/wallet-primitives"
-import type { Address, Hex, SignableMessage } from "viem"
+  SliceWalletPermissionAuthorization,
+  SliceWalletProtocolValue
+} from "../protocol/index"
 import type {
   CreateSliceWalletRegisteredKernelAccountParameters,
   SliceWalletRootSignatureRequest
 } from "./account"
+import type { SliceWalletCeremonyExtensionInput } from "./ceremonyExtension"
 import type {
   SliceWalletCeremonyBroker,
   SliceWalletPopupRequiredReason
 } from "./pendingCeremony"
 import type { SliceWalletRegistryCredential } from "./registry"
-import type {
-  SliceWalletCeremonySessionResult,
-  SliceWalletSessionConnectInput
-} from "./session"
 
 export type SliceWalletCeremonyMode = "auto" | "iframe" | "popup"
 
@@ -78,7 +76,7 @@ export type SliceWalletCeremonyAccountMessage = {
     permissionId: Hex
     signerAddress: Address
   }
-  session?: SliceWalletCeremonySessionResult
+  extension?: SliceWalletProtocolValue
   type: "slice-wallet:ceremony-account"
   version: 1
 }
@@ -93,7 +91,7 @@ export type SliceWalletConnectedAccount = SliceWalletRegistryCredential & {
     permissionId: Hex
     signerAddress: Address
   }
-  session?: SliceWalletCeremonySessionResult
+  extension?: SliceWalletProtocolValue
 }
 
 export type SliceWalletCeremonyRootSignRequest = {
@@ -161,17 +159,17 @@ export type ConnectSliceWalletAccountParameters = {
   document?: Document
   fetch?: typeof fetch
   idOrigin: string
-  session?: SliceWalletSessionConnectInput
+  extension?: SliceWalletCeremonyExtensionInput
   timeoutMs?: number
   window: Window
 }
 
-export type RequestSliceWalletSessionParameters = Omit<
+export type RequestSliceWalletCeremonyExtensionParameters = Omit<
   ConnectSliceWalletAccountParameters,
-  "session"
+  "extension"
 > & {
   account: Address
-  session: SliceWalletSessionConnectInput
+  extension: SliceWalletCeremonyExtensionInput
 }
 
 export type CreateSliceWalletCeremonyRootSignerParameters = {

@@ -1,4 +1,4 @@
-import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives"
+import type { SliceWalletProtocolValue } from "../protocol/index"
 import type {
   SliceWalletFrameRequest,
   SliceWalletFrameResponse,

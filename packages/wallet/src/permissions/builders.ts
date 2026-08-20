@@ -1,4 +1,3 @@
-import { maximumBrowserGenericGrantTtlSec } from "@slicekit/wallet-primitives"
 import {
   type Address,
   getAddress,
@@ -6,6 +5,7 @@ import {
   maxUint256,
   numberToHex
 } from "viem"
+import { maximumBrowserGenericGrantTtlSec } from "../protocol/index"
 import type {
   SliceWalletGenericPermission,
   SliceWalletGenericPermissionRule,

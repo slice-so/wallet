@@ -1,27 +1,4 @@
 import {
-  assertSliceWalletAuthorityDeployment,
-  buildSliceWalletPermissionInstallCalls,
-  buildSliceWalletPermissionRevocationCalls,
-  getSliceWalletChainManifest,
-  getSliceWalletP256SignerId,
-  predictSliceWalletKernelAccountAddressFromInitConfig,
-  type SliceWalletFrameSession,
-  type SliceWalletPermissionAuthorization,
-  type WalletCall,
-  type WalletPolicyDescriptor
-} from "@slicekit/wallet-primitives"
-import {
-  resolveSliceWalletDeploymentProfileId,
-  SliceWalletDeploymentProfileError
-} from "@slicekit/wallet-primitives/kernel"
-import {
-  assertWalletCallsMatchPolicy,
-  deserializeWalletPolicyDescriptor,
-  getWalletPermissionId,
-  getWalletPolicyHash,
-  serializeWalletPolicyDescriptor
-} from "@slicekit/wallet-primitives/policy"
-import {
   type Address,
   BaseError,
   bytesToHex,
@@ -44,7 +21,7 @@ import {
 } from "viem/account-abstraction"
 import {
   connectSliceWalletAccount,
-  requestSliceWalletSession
+  requestSliceWalletCeremonyExtension
 } from "../ceremony/accountClient"
 import { createSliceWalletCeremonyBroker } from "../ceremony/broker"
 import { authorizeSliceWalletSessions } from "../ceremony/client"
@@ -52,6 +29,29 @@ import { parseSliceWalletFrameSession } from "../ceremony/protocol"
 import { createSliceWalletCeremonyKernelAccount } from "../ceremony/rootAccountClient"
 import { acquireSliceWalletSignerFrame } from "../frame/client"
 import { createSliceWalletPermissionAccount } from "../permissionAccount"
+import {
+  assertSliceWalletAuthorityDeployment,
+  buildSliceWalletPermissionInstallCalls,
+  buildSliceWalletPermissionRevocationCalls,
+  getSliceWalletChainManifest,
+  getSliceWalletP256SignerId,
+  predictSliceWalletKernelAccountAddressFromInitConfig,
+  type SliceWalletFrameSession,
+  type SliceWalletPermissionAuthorization,
+  type WalletCall,
+  type WalletPolicyDescriptor
+} from "../protocol/index"
+import {
+  resolveSliceWalletDeploymentProfileId,
+  SliceWalletDeploymentProfileError
+} from "../protocol/kernel"
+import {
+  assertWalletCallsMatchPolicy,
+  deserializeWalletPolicyDescriptor,
+  getWalletPermissionId,
+  getWalletPolicyHash,
+  serializeWalletPolicyDescriptor
+} from "../protocol/policy"
 import { getSliceWalletRegistryRecoveryInitConfig } from "../recovery"
 import {
   createSliceWalletRegistryClient,
@@ -63,13 +63,13 @@ import {
 } from "../rootValidator"
 import type {
   SliceWalletCeremonyBroker,
+  SliceWalletCeremonyExtensionInput,
   SliceWalletConnectedAccount,
   SliceWalletGenericPermission,
   SliceWalletPendingCeremony,
   SliceWalletPermissionGrant,
   SliceWalletProviderValue,
   SliceWalletRegistryCredential,
-  SliceWalletSessionConnectInput,
   SliceWalletSignerFrameClient
 } from "../types"
 import type {
@@ -849,7 +849,9 @@ const createSliceWalletChainRuntime = (
     }
   }
 
-  const chooseAccount = async (session?: SliceWalletSessionConnectInput) => {
+  const chooseAccount = async (
+    extension?: SliceWalletCeremonyExtensionInput
+  ) => {
     const generation = config.getAccountGeneration()
     await getFrame()
     const connected = await (
@@ -861,7 +863,7 @@ const createSliceWalletChainRuntime = (
       document: browserDocument,
       fetch: fetchImpl,
       idOrigin,
-      ...(session === undefined ? {} : { session }),
+      ...(extension === undefined ? {} : { extension }),
       window: browserWindow
     })
     const wallet = await toActiveWallet(connected)
@@ -909,12 +911,12 @@ const createSliceWalletChainRuntime = (
     return commitAccount(await chooseAccount())
   }
 
-  const connectWithSession = async (
-    session: SliceWalletSessionConnectInput
+  const connectWithExtension = async (
+    extension: SliceWalletCeremonyExtensionInput
   ) => {
-    const selection = await chooseAccount(session)
+    const selection = await chooseAccount(extension)
     const wallet = commitAccount(selection)
-    return { session: selection.connected.session, wallet }
+    return { extension: selection.connected.extension, wallet }
   }
 
   const lockAccount = async (account: `0x${string}`) => {
@@ -924,12 +926,11 @@ const createSliceWalletChainRuntime = (
     })
   }
 
-  const requestSession = async () => {
-    if (config.session === undefined) {
-      throw new Error("Slice Wallet session integration is not configured.")
-    }
+  const requestExtension = async (
+    extension: SliceWalletCeremonyExtensionInput
+  ) => {
     const wallet = await requireActiveWallet()
-    const result = await requestSliceWalletSession({
+    return requestSliceWalletCeremonyExtension({
       account: wallet.rootAccount.address,
       ceremonyBroker: config.ceremonyBroker,
       ceremonyMode: config.ceremonyMode,
@@ -937,13 +938,9 @@ const createSliceWalletChainRuntime = (
       document: browserDocument,
       fetch: fetchImpl,
       idOrigin,
-      session: {
-        prepare: config.session.prepare
-      },
+      extension,
       window: browserWindow
     })
-    await config.session.onSession?.(result)
-    return result
   }
 
   const hydrateGrant = async () => {
@@ -2145,7 +2142,7 @@ const createSliceWalletChainRuntime = (
     chooseAccount,
     commitAccount,
     connect,
-    connectWithSession,
+    connectWithExtension,
     createGrant,
     destroy: () => {
       void framePromise?.then((frame) => frame.destroy()).catch(() => {})
@@ -2182,7 +2179,7 @@ const createSliceWalletChainRuntime = (
     lockAccount,
     paymasterAvailable: config.paymasterUrl !== undefined,
     revokeGrant,
-    requestSession,
+    requestExtension,
     rotateGrant,
     sendCalls: callTracker.sendCalls,
     signMessage,
@@ -2388,9 +2385,10 @@ export const createSliceWalletProviderRuntime = (
       return activeChainId
     },
     connect: () => getChainRuntime().connect(),
-    connectWithSession: (session: SliceWalletSessionConnectInput) =>
-      getChainRuntime().connectWithSession(session),
-    requestSession: () => getChainRuntime().requestSession(),
+    connectWithExtension: (extension: SliceWalletCeremonyExtensionInput) =>
+      getChainRuntime().connectWithExtension(extension),
+    requestExtension: (extension: SliceWalletCeremonyExtensionInput) =>
+      getChainRuntime().requestExtension(extension),
     continueInPopup: () => ceremonyBroker.continueInPopup(),
     cancelPendingCeremony: () => ceremonyBroker.cancel(),
     createGrant: (

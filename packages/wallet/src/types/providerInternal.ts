@@ -1,18 +1,14 @@
+import type { Address, Chain, Hex } from "viem"
 import type {
   SerializedWalletPolicyDescriptor,
   WalletCall
-} from "@slicekit/wallet-primitives"
-import type { Address, Chain, Hex } from "viem"
+} from "../protocol/index"
 import type { SliceWalletCeremonyMode } from "./ceremony"
 import type {
   SliceWalletParameters,
   SliceWalletPermissionGrant,
   SliceWalletProviderValue
 } from "./provider"
-import type {
-  SliceWalletCeremonySessionResult,
-  SliceWalletSessionConnectInput
-} from "./session"
 
 export type SliceWalletProviderChainConfig = {
   bundlerUrl: string
@@ -22,7 +18,6 @@ export type SliceWalletProviderChainConfig = {
 }
 
 export type SliceWalletProviderConfig = {
-  announce?: boolean
   ceremonyMode?: SliceWalletCeremonyMode
   chains: readonly SliceWalletProviderChainConfig[]
   defaultChainId: number
@@ -31,12 +26,6 @@ export type SliceWalletProviderConfig = {
   grantPermissions?: SliceWalletParameters["grantPermissions"]
   idOrigin: string
   requireAdmittedChain?: boolean
-  session?: {
-    onSession?: (
-      result: SliceWalletCeremonySessionResult | undefined
-    ) => void | Promise<void>
-    prepare: NonNullable<SliceWalletSessionConnectInput["prepare"]>
-  }
   storage?: Storage
   window?: Window
 }

@@ -1,5 +1,5 @@
-import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives"
 import { type Address, type Hex, hexToBytes, isAddress, isHex } from "viem"
+import type { SliceWalletProtocolValue } from "../protocol/index"
 import type { SliceWalletCeremonyDeviceResponse } from "../types"
 import { parseSliceWalletCeremonyResponse } from "./protocol"
 

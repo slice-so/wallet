@@ -1,8 +1,8 @@
+import type { Address, Hex } from "viem"
 import type {
   SliceTimelockPolicyParameters,
   SliceWalletRegisteredRootCredential
-} from "@slicekit/wallet-primitives"
-import type { Address, Hex } from "viem"
+} from "../protocol/index"
 import type { SliceWalletPublicClient } from "./account"
 import type { SliceWalletRegistryCredential } from "./registry"
 

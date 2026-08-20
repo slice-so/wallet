@@ -3,25 +3,26 @@
 The low-level Slice Wallet implementation consumed by Slice ID. It constructs
 and operates passkey-controlled Kernel v4 smart accounts, implements the trusted
 signing and signer-frame protocols, routes policy-scoped execution, exposes a
-portable EIP-1193/EIP-6963/EIP-5792 provider, and implements wallet recovery.
+portable EIP-1193/EIP-5792 provider, and implements wallet recovery.
 
 This package is not the application-facing connector or authentication SDK.
 Applications should normally adopt
 [`@slicekit/id`](https://www.npmjs.com/package/@slicekit/id), whose
 `@slicekit/id/wagmi` entry point owns the single `sliceId()` connector. The
-connector creates this package's provider internally and optionally adds the
-Slice ID authentication lifecycle when passed an `auth` client.
+connector creates this package's provider internally; Slice ID layers its own
+authentication lifecycle over Wallet's protocol-neutral ceremony extension.
 
 ## Package scope
 
-`@slicekit/wallet` owns stateful, I/O-bound wallet behavior:
+`@slicekit/wallet` owns the full low-level Wallet domain:
 
+- runtime-neutral account, permission, policy, deployment-profile, chain,
+  Kernel encoding, hashing, recovery, and execution-admission behavior;
 - Kernel v4 smart-account construction and client transports;
 - WebAuthn root, device, permission, recovery, and signer-frame ceremonies;
 - non-extractable browser P-256 session keys and permission execution;
-- the framework-neutral provider, EIP-6963 discovery, EIP-5792 calls, and
-  low-level permission actions;
-- optional React wallet state and lifecycle orchestration;
+- the framework-neutral EIP-1193/EIP-5792 provider and low-level permission
+  actions;
 - checkout, store-management, bundler, paymaster, and recovery execution
   clients used by Slice-owned surfaces; and
 - wallet credential-registry clients, proofs, and server-side account
@@ -31,10 +32,6 @@ It deliberately does not own:
 
 - Wagmi connectors, Wagmi permission actions, application authentication,
   delegated API sessions, or identity UI — those belong to `@slicekit/id`;
-- canonical policies, hashes, chain manifests, Kernel encodings, or execution
-  admission — those belong to
-  [`@slicekit/wallet-primitives`](../wallet-primitives) and are imported
-  directly rather than re-exported; or
 - Solidity modules and deployment facts — those live in the sibling
   [`contracts`](https://github.com/slice-so/wallet/tree/main/contracts) project
   in the public Wallet repository.
@@ -50,8 +47,6 @@ instead.
 npm install @slicekit/wallet
 ```
 
-The `react` entry point additionally requires its `react` peer dependency.
-
 ## Security Boundary
 
 - Root passkey operations run only in a visible trusted ceremony.
@@ -60,33 +55,46 @@ The `react` entry point additionally requires its `react` peer dependency.
 - Delegated calls are checked against the same canonical policy descriptor in the ceremony, frame, SDK, and onchain permission.
 - Unsupported or opaque calls stay root-confirmed.
 - General ERC-8128 API sessions use a separate server-held EOA and receive no onchain wallet authority.
-- Slice ID session enrollment transports the draft ERC-8128 Delegation Grant artifact through the wallet ceremony; `@slicekit/id` validates the Slice candidate profile, while the wallet remains a protocol-neutral root-signing boundary.
+- The account ceremony can exchange one opaque extension value. Slice ID owns
+  preparation, parsing, binding, completion, and persistence of its ERC-8128
+  session; Wallet does not understand authentication claims or delegations.
 
 ## Entry Points
 
 - `@slicekit/wallet`: account and credential construction, ceremony clients,
   signer-frame clients, P-256 keys, recovery secret formats, and wallet types.
-- `@slicekit/wallet/provider`: the portable EIP-1193/EIP-6963/EIP-5792
-  provider, canonical configuration, discovery, errors, and provider protocol.
+- `@slicekit/wallet/protocol`: runtime-neutral protocol values, chain
+  manifests, account prediction, permissions, authorization, factory
+  validation, recovery values, and shared types.
+- `@slicekit/wallet/kernel`: Kernel v4 ABIs, constants, deployment profiles,
+  nonce and permission encoding, factory derivation, and typed data.
+- `@slicekit/wallet/policy`: canonical permission descriptors, hashes,
+  serialization, validation, and call matching.
+- `@slicekit/wallet/provider`: the portable EIP-1193/EIP-5792 provider,
+  canonical configuration, errors, and provider protocol.
 - `@slicekit/wallet/permissions`: generic permission request builders,
   EIP-1193 actions, and the Viem wallet-client extension.
-- `@slicekit/wallet/react`: Wallet provider state and account/session lifecycle
-  hooks. It contains no Wagmi connector and performs no application
-  authentication.
 - `@slicekit/wallet/frame`: the isolated signer-frame controller, wire
   protocol, and session store.
 - `@slicekit/wallet/execution`: Kernel account clients and transports plus
-  low-level checkout, management, bundler, and paymaster execution helpers.
+  runtime-neutral admission policies and low-level checkout, management,
+  bundler, and paymaster execution helpers.
 - `@slicekit/wallet/recovery`: timelock proposal, cancellation, and root
   rotation operations.
 - `@slicekit/wallet/server`: server-safe account reconstruction, wallet
   credential classification, registry proof, device, root, and recovery
-  helpers. It is not the Slice ID request verifier.
+  helpers plus the protocol server surface. It is not the Slice ID request
+  verifier.
 - `@slicekit/wallet/argon2id`: the Argon2id implementation used to decrypt or
   create advanced recovery bundles without loading it into the default entry
   point.
 - `@slicekit/wallet/ceremony-routes`: the canonical embedded-dialog and
   broker-required ceremony route sets.
+
+Server and infrastructure consumers should import only the explicit
+`/protocol`, `/kernel`, `/policy`, `/execution`, or `/server` entry point they
+need. The package root is the client/account surface and is not an umbrella
+barrel for server runtimes.
 
 ## Provider
 

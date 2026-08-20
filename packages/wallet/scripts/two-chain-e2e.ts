@@ -1,16 +1,6 @@
 #!/usr/bin/env bun
 
 import {
-  buildRecoveryPermissionInitConfig,
-  buildSliceWalletPermissionEnableTypedData,
-  createNativeTransferCallRule,
-  getWalletPermissionId,
-  getWalletPermissionValidAfter,
-  type SliceWalletFrameSession,
-  sliceWalletEntryPoint,
-  sliceWalletKernelAddresses
-} from "@slicekit/wallet-primitives"
-import {
   createPublicClient,
   createWalletClient,
   defineChain,
@@ -31,6 +21,16 @@ import {
   generateSliceWalletP256KeyPair
 } from "../src/p256"
 import { createSliceWalletPermissionAccount } from "../src/permissionAccount"
+import {
+  buildRecoveryPermissionInitConfig,
+  buildSliceWalletPermissionEnableTypedData,
+  createNativeTransferCallRule,
+  getWalletPermissionId,
+  getWalletPermissionValidAfter,
+  type SliceWalletFrameSession,
+  sliceWalletEntryPoint,
+  sliceWalletKernelAddresses
+} from "../src/protocol/index"
 import { createSliceWalletRegisteredKernelAccount } from "../src/rootValidator"
 import type { SliceWalletSignerFrameClient } from "../src/types/frame"
 

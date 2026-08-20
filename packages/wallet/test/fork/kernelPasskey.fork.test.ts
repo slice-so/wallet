@@ -32,29 +32,11 @@ import {
   getRecoveryState,
   getSliceWalletCredentialIdHash,
   getSliceWalletRootValidatorPublicKey,
-  hashSliceWalletWeightedP256CoSign,
-  hashSliceWalletWeightedP256Proposal,
   parseSliceWalletUncompressedPublicKey,
   type SliceWalletSignerFrameClient,
   signSliceWalletP256,
   toSliceWalletDeviceSigner
 } from "@slicekit/wallet"
-import {
-  buildSliceExecutionEnableTypedData,
-  buildStoreManagementPermissionUninstallCalls,
-  createSliceExecutionAccount
-} from "@slicekit/wallet/execution"
-import {
-  buildRecoveryPermissionInitConfig,
-  buildSliceWalletPermissionEnableTypedData,
-  buildSliceWalletPermissionRevocationCalls,
-  createErc20ApproveCallRule,
-  getWalletPermissionId,
-  predictSliceWalletKernelAccountAddress,
-  type SliceWalletFrameSession,
-  sliceKernelConfig,
-  sliceWalletKernelAddresses
-} from "@slicekit/wallet-primitives"
 import {
   type Address,
   bytesToHex,
@@ -90,6 +72,23 @@ import {
   toAccount
 } from "viem/accounts"
 import { base } from "viem/chains"
+import {
+  buildRecoveryPermissionInitConfig,
+  buildSliceWalletPermissionEnableTypedData,
+  buildSliceWalletPermissionRevocationCalls,
+  buildSliceWalletPermissionUninstallCalls,
+  createErc20ApproveCallRule,
+  createSliceStoreManagementPolicyDescriptor,
+  getWalletPermissionId,
+  predictSliceWalletKernelAccountAddress,
+  type SliceWalletFrameSession,
+  sliceKernelConfig,
+  sliceWalletKernelAddresses
+} from "../../src/protocol/index"
+import {
+  hashSliceWalletWeightedP256CoSign,
+  hashSliceWalletWeightedP256Proposal
+} from "../../src/protocol/server"
 
 const forkRpcUrl = process.env.KERNEL_PASSKEY_FORK_RPC_URL
 const forkSubmitterPrivateKey =
@@ -1139,10 +1138,6 @@ runForkTests("KernelUUPS v4 Base fork", () => {
     const { slicerAddress, tokenId: slicerId } = tokenSliced.args
     const rootKey = await generateSliceWalletP256KeyPair()
     const credentialId = "ERITFBUWFxgZGhscHQ"
-    const browserCredential = {
-      id: credentialId,
-      publicKey: rootKey.publicKeyHex
-    }
     const registeredCredential = {
       credentialIdHash: getSliceWalletCredentialIdHash(credentialId),
       publicKey: rootKey.publicKeyHex
@@ -1165,26 +1160,62 @@ runForkTests("KernelUUPS v4 Base fork", () => {
           usePrecompiled: false
         })
     })
-    const sessionPrivateKey = generatePrivateKey()
-    const sessionSignerAddress = privateKeyToAccount(sessionPrivateKey).address
+    const sessionKey = await generateSliceWalletP256KeyPair()
     const timestamp = Number((await publicClient.getBlock()).timestamp)
     const startsAt = timestamp - 60
     const validUntil = timestamp + 86_400
-    const enableTypedData = await buildSliceExecutionEnableTypedData({
-      accountIndex: 0n,
-      address: rootAccount.address,
-      client: publicClient,
-      credential: browserCredential,
-      mode: "store_management",
-      sessionSignerAddress,
-      startsAt,
-      validUntil
+    const policy = createSliceStoreManagementPolicyDescriptor({
+      account: rootAccount.address,
+      chainId: base.id,
+      expiresAt: validUntil,
+      startsAt
     })
-    const executionAccount = await createSliceExecutionAccount({
+    const session = {
+      account: rootAccount.address,
+      chainId: base.id,
+      expiresAt: validUntil,
+      grantKind: "management",
+      permissionId: getWalletPermissionId(policy, sessionKey.signerId),
+      policy,
+      publicKey: sessionKey.publicKeyHex,
+      signerId: sessionKey.signerId
+    } satisfies SliceWalletFrameSession
+    const enableTypedData = await buildSliceWalletPermissionEnableTypedData({
+      address: rootAccount.address,
+      client: publicClient,
+      session
+    })
+    const frameClient: SliceWalletSignerFrameClient = {
+      destroy: () => {},
+      request: async (request) => {
+        if (request.method !== "signScopedUserOperation") {
+          throw new Error("Unexpected signer-frame request in fork test.")
+        }
+        const userOperationHash = getUserOperationHash({
+          chainId: base.id,
+          entryPointAddress: entryPoint09Address,
+          entryPointVersion: "0.9",
+          userOperation: { ...request.params.userOperation, signature: "0x" }
+        })
+        return {
+          proposalHash: `0x${"00".repeat(32)}` as Hex,
+          signature: await encodeSliceWalletSyntheticWebAuthnSignature({
+            chainId: base.id,
+            challenge: userOperationHash,
+            key: sessionKey.privateKey,
+            origin: "https://id.slice.so",
+            rpId: "id.slice.so",
+            usePrecompiled: false
+          }),
+          userOperationHash
+        }
+      }
+    }
+    const executionAccount = await createSliceWalletPermissionAccount({
       accountIndex: 0n,
       address: rootAccount.address,
       client: publicClient,
-      credential: browserCredential,
+      credential: registeredCredential,
       enableSignature: await encodeSliceWalletSyntheticWebAuthnSignature({
         chainId: base.id,
         challenge: hashTypedData(enableTypedData),
@@ -1193,12 +1224,10 @@ runForkTests("KernelUUPS v4 Base fork", () => {
         rpId: "id.slice.so",
         usePrecompiled: false
       }),
+      frameClient,
       getFactoryArgs: () => rootAccount.getFactoryArgs(),
-      mode: "store_management",
-      sessionPrivateKey,
-      sessionSignerAddress,
-      startsAt,
-      validUntil
+      mode: "management",
+      session
     })
     const productManagerMask = maskToHex(
       rolesToMask([USER_ROLE.ProductManager])
@@ -1266,12 +1295,10 @@ runForkTests("KernelUUPS v4 Base fork", () => {
     expect(unauthorized).toBe(false)
 
     await setRole(true)
-    const uninstall = await buildStoreManagementPermissionUninstallCalls({
+    const uninstall = await buildSliceWalletPermissionUninstallCalls({
       account: rootAccount.address,
       client: publicClient,
-      sessionSignerAddress,
-      startsAt,
-      validUntil
+      session
     })
     expect(uninstall.calls.length).toBeGreaterThan(1)
     expect(
@@ -1291,154 +1318,4 @@ runForkTests("KernelUUPS v4 Base fork", () => {
       )
     ).rejects.toThrow()
   }, 300_000)
-
-  it("requires both checkout session and policy co-signatures", async () => {
-    const publicClient = createForkPublicClient()
-    const rootKey = await generateSliceWalletP256KeyPair()
-    const credentialId = "AQIDBAUGBwgJCgsMDQ"
-    const credential = {
-      id: credentialId,
-      publicKey: rootKey.publicKeyHex
-    }
-    const registeredCredential = {
-      credentialIdHash: getSliceWalletCredentialIdHash(credentialId),
-      publicKey: rootKey.publicKeyHex
-    }
-    const recovery = await buildRecoveryPermissionInitConfig({
-      recoverySignerAddress: submitter.address
-    })
-    const rootAccount = await createSliceWalletRegisteredKernelAccount({
-      chainId: base.id,
-      client: publicClient,
-      credential: registeredCredential,
-      initConfig: recovery.initConfig,
-      rootSigner: (challenge) =>
-        encodeSliceWalletSyntheticWebAuthnSignature({
-          chainId: base.id,
-          challenge,
-          key: rootKey.privateKey,
-          origin: "https://id.slice.so",
-          rpId: "id.slice.so",
-          usePrecompiled: false
-        })
-    })
-    const sessionPrivateKey = generatePrivateKey()
-    const sessionSignerAddress = privateKeyToAccount(sessionPrivateKey).address
-    const policyCoSigner = privateKeyToAccount(generatePrivateKey())
-    const wrongCoSigner = privateKeyToAccount(generatePrivateKey())
-    const validUntil = Math.floor(Date.now() / 1_000) + 86_400
-    const enableTypedData = await buildSliceExecutionEnableTypedData({
-      accountIndex: 0n,
-      address: rootAccount.address,
-      client: publicClient,
-      coSignerAddress: policyCoSigner.address,
-      credential,
-      mode: "checkout",
-      sessionSignerAddress,
-      validUntil
-    })
-    const enableSignature = await encodeSliceWalletSyntheticWebAuthnSignature({
-      chainId: base.id,
-      challenge: hashTypedData(enableTypedData),
-      key: rootKey.privateKey,
-      origin: "https://id.slice.so",
-      rpId: "id.slice.so",
-      usePrecompiled: false
-    })
-    const createExecution = (
-      coSign: typeof policyCoSigner | undefined,
-      configuredCoSigner: Address = policyCoSigner.address
-    ) =>
-      createSliceExecutionAccount({
-        accountIndex: 0n,
-        address: rootAccount.address,
-        client: publicClient,
-        coSignerAddress: configuredCoSigner,
-        credential,
-        enableSignature,
-        getFactoryArgs: () => rootAccount.getFactoryArgs(),
-        ...(coSign === undefined
-          ? {}
-          : {
-              getCoSignature: ({ userOperation }) =>
-                coSign.sign({
-                  hash: getUserOperationHash({
-                    chainId: base.id,
-                    entryPointAddress: entryPoint09Address,
-                    entryPointVersion: "0.9",
-                    userOperation: { ...userOperation, signature: "0x" }
-                  })
-                })
-            }),
-        mode: "checkout",
-        sessionPrivateKey,
-        sessionSignerAddress,
-        validUntil
-      })
-    const executionAccount = await createExecution(policyCoSigner)
-    const productsModule = getProductsModuleAddress(base.id)
-    const paymentValue = 1n
-    const calls = [
-      {
-        data: encodeFunctionData({
-          abi: productsModuleAbi,
-          args: [
-            rootAccount.address,
-            [
-              {
-                amount: paymentValue,
-                currency: zeroAddress,
-                data: [],
-                recipient,
-                slicerId: 0n
-              }
-            ],
-            []
-          ],
-          functionName: "pay"
-        }),
-        to: productsModule,
-        value: paymentValue
-      }
-    ] as const
-    await depositToEntryPoint(rootAccount.address)
-    const fundHash = await createForkWalletClient().sendTransaction({
-      to: rootAccount.address,
-      value: parseEther("0.01")
-    })
-    await publicClient.waitForTransactionReceipt({ hash: fundHash })
-
-    const missingCoSignerAccount = await createExecution(undefined)
-    await expect(
-      buildUserOperation({
-        account: missingCoSignerAccount,
-        calls,
-        factoryArgs: await missingCoSignerAccount.getFactoryArgs()
-      })
-    ).rejects.toThrow("missing its policy co-signer")
-
-    const wrongCoSignerAccount = await createExecution(
-      wrongCoSigner,
-      policyCoSigner.address
-    )
-    await expect(
-      submitUserOperation(
-        await buildUserOperation({
-          account: wrongCoSignerAccount,
-          calls,
-          factoryArgs: await wrongCoSignerAccount.getFactoryArgs()
-        })
-      )
-    ).rejects.toThrow()
-
-    expect(
-      await submitUserOperation(
-        await buildUserOperation({
-          account: executionAccount,
-          calls,
-          factoryArgs: await executionAccount.getFactoryArgs()
-        })
-      )
-    ).toBe(true)
-  }, 240_000)
 })

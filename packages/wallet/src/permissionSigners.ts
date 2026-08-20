@@ -1,10 +1,4 @@
 import {
-  type SliceKernelModularSigner,
-  sliceKernelWeightedP256SignerAddress,
-  sliceWalletKernelAddresses
-} from "@slicekit/wallet-primitives"
-import { kernelDummyEcdsaSignature } from "@slicekit/wallet-primitives/kernel"
-import {
   type Address,
   bytesToBigInt,
   concat,
@@ -16,6 +10,12 @@ import {
   toHex
 } from "viem"
 import { toAccount } from "viem/accounts"
+import {
+  type SliceKernelModularSigner,
+  sliceKernelWeightedP256SignerAddress,
+  sliceWalletKernelAddresses
+} from "./protocol/index"
+import { kernelDummyEcdsaSignature } from "./protocol/kernel"
 import { sliceWalletWebAuthnDummySignature } from "./rootValidator"
 
 const getP256Coordinates = (publicKey: Hex) => {

@@ -1,21 +1,4 @@
 import {
-  maximumBrowserGenericGrantTtlSec,
-  type SliceWalletFrameSession,
-  type SliceWalletFrameSessionKey,
-  type SliceWalletProtocolValue,
-  sliceWalletDefaultRpId,
-  sliceWalletEntryPoint
-} from "@slicekit/wallet-primitives"
-import {
-  assertSliceCheckoutPolicyDescriptor,
-  assertSliceStoreManagementPolicyDescriptor
-} from "@slicekit/wallet-primitives/execution"
-import {
-  assertWalletCallsMatchPolicy,
-  getWalletPermissionId,
-  getWalletPolicyHash
-} from "@slicekit/wallet-primitives/policy"
-import {
   bytesToHex,
   type Hex,
   hexToBytes,
@@ -30,9 +13,32 @@ import { assertSliceWalletExecutionSafety } from "../executionSafety"
 import {
   encodeSliceWalletSyntheticWebAuthnSignature,
   generateSliceWalletP256KeyPair,
-  hashSliceWalletWeightedP256Proposal,
   signSliceWalletP256
 } from "../p256"
+import {
+  assertSliceCheckoutPolicyDescriptor,
+  assertSliceStoreManagementPolicyDescriptor
+} from "../protocol/execution"
+import {
+  maximumBrowserGenericGrantTtlSec,
+  type SliceWalletFrameSession,
+  type SliceWalletFrameSessionKey,
+  type SliceWalletProtocolValue,
+  sliceWalletDefaultRpId,
+  sliceWalletEntryPoint
+} from "../protocol/index"
+import {
+  assertWalletCallsMatchPolicy,
+  getWalletPermissionId,
+  getWalletPolicyHash
+} from "../protocol/policy"
+import {
+  formatSliceWalletExecutionGrantMessage,
+  hashSliceWalletAppPermissionRegistrationFields,
+  hashSliceWalletCoSignRequest,
+  hashSliceWalletSessionRequest,
+  hashSliceWalletWeightedP256Proposal
+} from "../protocol/server"
 import type {
   SliceWalletBridgeChallenge,
   SliceWalletBridgeGrantProofRequest,
@@ -50,12 +56,6 @@ import type {
   SliceWalletWindowMessage
 } from "../types"
 import { SliceWalletUserRejectedRequestError } from "../userRejectedRequest"
-import {
-  formatSliceWalletExecutionGrantMessage,
-  hashSliceWalletAppPermissionRegistrationFields,
-  hashSliceWalletCoSignRequest,
-  hashSliceWalletSessionRequest
-} from "./messages"
 import { parseSliceWalletFrameRequest } from "./protocol"
 
 const isConnectRequest = (

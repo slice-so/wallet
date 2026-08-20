@@ -3,7 +3,7 @@
 The onchain enforcement layer of Slice Wallet. This Foundry project contains
 the Slice-owned Kernel modules and registry, their deployment facts, and the
 tests and scripts needed to reproduce them. It is maintained alongside
-`@slicekit/wallet-primitives` and `@slicekit/wallet` in the public
+`@slicekit/wallet` in the public
 [`slice-so/wallet`](https://github.com/slice-so/wallet) repository, but it is
 not an npm workspace member or JavaScript package.
 
@@ -48,11 +48,10 @@ intentional deviation before the Solidity source.
 
 ## Relationship to the packages
 
-`@slicekit/wallet-primitives` consumes `deployments/addresses.json` directly to
-generate chain manifests, deployment profiles, and runtime admission facts.
-`@slicekit/wallet` consumes those primitives to construct accounts and route
-execution. Neither JavaScript package duplicates contract addresses or
-Solidity behavior.
+`@slicekit/wallet` consumes `deployments/addresses.json` directly to generate
+chain manifests, deployment profiles, and runtime admission facts used by its
+protocol and client entry points. The JavaScript package does not duplicate
+contract addresses or Solidity behavior.
 
 Contract changes, manifest changes, generated chain facts, and the wallet
 runtime therefore move through the same public repository and review history.
@@ -66,7 +65,7 @@ modules; they do not deploy upstream EntryPoint or Kernel infrastructure.
 
 `deployments/addresses.json` stores canonical contract addresses once. Each
 supported chain records only its observed runtime hashes and verification
-evidence. A chain is admitted by the generated Wallet Primitives manifest only
+evidence. A chain is admitted by the generated Wallet manifest only
 when all authority-specific deployment evidence is complete.
 
 ## Development

@@ -1,5 +1,5 @@
-import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives"
 import { bytesToHex, hexToBytes, isAddress, isAddressEqual, isHex } from "viem"
+import type { SliceWalletProtocolValue } from "../protocol/index"
 import type {
   SliceWalletBridgeUnlockChallenge,
   SliceWalletBridgeUnlockRecord,

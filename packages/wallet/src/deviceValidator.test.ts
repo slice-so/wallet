@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test"
-import { sliceWalletKernelAddresses } from "@slicekit/wallet-primitives"
 import { decodeAbiParameters } from "viem"
 import { toAccount } from "viem/accounts"
 import {
   getSliceWalletDevicePermissionId,
   toSliceWalletDeviceSigner
 } from "./deviceValidator"
+import { sliceWalletKernelAddresses } from "./protocol/index"
 
 const credential = {
   credentialIdHash: `0x${"11".repeat(32)}` as const,

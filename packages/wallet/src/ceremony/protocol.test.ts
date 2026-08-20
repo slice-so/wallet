@@ -1,18 +1,18 @@
 import { describe, expect, it } from "bun:test"
+import type { Address, Hex } from "viem"
 import {
   createErc20ApproveCallRule,
   getSliceWalletP256SignerId,
   getWalletPermissionId,
   type SliceWalletProtocolValue
-} from "@slicekit/wallet-primitives"
-import type { Address, Hex } from "viem"
+} from "../protocol/index"
 import {
   parseSliceWalletBridgeRecord,
   parseSliceWalletBridgeRegistrationProofResponse,
   parseSliceWalletCeremonyAccountResponse,
+  parseSliceWalletCeremonyExtensionRequestMessage,
   parseSliceWalletCeremonyResponse,
   parseSliceWalletCeremonyRootSignRequest,
-  parseSliceWalletCeremonySessionRequestMessage,
   parseSliceWalletPermissionAuthorization
 } from "./protocol"
 
@@ -89,57 +89,31 @@ const managementAuthorization = {
 } as const satisfies SliceWalletProtocolValue
 
 describe("wallet ceremony protocol parser", () => {
-  const grantedSessionMessage = () =>
+  const extensionMessage = () =>
     ({
       account,
       accountIndex: 0,
       credentialIdHash: rootCredential.credentialIdHash,
       nonce,
-      session: {
-        delegation: {
-          links: [
-            {
-              grant: {
-                audiences: ["https://shop.example"],
-                delegate: `eip155:8453:${coSigner.toLowerCase()}`,
-                delegateIsEOA: true,
-                epoch: 0,
-                id: `0x${"77".repeat(32)}`,
-                issuer: `eip155:8453:${account.toLowerCase()}`,
-                maxRequestValiditySeconds: 60,
-                parentGrantHash: `0x${"00".repeat(32)}`,
-                permissions: [],
-                requiredComponents: [],
-                requireNonReplayable: true,
-                validAfter: 100,
-                validUntil: 200
-              },
-              signature: `0x${"88".repeat(65)}`
-            }
-          ]
-        },
-        expiresAt: "1970-01-01T00:03:20.000Z",
-        sessionSigner: coSigner,
-        status: "granted"
-      },
+      extension: { result: "opaque", status: "granted" },
       type: "slice-wallet:ceremony-account",
       version: 1
     }) satisfies SliceWalletProtocolValue
 
-  it("uses one unversioned session-delegation request shape", () => {
+  it("uses one unversioned ceremony-extension request shape", () => {
     expect(
-      parseSliceWalletCeremonySessionRequestMessage({
+      parseSliceWalletCeremonyExtensionRequestMessage({
         status: "preparing",
-        type: "slice-wallet:ceremony-session-request"
+        type: "slice-wallet:ceremony-extension-request"
       })
     ).toEqual({
       status: "preparing",
-      type: "slice-wallet:ceremony-session-request"
+      type: "slice-wallet:ceremony-extension-request"
     })
     expect(() =>
-      parseSliceWalletCeremonySessionRequestMessage({
+      parseSliceWalletCeremonyExtensionRequestMessage({
         status: "preparing",
-        type: "slice-wallet:ceremony-session-request",
+        type: "slice-wallet:ceremony-extension-request",
         version: 1
       })
     ).toThrow("unknown field")
@@ -160,31 +134,12 @@ describe("wallet ceremony protocol parser", () => {
     })
   })
 
-  it("strictly parses granted delegation chains at the popup boundary", () => {
+  it("preserves opaque extension values at the popup boundary", () => {
     expect(
-      parseSliceWalletCeremonyAccountResponse(grantedSessionMessage())
+      parseSliceWalletCeremonyAccountResponse(extensionMessage())
     ).toMatchObject({
-      session: { delegation: { links: [{ grant: { epoch: 0 } }] } }
+      extension: { result: "opaque", status: "granted" }
     })
-
-    const empty = grantedSessionMessage()
-    empty.session.delegation.links = []
-    expect(() => parseSliceWalletCeremonyAccountResponse(empty)).toThrow(
-      "links are invalid"
-    )
-
-    for (const field of [
-      "epoch",
-      "validAfter",
-      "validUntil",
-      "maxRequestValiditySeconds"
-    ] as const) {
-      const negative = grantedSessionMessage()
-      negative.session.delegation.links[0].grant[field] = -1
-      expect(() => parseSliceWalletCeremonyAccountResponse(negative)).toThrow(
-        "must not be negative"
-      )
-    }
   })
 
   it("accepts a canonical checkout authorization", () => {

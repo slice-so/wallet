@@ -1,19 +1,4 @@
 import {
-  getSliceWalletChainPolicy,
-  type SliceKernelPermission,
-  sliceWalletKernelAddresses
-} from "@slicekit/wallet-primitives"
-import {
-  buildKernelInstallTypedData,
-  encodeKernelInstallPackagesCall,
-  encodeKernelPermissionUninstallCalls,
-  getKernelPermissionInstallState,
-  getKernelPermissionInstalls,
-  kernelAccountAbi,
-  kernelModuleType,
-  resolveSliceWalletDeployment
-} from "@slicekit/wallet-primitives/kernel"
-import {
   concat,
   type Hex,
   hexToBytes,
@@ -30,6 +15,21 @@ import {
   encodeSliceWalletWebAuthnSignerData,
   toSliceWalletWebAuthnSigner
 } from "./permissionSigners"
+import {
+  getSliceWalletChainPolicy,
+  type SliceKernelPermission,
+  sliceWalletKernelAddresses
+} from "./protocol/index"
+import {
+  buildKernelInstallTypedData,
+  encodeKernelInstallPackagesCall,
+  encodeKernelPermissionUninstallCalls,
+  getKernelPermissionInstallState,
+  getKernelPermissionInstalls,
+  kernelAccountAbi,
+  kernelModuleType,
+  resolveSliceWalletDeployment
+} from "./protocol/kernel"
 import { buildRecoveryRotationCalls } from "./recovery"
 import { createSliceWalletRootValidator } from "./rootValidator"
 import type {

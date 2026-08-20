@@ -1,11 +1,11 @@
-import type { SliceKernelValidator } from "@slicekit/wallet-primitives"
-import { resolveSliceWalletDeployment } from "@slicekit/wallet-primitives/kernel"
 import { toWebAuthnAccount } from "viem/account-abstraction"
 import {
   encodeWebAuthnRootValidatorData,
   encodeWebAuthnValidatorSignature
 } from "./execution/kernelPasskey/webAuthn"
 import { createKernelV4Account } from "./kernel/account"
+import type { SliceKernelValidator } from "./protocol/index"
+import { resolveSliceWalletDeployment } from "./protocol/kernel"
 import { sliceWalletWebAuthnDummySignature } from "./rootValidator"
 import type {
   CreateSliceWalletKernelAccountParameters,

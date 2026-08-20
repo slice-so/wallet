@@ -1,9 +1,9 @@
 import { describe, expect, it, mock } from "bun:test"
-import type { SliceWalletProtocolValue } from "@slicekit/wallet-primitives"
 import {
   sliceWalletBrokerRequiredDialogRoutes,
   sliceWalletDialogCeremonyRoutes
 } from "../ceremonyRoutes"
+import type { SliceWalletProtocolValue } from "../protocol/index"
 import { SliceWalletUserGestureRequiredError } from "./broker"
 import {
   openSliceWalletCeremonyChannel,

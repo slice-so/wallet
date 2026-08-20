@@ -1,17 +1,4 @@
 import {
-  assertSliceWalletAccountIndex,
-  getSliceWalletP256SignerId,
-  maximumBrowserGenericGrantTtlSec,
-  type WalletPolicyJsonValue
-} from "@slicekit/wallet-primitives"
-import { resolveSliceWalletDeploymentProfileId } from "@slicekit/wallet-primitives/kernel"
-import {
-  getWalletPermissionId,
-  getWalletPolicyHash,
-  parseSerializedWalletPolicyDescriptor,
-  serializeWalletPolicyDescriptor
-} from "@slicekit/wallet-primitives/policy"
-import {
   type Address,
   type Hex,
   hexToBigInt,
@@ -28,6 +15,19 @@ import {
   getUserOperationHash,
   type UserOperation
 } from "viem/account-abstraction"
+import {
+  assertSliceWalletAccountIndex,
+  getSliceWalletP256SignerId,
+  maximumBrowserGenericGrantTtlSec,
+  type WalletPolicyJsonValue
+} from "../protocol/index"
+import { resolveSliceWalletDeploymentProfileId } from "../protocol/kernel"
+import {
+  getWalletPermissionId,
+  getWalletPolicyHash,
+  parseSerializedWalletPolicyDescriptor,
+  serializeWalletPolicyDescriptor
+} from "../protocol/policy"
 import type {
   SliceWalletGenericPermission,
   SliceWalletProviderValue,

@@ -1,24 +1,4 @@
 import {
-  buildRecoveryPermissionInitConfig,
-  createRecoveryPermission,
-  type SliceKernelClient,
-  type SliceKernelPermission,
-  type SliceKernelValidator,
-  type SliceTimelockPolicyParameters,
-  type SliceWalletRegisteredRootCredential,
-  sliceWalletTimelockPolicyAddress
-} from "@slicekit/wallet-primitives"
-import {
-  buildKernelInstallTypedData,
-  encodeKernelInstallPackagesCall,
-  encodeKernelPermissionSignature,
-  encodeKernelPermissionUninstallCalls,
-  getKernelPermissionInstalls,
-  kernelAccountAbi,
-  kernelWebAuthnValidatorLifecycleAbi,
-  resolveSliceWalletDeployment
-} from "@slicekit/wallet-primitives/kernel"
-import {
   type Address,
   concat,
   decodeAbiParameters,
@@ -44,10 +24,28 @@ import { getCode, multicall, readContract } from "viem/actions"
 import { getAction } from "viem/utils"
 import { createKernelV4Account } from "./kernel/account"
 import { encodeKernelCalls } from "./kernel/execution"
+import { encodeSliceWalletRootValidatorData } from "./protocol/accountPrediction"
 import {
-  createSliceWalletRootValidator,
-  encodeSliceWalletRootValidatorData
-} from "./rootValidator"
+  buildRecoveryPermissionInitConfig,
+  createRecoveryPermission,
+  type SliceKernelClient,
+  type SliceKernelPermission,
+  type SliceKernelValidator,
+  type SliceTimelockPolicyParameters,
+  type SliceWalletRegisteredRootCredential,
+  sliceWalletTimelockPolicyAddress
+} from "./protocol/index"
+import {
+  buildKernelInstallTypedData,
+  encodeKernelInstallPackagesCall,
+  encodeKernelPermissionSignature,
+  encodeKernelPermissionUninstallCalls,
+  getKernelPermissionInstalls,
+  kernelAccountAbi,
+  kernelWebAuthnValidatorLifecycleAbi,
+  resolveSliceWalletDeployment
+} from "./protocol/kernel"
+import { createSliceWalletRootValidator } from "./rootValidator"
 import type {
   CreateDeployedRecoveryPermissionAccountParameters,
   CreateRecoveryPermissionAccountParameters,

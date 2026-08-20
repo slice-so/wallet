@@ -1,4 +1,4 @@
-import { getSliceWalletChainPolicy } from "@slicekit/wallet-primitives"
+import { getSliceWalletChainPolicy } from "./protocol/index"
 import type { SliceWalletUnsignedUserOperation } from "./types/frame"
 
 const developmentChainIds = new Set([31_337, 31_338])

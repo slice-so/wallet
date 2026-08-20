@@ -1,3 +1,8 @@
+import { type Address, type Hex, hexToBytes, isAddress, isHex } from "viem"
+import {
+  parseSliceWalletPolicyDescriptor,
+  parseSliceWalletUnsignedUserOperation
+} from "../frame/protocol"
 import {
   assertSliceWalletAccountIndex,
   getSliceWalletP256SignerId,
@@ -7,13 +12,8 @@ import {
   type SliceWalletPermissionAuthorization,
   type SliceWalletProtocolValue,
   type WalletGrantKind
-} from "@slicekit/wallet-primitives"
-import { getWalletPermissionId } from "@slicekit/wallet-primitives/policy"
-import { type Address, type Hex, hexToBytes, isAddress, isHex } from "viem"
-import {
-  parseSliceWalletPolicyDescriptor,
-  parseSliceWalletUnsignedUserOperation
-} from "../frame/protocol"
+} from "../protocol/index"
+import { getWalletPermissionId } from "../protocol/policy"
 import type {
   SliceWalletBridgeChallenge,
   SliceWalletBridgeGrantProofResponse,
@@ -22,23 +22,23 @@ import type {
   SliceWalletCeremonyAccountMessage,
   SliceWalletCeremonyAccountResponse,
   SliceWalletCeremonyConnectMessage,
+  SliceWalletCeremonyExtensionRequestMessage,
   SliceWalletCeremonyReadyMessage,
   SliceWalletCeremonyResponse,
   SliceWalletCeremonyRootResponse,
   SliceWalletCeremonyRootSignRequest,
-  SliceWalletCeremonySessionRequestMessage,
   SliceWalletRootSignatureRequest
 } from "../types"
 
 type ProtocolRecord = { readonly [key: string]: SliceWalletProtocolValue }
 
-export const parseSliceWalletCeremonySessionRequestMessage = (
+export const parseSliceWalletCeremonyExtensionRequestMessage = (
   value: SliceWalletProtocolValue
-): SliceWalletCeremonySessionRequestMessage => {
-  const input = record(value, "Ceremony session request")
-  const status = stringValue(input.status, "Ceremony session request status")
-  if (input.type !== "slice-wallet:ceremony-session-request") {
-    throw new Error("Ceremony session request is invalid.")
+): SliceWalletCeremonyExtensionRequestMessage => {
+  const input = record(value, "Ceremony extension request")
+  const status = stringValue(input.status, "Ceremony extension request status")
+  if (input.type !== "slice-wallet:ceremony-extension-request") {
+    throw new Error("Ceremony extension request is invalid.")
   }
   if (
     status === "none" ||
@@ -49,34 +49,11 @@ export const parseSliceWalletCeremonySessionRequestMessage = (
     return { status, type: input.type }
   }
   if (status !== "prepared") {
-    throw new Error("Ceremony session request status is invalid.")
+    throw new Error("Ceremony extension request status is invalid.")
   }
   assertKeys(input, ["request", "status", "type"])
-  const request = record(input.request, "Prepared session request")
-  assertKeys(
-    request,
-    ["claims", "sessionSigner"],
-    ["authorizationId", "pendingId"]
-  )
-  const sessionSigner = addressValue(request.sessionSigner, "Session signer")
-  const authorizationId =
-    request.authorizationId === undefined
-      ? undefined
-      : hexValue(request.authorizationId, "Authorization id", 32)
-  const pendingId =
-    request.pendingId === undefined
-      ? undefined
-      : stringValue(request.pendingId, "Pending session id")
-  if (pendingId !== undefined && !/^[A-Za-z0-9_-]{1,64}$/.test(pendingId)) {
-    throw new Error("Prepared session request is invalid.")
-  }
   return {
-    request: {
-      claims: request.claims,
-      ...(authorizationId === undefined ? {} : { authorizationId }),
-      ...(pendingId === undefined ? {} : { pendingId }),
-      sessionSigner
-    },
+    request: input.request,
     status,
     type: input.type
   }
@@ -120,7 +97,7 @@ const integerValue = (value: SliceWalletProtocolValue, label: string) => {
   return value
 }
 
-const nonNegativeIntegerValue = (
+const _nonNegativeIntegerValue = (
   value: SliceWalletProtocolValue,
   label: string
 ) => {
@@ -140,7 +117,7 @@ const nonNegativeIntegerString = (
   return BigInt(parsed).toString()
 }
 
-const booleanValue = (value: SliceWalletProtocolValue, label: string) => {
+const _booleanValue = (value: SliceWalletProtocolValue, label: string) => {
   if (typeof value !== "boolean") throw new Error(`${label} must be Boolean.`)
   return value
 }
@@ -484,7 +461,7 @@ export const parseSliceWalletCeremonyAccountMessage = (
   assertKeys(
     input,
     ["account", "accountIndex", "credentialIdHash", "nonce", "type", "version"],
-    ["recovery", "session"]
+    ["extension", "recovery"]
   )
   if (input.type !== "slice-wallet:ceremony-account" || input.version !== 1) {
     throw new Error("Ceremony account response is invalid.")
@@ -505,130 +482,6 @@ export const parseSliceWalletCeremonyAccountMessage = (
       )
     }
   }
-  let session: SliceWalletCeremonyAccountMessage["session"]
-  if (input.session !== undefined) {
-    const sessionInput = record(input.session, "Ceremony session result")
-    const status = stringValue(sessionInput.status, "Ceremony session status")
-    if (status === "granted") {
-      assertKeys(
-        sessionInput,
-        ["delegation", "expiresAt", "sessionSigner", "status"],
-        ["pendingId"]
-      )
-      const pendingId =
-        sessionInput.pendingId === undefined
-          ? undefined
-          : stringValue(sessionInput.pendingId, "Pending session id")
-      if (
-        pendingId !== undefined &&
-        (!/^[A-Za-z0-9_-]{1,64}$/.test(pendingId) || pendingId.length > 64)
-      ) {
-        throw new Error("Pending session id is invalid.")
-      }
-      const delegationInput = record(
-        sessionInput.delegation,
-        "Session delegation"
-      )
-      assertKeys(delegationInput, ["links"])
-      if (
-        !Array.isArray(delegationInput.links) ||
-        delegationInput.links.length === 0
-      ) {
-        throw new Error("Session delegation links are invalid.")
-      }
-      session = {
-        expiresAt: stringValue(sessionInput.expiresAt, "Session expiry"),
-        delegation: {
-          links: delegationInput.links.map((value) => {
-            const link = record(value, "Delegation link")
-            assertKeys(link, ["grant", "signature"])
-            const grant = record(link.grant, "Delegation grant")
-            assertKeys(grant, [
-              "audiences",
-              "delegate",
-              "delegateIsEOA",
-              "epoch",
-              "id",
-              "issuer",
-              "maxRequestValiditySeconds",
-              "parentGrantHash",
-              "permissions",
-              "requiredComponents",
-              "requireNonReplayable",
-              "validAfter",
-              "validUntil"
-            ])
-            if (
-              !Array.isArray(grant.audiences) ||
-              !Array.isArray(grant.requiredComponents) ||
-              !Array.isArray(grant.permissions)
-            ) {
-              throw new Error("Delegation grant arrays are invalid.")
-            }
-            return {
-              grant: {
-                issuer: stringValue(grant.issuer, "Delegation issuer"),
-                delegate: stringValue(grant.delegate, "Delegation delegate"),
-                audiences: grant.audiences.map((entry) =>
-                  stringValue(entry, "Delegation audience")
-                ),
-                id: hexValue(grant.id, "Delegation id", 32),
-                epoch: nonNegativeIntegerValue(grant.epoch, "Delegation epoch"),
-                validAfter: nonNegativeIntegerValue(
-                  grant.validAfter,
-                  "Delegation validity start"
-                ),
-                validUntil: nonNegativeIntegerValue(
-                  grant.validUntil,
-                  "Delegation validity end"
-                ),
-                maxRequestValiditySeconds: nonNegativeIntegerValue(
-                  grant.maxRequestValiditySeconds,
-                  "Delegation maximum request validity"
-                ),
-                delegateIsEOA: booleanValue(
-                  grant.delegateIsEOA,
-                  "Delegation EOA statement"
-                ),
-                requireNonReplayable: booleanValue(
-                  grant.requireNonReplayable,
-                  "Delegation non-replayable requirement"
-                ),
-                requiredComponents: grant.requiredComponents.map((entry) =>
-                  stringValue(entry, "Delegation component")
-                ),
-                permissions: grant.permissions.map((entry) =>
-                  stringValue(entry, "Delegation permission")
-                ),
-                parentGrantHash: hexValue(
-                  grant.parentGrantHash,
-                  "Delegation parent grant hash",
-                  32
-                )
-              },
-              signature: hexValue(link.signature, "Delegation signature")
-            }
-          })
-        },
-        ...(pendingId === undefined ? {} : { pendingId }),
-        sessionSigner: addressValue(
-          sessionInput.sessionSigner,
-          "Session signer"
-        ),
-        status
-      }
-    } else {
-      assertKeys(sessionInput, ["status"])
-      if (
-        status !== "cancelled" &&
-        status !== "preparation_failed" &&
-        status !== "timed_out"
-      ) {
-        throw new Error("Ceremony session status is invalid.")
-      }
-      session = { status }
-    }
-  }
   return {
     account: addressValue(input.account, "Wallet account"),
     accountIndex: assertSliceWalletAccountIndex(
@@ -640,8 +493,8 @@ export const parseSliceWalletCeremonyAccountMessage = (
       32
     ),
     nonce: hexValue(input.nonce, "Ceremony nonce", 32),
+    ...(input.extension === undefined ? {} : { extension: input.extension }),
     ...(recovery === undefined ? {} : { recovery }),
-    ...(session === undefined ? {} : { session }),
     type: "slice-wallet:ceremony-account",
     version: 1
   }

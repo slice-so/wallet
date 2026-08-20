@@ -1,9 +1,3 @@
-import type {
-  SliceKernelSignatureContext,
-  SliceKernelValidator,
-  SliceWalletRegisteredRootCredential
-} from "@slicekit/wallet-primitives"
-import { resolveSliceWalletDeployment } from "@slicekit/wallet-primitives/kernel"
 import {
   type Address,
   bytesToBigInt,
@@ -16,6 +10,13 @@ import {
 import type { UserOperation } from "viem/account-abstraction"
 import { assertSliceWalletExecutionSafety } from "./executionSafety"
 import { createKernelV4Account } from "./kernel/account"
+import { encodeSliceWalletRootValidatorData } from "./protocol/accountPrediction"
+import type {
+  SliceKernelSignatureContext,
+  SliceKernelValidator,
+  SliceWalletRegisteredRootCredential
+} from "./protocol/index"
+import { resolveSliceWalletDeployment } from "./protocol/kernel"
 import type {
   CreateSliceWalletRegisteredKernelAccountParameters,
   SliceWalletRootSigner
@@ -68,31 +69,6 @@ export const getSliceWalletRootValidatorPublicKey = async ({
     functionName: "webAuthnValidatorStorage"
   })
   return x === 0n && y === 0n ? null : { x, y }
-}
-
-export const encodeSliceWalletRootValidatorData = (
-  credential: SliceWalletRegisteredRootCredential
-) => {
-  const coordinates = parseSliceWalletUncompressedPublicKey(
-    credential.publicKey
-  )
-  if (hexToBytes(credential.credentialIdHash).length !== 32) {
-    throw new Error("Root credential id hash must be 32 bytes.")
-  }
-  return encodeAbiParameters(
-    [
-      {
-        components: [
-          { name: "x", type: "uint256" },
-          { name: "y", type: "uint256" }
-        ],
-        name: "webAuthnData",
-        type: "tuple"
-      },
-      { name: "authenticatorIdHash", type: "bytes32" }
-    ],
-    [{ x: coordinates.x, y: coordinates.y }, credential.credentialIdHash]
-  )
 }
 
 export const sliceWalletWebAuthnDummySignature = encodeAbiParameters(

@@ -1,12 +1,12 @@
-import type {
-  SerializedWalletPolicyDescriptor,
-  SliceWalletPermissionAuthorization
-} from "@slicekit/wallet-primitives"
+import type { Address, Hex } from "viem"
 import type {
   SliceUserOperationPolicyFetch,
   SliceWalletExecutionSessionDescriptor
-} from "@slicekit/wallet-primitives/execution"
-import type { Address, Hex } from "viem"
+} from "../protocol/execution"
+import type {
+  SerializedWalletPolicyDescriptor,
+  SliceWalletPermissionAuthorization
+} from "../protocol/index"
 import type { SliceWalletCheckoutCoSignerClient } from "./permission"
 
 export type SliceWalletCheckoutExecutionGrantRegistration = {

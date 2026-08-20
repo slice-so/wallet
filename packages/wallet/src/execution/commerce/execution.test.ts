@@ -1,20 +1,20 @@
 import { describe, expect, it } from "bun:test"
+import type { Address, Hex } from "viem"
+import {
+  createSliceCheckoutPolicyDescriptor,
+  createSliceStoreManagementPolicyDescriptor
+} from "../../protocol/execution"
 import {
   getSliceWalletP256SignerId,
   getWalletPermissionId,
   type SliceWalletPermissionAuthorization,
   walletExecutionPermissionExecutionScope,
   walletExecutionPermissionStoreManagementScope
-} from "@slicekit/wallet-primitives"
-import type { Address, Hex } from "viem"
+} from "../../protocol/index"
 import {
   createSliceWalletCheckoutExecutionClient,
   createSliceWalletManagementExecutionClient
 } from "./execution"
-import {
-  createSliceCheckoutPolicyDescriptor,
-  createSliceStoreManagementPolicyDescriptor
-} from "./policies"
 
 const account = "0x1000000000000000000000000000000000000001" as Address
 const coSigner = "0x2000000000000000000000000000000000000002" as Address

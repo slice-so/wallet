@@ -1,5 +1,5 @@
-import type { SliceWalletPermissionAuthorization } from "@slicekit/wallet-primitives"
 import type { Address, Hex } from "viem"
+import type { SliceWalletPermissionAuthorization } from "../protocol/index"
 import type { SliceWalletRegistryCredential } from "./registry"
 
 export type SliceWalletPopupRequiredReason =

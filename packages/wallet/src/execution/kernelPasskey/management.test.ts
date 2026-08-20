@@ -1,14 +1,14 @@
 import { describe, expect, test } from "bun:test"
-import {
-  sliceWalletKernelAddresses,
-  toWalletPermissionPolicies
-} from "@slicekit/wallet-primitives"
 import { toFunctionSelector, zeroAddress } from "viem"
 import { base } from "viem/chains"
 import {
   createSliceStoreManagementPermissionPolicies,
   createSliceStoreManagementPolicyDescriptor
-} from "../commerce/policies"
+} from "../../protocol/execution"
+import {
+  sliceWalletKernelAddresses,
+  toWalletPermissionPolicies
+} from "../../protocol/index"
 
 const parameters = {
   account: "0x2222222222222222222222222222222222222222",
