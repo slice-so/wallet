@@ -1,7 +1,7 @@
 {
   "name": "@slicekit/wallet",
   "version": "0.1.0",
-  "description": "Framework-neutral self-custodial passkey smart wallet SDK with Kernel v4 accounts, scoped app permissions, and an EIP-1193/6963/5792 provider",
+  "description": "Low-level Slice Wallet runtime for Kernel v4 passkey accounts, isolated signing ceremonies, policy-scoped execution, provider integration, and recovery",
   "license": "(MIT OR Apache-2.0)",
   "type": "module",
   "main": "./dist/esm/index.js",

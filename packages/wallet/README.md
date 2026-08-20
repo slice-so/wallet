@@ -1,34 +1,48 @@
 # `@slicekit/wallet`
 
-Slice Wallet is a self-custodial smart wallet rooted in a passkey. A WebAuthn
-credential controls a Kernel v4 account on ERC-4337 EntryPoint v0.9, with the
-same counterfactual address on Ethereum, OP Mainnet, Base, and Arbitrum One.
-There is no root EOA behind the passkey, and no wallet vendor underneath: the
-account stack uses no ZeroDev or other third-party wallet-infrastructure SDKs.
+The low-level Slice Wallet implementation consumed by Slice ID. It constructs
+and operates passkey-controlled Kernel v4 smart accounts, implements the trusted
+signing and signer-frame protocols, routes policy-scoped execution, exposes a
+portable EIP-1193/EIP-6963/EIP-5792 provider, and implements wallet recovery.
 
-What sets it apart:
+This package is not the application-facing connector or authentication SDK.
+Applications should normally adopt
+[`@slicekit/id`](https://www.npmjs.com/package/@slicekit/id), whose
+`@slicekit/id/wagmi` entry point owns the single `sliceId()` connector. The
+connector creates this package's provider internally and optionally adds the
+Slice ID authentication lifecycle when passed an `auth` client.
 
-- **Apps can never reach a key.** Root passkey ceremonies run only in the
-  visible, origin-isolated Slice ID signer surface, and promptless session keys
-  are non-extractable P-256 `CryptoKey`s owned by that frame. Embedding
-  applications receive public metadata and signatures, never key material.
-- **Promptless execution is policy-scoped and onchain-enforced.** Applications
-  request narrow grants — call rules, amount caps, a rate limit, an expiry —
-  that install as Kernel permissions; anything outside an active grant falls
-  back to the visible root ceremony.
-- **Checkout is a 2-of-2 authority with fiat-denominated allowances.** The
-  origin-bound browser key initiates and the Slice co-signer independently
-  validates the calls, live prices, USD allowance, and gas bounds before
-  signing.
-- **Standard surfaces.** EIP-1193/EIP-6963/EIP-5792 provider and Viem actions;
-  EIP-5792 is the only call envelope.
-- **User-held recovery.** A recovery code (or encrypted bundle) restores root
-  control through an onchain timelock, even when Slice services are down.
+## Package scope
 
-The wallet protocol itself — policies, chain manifests, hashes, and the entire
-Kernel v4 encoding — lives in
-[`@slicekit/wallet-primitives`](../wallet-primitives), so servers verify
-exactly the bytes this SDK signs.
+`@slicekit/wallet` owns stateful, I/O-bound wallet behavior:
+
+- Kernel v4 smart-account construction and client transports;
+- WebAuthn root, device, permission, recovery, and signer-frame ceremonies;
+- non-extractable browser P-256 session keys and permission execution;
+- the framework-neutral provider, EIP-6963 discovery, EIP-5792 calls, and
+  low-level permission actions;
+- optional React wallet state and lifecycle orchestration;
+- checkout, store-management, bundler, paymaster, and recovery execution
+  clients used by Slice-owned surfaces; and
+- wallet credential-registry clients, proofs, and server-side account
+  reconstruction helpers.
+
+It deliberately does not own:
+
+- Wagmi connectors, Wagmi permission actions, application authentication,
+  delegated API sessions, or identity UI — those belong to `@slicekit/id`;
+- canonical policies, hashes, chain manifests, Kernel encodings, or execution
+  admission — those belong to
+  [`@slicekit/wallet-primitives`](../wallet-primitives) and are imported
+  directly rather than re-exported; or
+- Solidity modules and deployment facts — those live in the sibling
+  [`contracts`](https://github.com/slice-so/wallet/tree/main/contracts) project
+  in the public Wallet repository.
+
+Install this package directly when building a wallet host, Slice ID signer
+surface, recovery surface, custom provider/Viem integration, or wallet
+infrastructure. A typical Wagmi application should install `@slicekit/id`
+instead.
 
 ## Installation
 
@@ -50,16 +64,29 @@ The `react` entry point additionally requires its `react` peer dependency.
 
 ## Entry Points
 
-- `@slicekit/wallet`: account, credential, ceremony, frame, registry, and recovery primitives.
-- `@slicekit/wallet/execution`: Kernel passkey execution, commerce policies, bundler/paymaster handlers, and execution clients.
-- `@slicekit/wallet/react`: the Slice wallet provider and account/session hooks;
-  the provider accepts a framework-neutral connection adapter with the current
-  account, admitted chain IDs, provider access, and a connect action.
-- `@slicekit/wallet/frame`: the minimal signer-frame controller, protocol, session store, calls, and policy graph.
-- `@slicekit/wallet/permissions`: public permission builders, Slice EIP-1193 actions, and the Viem wallet-client extension.
-- `@slicekit/wallet/provider`: portable provider and EIP-6963 discovery.
-- `@slicekit/wallet/recovery`: Timelock recovery operations. The root entry point also exports the primary password-manager recovery-code format and the advanced encrypted-file alternative.
-- `@slicekit/wallet/server`: server-only P-256 verification and proposal helpers.
+- `@slicekit/wallet`: account and credential construction, ceremony clients,
+  signer-frame clients, P-256 keys, recovery secret formats, and wallet types.
+- `@slicekit/wallet/provider`: the portable EIP-1193/EIP-6963/EIP-5792
+  provider, canonical configuration, discovery, errors, and provider protocol.
+- `@slicekit/wallet/permissions`: generic permission request builders,
+  EIP-1193 actions, and the Viem wallet-client extension.
+- `@slicekit/wallet/react`: Wallet provider state and account/session lifecycle
+  hooks. It contains no Wagmi connector and performs no application
+  authentication.
+- `@slicekit/wallet/frame`: the isolated signer-frame controller, wire
+  protocol, and session store.
+- `@slicekit/wallet/execution`: Kernel account clients and transports plus
+  low-level checkout, management, bundler, and paymaster execution helpers.
+- `@slicekit/wallet/recovery`: timelock proposal, cancellation, and root
+  rotation operations.
+- `@slicekit/wallet/server`: server-safe account reconstruction, wallet
+  credential classification, registry proof, device, root, and recovery
+  helpers. It is not the Slice ID request verifier.
+- `@slicekit/wallet/argon2id`: the Argon2id implementation used to decrypt or
+  create advanced recovery bundles without loading it into the default entry
+  point.
+- `@slicekit/wallet/ceremony-routes`: the canonical embedded-dialog and
+  broker-required ceremony route sets.
 
 ## Provider
 
