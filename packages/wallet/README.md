@@ -1,16 +1,9 @@
 # `@slicekit/wallet`
 
-The low-level Slice Wallet implementation consumed by Slice ID. It constructs
+The low-level Slice Wallet implementation consumed by [`@slicekit/id`](https://www.npmjs.com/package/@slicekit/id). It constructs
 and operates passkey-controlled Kernel v4 smart accounts, implements the trusted
 signing and signer-frame protocols, routes policy-scoped execution, exposes a
 portable EIP-1193/EIP-5792 provider, and implements wallet recovery.
-
-This package is not the application-facing connector or authentication SDK.
-Applications should normally adopt
-[`@slicekit/id`](https://www.npmjs.com/package/@slicekit/id), whose
-`@slicekit/id/wagmi` entry point owns the single `sliceId()` connector. The
-connector creates this package's provider internally; Slice ID layers its own
-authentication lifecycle over Wallet's protocol-neutral ceremony extension.
 
 ## Package scope
 
@@ -34,7 +27,7 @@ It deliberately does not own:
   delegated API sessions, or identity UI — those belong to `@slicekit/id`;
 - Solidity modules and deployment facts — those live in the sibling
   [`contracts`](https://github.com/slice-so/wallet/tree/main/packages/contracts)
-  project in the public Wallet repository.
+  project.
 
 Install this package directly when building a wallet host, Slice ID signer
 surface, recovery surface, custom provider/Viem integration, or wallet
@@ -56,7 +49,7 @@ npm install @slicekit/wallet
 - Unsupported or opaque calls stay root-confirmed.
 - General ERC-8128 API sessions use a separate server-held EOA and receive no onchain wallet authority.
 - The account ceremony can exchange one opaque extension value. Slice ID owns
-  preparation, parsing, binding, completion, and persistence of its ERC-8128
+  preparation, parsing, binding, completion, and persistence of its [ERC-8128](https://github.com/slice-so/erc8128)
   session; Wallet does not understand authentication claims or delegations.
 
 ## Entry Points
@@ -109,7 +102,7 @@ Use `createSliceWalletProvider()` from `@slicekit/wallet/provider`. The canonica
 
 The provider exposes root-confirmed account, signature, and call methods plus Slice's versioned session-permission methods. Slice does not advertise ERC-7710 or ERC-7715 compatibility. Calls that do not match an active Slice permission are sent through the visible root ceremony.
 
-The canonical wallet is admitted on Ethereum, OP Mainnet, Base, and Arbitrum One, with Base as the default chain. Wallet contract addresses and the resulting counterfactual account address are consistent across chains. Slice commerce contracts and policies are Base-only; admitting a wallet chain does not imply ProductsModule, checkout, pricing, indexing, co-signing, or Slice sponsorship support there.
+The canonical wallet is admitted on Ethereum, OP Mainnet, Base, and Arbitrum One, with Base as the default chain. Wallet contract addresses and the resulting counterfactual account address are consistent across chains. Slice commerce contracts and policies are Base-only.
 
 The public provider remains a beta surface until the signer contract audit, Base deployment canary, real-browser bridge matrix, API security review, and external-origin rollout gate are complete.
 
@@ -292,22 +285,3 @@ The locally served artifact is the preferred recovery surface because a hosted
 copy can access decrypted recovery material. Production releases that change
 the root ceremony, signer frame, co-signer, or recovery application require
 independent two-person approval.
-
-## Compromise boundaries
-
-- Compromise of the auth registry can expose or corrupt generic permission
-  metadata, but cannot install, broaden, or execute an onchain permission.
-- Compromise of the Slice database can expose Slice service delegation and
-  allowance metadata. Checkout still requires the registered browser key and
-  Slice co-signer, and the co-signer fails closed when its database, quote, or
-  execution-state dependencies are unavailable.
-- A third-party origin can exercise only its exact origin-namespaced generic
-  grant. Slice commerce origins use separate checkout, management, API, and
-  automation authorities.
-- A browser-key compromise remains constrained by the installed policy,
-  rate, chain, and expiry. Checkout additionally requires a fresh bounded
-  Slice co-signature; a co-signer compromise cannot satisfy the browser
-  signature.
-- The root passkey can replace or revoke authorities but is used only by the
-  visible Slice ID ceremony. User-held recovery material restores subsequent
-  root control after the timelock and cannot reverse confirmed transactions.

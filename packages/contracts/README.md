@@ -1,11 +1,8 @@
 # Slice Wallet Contracts
 
-The onchain enforcement layer of Slice Wallet. This Foundry project contains
+The onchain enforcement layer of Slice Wallet. This project contains
 the Slice-owned Kernel modules and registry, their deployment facts, and the
-tests and scripts needed to reproduce them. It is maintained alongside
-`@slicekit/wallet` in the public
-[`slice-so/wallet`](https://github.com/slice-so/wallet) repository, but it is
-not an npm workspace member or JavaScript package.
+tests and scripts needed to reproduce them.
 
 ## Scope
 
@@ -59,9 +56,8 @@ runtime therefore move through the same public repository and review history.
 ## Deployment facts
 
 The five Slice-owned contracts use the canonical Foundry CREATE2 deployer, so
-their addresses are chain-invariant across Ethereum, OP Mainnet, Base, and
-Arbitrum One. Deployment scripts deploy only the selected missing Slice-owned
-modules; they do not deploy upstream EntryPoint or Kernel infrastructure.
+their addresses are chain-invariant across chains. Deployment scripts deploy
+only the selected missing Slice-owned modules.
 
 `deployments/addresses.json` stores canonical contract addresses once. Each
 supported chain records only its observed runtime hashes and verification
