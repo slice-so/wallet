@@ -20,7 +20,6 @@ import {
   isAddressEqual
 } from "viem"
 import { anvil, base } from "viem/chains"
-import { useConfig, useConnection } from "wagmi"
 import type { createSliceWalletCeremonyKernelAccount } from "../ceremony/rootAccountClient"
 import { createSliceWalletCheckoutExecutionClient } from "../execution/commerce/execution"
 import { buildRecoveryCancelCall } from "../recovery"
@@ -39,7 +38,6 @@ import type {
   SliceWalletRecoverySnapshot,
   SliceWalletStatus
 } from "../types/react"
-import { sliceWalletConnectorId } from "../wagmi"
 import {
   shouldLockReplacedSliceAccount,
   useSliceWalletAccountHydration
@@ -118,6 +116,7 @@ const AvailableSliceWalletProvider = ({
   adapters = {},
   ceremonyMode = "auto",
   children,
+  connection,
   notifications,
   walletChain,
   walletRpcUrl
@@ -130,7 +129,6 @@ const AvailableSliceWalletProvider = ({
     adapters.checkoutExecution ?? defaultCheckoutExecution
   const fetchWalletRecovery = adapters.fetchWalletRecovery
   const storeManagement = adapters.storeManagement
-  const wagmiConfig = useConfig()
   const normalizedIdOrigin =
     walletChain.id === anvil.id
       ? "http://localhost:3003"
@@ -144,12 +142,7 @@ const AvailableSliceWalletProvider = ({
     [walletChain, walletRpcUrl]
   )
   const [status, setStatus] = useState<SliceWalletStatus>("loading")
-  const connection = useConnection({ config: wagmiConfig })
-  const connectedSliceAccount =
-    connection.status === "connected" &&
-    connection.connector.id === sliceWalletConnectorId
-      ? connection.address
-      : null
+  const connectedSliceAccount = connection.account
   const [pendingAction, setPendingAction] =
     useState<SliceWalletPendingAction>(null)
   const [error, setError] = useState<string | null>(null)
@@ -275,30 +268,28 @@ const AvailableSliceWalletProvider = ({
       notifications,
       setError,
       setPendingAction,
-      wagmiConfig,
+      connection,
       walletChain
     })
 
   useEffect(() => {
     let active = true
     let unsubscribe: (() => void) | undefined
-    const connector = wagmiConfig.connectors.find(
-      (candidate) => candidate.id === sliceWalletConnectorId
-    )
-    if (connector === undefined) return
-    void connector.getProvider().then((provider) => {
-      if (!active || provider === undefined) return
-      const sliceProvider = provider as SliceWalletEip1193Provider
-      setConnectorPendingCeremony(sliceProvider.pendingCeremony)
-      unsubscribe = sliceProvider.subscribePendingCeremony(
-        setConnectorPendingCeremony
-      )
-    })
+    void connection
+      .getProvider()
+      .then((provider) => {
+        if (!active) return
+        setConnectorPendingCeremony(provider.pendingCeremony)
+        unsubscribe = provider.subscribePendingCeremony(
+          setConnectorPendingCeremony
+        )
+      })
+      .catch(() => undefined)
     return () => {
       active = false
       unsubscribe?.()
     }
-  }, [wagmiConfig.connectors])
+  }, [connection])
 
   useEffect(() => {
     const previousAccount = previousSliceAccountRef.current
@@ -381,23 +372,14 @@ const AvailableSliceWalletProvider = ({
     [managementExecutionSession]
   )
 
-  const getConnectorProvider = useCallback(async () => {
-    const connector = wagmiConfig.connectors.find(
-      (candidate) => candidate.id === sliceWalletConnectorId
-    )
-    const provider = await connector?.getProvider()
-    if (provider === undefined) {
-      throw new Error("Slice Wallet provider is unavailable.")
-    }
-    return provider as SliceWalletEip1193Provider
-  }, [wagmiConfig.connectors])
-
   const continueInPopup = useCallback(
     () =>
       featurePendingCeremony !== null
         ? ceremonyBroker.continueInPopup()
-        : getConnectorProvider().then((provider) => provider.continueInPopup()),
-    [ceremonyBroker, featurePendingCeremony, getConnectorProvider]
+        : connection
+            .getProvider()
+            .then((provider) => provider.continueInPopup()),
+    [ceremonyBroker, connection, featurePendingCeremony]
   )
 
   const cancelPendingCeremony = useCallback(() => {
@@ -405,10 +387,10 @@ const AvailableSliceWalletProvider = ({
       ceremonyBroker.cancel()
       return
     }
-    void getConnectorProvider().then((provider) =>
-      provider.cancelPendingCeremony()
-    )
-  }, [ceremonyBroker, featurePendingCeremony, getConnectorProvider])
+    void connection
+      .getProvider()
+      .then((provider) => provider.cancelPendingCeremony())
+  }, [ceremonyBroker, connection, featurePendingCeremony])
 
   const enableExecutionSession = useSliceWalletCheckoutEnablement({
     activeWalletRef,
@@ -583,10 +565,9 @@ const AvailableSliceWalletProvider = ({
 }
 
 export function SliceWalletProvider(props: SliceWalletProviderProps) {
-  const wagmiConfig = useConfig()
   const usesLocalSliceChain =
-    !wagmiConfig.chains.some((chain) => chain.id === base.id) &&
-    wagmiConfig.chains.some((chain) => chain.id === anvil.id)
+    !props.connection.chainIds.includes(base.id) &&
+    props.connection.chainIds.includes(anvil.id)
   const walletPolicy = getSliceWalletChainPolicy(
     usesLocalSliceChain ? anvil.id : base.id
   )

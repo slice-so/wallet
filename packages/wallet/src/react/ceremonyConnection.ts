@@ -1,6 +1,5 @@
 "use client"
 
-import { type Config, connect } from "@wagmi/core"
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { Chain } from "viem"
 import { createSliceWalletCeremonyBroker } from "../ceremony/broker"
@@ -8,16 +7,15 @@ import type { createSliceWalletCeremonyKernelAccount } from "../ceremony/rootAcc
 import { acquireSliceWalletSignerFrame } from "../frame/client"
 import type {
   SliceWalletCeremonyBroker,
-  SliceWalletEip1193Provider,
   SliceWalletSignerFrameClient
 } from "../types"
 import type {
+  SliceWalletConnectionAdapter,
   SliceWalletCredentialRecord,
   SliceWalletManagementLifecycle,
   SliceWalletNotifications,
   SliceWalletPendingAction
 } from "../types/react"
-import { sliceWalletConnectorId } from "../wagmi"
 
 type RootAccount = Awaited<
   ReturnType<typeof createSliceWalletCeremonyKernelAccount>
@@ -95,7 +93,7 @@ export const useSliceWalletCeremonyActions = ({
   notifications,
   setError,
   setPendingAction,
-  wagmiConfig,
+  connection,
   walletChain
 }: {
   activeWalletRef: {
@@ -109,7 +107,7 @@ export const useSliceWalletCeremonyActions = ({
   notifications?: SliceWalletNotifications
   setError: (value: string | null) => void
   setPendingAction: (value: SliceWalletPendingAction) => void
-  wagmiConfig: Config
+  connection: SliceWalletConnectionAdapter
   walletChain: Chain
 }) => {
   const runWalletAction = useCallback(
@@ -137,39 +135,16 @@ export const useSliceWalletCeremonyActions = ({
     [notifications, setError, setPendingAction]
   )
 
-  const getSliceConnector = useCallback(() => {
-    const connector = wagmiConfig.connectors.find(
-      (candidate) => candidate.id === sliceWalletConnectorId
-    )
-    if (connector === undefined) {
-      throw new Error("Slice Wallet connector is not configured.")
-    }
-    return connector
-  }, [wagmiConfig.connectors])
-
-  const getSliceProvider = useCallback(async () => {
-    const provider = await getSliceConnector().getProvider()
-    if (provider === undefined) {
-      throw new Error("Slice Wallet provider is unavailable.")
-    }
-    return provider as SliceWalletEip1193Provider
-  }, [getSliceConnector])
-
   const connectWallet = useCallback(async () => {
-    const result = await connect(wagmiConfig, {
-      chainId: walletChain.id,
-      connector: getSliceConnector()
-    })
-    const account = result.accounts[0]
-    if (account === undefined) throw new Error("Slice Wallet did not connect.")
+    await connection.connect(walletChain.id)
     notifications?.success?.("Slice wallet ready")
-  }, [getSliceConnector, notifications, wagmiConfig, walletChain.id])
+  }, [connection, notifications, walletChain.id])
 
   const signInWallet = useCallback(async () => {
     const activeWallet = activeWalletRef.current
     if (!activeWallet) throw new Error("Unlock your Slice wallet first.")
     try {
-      await (await getSliceProvider()).requestSession()
+      await (await connection.getProvider()).requestSession()
       if (managementEnabled) {
         await managementLifecycle.retryHydration(
           activeWallet.kernelAccount.address
@@ -186,7 +161,7 @@ export const useSliceWalletCeremonyActions = ({
     }
   }, [
     activeWalletRef,
-    getSliceProvider,
+    connection,
     managementEnabled,
     managementLifecycle,
     notifications,
@@ -197,7 +172,7 @@ export const useSliceWalletCeremonyActions = ({
     setPendingAction("login")
     setError(null)
     try {
-      await (await getSliceProvider()).switchAccount()
+      await (await connection.getProvider()).switchAccount()
       return true
     } catch (caughtError) {
       const message =
@@ -210,7 +185,7 @@ export const useSliceWalletCeremonyActions = ({
     } finally {
       setPendingAction(null)
     }
-  }, [getSliceProvider, notifications, setError, setPendingAction])
+  }, [connection, notifications, setError, setPendingAction])
 
   return {
     createWallet: () => runWalletAction("create", connectWallet),

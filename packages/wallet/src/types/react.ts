@@ -11,6 +11,7 @@ import type {
   SliceWalletManagementExecutionClient
 } from "./commerce"
 import type { SliceWalletPendingCeremony } from "./pendingCeremony"
+import type { SliceWalletEip1193Provider } from "./provider"
 export type SliceWalletStatus =
   | "error"
   | "idle"
@@ -212,10 +213,18 @@ export type SliceWalletNotifications = {
   success?: (message: string) => void
 }
 
+export type SliceWalletConnectionAdapter = {
+  account: Address | null
+  chainIds: readonly number[]
+  connect: (chainId: number) => Promise<Address>
+  getProvider: () => Promise<SliceWalletEip1193Provider>
+}
+
 export type SliceWalletProviderProps = {
   adapters?: SliceWalletProviderAdapters
   ceremonyMode?: SliceWalletCeremonyMode
   children: ReactNode
+  connection: SliceWalletConnectionAdapter
   notifications?: SliceWalletNotifications
 }
 

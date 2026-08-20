@@ -20,8 +20,8 @@ What sets it apart:
   origin-bound browser key initiates and the Slice co-signer independently
   validates the calls, live prices, USD allowance, and gas bounds before
   signing.
-- **Standard surfaces.** EIP-1193/EIP-6963/EIP-5792 provider, Viem actions, and
-  a wagmi connector; EIP-5792 is the only call envelope.
+- **Standard surfaces.** EIP-1193/EIP-6963/EIP-5792 provider and Viem actions;
+  EIP-5792 is the only call envelope.
 - **User-held recovery.** A recovery code (or encrypted bundle) restores root
   control through an onchain timelock, even when Slice services are down.
 
@@ -36,8 +36,7 @@ exactly the bytes this SDK signs.
 npm install @slicekit/wallet
 ```
 
-The `react` and `wagmi` entry points additionally require their peer
-dependencies (`react`, `wagmi`, `@wagmi/core`, `@tanstack/react-query`).
+The `react` entry point additionally requires its `react` peer dependency.
 
 ## Security Boundary
 
@@ -53,17 +52,18 @@ dependencies (`react`, `wagmi`, `@wagmi/core`, `@tanstack/react-query`).
 
 - `@slicekit/wallet`: account, credential, ceremony, frame, registry, and recovery primitives.
 - `@slicekit/wallet/execution`: Kernel passkey execution, commerce policies, bundler/paymaster handlers, and execution clients.
-- `@slicekit/wallet/react`: the Slice wallet provider and account/session hooks.
+- `@slicekit/wallet/react`: the Slice wallet provider and account/session hooks;
+  the provider accepts a framework-neutral connection adapter with the current
+  account, admitted chain IDs, provider access, and a connect action.
 - `@slicekit/wallet/frame`: the minimal signer-frame controller, protocol, session store, calls, and policy graph.
 - `@slicekit/wallet/permissions`: public permission builders, Slice EIP-1193 actions, and the Viem wallet-client extension.
 - `@slicekit/wallet/provider`: portable provider and EIP-6963 discovery.
-- `@slicekit/wallet/wagmi`: wagmi connector plus permission actions and React hooks.
 - `@slicekit/wallet/recovery`: Timelock recovery operations. The root entry point also exports the primary password-manager recovery-code format and the advanced encrypted-file alternative.
 - `@slicekit/wallet/server`: server-only P-256 verification and proposal helpers.
 
 ## Provider
 
-Use `sliceWallet()` from `@slicekit/wallet/wagmi`, or `createSliceWalletProvider()` from `@slicekit/wallet/provider`. The canonical factory fixes the identity origin and all account security metadata; applications may select admitted chains and override only RPC and bundler transports. A request may supply its own ERC-7677 paymaster URL and canonical JSON-compatible context.
+Use `createSliceWalletProvider()` from `@slicekit/wallet/provider`. The canonical factory fixes the identity origin and all account security metadata; applications may select admitted chains and override only RPC and bundler transports. A request may supply its own ERC-7677 paymaster URL and canonical JSON-compatible context. Applications using Wagmi integrate through `@slicekit/id/wagmi`, which adapts this public provider.
 
 The provider exposes root-confirmed account, signature, and call methods plus Slice's versioned session-permission methods. Slice does not advertise ERC-7710 or ERC-7715 compatibility. Calls that do not match an active Slice permission are sent through the visible root ceremony.
 
@@ -221,59 +221,6 @@ if (current) {
   await client.revokePermission(rotated.permissionId)
 }
 ```
-
-### Wagmi and React
-
-```ts
-import { createConfig, http } from "@wagmi/core"
-import {
-  createSliceWalletPermissionRequest,
-  nativeTransferPermission
-} from "@slicekit/wallet/permissions"
-import {
-  sliceWallet
-} from "@slicekit/wallet/wagmi"
-import { useGrantSliceWalletPermissions } from "@slicekit/wallet/react"
-import { useSendCalls } from "wagmi"
-import { base } from "wagmi/chains"
-
-const onboardingPermission = createSliceWalletPermissionRequest({
-  expiry: Math.floor(Date.now() / 1_000) + 3_600,
-  rateLimit: { count: 1, intervalSec: 3_600 },
-  rules: [
-    nativeTransferPermission({
-      maximumValue: 1_000_000_000_000_000n,
-      recipient: "0x1111111111111111111111111111111111111111"
-    })
-  ]
-})
-
-export const config = createConfig({
-  chains: [base],
-  connectors: [
-    sliceWallet({
-      chainIds: [base.id],
-      grantPermissions: { ...onboardingPermission, optional: true }
-    })
-  ],
-  transports: { [base.id]: http() }
-})
-
-export function Actions() {
-  const grant = useGrantSliceWalletPermissions({
-    config,
-    origin: window.location.origin
-  })
-  const calls = useSendCalls({ config })
-
-  // Standalone grant remains available when scope is unknown at onboarding.
-  // grant.mutate(onboardingPermission)
-  // calls.sendCalls({ calls: [{ to, data, value }] })
-  return null
-}
-```
-
-The exported Wagmi grant, list, rotate, and revoke actions follow the same provider contract. Their hooks key cached lists by connector, exact origin, account, and chain and invalidate those lists after successful lifecycle mutations.
 
 ## EIP-5792 execution semantics
 

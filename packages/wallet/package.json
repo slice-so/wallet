@@ -1,7 +1,7 @@
 {
   "name": "@slicekit/wallet",
   "version": "0.1.0",
-  "description": "Self-custodial passkey smart wallet SDK: Kernel v4 accounts, scoped app permissions, promptless checkout, EIP-1193/6963/5792 provider and wagmi connector",
+  "description": "Framework-neutral self-custodial passkey smart wallet SDK with Kernel v4 accounts, scoped app permissions, and an EIP-1193/6963/5792 provider",
   "license": "(MIT OR Apache-2.0)",
   "type": "module",
   "main": "./dist/esm/index.js",
@@ -107,16 +107,6 @@
       "types": "./dist/esm/server.d.ts",
       "import": "./dist/esm/server.js",
       "default": "./dist/esm/server.js"
-    },
-    "./wagmi": {
-      "development": {
-        "types": "./src/wagmi.ts",
-        "import": "./src/wagmi.ts",
-        "default": "./src/wagmi.ts"
-      },
-      "types": "./dist/esm/wagmi.d.ts",
-      "import": "./dist/esm/wagmi.js",
-      "default": "./dist/esm/wagmi.js"
     }
   },
   "files": [
@@ -149,22 +139,10 @@
     "viem": "catalog:"
   },
   "peerDependencies": {
-    "@tanstack/react-query": "catalog:",
-    "@wagmi/core": "catalog:",
-    "react": ">=18",
-    "wagmi": "catalog:"
+    "react": ">=18"
   },
   "peerDependenciesMeta": {
-    "@tanstack/react-query": {
-      "optional": true
-    },
-    "@wagmi/core": {
-      "optional": true
-    },
     "react": {
-      "optional": true
-    },
-    "wagmi": {
       "optional": true
     }
   },
@@ -173,9 +151,7 @@
     "@slicekit/commerce": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
-    "@wagmi/core": "catalog:",
-    "fake-indexeddb": "^6.2.4",
-    "wagmi": "catalog:"
+    "fake-indexeddb": "^6.2.4"
   },
   "repository": {
     "type": "git",
