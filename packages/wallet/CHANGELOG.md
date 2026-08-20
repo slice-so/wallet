@@ -1,5 +1,12 @@
 # @slicekit/wallet
 
+## 0.1.1
+### Patch Changes
+
+
+
+- [`1055fd7`](https://github.com/slice-so/monorepo/commit/1055fd7361470a978122954eaf209ecf4042a5b9) Thanks [@jacopo-eth](https://github.com/jacopo-eth)! - Make Slice ID the sole Wagmi integration, consolidate the low-level Wallet protocol into Wallet, and require canonical Kernel deployment-profile identifiers.
+
 ## 0.1.0
 ### Minor Changes
 
