@@ -100,29 +100,27 @@ describe("KernelUUPS v4 account prediction", () => {
     expect(account.address).toBe(vectors[2][1])
   })
 
-  test("derives identical identity and factory calldata for every r1 selector", async () => {
+  test("derives identical identity and factory calldata for the default and exact r1 selector", async () => {
     const results = await Promise.all(
-      [undefined, "0.4.0", "Kernel 0.4.0", "slice-kernel-v4-ep09-r1"].map(
-        async (factoryVersion) => {
-          const recovery = await buildRecoveryPermissionInitConfig({
-            chainId: parameters.chainId,
-            ...(factoryVersion === undefined ? {} : { factoryVersion }),
-            recoverySignerAddress: parameters.recoverySignerAddress
-          })
-          const account = await createSliceWalletRegisteredKernelAccount({
-            chainId: parameters.chainId,
-            client,
-            credential: parameters.credential,
-            ...(factoryVersion === undefined ? {} : { factoryVersion }),
-            index: 7n,
-            initConfig: recovery.initConfig
-          })
-          return {
-            address: account.address,
-            factoryArgs: await account.getFactoryArgs()
-          }
+      [undefined, "slice-kernel-v4-ep09-r1"].map(async (factoryVersion) => {
+        const recovery = await buildRecoveryPermissionInitConfig({
+          chainId: parameters.chainId,
+          ...(factoryVersion === undefined ? {} : { factoryVersion }),
+          recoverySignerAddress: parameters.recoverySignerAddress
+        })
+        const account = await createSliceWalletRegisteredKernelAccount({
+          chainId: parameters.chainId,
+          client,
+          credential: parameters.credential,
+          ...(factoryVersion === undefined ? {} : { factoryVersion }),
+          index: 7n,
+          initConfig: recovery.initConfig
+        })
+        return {
+          address: account.address,
+          factoryArgs: await account.getFactoryArgs()
         }
-      )
+      })
     )
     expect(results).toEqual(results.map(() => results[0]))
   })

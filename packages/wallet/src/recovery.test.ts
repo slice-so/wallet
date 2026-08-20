@@ -206,7 +206,7 @@ describe("Kernel v4 recovery calldata", () => {
   test("device promotion targets the selected profile's root validator", async () => {
     const deployment = resolveSliceWalletDeployment({
       chainId: 8453,
-      factoryVersion: "0.4.0"
+      factoryVersion: "slice-kernel-v4-ep09-r1"
     })
     const calls = await buildDevicePromotionCalls({
       account: account as Address,
@@ -216,7 +216,7 @@ describe("Kernel v4 recovery calldata", () => {
         multicall: async () => [true, true]
       } as never,
       credential,
-      factoryVersion: "0.4.0",
+      factoryVersion: "slice-kernel-v4-ep09-r1",
       newRootCredential: credential,
       signer: toSliceWalletDeviceSigner({
         account: privateKeyToAccount(`0x${"11".repeat(32)}`),

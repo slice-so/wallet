@@ -163,13 +163,13 @@ describe("recovery credential handoff", () => {
   it("matches only the deployment profile requested by the recovery app", () => {
     expect(
       isSliceWalletRecoveryHandoffDeploymentProfileMatch({
-        factoryVersion: "0.4.0",
+        factoryVersion: "slice-kernel-v4-ep09-r1",
         requestFactoryVersion: "slice-kernel-v4-ep09-r1"
       })
     ).toBe(true)
     expect(
       isSliceWalletRecoveryHandoffDeploymentProfileMatch({
-        factoryVersion: "0.4.0",
+        factoryVersion: "slice-kernel-v4-ep09-r1",
         requestFactoryVersion: "slice-kernel-future"
       })
     ).toBe(false)

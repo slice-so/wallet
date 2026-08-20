@@ -8,17 +8,20 @@ import {
 } from "./deploymentProfiles"
 
 describe("Slice Wallet deployment profiles", () => {
-  test("resolves only the exact immutable r1 id and legacy aliases", () => {
-    for (const selector of [
-      sliceWalletKernelV4Ep09R1DeploymentProfileId,
-      "0.4.0",
-      "Kernel 0.4.0"
-    ]) {
-      expect(resolveSliceWalletDeploymentProfile(selector).id).toBe(
+  test("resolves only the exact immutable r1 id", () => {
+    expect(
+      resolveSliceWalletDeploymentProfile(
         sliceWalletKernelV4Ep09R1DeploymentProfileId
-      )
-    }
-    for (const selector of ["4.0", "kernel 0.4.0", " 0.4.0", "0.4.1"]) {
+      ).id
+    ).toBe(sliceWalletKernelV4Ep09R1DeploymentProfileId)
+    for (const selector of [
+      "0.4.0",
+      "Kernel 0.4.0",
+      "4.0",
+      "kernel 0.4.0",
+      " 0.4.0",
+      "0.4.1"
+    ]) {
       expect(() => resolveSliceWalletDeploymentProfile(selector)).toThrow(
         "Unknown Slice Wallet deployment profile"
       )
@@ -27,7 +30,10 @@ describe("Slice Wallet deployment profiles", () => {
 
   test("gives an explicit persisted selector precedence over the default", () => {
     expect(
-      resolveSliceWalletDeploymentProfile("0.4.0", "future-default").id
+      resolveSliceWalletDeploymentProfile(
+        sliceWalletKernelV4Ep09R1DeploymentProfileId,
+        "future-default"
+      ).id
     ).toBe(sliceWalletKernelV4Ep09R1DeploymentProfileId)
     expect(() =>
       resolveSliceWalletDeploymentProfile(undefined, "future-default")
@@ -39,12 +45,11 @@ describe("Slice Wallet deployment profiles", () => {
     expect(sliceWalletCurrentDeploymentProfileId).toBe(profile.id)
     expect(Object.isFrozen(sliceWalletDeploymentProfiles)).toBe(true)
     expect(Object.isFrozen(profile)).toBe(true)
-    expect(Object.isFrozen(profile.aliases)).toBe(true)
     expect(Object.isFrozen(profile.contractKeys)).toBe(true)
 
     const deployment = resolveSliceWalletDeployment({
       chainId: 8453,
-      factoryVersion: "0.4.0"
+      factoryVersion: sliceWalletKernelV4Ep09R1DeploymentProfileId
     })
     expect(deployment.factory).toBe(
       deployment.manifest.contracts.kernelFactory.address

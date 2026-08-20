@@ -5,7 +5,6 @@ export type SliceWalletDeploymentProfileId = "slice-kernel-v4-ep09-r1"
 
 export type SliceWalletDeploymentProfile = {
   readonly accountRecipe: "kernel-v4-erc1967-webauthn-root-r1"
-  readonly aliases: readonly string[]
   readonly contractKeys: {
     readonly erc6492BootstrapFactory: keyof Pick<
       SliceWalletContractDeployments,

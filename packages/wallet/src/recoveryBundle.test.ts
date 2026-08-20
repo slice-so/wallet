@@ -37,7 +37,7 @@ const payload = {
   credentialId: "credential-id",
   credentialPublicKey: `0x04${"22".repeat(64)}`,
   factory: "0xa299a4efee7bbfb2ea5668b30218c45fff78356c",
-  factoryVersion: "Kernel 0.4.0",
+  factoryVersion: sliceWalletCurrentDeploymentProfileId,
   recoveryPermissionId: "0x12345678",
   recoveryPrivateKey: `0x${"33".repeat(32)}`,
   recoverySignerAddress: "0x3333333333333333333333333333333333333333"
@@ -57,10 +57,17 @@ describe("Slice Wallet recovery bundle", () => {
         bundle,
         passphrase: "correct horse battery staple"
       })
-    ).resolves.toEqual({
-      ...payload,
-      factoryVersion: sliceWalletCurrentDeploymentProfileId
-    })
+    ).resolves.toEqual(payload)
+  })
+
+  it("rejects legacy deployment-profile aliases", async () => {
+    await expect(
+      encryptSliceWalletRecoveryBundle({
+        argon2id: testKdf,
+        passphrase: "correct horse battery staple",
+        payload: { ...payload, factoryVersion: "Kernel 0.4.0" }
+      })
+    ).rejects.toThrow("Unknown Slice Wallet deployment profile")
   })
 
   it("rejects a wrong passphrase, AAD tampering, and unknown fields", async () => {

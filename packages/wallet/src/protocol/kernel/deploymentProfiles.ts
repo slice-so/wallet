@@ -14,7 +14,6 @@ export const sliceWalletKernelV4Ep09R1DeploymentProfileId =
 export const sliceWalletCurrentDeploymentProfileId =
   sliceWalletKernelV4Ep09R1DeploymentProfileId
 
-const kernelV4Ep09R1Aliases = Object.freeze(["0.4.0", "Kernel 0.4.0"] as const)
 const kernelV4Ep09R1ContractKeys = Object.freeze({
   erc6492BootstrapFactory: "erc6492BootstrapFactory",
   entryPoint: "entryPoint",
@@ -25,7 +24,6 @@ const kernelV4Ep09R1ContractKeys = Object.freeze({
 
 const kernelV4Ep09R1Profile = Object.freeze({
   accountRecipe: "kernel-v4-erc1967-webauthn-root-r1",
-  aliases: kernelV4Ep09R1Aliases,
   contractKeys: kernelV4Ep09R1ContractKeys,
   entryPointVersion: "0.9",
   id: sliceWalletKernelV4Ep09R1DeploymentProfileId,
@@ -46,9 +44,7 @@ export const resolveSliceWalletDeploymentProfile = (
 ): SliceWalletDeploymentProfile => {
   const selectedProfile = selector ?? defaultSelector
   const profile = sliceWalletDeploymentProfiles.find(
-    (candidate) =>
-      candidate.id === selectedProfile ||
-      candidate.aliases.some((alias) => alias === selectedProfile)
+    (candidate) => candidate.id === selectedProfile
   )
   if (profile === undefined) {
     throw new SliceWalletDeploymentProfileError(

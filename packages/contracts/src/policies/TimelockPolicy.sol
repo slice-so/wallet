@@ -32,7 +32,7 @@ import {SIG_VALIDATION_FAILED_UINT} from "src/types/Constants.sol";
  *      SECURITY: Signer Trust Assumption
  *      This policy trusts whichever signer module is configured on the permission.
  *      It does NOT independently verify who signed the UserOp — that responsibility
- *      belongs to the signer module (e.g., ECDSASigner, WeightedECDSASigner).
+ *      belongs to the signer module (e.g., ECDSASigner, WeightedP256Signer).
  *      The signer validates the signature; this policy only enforces the timelock.
  *
  *      SECURITY: Nonce Isolation

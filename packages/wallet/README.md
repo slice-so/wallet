@@ -108,9 +108,9 @@ The public provider remains a beta surface until the signer contract audit, Base
 
 ## Deployment profiles
 
-The retained `factoryVersion` field is a deployment-profile selector, not only a Kernel version label. The current immutable profile is `slice-kernel-v4-ep09-r1`: Kernel `0.4.0` behind its pinned ERC-1967 proxy and factory, EntryPoint `0.9`, and the current WebAuthn root validator. Its exact legacy aliases, `0.4.0` in registry rows and `Kernel 0.4.0` in recovery bundles, permanently resolve to the same r1 recipe. Unknown values are rejected.
+The retained `factoryVersion` field is a deployment-profile selector, not only a Kernel version label. The current immutable profile is `slice-kernel-v4-ep09-r1`: Kernel `0.4.0` behind its pinned ERC-1967 proxy and factory, EntryPoint `0.9`, and the current WebAuthn root validator. Only the exact profile ID is accepted; raw Kernel version labels and unknown values are rejected.
 
-Profiles and aliases are immutable. A future deployment is added under a new profile ID and new manifest facts; it does not edit r1 or reinterpret a persisted credential. New credentials and recovery bundles store the canonical profile ID. Legacy fixed-format recovery codes have no selector field and are explicitly pinned to r1 rather than following whichever profile becomes the default.
+Profiles are immutable. A future deployment is added under a new profile ID and new manifest facts; it does not edit r1 or reinterpret a persisted credential. New credentials and recovery bundles store the canonical profile ID. Fixed-format recovery codes have no selector field and therefore default to the current profile; this is defaulting, not alias resolution.
 
 Recovery restores WebAuthn root authority through the existing timelocked uninstall/install lifecycle. It does not authorize account self-calls, arbitrary module administration, or implementation upgrades. Any future implementation upgrade requires a separate root-authorized ceremony and an independently audited, code-hash-pinned admission target.
 
