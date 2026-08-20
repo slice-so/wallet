@@ -17,10 +17,21 @@ export const createSliceWalletProvider = (
       : () => {}
 
   return {
-    ...provider,
+    cancelPendingCeremony: provider.cancelPendingCeremony,
+    connectWithSession: provider.connectWithSession,
+    continueInPopup: provider.continueInPopup,
     destroy: () => {
       stopAnnouncement()
       provider.destroy()
-    }
+    },
+    get pendingCeremony() {
+      return provider.pendingCeremony
+    },
+    on: provider.on,
+    removeListener: provider.removeListener,
+    request: provider.request,
+    requestSession: provider.requestSession,
+    subscribePendingCeremony: provider.subscribePendingCeremony,
+    switchAccount: provider.switchAccount
   }
 }
