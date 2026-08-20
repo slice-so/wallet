@@ -1,6 +1,33 @@
 # `@slicekit/wallet`
 
-Portable Kernel wallet primitives for Slice and third-party applications, including account construction, signer-frame and ceremony clients, normalized commerce policies, recovery, React integration, EIP-1193/EIP-6963/EIP-5792 provider support, and a wagmi connector.
+Slice Wallet is a self-custodial smart wallet rooted in a passkey. A WebAuthn
+credential controls a Kernel v4 account on ERC-4337 EntryPoint v0.9, with the
+same counterfactual address on Ethereum, OP Mainnet, Base, and Arbitrum One —
+no seed phrase, no root EOA, no vendor SDKs.
+
+What sets it apart:
+
+- **Apps can never reach a key.** Root passkey ceremonies run only in the
+  visible, origin-isolated Slice ID signer surface, and promptless session keys
+  are non-extractable P-256 `CryptoKey`s owned by that frame. Embedding
+  applications receive public metadata and signatures, never key material.
+- **Promptless execution is policy-scoped and onchain-enforced.** Applications
+  request narrow grants — call rules, amount caps, a rate limit, an expiry —
+  that install as Kernel permissions; anything outside an active grant falls
+  back to the visible root ceremony.
+- **Checkout is a 2-of-2 authority with fiat-denominated allowances.** The
+  origin-bound browser key initiates and the Slice co-signer independently
+  validates the calls, live prices, USD allowance, and gas bounds before
+  signing.
+- **Standard surfaces.** EIP-1193/EIP-6963/EIP-5792 provider, Viem actions, and
+  a wagmi connector; EIP-5792 is the only call envelope.
+- **User-held recovery.** A recovery code (or encrypted bundle) restores root
+  control through an onchain timelock, even when Slice services are down.
+
+The wallet protocol itself — policies, chain manifests, hashes, and the entire
+Kernel v4 encoding — lives in
+[`@slicekit/wallet-primitives`](../wallet-primitives), so servers verify
+exactly the bytes this SDK signs.
 
 ## Security Boundary
 
