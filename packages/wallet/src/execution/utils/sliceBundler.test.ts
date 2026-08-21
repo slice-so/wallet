@@ -394,7 +394,7 @@ describe("slice bundler", () => {
     ] as const) {
       const body = createBundlerBody(method, callData, {
         factory: sliceKernelAddresses.factory,
-        factoryData: "0x1234"
+        factoryData: canonicalKernelFactoryData
       })
       const fetchBundler = mock(
         async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -599,7 +599,7 @@ describe("slice bundler", () => {
     })
     const body = createBundlerBody("eth_sendUserOperation", callData, {
       factory: sliceKernelAddresses.factory,
-      factoryData: "0x1234"
+      factoryData: canonicalKernelFactoryData
     })
     const fetchBundler = mock(async () =>
       Response.json({
@@ -1075,7 +1075,7 @@ describe("slice bundler", () => {
     })
     const body = createBundlerBody("eth_sendUserOperation", callData, {
       factory: sliceKernelAddresses.factory,
-      factoryData: "0x1234"
+      factoryData: canonicalKernelFactoryData
     })
     const fetchBundler = mock(async () =>
       Response.json({
