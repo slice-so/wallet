@@ -22,18 +22,34 @@ export const getSliceWalletExecutionSafetyEnvelope = (chainId: number) =>
     ? localExecutionSafetyEnvelope
     : getSliceWalletChainPolicy(chainId).executionSafety
 
-export const getSliceWalletUserOperationGasExposure = (
+/**
+ * Declared per-operation gas ceilings (pre-verification, verification, call,
+ * and paymaster phases) that the EntryPoint enforces when charging prefund.
+ */
+export const getSliceWalletUserOperationDeclaredGasCeiling = (
   userOperation: SliceWalletUnsignedUserOperation
 ) => {
   const paymasterVerificationGasLimit =
     userOperation.paymasterVerificationGasLimit ?? 0n
   const paymasterPostOpGasLimit = userOperation.paymasterPostOpGasLimit ?? 0n
+  return (
+    userOperation.callGasLimit +
+    userOperation.preVerificationGas +
+    userOperation.verificationGasLimit +
+    paymasterVerificationGasLimit +
+    paymasterPostOpGasLimit
+  )
+}
+
+export const getSliceWalletUserOperationGasExposure = (
+  userOperation: SliceWalletUnsignedUserOperation
+) => {
   const accountGas =
     userOperation.callGasLimit +
     userOperation.preVerificationGas +
     userOperation.verificationGasLimit
   const prefundGas =
-    accountGas + paymasterVerificationGasLimit + paymasterPostOpGasLimit
+    getSliceWalletUserOperationDeclaredGasCeiling(userOperation)
 
   return {
     maxNativeCostWei: accountGas * userOperation.maxFeePerGas,

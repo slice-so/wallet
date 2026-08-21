@@ -36,9 +36,11 @@ import {
   metaMaskDelegatorExecutionAbi,
   type SliceSenderAccountSnapshot,
   sliceKernelAddresses,
+  sliceKernelWebAuthnValidatorAddress,
   sliceWalletKernelAddresses
 } from "../../protocol/index"
 import {
+  kernelFactoryAbi,
   kernelPermissionExecuteSelector,
   kernelValidationManagementAbi
 } from "../../protocol/kernel"
@@ -132,6 +134,25 @@ const kernelSenderAccountSnapshot: SliceSenderAccountSnapshot = {
     size: 32
   })
 }
+const undeployedSenderAccountSnapshot: SliceSenderAccountSnapshot = {
+  code: "0x",
+  erc1967Implementation: pad("0x00", { size: 32 })
+}
+const canonicalKernelFactoryData = encodeFunctionData({
+  abi: kernelFactoryAbi,
+  args: [
+    [
+      {
+        internalData: "0x",
+        module: sliceKernelWebAuthnValidatorAddress,
+        moduleData: "0x1234",
+        moduleType: 1n
+      }
+    ],
+    0n
+  ],
+  functionName: "deploy"
+})
 
 const createSlicerValidationFetch = ({
   address,
@@ -1005,6 +1026,43 @@ describe("slice paymaster", () => {
     }
   })
 
+  it("does not treat an arbitrary deployment call as Slice account creation", async () => {
+    const body = createPaymasterBody(
+      encodeSmartWalletExecuteBatch([
+        {
+          target: productsModuleAddress,
+          data: encodeSetProductType()
+        },
+        {
+          target: untrustedFactoryAddress,
+          data: "0x1234"
+        }
+      ]),
+      {
+        entryPoint: entryPoint09Address,
+        factory: sliceKernelAddresses.factory,
+        factoryData: canonicalKernelFactoryData
+      }
+    )
+    const fetchPaymaster = mock<typeof fetch>()
+
+    const response = await handleTestPaymasterRequest(
+      new Request("https://shop.test/api/paymaster", {
+        body: JSON.stringify(body),
+        method: "POST"
+      }),
+      {
+        paymasterRpcUrl: paymasterUrl,
+        fetchPaymaster,
+        fetchSenderAccount: mock(async () => undeployedSenderAccountSnapshot),
+        requireVerifiedSender: true
+      }
+    )
+
+    expect(response.status).toBe(403)
+    expect(fetchPaymaster).not.toHaveBeenCalled()
+  })
+
   it("rejects unsupported EntryPoint addresses", async () => {
     const body = createPaymasterBody(
       encodeSmartWalletExecute({
@@ -1202,7 +1260,7 @@ describe("slice paymaster", () => {
       const body = createPaymasterBody(callData, {
         entryPoint: entryPoint09Address,
         factory,
-        factoryData: "0x1234"
+        factoryData: canonicalKernelFactoryData
       })
       const fetchPaymaster = mock(
         async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -1224,13 +1282,44 @@ describe("slice paymaster", () => {
         }),
         {
           paymasterRpcUrl: paymasterUrl,
-          fetchPaymaster
+          fetchPaymaster,
+          fetchSenderAccount: mock(async () => undeployedSenderAccountSnapshot),
+          requireVerifiedSender: true
         }
       )
 
       expect(response.status).toBe(200)
       expect(fetchPaymaster).toHaveBeenCalledTimes(1)
     }
+  })
+
+  it("rejects noncanonical deployment data through the Slice Kernel factory", async () => {
+    const body = createPaymasterBody(
+      encodeSmartWalletExecute({
+        target: productsModuleAddress,
+        data: encodeSetProductType()
+      }),
+      {
+        entryPoint: entryPoint09Address,
+        factory: sliceKernelAddresses.factory,
+        factoryData: "0x1234"
+      }
+    )
+    const fetchPaymaster = mock<typeof fetch>()
+
+    const response = await handleTestPaymasterRequest(
+      new Request("https://shop.test/api/paymaster", {
+        body: JSON.stringify(body),
+        method: "POST"
+      }),
+      {
+        paymasterRpcUrl: paymasterUrl,
+        fetchPaymaster
+      }
+    )
+
+    expect(response.status).toBe(403)
+    expect(fetchPaymaster).not.toHaveBeenCalled()
   })
 
   it("rejects deployment user operations through unknown factories", async () => {

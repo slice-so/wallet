@@ -223,7 +223,7 @@ const isCanonicalSliceWalletFactoryData = ({
 
 export const sliceUserOperationPolicyDescription = [
   "The UserOperation callData must decode as a supported smart-account execution envelope.",
-  "Deployment UserOperations must use the pinned Slice KernelUUPS factory.",
+  "Deployment UserOperations must use the pinned Slice KernelUUPS factory with canonical Slice account deployment data.",
   "Every account call must be an accepted Slice protocol action, any FundsModule or indexed slicer action, a generated Slice hook, or an ERC20 approve whose spender is the chain's ProductsModule, FundsModule, or configured paymaster.",
   "Root-validated (passkey) UserOperations from a verified Slice Kernel sender may additionally install or remove allowlisted Kernel v4 permission modules, checkpoint the install nonce, rotate its WebAuthn root, and cancel its own recovery timelock proposal.",
   "EIP-7702 authorizations must be chain-scoped to the request and use a configured trusted delegate contract.",
@@ -461,19 +461,6 @@ const isAddressInList = (address: Address, addresses: readonly Address[]) =>
       normalizeAddress(listedAddress) === normalizeAddress(address)
   )
 
-const isAdmittedSliceFactory = ({
-  entryPoint,
-  factory
-}: {
-  entryPoint: Address
-  factory: Address
-}) =>
-  sliceDeploymentAdmissions.some(
-    (admission) =>
-      isAddressEqual(admission.entryPoint, entryPoint) &&
-      isAddressEqual(admission.factory, factory)
-  )
-
 const isAcceptedEip7702Authorization = ({
   authorization,
   requestChainId,
@@ -512,30 +499,47 @@ const isAcceptedUserOperationFactory = ({
   entryPoint: Address
   userOperation: SliceUserOperation
 }) => {
-  if (
-    userOperation.factory !== undefined &&
-    userOperation.factory !== eip7702FactoryMarker &&
-    !isAdmittedSliceFactory({
-      entryPoint,
-      factory: userOperation.factory
-    })
-  ) {
+  const hasInitCode =
+    userOperation.initCode !== undefined && userOperation.initCode !== "0x"
+
+  if (userOperation.factory !== undefined && hasInitCode) {
     return false
   }
 
-  if (userOperation.initCode !== undefined && userOperation.initCode !== "0x") {
+  if (userOperation.factory !== undefined) {
+    if (userOperation.factory === eip7702FactoryMarker) return true
+
+    return (
+      userOperation.factoryData !== undefined &&
+      isCanonicalSliceWalletFactoryData({
+        entryPoint,
+        factory: userOperation.factory,
+        factoryData: userOperation.factoryData
+      })
+    )
+  }
+
+  if (userOperation.factoryData !== undefined) return false
+
+  if (hasInitCode) {
     const initCodeFactoryHexLength = 2 + 20 * 2
-    if (userOperation.initCode.length < initCodeFactoryHexLength) {
+    if (
+      userOperation.initCode === undefined ||
+      userOperation.initCode.length <= initCodeFactoryHexLength
+    ) {
       return false
     }
 
     const initCodeFactory = sliceHex(userOperation.initCode, 0, 20)
-    if (
-      !isAddress(initCodeFactory) ||
-      !isAdmittedSliceFactory({ entryPoint, factory: initCodeFactory })
-    ) {
-      return false
-    }
+    const initCodeFactoryData = sliceHex(userOperation.initCode, 20)
+    return (
+      isAddress(initCodeFactory) &&
+      isCanonicalSliceWalletFactoryData({
+        entryPoint,
+        factory: initCodeFactory,
+        factoryData: initCodeFactoryData
+      })
+    )
   }
 
   return true
@@ -571,8 +575,8 @@ const hasDeploymentArgs = (userOperation: SliceUserOperation) =>
 /**
  * Verifies the sender is an account whose execution semantics are known:
  * a deployed account matching an accepted code hash (and pinned ERC-1967
- * implementation where required), an undeployed account carrying deployment
- * args (already pinned to the Slice Kernel factories), or an EIP-7702
+ * implementation where required), an undeployed account carrying canonical
+ * Slice Kernel deployment args, or an EIP-7702
  * account delegating to an allowlisted contract. Without this, the policy
  * decodes callData on trust — a malicious account contract could declare
  * accepted calls and execute something else.
