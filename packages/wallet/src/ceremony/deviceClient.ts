@@ -38,7 +38,6 @@ const manageSliceWalletDevice = async (
   const idUrl = new URL(`/ceremony/device-${action}`, new URL(idOrigin).origin)
   idUrl.searchParams.set("account", account)
   idUrl.searchParams.set("chainId", String(chainId))
-  idUrl.searchParams.set("nonce", nonce)
   if (credentialIdHash !== undefined) {
     idUrl.searchParams.set("credentialIdHash", credentialIdHash)
   }

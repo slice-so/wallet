@@ -242,6 +242,11 @@ describe("openSliceWalletCeremonyChannel", () => {
       "publickey-credentials-create https://id.slice.so; publickey-credentials-get https://id.slice.so"
     )
     expect(iframe.src).toContain("/dialog/grant")
+    const ceremonyUrl = new URL(iframe.src)
+    expect(ceremonyUrl.searchParams.has("nonce")).toBe(false)
+    expect(new URLSearchParams(ceremonyUrl.hash.slice(1)).get("nonce")).toBe(
+      nonce
+    )
     expect(iframeVisibilityAtMount).toBe("hidden")
     expect(iframe.style.visibility).toBe("visible")
     expect(dialog.style.pointerEvents).toBe("auto")

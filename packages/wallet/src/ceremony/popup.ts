@@ -243,7 +243,10 @@ export const openSliceWalletCeremonyChannel = ({
   if (resolvedMode === "iframe" && getCeremonyRoute(url.href) !== undefined) {
     url.pathname = url.pathname.replace(/^\/ceremony\//, "/dialog/")
   }
-  url.searchParams.set("nonce", nonce)
+  url.searchParams.delete("nonce")
+  const fragmentParameters = new URLSearchParams(url.hash.slice(1))
+  fragmentParameters.set("nonce", nonce)
+  url.hash = fragmentParameters.toString()
   let surface: SliceWalletCeremonySurface
   if (resolvedMode === "iframe") {
     if (document === undefined) {

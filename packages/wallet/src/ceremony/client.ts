@@ -1,4 +1,4 @@
-import { bytesToHex, type Hex } from "viem"
+import { bytesToHex } from "viem"
 import type {
   SliceWalletFrameSession,
   SliceWalletPermissionAuthorization,
@@ -59,18 +59,15 @@ const batchPolicyFingerprint = (session: SliceWalletFrameSession) =>
 
 const getCeremonyUrl = ({
   idOrigin,
-  nonce,
   session
 }: {
   idOrigin: string
-  nonce: Hex
   session: SliceWalletFrameSession
 }) => {
   const url = new URL("/ceremony/grant", new URL(idOrigin).origin)
   url.searchParams.set("account", session.account)
   url.searchParams.set("chainId", String(session.chainId))
   url.searchParams.set("grantKind", session.grantKind)
-  url.searchParams.set("nonce", nonce)
   return url
 }
 
@@ -108,11 +105,9 @@ export const assertSliceWalletBatchSessions = (
 
 const getBatchCeremonyUrl = ({
   idOrigin,
-  nonce,
   sessions
 }: {
   idOrigin: string
-  nonce: Hex
   sessions: readonly SliceWalletFrameSession[]
 }) => {
   const first = assertSliceWalletBatchSessions(sessions)
@@ -123,7 +118,6 @@ const getBatchCeremonyUrl = ({
     sessions.map(({ chainId }) => String(chainId)).join(",")
   )
   url.searchParams.set("grantKind", first.grantKind)
-  url.searchParams.set("nonce", nonce)
   return url
 }
 
@@ -202,7 +196,6 @@ export const authorizeSliceWalletSession = async ({
       nonce,
       path: getCeremonyUrl({
         idOrigin: normalizedIdOrigin,
-        nonce,
         session
       }).href,
       popupName: "slice-wallet-grant",
@@ -292,7 +285,6 @@ export const authorizeSliceWalletSessions = async ({
       nonce,
       path: getBatchCeremonyUrl({
         idOrigin: normalizedIdOrigin,
-        nonce,
         sessions
       }).href,
       popupName: "slice-wallet-grants",
