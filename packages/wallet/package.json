@@ -28,6 +28,16 @@
       "import": "./dist/esm/protocol/index.js",
       "default": "./dist/esm/protocol/index.js"
     },
+    "./assets": {
+      "development": {
+        "types": "./src/assets.ts",
+        "import": "./src/assets.ts",
+        "default": "./src/assets.ts"
+      },
+      "types": "./dist/esm/assets.d.ts",
+      "import": "./dist/esm/assets.js",
+      "default": "./dist/esm/assets.js"
+    },
     "./execution": {
       "development": {
         "types": "./src/execution.ts",

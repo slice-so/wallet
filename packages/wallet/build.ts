@@ -7,6 +7,7 @@ await buildPackage({
   bundleDeclarations: bundleDeclarationTypes,
   entrypoints: [
     "./src/index.ts",
+    "./src/assets.ts",
     "./src/protocol/index.ts",
     "./src/protocol/kernel.ts",
     "./src/protocol/policy.ts",
