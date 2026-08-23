@@ -171,6 +171,7 @@
   "devDependencies": {
     "@slice/typescript-config": "workspace:*",
     "@slicekit/commerce": "workspace:*",
+    "@typescript/typescript6": "6.0.2",
     "@types/node": "catalog:",
     "fake-indexeddb": "^6.2.4"
   },

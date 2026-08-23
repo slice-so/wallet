@@ -1,5 +1,7 @@
 import { relative, resolve, sep } from "node:path"
-import ts from "typescript"
+// TypeScript 7 has no programmatic compiler API; the boundary checks need
+// type-only import detection, so they pin the official TS6 compiler package.
+import ts from "@typescript/typescript6"
 
 const defaultPackageRoot = resolve(import.meta.dir, "..")
 
