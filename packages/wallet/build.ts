@@ -1,7 +1,7 @@
 import { readdirSync } from "node:fs"
-import { buildPackage } from "../../build"
-import { bundleDeclarationTypes } from "../../build-declarations"
 import { dependencies } from "./package.json"
+import { buildPackage } from "./tooling/build"
+import { bundleDeclarationTypes } from "./tooling/build-declarations"
 
 await buildPackage({
   bundleDeclarations: bundleDeclarationTypes,
