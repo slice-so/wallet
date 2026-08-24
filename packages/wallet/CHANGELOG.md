@@ -1,5 +1,18 @@
 # @slicekit/wallet
 
+## 0.1.2
+
+### Patch Changes
+
+- Add exact root UserOperation simulation with before/after native/ERC-20 and
+  allowance snapshots, standard ERC-721/ERC-1155 transfer decoding, separate
+  EntryPoint gas accounting, and failure-tolerant structured data for trusted
+  confirmation surfaces.
+
+- Allow paymaster sponsorship for canonical counterfactual Slice ID account
+  deployment combined with accepted Slice operations, while rejecting malformed
+  factory payloads and arbitrary deployment calls.
+
 ## 0.1.1
 ### Patch Changes
 

@@ -1,6 +1,6 @@
 {
   "name": "@slicekit/wallet",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Low-level Slice Wallet runtime for Kernel v4 passkey accounts, isolated signing ceremonies, policy-scoped execution, provider integration, and recovery",
   "license": "(MIT OR Apache-2.0)",
   "type": "module",
