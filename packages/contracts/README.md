@@ -9,7 +9,7 @@ tests and scripts needed to reproduce them.
 This project owns five deployed contracts:
 
 - `AuthorizationRevocationRegistry`: issuer-scoped revocation IDs and monotonic
-  epochs for Slice ID's ERC-8128 delegation profile.
+  epochs for ERC-8128 delegation profiles.
 - `SlicerRegistryPolicy`: an additional Kernel policy that restricts dynamic
   store-management targets to canonical Slicer contracts and rejects role
   mutation paths.

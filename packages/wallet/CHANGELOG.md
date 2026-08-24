@@ -5,7 +5,7 @@
 
 
 
-- [`1055fd7`](https://github.com/slice-so/monorepo/commit/1055fd7361470a978122954eaf209ecf4042a5b9) Thanks [@jacopo-eth](https://github.com/jacopo-eth)! - Make Slice ID the sole Wagmi integration, consolidate the low-level Wallet protocol into Wallet, and require canonical Kernel deployment-profile identifiers.
+- [`1055fd7`](https://github.com/slice-so/monorepo/commit/1055fd7361470a978122954eaf209ecf4042a5b9) Thanks [@jacopo-eth](https://github.com/jacopo-eth)! - Remove the Wallet-owned Wagmi integration, consolidate the low-level Wallet protocol into Wallet, and require canonical Kernel deployment-profile identifiers.
 
 ## 0.1.0
 ### Minor Changes
@@ -30,10 +30,6 @@
     aware registration (`factoryVersion`), `allowCdpFallback` for the bundler,
     explicit paymaster upstreams, and no `@zerodev/*` dependencies. Protocol
     builders moved to `@slicekit/wallet-primitives` are no longer exported here.
-  - `@slicekit/id`: the React provider treats the new `unavailable` wallet status
-    as not connected.
-
-
 - [`a8dbf83`](https://github.com/slice-so/monorepo/commit/a8dbf83de625cabb976d35c374c77e8938e94138) Thanks [@jacopo-eth](https://github.com/jacopo-eth)! - Shared-domain ownership refactor for the public Slice repositories.
   
   - `@slicekit/commerce` (new): the commerce domain model previously spread across
@@ -53,10 +49,6 @@
     execution grant, chain policy and allowance primitives.
   - `@slicekit/wallet`: no longer re-exports primitives; import them from
     `@slicekit/wallet-primitives`. The `./policy` subpath is removed.
-  - `@slicekit/id-primitives` (new): delegation contracts, server verifier,
-    session primitives and server-safe types split out of `@slicekit/id`.
-  - `@slicekit/id`: keeps the browser client, React, wagmi and Next integrations;
-    `./delegation` and `./server` moved to `@slicekit/id-primitives`.
   - `@slicekit/erc8128`: adds `assertErc8128PrivateKey`.
 
 ### Patch Changes

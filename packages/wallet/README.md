@@ -1,9 +1,14 @@
 # `@slicekit/wallet`
 
-The low-level Slice Wallet implementation consumed by [`@slicekit/id`](https://www.npmjs.com/package/@slicekit/id). It constructs
-and operates passkey-controlled Kernel v4 smart accounts, implements the trusted
-signing and signer-frame protocols, routes policy-scoped execution, exposes a
-portable EIP-1193/EIP-5792 provider, and implements wallet recovery.
+The low-level Slice Wallet implementation. It constructs and operates
+passkey-controlled Kernel v4 smart accounts, implements the trusted signing and
+signer-frame protocols, routes policy-scoped execution, exposes a portable
+EIP-1193/EIP-5792 provider, and implements wallet recovery.
+
+> [!WARNING]
+> `@slicekit/wallet` is in beta and has not been audited. Do not use it in
+> production or to secure funds you cannot afford to lose. Expect breaking
+> changes before a stable release.
 
 ## Package scope
 
@@ -24,15 +29,13 @@ portable EIP-1193/EIP-5792 provider, and implements wallet recovery.
 It deliberately does not own:
 
 - Wagmi connectors, Wagmi permission actions, application authentication,
-  delegated API sessions, or identity UI — those belong to `@slicekit/id`;
+  delegated API sessions, or identity UI;
 - Solidity modules and deployment facts — those live in the sibling
   [`contracts`](https://github.com/slice-so/wallet/tree/main/packages/contracts)
   project.
 
-Install this package directly when building a wallet host, Slice ID signer
-surface, recovery surface, custom provider/Viem integration, or wallet
-infrastructure. A typical Wagmi application should install `@slicekit/id`
-instead.
+Install this package directly when building a wallet host, signer surface,
+recovery surface, custom provider/Viem integration, or wallet infrastructure.
 
 ## Installation
 
@@ -48,9 +51,10 @@ npm install @slicekit/wallet
 - Delegated calls are checked against the same canonical policy descriptor in the ceremony, frame, SDK, and onchain permission.
 - Unsupported or opaque calls stay root-confirmed.
 - General ERC-8128 API sessions use a separate server-held EOA and receive no onchain wallet authority.
-- The account ceremony can exchange one opaque extension value. Slice ID owns
-  preparation, parsing, binding, completion, and persistence of its [ERC-8128](https://github.com/slice-so/erc8128)
-  session; Wallet does not understand authentication claims or delegations.
+- The account ceremony can exchange one opaque extension value. The host owns
+  preparation, parsing, binding, completion, and persistence of any
+  [ERC-8128](https://github.com/slice-so/erc8128) session; Wallet does not
+  understand authentication claims or delegations.
 
 ## Entry Points
 
@@ -76,7 +80,7 @@ npm install @slicekit/wallet
   rotation operations.
 - `@slicekit/wallet/server`: server-safe account reconstruction, wallet
   credential classification, registry proof, device, root, and recovery
-  helpers plus the protocol server surface. It is not the Slice ID request
+  helpers plus the protocol server surface. It is not an application request
   verifier.
 - `@slicekit/wallet/argon2id`: the Argon2id implementation used to decrypt or
   create advanced recovery bundles without loading it into the default entry
@@ -98,7 +102,7 @@ intent.
 
 ## Provider
 
-Use `createSliceWalletProvider()` from `@slicekit/wallet/provider`. The canonical factory fixes the identity origin and all account security metadata; applications may select admitted chains and override only RPC and bundler transports. A request may supply its own ERC-7677 paymaster URL and canonical JSON-compatible context. Applications using Wagmi integrate through `@slicekit/id/wagmi`, which adapts this public provider.
+Use `createSliceWalletProvider()` from `@slicekit/wallet/provider`. The canonical factory fixes the identity origin and all account security metadata; applications may select admitted chains and override only RPC and bundler transports. A request may supply its own ERC-7677 paymaster URL and canonical JSON-compatible context. Applications using Wagmi can adapt this public provider through a custom connector.
 
 The provider exposes root-confirmed account, signature, and call methods plus Slice's versioned session-permission methods. Slice does not advertise ERC-7710 or ERC-7715 compatibility. Calls that do not match an active Slice permission are sent through the visible root ceremony.
 
@@ -118,7 +122,7 @@ Recovery restores WebAuthn root authority through the existing timelocked uninst
 
 ## Generic app permissions
 
-Any HTTPS application can request a generic permission. Loopback HTTP origins are accepted for local development. Integration requires no Slice app registration, API key, app ID, or domain approval; Slice ID handles the visible consent ceremony and metadata persistence.
+Any HTTPS application can request a generic permission. Loopback HTTP origins are accepted for local development. Integration requires no Slice app registration, API key, app ID, or domain approval; the wallet host handles the visible consent ceremony and metadata persistence.
 
 The application supplies one to 16 rules built from four templates:
 
@@ -277,7 +281,7 @@ Checkout allowances use canonical unsigned 128-bit micro-USD strings and either 
 
 ## Recovery
 
-Recovery secrets remain exclusively in the user-held recovery code or encrypted bundle. Recovery can rotate control after its timelock even when Slice ID and service databases are unavailable; it does not reverse confirmed transactions. After control is restored, the recovered root can revoke both generic and Slice service permissions onchain, and registry reconciliation records the resulting lifecycle state when services return.
+Recovery secrets remain exclusively in the user-held recovery code or encrypted bundle. Recovery can rotate control after its timelock even when hosted wallet services and their databases are unavailable; it does not reverse confirmed transactions. After control is restored, the recovered root can revoke both generic and Slice service permissions onchain, and registry reconciliation records the resulting lifecycle state when services return.
 
 The recovery application is designed to be downloaded as a reproducible,
 checksummed release artifact and served from localhost without `id.slice.so`.
